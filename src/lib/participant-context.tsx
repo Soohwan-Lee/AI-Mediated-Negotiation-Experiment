@@ -55,52 +55,82 @@ function newParticipantKey(): string {
   return `P-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
 }
 
+/**
+ * Reads the browser-only session sources (URL params + localStorage). Called
+ * lazily from useState so it runs once on the client without an effect.
+ * Returns the server-safe empty state during SSR.
+ */
+function readInitialState(): ParticipantState {
+  if (typeof window === "undefined") {
+    return {
+      participantKey: null,
+      prolific: { prolificPid: null, studyId: null, sessionId: null },
+      assignment: null,
+      consented: false,
+      ready: false,
+    };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const urlProlific: ProlificContext = {
+    prolificPid: params.get("PROLIFIC_PID"),
+    studyId: params.get("STUDY_ID"),
+    sessionId: params.get("SESSION_ID"),
+  };
+
+  const stored = window.localStorage.getItem(STORAGE_KEY);
+  if (!stored) {
+    return {
+      participantKey: null,
+      prolific: urlProlific,
+      assignment: null,
+      consented: false,
+      ready: true,
+    };
+  }
+
+  const parsed = JSON.parse(stored) as {
+    participantKey: string;
+    prolific: ProlificContext;
+    consented: boolean;
+  };
+
+  return {
+    participantKey: parsed.participantKey,
+    // Fresh URL params win if present, otherwise keep what we stored.
+    prolific: urlProlific.prolificPid ? urlProlific : parsed.prolific,
+    // Loaded asynchronously below.
+    assignment: null,
+    consented: parsed.consented,
+    ready: true,
+  };
+}
+
 export function ParticipantProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [state, setState] = useState<ParticipantState>({
-    participantKey: null,
-    prolific: { prolificPid: null, studyId: null, sessionId: null },
-    assignment: null,
-    consented: false,
-    ready: false,
-  });
+  const [state, setState] = useState<ParticipantState>(readInitialState);
 
-  // Restore prior session + capture Prolific params on mount.
+  // Rehydrate the assignment for a returning participant. This is a genuine
+  // external-store read, so it belongs in an effect.
+  const restoredKey = state.participantKey;
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const prolific: ProlificContext = {
-      prolificPid: params.get("PROLIFIC_PID"),
-      studyId: params.get("STUDY_ID"),
-      sessionId: params.get("SESSION_ID"),
+    if (!restoredKey) return;
+    let cancelled = false;
+    void getStore()
+      .loadAssignment(restoredKey)
+      .then((assignment) => {
+        if (cancelled || !assignment) return;
+        setState((s) =>
+          s.assignment ? s : { ...s, assignment },
+        );
+      });
+    return () => {
+      cancelled = true;
     };
-
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as {
-        participantKey: string;
-        prolific: ProlificContext;
-        consented: boolean;
-      };
-      getStore()
-        .loadAssignment(parsed.participantKey)
-        .then((assignment) => {
-          setState({
-            participantKey: parsed.participantKey,
-            // Fresh URL params win if present, otherwise keep what we stored.
-            prolific: prolific.prolificPid ? prolific : parsed.prolific,
-            assignment,
-            consented: parsed.consented,
-            ready: true,
-          });
-        });
-      return;
-    }
-
-    setState((s) => ({ ...s, prolific, ready: true }));
-  }, []);
+  }, [restoredKey]);
 
   const persist = useCallback(
     (next: Pick<ParticipantState, "participantKey" | "prolific" | "consented">) => {
@@ -172,6 +202,22 @@ export function ParticipantProvider({
     () => ({ ...state, beginStudy, logEvent, saveResponses }),
     [state, beginStudy, logEvent, saveResponses],
   );
+
+  // The initial state is read from localStorage + URL params, which do not
+  // exist during SSR. Rendering children only after mount keeps the server and
+  // first client paint identical and avoids a hydration mismatch.
+  if (!state.ready) {
+    return (
+      <ParticipantContext.Provider value={value}>
+        <div
+          aria-busy="true"
+          className="flex min-h-screen items-center justify-center text-sm text-neutral-500"
+        >
+          Loading…
+        </div>
+      </ParticipantContext.Provider>
+    );
+  }
 
   return (
     <ParticipantContext.Provider value={value}>
