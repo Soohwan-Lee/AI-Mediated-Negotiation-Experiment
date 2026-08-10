@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI-Mediated Negotiation Experiment
 
-## Getting Started
+Online experiment platform for a study on AI proxies in workplace negotiation.
+Scaffold stage: layout and flow are complete; task payoffs, the negotiation
+state machine, and Supabase persistence are not yet wired.
 
-First, run the development server:
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Works with no API key — the counterpart falls back to canned text so the whole
+flow is walkable.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+OPENAI_API_KEY=sk-...          # optional; without it, AI turns are stubbed
+OPENAI_MODEL=gpt-5.6-sol       # optional; defaults to this
+```
 
-## Learn More
+## Participant flow
 
-To learn more about Next.js, take a look at the following resources:
+Consent → Background → Instructions → Practice 1 → Session 1 → Practice 2 →
+Session 2 → Questionnaire → Manipulation check → Reward decision →
+Debriefing → Completion code
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Each participant does one Direct session and one Proxy session (Delegate or
+Explorer), with task and order counterbalanced. Assignment happens on entry
+and is never shown to the participant.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Layout
 
-## Deploy on Vercel
+```
+src/lib/         types, study config, assignment, store, tasks
+src/lib/ai/      prompts, structured-action schema, guardrail validator
+src/app/api/     assign, counterpart, proxy-negotiation
+src/app/         one directory per flow page
+src/components/  shared UI and negotiation surfaces
+docs/            data model and Supabase integration plan
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See `CLAUDE.md` for design constraints and `docs/DATA_MODEL.md` for the
+planned schema.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy
+
+Vercel. Set the environment variables above in project settings.
