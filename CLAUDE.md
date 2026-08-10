@@ -70,13 +70,43 @@ Currently `lib/assignment.ts#claimSlot` is a deterministic local stand-in.
 Pages never touch persistence or the network directly — they go through
 `lib/store.ts` and `lib/participant-context.tsx`.
 
+## Verified against the live model
+
+Tested end to end against `gpt-5.6-sol` (2026-08-11). Findings worth keeping:
+
+- **No `temperature`.** This model family rejects the parameter with a 400.
+  Use `reasoning.effort` instead — see `lib/ai/config.ts`.
+- **Reasoning block comes first.** The Responses payload emits a `reasoning`
+  block before the `message` block, so `output[0]` has no text. Select by
+  `type === "message"`. Also keep `max_output_tokens` generous, since reasoning
+  tokens draw from the same budget and a tight cap returns `incomplete` with
+  no message at all.
+- **~7.5s per AI turn.** The AI-AI loop runs both sides, so wall-clock is
+  roughly `maxTurnsPerSide * 2 * 7.5s`. Vercel caps functions at 60s on Hobby
+  and 300s on Pro. The turn budget is currently 4 per side to stay inside
+  that; raising it needs Pro or a one-turn-per-request split.
+- **The counterpart needs its own mandate.** Without one it mirrors whatever
+  the participant's Proxy opens with instead of negotiating. See
+  `counterpartMandateSummary` in `lib/tasks.ts` — placeholder derived from the
+  role scorecard, to be replaced with the researcher-defined mandate.
+- **Guardrail asymmetry confirmed.** The same unentrusted-issue action is
+  blocked for Delegate and allowed for Explorer when marked as an agent
+  option; red lines, fabricated personal facts, and invalid options all block.
+
 ## Still open (from Methods §B3)
 
-Task payoff matrices and BATNAs · negotiation state machine (the review screen
-currently derives terms from the mandate as a placeholder) · turn budget and
-temperature · whether Explorer options are pre-generated or validator-bounded
-at runtime · fixed vs. jittered counterpart delay · final IRB language,
-payment amount, and Prolific completion code.
+**Negotiation state machine — the largest gap.** Termination is currently
+decided by the model, which in testing accepted a package on its own terms
+after two exchanges. Methods §Negotiation state machine requires the state
+machine to own acceptance, concession points, and challenge timing so
+trajectories are comparable across conditions. The candidate agreement on the
+review screen is likewise derived from the mandate as a placeholder rather than
+from negotiated terms.
+
+Also open: task payoff matrices and BATNAs · turn budget and reasoning effort ·
+whether Explorer options are pre-generated or validator-bounded at runtime ·
+fixed vs. jittered counterpart delay · final IRB language, payment amount, and
+Prolific completion code.
 
 ## Conventions
 
@@ -84,3 +114,13 @@ payment amount, and Prolific completion code.
 - Anything that would leak the design gets a comment explaining why it is
   written that way — the next person will not have this context.
 - `npm run build` and `npx eslint src --max-warnings=0` must pass before commit.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

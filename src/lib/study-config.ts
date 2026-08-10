@@ -36,11 +36,20 @@ export const STAGE_MINUTES = {
   rewardDecision: 2,
 } as const;
 
-/** Turn budget for a single main session. TBD pending pilot. */
+/**
+ * Turn budget for a single main session. TBD pending pilot.
+ *
+ * LATENCY NOTE: measured ~7.5s per AI turn against gpt-5.6-sol at low
+ * reasoning effort. The AI-AI loop runs both sides, so wall-clock is roughly
+ * `maxTurnsPerSide * 2 * 7.5s`. Vercel caps serverless functions at 60s on
+ * Hobby and 300s on Pro, so a budget above ~4 turns per side REQUIRES either
+ * the Pro plan or splitting the loop into one request per turn. See
+ * docs/DATA_MODEL.md and the note in api/proxy-negotiation.
+ */
 export const NEGOTIATION = {
   sessionSeconds: 10 * 60,
   practiceSeconds: 5 * 60,
-  maxTurnsPerSide: 8,
+  maxTurnsPerSide: 4,
   /** Delay before the counterpart replies, ms. TBD: fixed vs. jitter. */
   counterpartDelayMs: 2500,
 } as const;

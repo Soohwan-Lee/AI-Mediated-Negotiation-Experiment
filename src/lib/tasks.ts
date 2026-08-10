@@ -15,7 +15,7 @@
  *    frontier, critical-requirement cost, reading length, and difficulty
  */
 
-import type { NegotiationTask, TaskId } from "./types";
+import type { NegotiationTask, Role, TaskId } from "./types";
 
 const TASK_A: NegotiationTask = {
   id: "task_a",
@@ -283,4 +283,38 @@ const TASKS: Record<TaskId, NegotiationTask> = {
 
 export function getTask(id: TaskId): NegotiationTask {
   return TASKS[id];
+}
+
+/**
+ * The counterpart principal's mandate, held constant across conditions
+ * (Methods §Controlled counterpart and participant belief: "role-specific
+ * principal mandates, critical requirements, and reservation thresholds are
+ * kept identical across conditions").
+ *
+ * Without this the counterpart Proxy has nothing of its own to argue for and
+ * simply mirrors whatever the participant's Proxy opens with, which would
+ * destroy the negotiation. Derived from the role's own scorecard: aim for the
+ * best option for that role, concede no further than the midpoint.
+ *
+ * PLACEHOLDER: replace with the researcher-defined mandate once the payoff
+ * matrix and BATNAs are fixed.
+ */
+export function counterpartMandateSummary(
+  taskId: TaskId,
+  counterpartRole: Role,
+): string {
+  const task = getTask(taskId);
+  return task.issues
+    .map((issue) => {
+      const ranked = [...issue.options].sort(
+        (a, b) => b.points[counterpartRole] - a.points[counterpartRole],
+      );
+      const ideal = ranked[0];
+      const floor = ranked[Math.min(1, ranked.length - 1)];
+      const critical = issue.criticalFor === counterpartRole;
+      return `- ${issue.label}: aim for "${ideal.label}", do not concede past "${floor.label}"${
+        critical ? " (this one matters a great deal to you)" : ""
+      }`;
+    })
+    .join("\n");
 }

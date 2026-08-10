@@ -13,13 +13,22 @@
 import { NextResponse } from "next/server";
 import { generateAction } from "@/lib/ai/client";
 import { validateAction } from "@/lib/ai/validator";
-import { getTask } from "@/lib/tasks";
+import { counterpartMandateSummary, getTask } from "@/lib/tasks";
 import { NEGOTIATION } from "@/lib/study-config";
 import type { Mandate, Role, TaskId, TranscriptMessage } from "@/lib/types";
 
 export const runtime = "nodejs";
-/** AI-AI loops can exceed the default serverless timeout. */
-export const maxDuration = 120;
+/**
+ * AI-AI loops are long-running. Measured ~7.5s per turn, so the full loop is
+ * roughly maxTurnsPerSide * 2 * 7.5s.
+ *
+ * DEPLOYMENT CONSTRAINT: Vercel caps this at 60s on Hobby and 300s on Pro. The
+ * current 4-turns-per-side budget lands near 60s, which is uncomfortably close
+ * to the Hobby ceiling. Before data collection, either deploy on Pro or split
+ * the loop so each request advances a single turn and the client drives the
+ * sequence — the latter also lets the waiting screen show real progress.
+ */
+export const maxDuration = 300;
 
 interface RequestBody {
   taskId: TaskId;
@@ -79,9 +88,10 @@ export async function POST(request: Request) {
           issues: task.issues,
           mandateSummary: isParticipantSide
             ? mandateSummary(body.mandate, body.taskId)
-            : // The counterpart principal's mandate is researcher-defined and
-              // held constant across conditions.
-              "[Researcher-defined counterpart mandate — TBD with the payoff matrix]",
+            : // Researcher-defined and held constant across conditions. Without
+              // its own mandate the counterpart Proxy mirrors whatever the
+              // participant's Proxy opens with instead of negotiating.
+              counterpartMandateSummary(body.taskId, counterpartRole),
           turnsRemaining,
         },
         history,
@@ -118,6 +128,12 @@ export async function POST(request: Request) {
         content: action.rationale,
       });
 
+      // TODO(state-machine): termination is currently decided by the model,
+      // which in testing accepted a package on its own terms after two
+      // exchanges. Methods §Negotiation state machine requires the state
+      // machine to own this: acceptance should be gated on the offer clearing
+      // both sides' reservation thresholds, with fixed challenge and
+      // concession points so trajectories are comparable across conditions.
       if (action.actionType === "accept") break;
     }
 

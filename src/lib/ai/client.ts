@@ -66,7 +66,8 @@ export async function generateAction(
     },
     body: JSON.stringify({
       model: AI_CONFIG.model,
-      temperature: AI_CONFIG.temperature,
+      // No `temperature`: this model family rejects it (see ai/config.ts).
+      reasoning: { effort: AI_CONFIG.reasoningEffort },
       max_output_tokens: AI_CONFIG.maxOutputTokens,
       input: [
         { role: "system", content: system },
@@ -89,17 +90,43 @@ export async function generateAction(
     );
   }
 
-  const payload = (await response.json()) as {
-    output_text?: string;
-    output?: Array<{ content?: Array<{ text?: string }> }>;
-  };
+  const payload = (await response.json()) as ResponsesPayload;
+  const text = extractOutputText(payload);
 
-  const text =
-    payload.output_text ?? payload.output?.[0]?.content?.[0]?.text ?? "";
+  if (!text) {
+    throw new Error(
+      `LLM returned no message content (status: ${payload.status ?? "unknown"})`,
+    );
+  }
 
   return {
     action: JSON.parse(text) as NegotiationAction,
     stubbed: false,
     raw: payload,
   };
+}
+
+interface ResponsesPayload {
+  status?: string;
+  output_text?: string;
+  output?: Array<{
+    type?: string;
+    content?: Array<{ type?: string; text?: string }>;
+  }>;
+}
+
+/**
+ * Pulls the assistant's text out of a Responses API payload.
+ *
+ * This model emits a `reasoning` block BEFORE the `message` block, so indexing
+ * output[0] returns reasoning with no text. Select by block type instead.
+ */
+function extractOutputText(payload: ResponsesPayload): string {
+  if (payload.output_text) return payload.output_text;
+
+  const message = payload.output?.find((o) => o.type === "message");
+  const chunk = message?.content?.find(
+    (c) => c.type === "output_text" || typeof c.text === "string",
+  );
+  return chunk?.text ?? "";
 }
