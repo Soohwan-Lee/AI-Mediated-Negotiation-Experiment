@@ -188,8 +188,20 @@ export type RatificationChoice = "ratify" | "request_revision" | "reject";
 // Survey
 // ---------------------------------------------------------------------------
 
+/**
+ * A single stored answer. Most items are a scale point or a choice, but some
+ * blocks (initial preference, mandate summaries) store an issue-keyed map.
+ */
+export type ResponseValue =
+  | string
+  | number
+  | boolean
+  | null
+  | string[]
+  | Record<string, string | number | null>;
+
 /** Keyed by item id (e.g. "FNE1", "SAFE2_R"). */
-export type SurveyResponses = Record<string, string | number | string[] | null>;
+export type SurveyResponses = Record<string, ResponseValue>;
 
 // ---------------------------------------------------------------------------
 // Event log
