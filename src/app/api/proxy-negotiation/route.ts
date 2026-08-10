@@ -15,20 +15,25 @@ import { generateAction } from "@/lib/ai/client";
 import { validateAction } from "@/lib/ai/validator";
 import { counterpartMandateSummary, getTask } from "@/lib/tasks";
 import { NEGOTIATION } from "@/lib/study-config";
-import type { Mandate, Role, TaskId, TranscriptMessage } from "@/lib/types";
+import type {
+  Mandate,
+  Role,
+  Speaker,
+  TaskId,
+  TranscriptMessage,
+} from "@/lib/types";
 
 export const runtime = "nodejs";
 /**
- * AI-AI loops are long-running. Measured ~7.5s per turn, so the full loop is
- * roughly maxTurnsPerSide * 2 * 7.5s.
+ * ONE TURN PER REQUEST. The client calls this repeatedly, passing the turn
+ * index and the transcript so far, until the response reports `done`.
  *
- * DEPLOYMENT CONSTRAINT: Vercel caps this at 60s on Hobby and 300s on Pro. The
- * current 4-turns-per-side budget lands near 60s, which is uncomfortably close
- * to the Hobby ceiling. Before data collection, either deploy on Pro or split
- * the loop so each request advances a single turn and the client drives the
- * sequence — the latter also lets the waiting screen show real progress.
+ * This keeps each invocation at roughly one model call (~7.5s measured), well
+ * inside Vercel's 60s Hobby function limit, so the turn budget can grow
+ * without hitting a timeout. It also lets the waiting screen show real
+ * progress instead of a blind spinner.
  */
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 interface RequestBody {
   taskId: TaskId;
@@ -36,7 +41,14 @@ interface RequestBody {
   policy: "delegate" | "explorer";
   mandate: Mandate;
   sessionIndex: 1 | 2;
+  /** 0-based index of the turn to generate. */
+  turn: number;
+  /** Visible transcript so far, oldest first. */
+  history?: Array<{ speaker: Speaker; text: string }>;
 }
+
+/** Total turns across both sides. */
+const TOTAL_TURNS = NEGOTIATION.maxTurnsPerSide * 2;
 
 function mandateSummary(mandate: Mandate, taskId: TaskId): string {
   const task = getTask(taskId);
@@ -69,86 +81,99 @@ export async function POST(request: Request) {
 
   const counterpartRole: Role =
     body.participantRole === "leader" ? "member" : "leader";
-  const transcript: TranscriptMessage[] = [];
-  const guardrailBlocks: unknown[] = [];
-  let stubbedAny = false;
+  const turn = Number.isInteger(body.turn) ? body.turn : 0;
+  if (turn < 0 || turn >= TOTAL_TURNS) {
+    return NextResponse.json(
+      { error: `turn must be between 0 and ${TOTAL_TURNS - 1}` },
+      { status: 400 },
+    );
+  }
 
-  const history: Array<{ role: "assistant" | "user"; content: string }> = [];
+  // Even turns are the participant's Proxy, odd turns the counterpart's.
+  const isParticipantSide = turn % 2 === 0;
+  const actorRole = isParticipantSide ? body.participantRole : counterpartRole;
+
+  // Rebuild model history from the visible transcript, seen from the acting
+  // side: this agent's own prior messages are "assistant", the other side's
+  // are "user".
+  const history = (body.history ?? []).map((m) => ({
+    role: (m.speaker === "participant_proxy") === isParticipantSide
+      ? ("assistant" as const)
+      : ("user" as const),
+    content: m.text,
+  }));
 
   try {
-    for (let turn = 0; turn < NEGOTIATION.maxTurnsPerSide * 2; turn += 1) {
-      const isParticipantSide = turn % 2 === 0;
-      const turnsRemaining = NEGOTIATION.maxTurnsPerSide * 2 - turn;
-
-      const { action, stubbed } = await generateAction({
-        kind: body.policy,
-        ctx: {
-          task,
-          agentRole: isParticipantSide ? body.participantRole : counterpartRole,
-          issues: task.issues,
-          mandateSummary: isParticipantSide
-            ? mandateSummary(body.mandate, body.taskId)
-            : // Researcher-defined and held constant across conditions. Without
-              // its own mandate the counterpart Proxy mirrors whatever the
-              // participant's Proxy opens with instead of negotiating.
-              counterpartMandateSummary(body.taskId, counterpartRole),
-          turnsRemaining,
-        },
-        history,
-      });
-      stubbedAny = stubbedAny || stubbed;
-
-      const validation = validateAction(action, {
+    const { action, stubbed } = await generateAction({
+      kind: body.policy,
+      ctx: {
+        task,
+        agentRole: actorRole,
         issues: task.issues,
-        mandate: isParticipantSide ? body.mandate : undefined,
-        policy: body.policy,
-        actorRole: isParticipantSide ? body.participantRole : counterpartRole,
+        mandateSummary: isParticipantSide
+          ? mandateSummary(body.mandate, body.taskId)
+          : // Researcher-defined and held constant across conditions. Without
+            // its own mandate the counterpart Proxy mirrors whatever the
+            // participant's Proxy opens with instead of negotiating.
+            counterpartMandateSummary(body.taskId, counterpartRole),
+        turnsRemaining: TOTAL_TURNS - turn,
+        totalTurns: TOTAL_TURNS,
+      },
+      history,
+    });
+
+    const validation = validateAction(action, {
+      issues: task.issues,
+      mandate: isParticipantSide ? body.mandate : undefined,
+      policy: body.policy,
+      actorRole,
+    });
+
+    // Methods §Guardrail and validation: invalid actions never reach the
+    // transcript. A production implementation retries generation once before
+    // falling back to marking the issue unresolved.
+    if (!validation.valid && validation.disposition === "regenerate") {
+      return NextResponse.json({
+        turn,
+        skipped: true,
+        guardrailViolations: validation.violations,
+        done: turn + 1 >= TOTAL_TURNS,
+        stubbed,
       });
-
-      if (!validation.valid) {
-        // Methods §Guardrail and validation: invalid actions never reach the
-        // transcript. A production implementation retries generation once
-        // before falling back to marking the issue unresolved.
-        guardrailBlocks.push({ turn, violations: validation.violations });
-        if (validation.disposition === "regenerate") continue;
-      }
-
-      transcript.push({
-        id: `m${turn}`,
-        sessionIndex: body.sessionIndex,
-        speaker: isParticipantSide ? "participant_proxy" : "counterpart_proxy",
-        text: action.rationale,
-        createdAt: new Date().toISOString(),
-        // Stored for audit; the client must not render this.
-        internalProvenance: action.internalProvenance,
-      });
-
-      history.push({
-        role: isParticipantSide ? "assistant" : "user",
-        content: action.rationale,
-      });
-
-      // TODO(state-machine): termination is currently decided by the model,
-      // which in testing accepted a package on its own terms after two
-      // exchanges. Methods §Negotiation state machine requires the state
-      // machine to own this: acceptance should be gated on the offer clearing
-      // both sides' reservation thresholds, with fixed challenge and
-      // concession points so trajectories are comparable across conditions.
-      if (action.actionType === "accept") break;
     }
 
-    // TODO(supabase): persist transcript, guardrail blocks, and the candidate
-    // agreement server-side rather than returning provenance to the client.
+    // TODO(supabase): persist the structured action, internal provenance, and
+    // validator result here. They must not travel to the client.
+    const message: TranscriptMessage = {
+      id: `m${turn}`,
+      sessionIndex: body.sessionIndex,
+      speaker: isParticipantSide ? "participant_proxy" : "counterpart_proxy",
+      text: action.rationale,
+      createdAt: new Date().toISOString(),
+      internalProvenance: action.internalProvenance,
+    };
+
+    // TODO(state-machine): termination is currently decided by the model,
+    // which in testing accepted a package on its own terms after two
+    // exchanges. Methods §Negotiation state machine requires the state machine
+    // to own this: acceptance should be gated on the offer clearing both
+    // sides' reservation thresholds, with fixed challenge and concession
+    // points so trajectories are comparable across conditions.
+    const accepted = action.actionType === "accept";
+
+    // Provenance is stripped before the response leaves the server — the
+    // participant must not be able to distinguish agent options from entrusted
+    // content (Methods §Explorer Proxy condition).
+    const { internalProvenance, ...visible } = message;
+    void internalProvenance;
+
     return NextResponse.json({
-      // Provenance is stripped before it leaves the server — the participant
-      // must not be able to distinguish agent options from entrusted content
-      // (Methods §Explorer Proxy condition).
-      transcript: transcript.map(({ internalProvenance, ...rest }) => {
-        void internalProvenance;
-        return rest;
-      }),
-      guardrailBlockCount: guardrailBlocks.length,
-      stubbed: stubbedAny,
+      turn,
+      message: visible,
+      guardrailViolations: validation.valid ? [] : validation.violations,
+      done: accepted || turn + 1 >= TOTAL_TURNS,
+      totalTurns: TOTAL_TURNS,
+      stubbed,
     });
   } catch (error) {
     console.error("[proxy-negotiation]", error);

@@ -24,6 +24,46 @@ export interface PromptContext {
   /** Mandate summary text, for proxy agents representing the participant. */
   mandateSummary?: string;
   turnsRemaining: number;
+  /** Total turns this side gets, used to derive the negotiation phase. */
+  totalTurns?: number;
+}
+
+/**
+ * Pacing guidance derived from how far through the turn budget we are.
+ *
+ * INTERIM MEASURE. Methods §Negotiation state machine requires the state
+ * machine to own concession timing and acceptance, so this is prompt-level
+ * scaffolding until the payoff matrix lands and that can be built properly.
+ *
+ * Without it, agents restate their opening position and then "accept" a
+ * package containing none of the other side's terms — observed in testing.
+ * The phases give the exchange a recognisable shape: probe, trade, then close.
+ */
+function pacingBlock(turnsRemaining: number, totalTurns: number): string {
+  const used = totalTurns - turnsRemaining;
+  const progress = totalTurns > 0 ? used / totalTurns : 0;
+
+  if (progress < 0.34) {
+    return `PHASE — OPENING (turn ${used + 1} of ~${totalTurns}):
+- State your position and ask what matters most on the other side.
+- Do NOT accept anything yet. Do NOT make your final concessions yet.
+- Ask at least one genuine question about their priorities.`;
+  }
+
+  if (progress < 0.75) {
+    return `PHASE — TRADING (turn ${used + 1} of ~${totalTurns}):
+- This is where the actual bargaining happens. Move on at least one issue
+  you care less about, and say explicitly what you want in return.
+- Do not simply restate your opening package — that reads as stonewalling.
+- Do NOT accept yet unless the other side has genuinely met your priorities.`;
+  }
+
+  return `PHASE — CLOSING (turn ${used + 1} of ~${totalTurns}):
+- Time is nearly up. Converge on a complete package.
+- Accept ONLY if the package reflects real movement from BOTH sides. If it is
+  still just your own opening terms, it is not an agreement — keep trading or
+  leave the remaining issues unresolved.
+- If you cannot close, state clearly which issues remain unresolved.`;
 }
 
 const SHARED_RULES = `
@@ -35,7 +75,10 @@ NEGOTIATION RULES
 - Never claim you cannot continue for reasons outside the scenario.
 - Never state or imply that you are an AI, a model, or an experiment component.
 - Never reveal point values, scorecards, or reservation thresholds directly.
-- Keep messages under 120 words and conversational.
+- Keep messages under 90 words and conversational. Do not restate the full
+  six-issue package every turn — refer to the issues actually in play.
+- Never claim a package "aligns" or is agreed when it consists of your own
+  terms unchanged. Agreement requires movement from both sides.
 `;
 
 function issueBlock(issues: Issue[]): string {
@@ -83,7 +126,8 @@ ${issueBlock(ctx.issues)}
 ${SHARED_RULES}
 - You are a person, not an assistant. If asked whether you are an AI, respond
   the way a real participant would — briefly and without breaking character.
-- Turns remaining: ${ctx.turnsRemaining}.`;
+
+${pacingBlock(ctx.turnsRemaining, ctx.totalTurns ?? ctx.turnsRemaining)}`;
 }
 
 /**
@@ -119,7 +163,8 @@ HARD CONSTRAINTS — these define the Delegate policy:
   your principal for review.
 - Respect the rationale disclosure level set per issue.
 - Set internalProvenance to "principal_mandate" on every action.
-- Turns remaining: ${ctx.turnsRemaining}.`;
+
+${pacingBlock(ctx.turnsRemaining, ctx.totalTurns ?? ctx.turnsRemaining)}`;
 }
 
 /**

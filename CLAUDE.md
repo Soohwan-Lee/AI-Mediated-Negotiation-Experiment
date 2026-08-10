@@ -81,10 +81,19 @@ Tested end to end against `gpt-5.6-sol` (2026-08-11). Findings worth keeping:
   `type === "message"`. Also keep `max_output_tokens` generous, since reasoning
   tokens draw from the same budget and a tight cap returns `incomplete` with
   no message at all.
-- **~7.5s per AI turn.** The AI-AI loop runs both sides, so wall-clock is
-  roughly `maxTurnsPerSide * 2 * 7.5s`. Vercel caps functions at 60s on Hobby
-  and 300s on Pro. The turn budget is currently 4 per side to stay inside
-  that; raising it needs Pro or a one-turn-per-request split.
+- **~7.5s per AI turn**, so `/api/proxy-negotiation` generates **one turn per
+  request** and the client drives the sequence. Each invocation stays well
+  inside Vercel's 60s Hobby limit, so the turn budget is a design choice
+  rather than a timeout constraint, and the waiting screen shows real
+  progress. Budget is 6 per side (12 total, ~100s measured).
+- **Agents need pacing guidance, not just a turn count.** Given only
+  "turns remaining" they restated their opening and then "accepted" a package
+  containing none of the other side's terms. `pacingBlock()` in
+  `lib/ai/prompts.ts` derives an opening / trading / closing phase from
+  progress through the budget. With it, the exchange logrolls properly
+  (trading timeline and review rights for workload and credit) and reports a
+  genuine impasse instead of fake-accepting. This is prompt scaffolding
+  standing in for the state machine — remove it when that lands.
 - **The counterpart needs its own mandate.** Without one it mirrors whatever
   the participant's Proxy opens with instead of negotiating. See
   `counterpartMandateSummary` in `lib/tasks.ts` — placeholder derived from the
@@ -95,13 +104,21 @@ Tested end to end against `gpt-5.6-sol` (2026-08-11). Findings worth keeping:
 
 ## Still open (from Methods §B3)
 
-**Negotiation state machine — the largest gap.** Termination is currently
-decided by the model, which in testing accepted a package on its own terms
-after two exchanges. Methods §Negotiation state machine requires the state
-machine to own acceptance, concession points, and challenge timing so
-trajectories are comparable across conditions. The candidate agreement on the
-review screen is likewise derived from the mandate as a placeholder rather than
-from negotiated terms.
+**Negotiation state machine — the largest gap.** Termination is still decided
+by the model. With the pacing phases in place the exchange is now sound, but
+two symptoms remain that the state machine should own:
+
+- When both sides reach a genuine impasse they spend the remaining turns
+  restating it (turns 11–12 in testing were pure confirmation). The state
+  machine should detect the deadlock and stop.
+- Acceptance is not gated on reservation thresholds, so nothing structurally
+  prevents a premature accept — the prompt currently discourages it.
+
+Methods §Negotiation state machine requires the state machine to own
+acceptance, concession points, and challenge timing so trajectories are
+comparable across conditions. The candidate agreement on the review screen is
+likewise derived from the mandate as a placeholder rather than from negotiated
+terms.
 
 Also open: task payoff matrices and BATNAs · turn budget and reasoning effort ·
 whether Explorer options are pre-generated or validator-bounded at runtime ·

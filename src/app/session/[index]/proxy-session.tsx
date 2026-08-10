@@ -18,7 +18,7 @@ import { useState } from "react";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { getTask } from "@/lib/tasks";
-import { nextHref } from "@/lib/study-config";
+import { NEGOTIATION, nextHref } from "@/lib/study-config";
 import type {
   IssueMandate,
   Mandate,
@@ -120,6 +120,7 @@ export function ProxySession({
   const [revisionNote, setRevisionNote] = useState("");
   const [satisfaction, setSatisfaction] = useState(50);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   function updateIssue(issueId: string, patch: Partial<IssueMandate>) {
     setMandate((m) => ({
@@ -130,38 +131,67 @@ export function ProxySession({
     }));
   }
 
+  /**
+   * Drives the AI-AI negotiation one turn at a time.
+   *
+   * The route generates a single turn per request (see its header comment), so
+   * the client owns the sequence. Turns are appended as they arrive, which
+   * keeps every request short and lets the waiting screen show real progress.
+   */
   async function runNegotiation() {
     setPhase("negotiating");
     setError(null);
+    setTranscript([]);
+    setProgress({ done: 0, total: NEGOTIATION.maxTurnsPerSide * 2 });
     logEvent("negotiation_started", { policy }, { sessionIndex });
 
+    const collected: DisplayMessage[] = [];
+
     try {
-      const res = await fetch("/api/proxy-negotiation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskId,
-          participantRole: role,
-          policy,
-          mandate,
-          sessionIndex,
-        }),
-      });
+      for (let turn = 0; turn < NEGOTIATION.maxTurnsPerSide * 2; turn += 1) {
+        const res = await fetch("/api/proxy-negotiation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskId,
+            participantRole: role,
+            policy,
+            mandate,
+            sessionIndex,
+            turn,
+            history: collected.map((m) => ({
+              speaker: m.speaker,
+              text: m.text,
+            })),
+          }),
+        });
 
-      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
 
-      const data = (await res.json()) as {
-        transcript: Array<{ id: string; speaker: DisplayMessage["speaker"]; text: string }>;
-      };
+        const data = (await res.json()) as {
+          message?: { id: string; speaker: DisplayMessage["speaker"]; text: string };
+          done: boolean;
+          totalTurns?: number;
+        };
 
-      setTranscript(
-        data.transcript.map((m) => ({
-          id: m.id,
-          speaker: m.speaker,
-          text: m.text,
-        })),
-      );
-      logEvent("negotiation_ended", undefined, { sessionIndex });
+        if (data.message) {
+          collected.push({
+            id: data.message.id,
+            speaker: data.message.speaker,
+            text: data.message.text,
+          });
+          setTranscript([...collected]);
+        }
+
+        setProgress({
+          done: turn + 1,
+          total: data.totalTurns ?? NEGOTIATION.maxTurnsPerSide * 2,
+        });
+
+        if (data.done) break;
+      }
+
+      logEvent("negotiation_ended", { turns: collected.length }, { sessionIndex });
       setPhase("review");
     } catch (e) {
       console.error(e);
@@ -469,10 +499,26 @@ export function ProxySession({
           <h1 className="mb-2 text-lg font-semibold">
             Your assistant is negotiating
           </h1>
-          <p className="max-w-sm text-sm text-[var(--muted)]">
-            Both sides are represented by their assistants. This usually takes
-            under a minute. You will review the result when it finishes.
+          <p className="mb-6 max-w-sm text-sm text-[var(--muted)]">
+            Both sides are represented by their assistants. You will review the
+            result when it finishes.
           </p>
+
+          {progress.total > 0 ? (
+            <div className="w-full max-w-xs">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-muted)]">
+                <div
+                  className="h-full rounded-full bg-[var(--accent)] transition-all duration-500"
+                  style={{
+                    width: `${Math.round((progress.done / progress.total) * 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                {progress.done} of {progress.total} exchanges
+              </p>
+            </div>
+          ) : null}
         </div>
       </PageShell>
     );
