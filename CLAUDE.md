@@ -80,10 +80,14 @@ compiles.
 3. **One progress bar, derived from the URL.** `flowKeyFromPath` is the single
    source; pages never declare their own step. This is what makes progress
    assignment-order-proof — the URL carries only the session index.
-4. **The study only moves forward.** `NavigationGuard` absorbs the back press
-   with a sentinel history entry. Do not "fix" it by redirecting forward
-   instead: a session's phase is component state, so a remount restarts the
-   negotiation.
+4. **The study only moves forward, except where going back is harmless.**
+   `NavigationGuard` absorbs the browser back press with a sentinel history
+   entry — do not "fix" it by redirecting forward instead, because a session's
+   phase is component state and a remount restarts the negotiation. The four
+   steps a participant may return to are listed in `BACK_STEPS`
+   (`lib/study-config.ts`), reached through the `BackButton` in the action bar.
+   Anything reachable by Back must restore its saved answers with
+   `useRestoreAnswers`, or Back is a trap that blanks the screen.
 5. **The briefing is never taken away.** `SessionLayout` pins it beside the
    work from `lg` up and behind one tap below that, at every phase. Anything a
    participant is expected to negotiate from belongs in it.

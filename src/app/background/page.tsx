@@ -22,6 +22,7 @@ import { Page, PageHeader } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { BACKGROUND_BLOCKS, dummyAnswer } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { useRestoreAnswers } from "@/lib/saved-answers";
 import { nextHref } from "@/lib/study-config";
 
 const BLOCKS = BACKGROUND_BLOCKS;
@@ -33,6 +34,11 @@ export default function BackgroundPage() {
   const [answers, setAnswers] = useState<Answers>({});
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+
+  // Reachable again via Back from the instructions.
+  useRestoreAnswers("background", (saved) =>
+    setAnswers((cur) => ({ ...saved, ...cur })),
+  );
 
   const missing = missingIds(BLOCKS, answers);
   const canContinue = useDevGate(missing.length === 0);

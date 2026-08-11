@@ -16,11 +16,12 @@ import {
   missingIds,
   type Answers,
 } from "@/components/measure";
-import { ActionBar } from "@/components/study-chrome";
+import { ActionBar, BackButton } from "@/components/study-chrome";
 import { Page, PageHeader } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { POWER_BLOCK, dummyAnswer } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { useRestoreAnswers } from "@/lib/saved-answers";
 import { nextHref } from "@/lib/study-config";
 
 const BLOCKS = [POWER_BLOCK];
@@ -32,6 +33,11 @@ export default function ManipulationCheckPage() {
   const [answers, setAnswers] = useState<Answers>({});
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+
+  // Reachable again via Back from the reward decision.
+  useRestoreAnswers("manipulation_check", (saved) =>
+    setAnswers((cur) => ({ ...saved, ...cur })),
+  );
 
   const missing = missingIds(BLOCKS, answers);
   const canContinue = useDevGate(missing.length === 0);
@@ -94,6 +100,7 @@ export default function ManipulationCheckPage() {
         remaining={flagged.size > 0 ? missing.length : 0}
         firstUnansweredId={missing[0] ?? null}
         note={answeredNote(BLOCKS, answers)}
+        secondary={<BackButton from="manipulation-check" />}
       />
     </>
   );

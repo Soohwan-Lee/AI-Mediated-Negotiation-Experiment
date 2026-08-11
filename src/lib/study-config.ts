@@ -114,3 +114,35 @@ export function flowIndex(key: FlowKey): number {
 export function flowLabel(key: FlowKey): string {
   return FLOW[flowIndex(key)]?.label ?? "";
 }
+
+/**
+ * Where a participant may go back to, and from where.
+ *
+ * Deliberately a short list rather than "the previous step", because most
+ * steps cannot be re-entered without damage:
+ *
+ *  - a session holds its phase in component state, so returning restarts a
+ *    negotiation that has already happened;
+ *  - the initial-preference measures are baselines that must be taken before
+ *    the counterpart is seen, and a second pass would not be one;
+ *  - the reward decision cannot be revisited after the debriefing explains
+ *    that it was not real;
+ *  - the consent page claims a slot.
+ *
+ * What is left is the reading and the questionnaires, where changing your mind
+ * is harmless and being unable to is just frustrating.
+ */
+const BACK_STEPS: Partial<Record<FlowKey, FlowKey>> = {
+  instruction: "background",
+  "practice-1": "instruction",
+  "manipulation-check": "survey",
+  reward: "manipulation-check",
+};
+
+export function backStep(
+  current: FlowKey,
+): { key: FlowKey; href: string; label: string } | null {
+  const key = BACK_STEPS[current];
+  if (!key) return null;
+  return { key, href: FLOW[flowIndex(key)].href, label: flowLabel(key) };
+}

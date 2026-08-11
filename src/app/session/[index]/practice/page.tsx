@@ -21,7 +21,7 @@ import {
   type DisplayMessage,
 } from "@/components/negotiation";
 import { BriefingPanel, SessionLayout } from "@/components/session";
-import { ActionBar } from "@/components/study-chrome";
+import { ActionBar, BackButton } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Page, PageHeader } from "@/components/ui";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
@@ -163,6 +163,11 @@ export default function PracticePage({
         label={`Start session ${sessionIndex}`}
         onClick={finish}
         note="Practice is not recorded as a result."
+        secondary={
+          // Only before the first session. After that the previous step is a
+          // completed session, which cannot be re-entered.
+          sessionIndex === 1 ? <BackButton from="practice-1" /> : null
+        }
       />
     </>
   );

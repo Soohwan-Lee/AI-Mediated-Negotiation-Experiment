@@ -21,7 +21,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ActionBar } from "@/components/study-chrome";
+import { ActionBar, BackButton } from "@/components/study-chrome";
 import {
   AmountScale,
   Card,
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { useRestoreAnswers } from "@/lib/saved-answers";
 import { nextHref } from "@/lib/study-config";
 
 /** PLACEHOLDER — fix after pilot and preregister. */
@@ -50,6 +51,13 @@ export default function RewardPage() {
   const [busy, setBusy] = useState(false);
 
   const isLeader = assignment?.role === "leader";
+
+  // Left and re-entered via Back from here to the manipulation check.
+  useRestoreAnswers("reward_decision", (saved) => {
+    if (typeof saved.allocation === "number") setAllocation(saved.allocation);
+    if (typeof saved.fairness === "number") setFairness(saved.fairness);
+    if (typeof saved.rationale === "string") setRationale(saved.rationale);
+  });
 
   useDevAutofill(() => {
     setFairness(4);
@@ -172,6 +180,7 @@ export default function RewardPage() {
         disabled={!canContinue}
         busy={busy}
         note={complete ? "" : "A rating is needed to continue."}
+        secondary={<BackButton from="reward" />}
       />
     </>
   );

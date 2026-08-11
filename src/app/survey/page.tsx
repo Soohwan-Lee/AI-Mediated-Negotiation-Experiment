@@ -41,6 +41,7 @@ import {
   type Block,
 } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { useRestoreAnswers } from "@/lib/saved-answers";
 import { nextHref } from "@/lib/study-config";
 import { getTask } from "@/lib/tasks";
 
@@ -128,6 +129,23 @@ export default function SurveyPage() {
 
     return built;
   }, [assignment]);
+
+  /**
+   * Answers are written on every part, so a returning participant lands where
+   * they actually stopped: the first part still missing something, or the last
+   * part if the questionnaire was finished and they came back through the
+   * manipulation check. Always starting at part one would make someone who
+   * came back to fix one item click through all six.
+   */
+  useRestoreAnswers("survey", (saved) => {
+    setAnswers((cur) => ({ ...saved, ...cur }));
+    const firstIncomplete = parts.findIndex(
+      (p) => missingIds(p.blocks, saved).length > 0,
+    );
+    setPartIndex(
+      firstIncomplete === -1 ? Math.max(parts.length - 1, 0) : firstIncomplete,
+    );
+  });
 
   const part = parts[partIndex];
   const isLast = partIndex === parts.length - 1;

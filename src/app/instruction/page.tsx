@@ -21,7 +21,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ActionBar } from "@/components/study-chrome";
+import { ActionBar, BackButton } from "@/components/study-chrome";
 import {
   Callout,
   Card,
@@ -32,6 +32,7 @@ import {
 } from "@/components/ui";
 import { useDevAutofill, useDevBypass } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { useRestoreAnswers } from "@/lib/saved-answers";
 import { nextHref } from "@/lib/study-config";
 
 interface CheckItem {
@@ -92,7 +93,7 @@ const CHECKS: CheckItem[] = [
 export default function InstructionPage() {
   usePageEnter("instruction");
   const router = useRouter();
-  const { assignment, logEvent } = useParticipant();
+  const { assignment, logEvent, saveResponses } = useParticipant();
   const [part, setPart] = useState<"read" | "check">("read");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -115,6 +116,19 @@ export default function InstructionPage() {
   // button, so an unanswered check cannot trap a walkthrough.
   const bypass = useDevBypass();
 
+  // Reachable again via Back from the first practice round, so the answers are
+  // stored rather than only logged.
+  useRestoreAnswers("instruction_check", (saved) => {
+    const restored = Object.fromEntries(
+      CHECKS.map((c) => [c.id, saved[c.id]]).filter(
+        ([, v]) => typeof v === "string",
+      ),
+    ) as Record<string, string>;
+    if (Object.keys(restored).length > 0) {
+      setAnswers((cur) => ({ ...restored, ...cur }));
+    }
+  });
+
   function check() {
     setSubmitted(true);
     logEvent("comprehension_answer", {
@@ -122,6 +136,7 @@ export default function InstructionPage() {
       answers,
       correctCount: CHECKS.length - wrong.length,
     });
+    void saveResponses("instruction_check", answers);
     if (wrong.length > 0) setAttempt((a) => a + 1);
   }
 
@@ -251,6 +266,7 @@ export default function InstructionPage() {
             window.scrollTo({ top: 0 });
           }}
           note="Next: three quick questions"
+          secondary={<BackButton from="instruction" />}
         />
       </>
     );

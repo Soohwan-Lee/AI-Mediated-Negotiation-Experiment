@@ -23,9 +23,8 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useDevMode } from "@/lib/dev-mode";
+import { readFurthest, writeFurthest } from "@/lib/flow-position";
 import { FLOW, flowIndex, flowKeyFromPath } from "@/lib/study-config";
-
-const FURTHEST_KEY = "amne:furthest";
 
 export function NavigationGuard() {
   const pathname = usePathname();
@@ -57,14 +56,16 @@ export function NavigationGuard() {
     if (devEnabled || !key) return;
 
     const index = flowIndex(key);
-    const stored = Number(window.localStorage.getItem(FURTHEST_KEY) ?? "0");
-    const furthest = Number.isFinite(stored) ? stored : 0;
+    const furthest = readFurthest();
 
     if (index >= furthest) {
-      window.localStorage.setItem(FURTHEST_KEY, String(index));
+      writeFurthest(index);
       return;
     }
 
+    // Below the mark and not put here by the Back control, which lowers the
+    // mark before navigating. So: a bookmark, a typed URL, or a back press the
+    // sentinel did not catch.
     router.replace(FLOW[furthest].href);
   }, [devEnabled, key, router]);
 

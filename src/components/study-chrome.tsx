@@ -9,14 +9,17 @@
  * condition.
  */
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { writeFurthest } from "@/lib/flow-position";
 import {
   FLOW,
   STUDY,
+  backStep,
   flowKeyFromPath,
   flowIndex,
   flowLabel,
+  type FlowKey,
 } from "@/lib/study-config";
 import { cx } from "./ui";
 
@@ -158,5 +161,32 @@ export function ActionBar({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Returns to the previous step, where that is one of the few steps a
+ * participant may return to (`backStep`). Renders nothing elsewhere.
+ *
+ * It lowers the recorded position before navigating, otherwise the navigation
+ * guard would read the arrival as a stray back press and bounce it forward
+ * again.
+ */
+export function BackButton({ from }: { from: FlowKey }) {
+  const router = useRouter();
+  const target = backStep(from);
+  if (!target) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        writeFurthest(flowIndex(target.key));
+        router.push(target.href);
+      }}
+      className="rounded-[var(--radius)] px-3 py-2 text-[0.9375rem] font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]"
+    >
+      ← {target.label}
+    </button>
   );
 }
