@@ -551,25 +551,6 @@ export const Likert = Scale;
 /** @deprecated use `ChoiceList` */
 export const RadioGroup = ChoiceList;
 
-/** @deprecated the study-wide progress bar now lives in the page chrome */
-export function ProgressBar({
-  step,
-  total,
-}: {
-  step: number;
-  total: number;
-  label?: string;
-}) {
-  return (
-    <div className="mb-8 h-1 w-full overflow-hidden rounded-full bg-[var(--line)]">
-      <div
-        className="h-full bg-[var(--accent)]"
-        style={{ width: `${Math.round((step / total) * 100)}%` }}
-      />
-    </div>
-  );
-}
-
 /**
  * @deprecated use `Scale` or `AmountScale`.
  *

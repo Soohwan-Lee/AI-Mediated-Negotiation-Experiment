@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { STUDY, nextHref, stepNumber } from "@/lib/study-config";
+import { STUDY, nextHref } from "@/lib/study-config";
 import {
   Button,
   Callout,
@@ -26,7 +26,6 @@ import {
   Divider,
   PageHeader,
   PageShell,
-  ProgressBar,
   TextArea,
 } from "@/components/ui";
 
@@ -60,11 +59,8 @@ export default function DebriefingPage() {
     }
   }
 
-  const { step, total } = stepNumber("debriefing");
-
   return (
     <PageShell>
-      <ProgressBar step={step} total={total} label="Debriefing" />
       <PageHeader
         title="What this study was really about"
         subtitle="Thank you for taking part. Now that you have finished, here is the full picture."

@@ -11,14 +11,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { nextHref, stepNumber } from "@/lib/study-config";
+import { nextHref } from "@/lib/study-config";
 import {
   Button,
   Card,
   Likert,
   PageHeader,
   PageShell,
-  ProgressBar,
 } from "@/components/ui";
 import type { SurveyResponses } from "@/lib/types";
 
@@ -61,11 +60,8 @@ export default function ManipulationCheckPage() {
     }
   }
 
-  const { step, total } = stepNumber("manipulation-check");
-
   return (
     <PageShell>
-      <ProgressBar step={step} total={total} label="Final check" />
       <PageHeader
         title="About the roles"
         subtitle="A few questions about how you experienced the roles in the scenario. 1 = Strongly disagree, 7 = Strongly agree."

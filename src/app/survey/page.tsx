@@ -19,7 +19,7 @@ import { useMemo, useState } from "react";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
-import { nextHref, stepNumber } from "@/lib/study-config";
+import { nextHref } from "@/lib/study-config";
 import {
   Button,
   Card,
@@ -27,7 +27,6 @@ import {
   Likert,
   PageHeader,
   PageShell,
-  ProgressBar,
   RadioGroup,
   TextArea,
 } from "@/components/ui";
@@ -146,11 +145,8 @@ export default function SurveyPage() {
     }
   }
 
-  const { step, total } = stepNumber("survey");
-
   return (
     <PageShell>
-      <ProgressBar step={step} total={total} label="Questionnaire" />
       <PageHeader
         title="Your experience"
         subtitle="Please answer for each session separately. 1 = Strongly disagree, 7 = Strongly agree."

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Serif } from "next/font/google";
 import { DevPanelMount } from "@/components/dev-panel-mount";
+import { NavigationGuard } from "@/components/navigation-guard";
+import { StudyChrome } from "@/components/study-chrome";
 import { DevModeProvider } from "@/lib/dev-mode";
 import { ParticipantProvider } from "@/lib/participant-context";
 import { STUDY } from "@/lib/study-config";
@@ -54,7 +56,8 @@ export default function RootLayout({
         */}
         <DevModeProvider>
           <ParticipantProvider>
-            {children}
+            <NavigationGuard />
+            <StudyChrome>{children}</StudyChrome>
             <DevPanelMount />
           </ParticipantProvider>
         </DevModeProvider>

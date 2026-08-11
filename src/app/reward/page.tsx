@@ -18,7 +18,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { nextHref, stepNumber } from "@/lib/study-config";
+import { nextHref } from "@/lib/study-config";
 import {
   Button,
   Card,
@@ -26,7 +26,6 @@ import {
   Likert,
   PageHeader,
   PageShell,
-  ProgressBar,
   Slider,
   TextArea,
 } from "@/components/ui";
@@ -72,11 +71,8 @@ export default function RewardPage() {
     }
   }
 
-  const { step, total } = stepNumber("reward");
-
   return (
     <PageShell>
-      <ProgressBar step={step} total={total} label="Reward decision" />
 
       {isLeader ? (
         <>

@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useDevAutofill, useDevBypass } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { nextHref, stepNumber } from "@/lib/study-config";
+import { nextHref } from "@/lib/study-config";
 import {
   Button,
   Callout,
@@ -27,7 +27,6 @@ import {
   Divider,
   PageHeader,
   PageShell,
-  ProgressBar,
   RadioGroup,
 } from "@/components/ui";
 
@@ -143,11 +142,8 @@ export default function InstructionPage() {
     setSubmitted(false);
   }
 
-  const { step, total } = stepNumber("instruction");
-
   return (
     <PageShell>
-      <ProgressBar step={step} total={total} label="Instructions" />
       <PageHeader
         title="Your role and how this works"
         subtitle="Please read carefully. You will be asked a few questions about this at the end."

@@ -7,6 +7,8 @@
 
 export const STUDY = {
   title: "Workplace Negotiation and AI-Mediated Communication",
+  /** Shown in the page chrome, where the full title does not fit. */
+  shortTitle: "Workplace Negotiation Study",
   /** Shown on the consent page. */
   estimatedMinutes: 55,
   compensationUsd: "9.00", // TBD after pilot; must clear Prolific fair rate
@@ -82,9 +84,32 @@ export function nextHref(current: FlowKey): string {
   return FLOW[Math.min(i + 1, FLOW.length - 1)].href;
 }
 
-export function stepNumber(current: FlowKey): { step: number; total: number } {
-  return {
-    step: FLOW.findIndex((s) => s.key === current) + 1,
-    total: FLOW.length,
-  };
+/**
+ * Resolves the flow step from the URL.
+ *
+ * The chrome derives progress this way rather than having each page declare
+ * its own step, so there is one source of truth and no page can drift out of
+ * sync. It is also assignment-order-proof: the URL carries only the session
+ * INDEX, so "Session 1" is step 5 for every participant regardless of which
+ * condition or task they were assigned (Methods §Controlled counterpart and
+ * participant belief).
+ */
+const HREF_TO_KEY = new Map<string, FlowKey>(
+  FLOW.map((s) => [s.href, s.key as FlowKey]),
+);
+
+export function flowKeyFromPath(pathname: string): FlowKey | null {
+  const clean =
+    pathname.length > 1 && pathname.endsWith("/")
+      ? pathname.slice(0, -1)
+      : pathname;
+  return HREF_TO_KEY.get(clean) ?? null;
+}
+
+export function flowIndex(key: FlowKey): number {
+  return FLOW.findIndex((s) => s.key === key);
+}
+
+export function flowLabel(key: FlowKey): string {
+  return FLOW[flowIndex(key)]?.label ?? "";
 }

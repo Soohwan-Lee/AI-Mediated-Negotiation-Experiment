@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { nextHref, stepNumber } from "@/lib/study-config";
+import { nextHref } from "@/lib/study-config";
 import {
   Button,
   Card,
@@ -22,7 +22,6 @@ import {
   Likert,
   PageHeader,
   PageShell,
-  ProgressBar,
   RadioGroup,
   Select,
   TextInput,
@@ -136,11 +135,8 @@ export default function BackgroundPage() {
     }
   }
 
-  const { step, total } = stepNumber("background");
-
   return (
     <PageShell>
-      <ProgressBar step={step} total={total} label="Background survey" />
       <PageHeader
         title="About you"
         subtitle="These questions help us describe who took part. There are no right or wrong answers."
