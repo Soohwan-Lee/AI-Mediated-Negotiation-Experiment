@@ -483,57 +483,74 @@ export function Scale({
     <fieldset
       className={cx(
         "scroll-mt-24",
-        !compact && "border-b border-[var(--line)] py-5 last:border-b-0",
+        !compact && "border-b border-[var(--line)] py-3.5 last:border-b-0",
         flagged && "-ml-4 border-l-2 border-l-[var(--caution)] pl-4",
       )}
       id={`q-${id}`}
     >
-      {statement ? (
-        <legend className="mb-3 text-[0.9375rem] leading-snug">
-          {statement}
-        </legend>
-      ) : null}
+      {/* A rendered <legend> is laid out by the fieldset itself and does not
+          take part in flex, so it cannot sit beside the buttons. It stays as
+          the accessible name for the group, hidden, and the visible statement
+          below is an ordinary flex child. */}
+      {statement ? <legend className="sr-only">{statement}</legend> : null}
 
-      <div className="flex items-center gap-3">
-        <span className="hidden w-24 shrink-0 text-right text-xs leading-tight text-[var(--ink-2)] sm:block">
-          {lowAnchor}
-        </span>
+      {/* The statement sits beside its buttons once there is room for both.
+          Stacked, every item costs two rows, and a battery of eighty of them
+          becomes a long scroll; side by side each item is one row and a block
+          can be taken in at once. Below `lg` it stacks as it did before. */}
+      <div className={cx(statement && "lg:flex lg:items-center lg:gap-6")}>
+        {statement ? (
+          <p
+            aria-hidden
+            className="mb-3 text-[0.9375rem] leading-snug lg:mb-0 lg:w-[21rem] lg:shrink-0"
+          >
+            {statement}
+          </p>
+        ) : null}
 
-        <div className="flex flex-1 justify-between gap-1.5">
-          {steps.map((n) => {
-            const selected = value === n;
-            return (
-              <label
-                key={n}
-                className="group flex flex-1 cursor-pointer flex-col items-center gap-1"
-              >
-                <input
-                  type="radio"
-                  name={id}
-                  checked={selected}
-                  onChange={() => onChange(n)}
-                  className="sr-only"
-                />
-                <span
-                  className={cx(
-                    "flex h-9 w-9 items-center justify-center rounded-full border-2 text-[0.8125rem] font-medium transition-all",
-                    selected
-                      ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-                      : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-3)] group-hover:border-[var(--accent)] group-hover:text-[var(--ink)]",
-                  )}
+        <div className="flex items-center gap-3 lg:min-w-0 lg:flex-1">
+          <span className="hidden w-24 shrink-0 text-right text-xs leading-tight text-[var(--ink-2)] sm:block">
+            {lowAnchor}
+          </span>
+
+          <div className="flex flex-1 justify-between gap-1.5">
+            {steps.map((n) => {
+              const selected = value === n;
+              return (
+                <label
+                  key={n}
+                  className="group flex flex-1 cursor-pointer flex-col items-center gap-1"
                 >
-                  {n}
-                </span>
-              </label>
-            );
-          })}
-        </div>
+                  <input
+                    type="radio"
+                    name={id}
+                    checked={selected}
+                    onChange={() => onChange(n)}
+                    className="sr-only"
+                  />
+                  <span
+                    className={cx(
+                      "flex h-9 w-9 items-center justify-center rounded-full border-2 text-[0.8125rem] font-medium transition-all",
+                      selected
+                        ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+                        : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-3)] group-hover:border-[var(--accent)] group-hover:text-[var(--ink)]",
+                    )}
+                  >
+                    {n}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
 
-        <span className="hidden w-24 shrink-0 text-xs leading-tight text-[var(--ink-2)] sm:block">
-          {highAnchor}
-        </span>
+          <span className="hidden w-24 shrink-0 text-xs leading-tight text-[var(--ink-2)] sm:block">
+            {highAnchor}
+          </span>
+        </div>
       </div>
 
+      {/* Anchors for narrow screens, where the pair above is hidden. Never
+          visible at the same time as the side-by-side layout. */}
       <div className="mt-2 flex justify-between text-xs text-[var(--ink-2)] sm:hidden">
         <span>{lowAnchor}</span>
         <span>{highAnchor}</span>
