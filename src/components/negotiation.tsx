@@ -89,18 +89,39 @@ export function Transcript({
   messages,
   pending,
   emptyHint,
+  flow,
+  endRef: externalEndRef,
 }: {
   messages: DisplayMessage[];
   pending?: boolean;
   emptyHint?: string;
+  /**
+   * Lay the whole thing out in the page instead of scrolling inside a box.
+   * Used where the transcript is the thing being read rather than a live
+   * conversation being added to — a box that scrolls internally invites
+   * skipping, and a completed AI-AI negotiation has to be read.
+   */
+  flow?: boolean;
+  /** Marker at the end of the messages, for "have they reached the bottom". */
+  endRef?: React.Ref<HTMLDivElement>;
 }) {
-  const endRef = useRef<HTMLDivElement>(null);
+  const ownEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length, pending]);
+    // Following a live conversation. In flow mode the participant controls the
+    // scroll, so moving it under them would be wrong.
+    if (flow) return;
+    ownEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length, pending, flow]);
 
   return (
-    <div className="flex h-full min-h-80 flex-col gap-3 overflow-y-auto p-4">
+    <div
+      className={
+        flow
+          ? "flex flex-col gap-3 p-4"
+          : "flex h-full min-h-80 flex-col gap-3 overflow-y-auto p-4"
+      }
+    >
       {messages.length === 0 && !pending ? (
         <p className="m-auto max-w-xs text-center text-sm text-[var(--ink-2)]">
           {emptyHint ?? "No messages yet."}
@@ -156,7 +177,8 @@ export function Transcript({
         </div>
       ) : null}
 
-      <div ref={endRef} />
+      <div ref={ownEndRef} />
+      <div ref={externalEndRef} />
     </div>
   );
 }

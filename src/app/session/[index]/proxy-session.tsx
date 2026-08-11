@@ -22,7 +22,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OptionChips } from "@/components/issues";
 import { Transcript, type DisplayMessage } from "@/components/negotiation";
 import { BriefingPanel, SessionHeader, SessionLayout } from "@/components/session";
@@ -201,6 +201,28 @@ export function ProxySession({
 
   const mockAi = useDevMockAi();
 
+  /**
+   * Has the participant reached the end of the transcript?
+   *
+   * The decision measures (AI Settlement Adoption, Preference Displacement)
+   * are meaningless if the agreement was accepted without reading what was
+   * said to reach it, so the decision waits for the bottom of the conversation
+   * to come into view. A marker is used rather than a scroll position because
+   * a short transcript may already be fully visible, and that counts as read.
+   */
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const [transcriptSeen, setTranscriptSeen] = useState(false);
+
+  useEffect(() => {
+    const el = transcriptEndRef.current;
+    if (!el || transcriptSeen) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setTranscriptSeen(true);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [transcriptSeen, phase]);
+
   useDevActions(
     `session-${sessionIndex}`,
     PHASES.map((p, i) => ({
@@ -334,8 +356,10 @@ export function ProxySession({
     }
   }
 
+  const canDecide = useDevGate(transcriptSeen);
   const canSubmit = useDevGate(
-    choice !== null &&
+    transcriptSeen &&
+      choice !== null &&
       satisfaction !== null &&
       (choice !== "request_revision" || revisionNote.trim().length > 0),
   );
@@ -632,21 +656,46 @@ export function ProxySession({
             <TermsList task={task} terms={settled} />
           </Card>
 
-          <details className="mb-5 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)]">
-            <summary className="cursor-pointer px-5 py-4 text-[0.9375rem] font-medium">
-              Read the full conversation
-            </summary>
-            <div className="border-t border-[var(--line)]">
-              <Transcript
-                messages={transcript}
-                emptyHint="No messages were exchanged."
-              />
+          <Card className="mb-5 flex flex-col" padded={false}>
+            <div className="border-b border-[var(--line)] px-5 py-4">
+              <h2 className="text-[0.95rem] font-semibold">
+                The full conversation
+              </h2>
+              <p className="mt-1 text-[0.875rem] text-[var(--ink-2)]">
+                Every exchange between the two assistants,{" "}
+                {transcript.length} in all. Read it before you decide — the
+                decision below unlocks at the end.
+              </p>
             </div>
-          </details>
+            <Transcript
+              messages={transcript}
+              emptyHint="No messages were exchanged."
+              flow
+              endRef={transcriptEndRef}
+            />
+          </Card>
 
           <Card className="mb-5">
             <CardTitle>Your decision</CardTitle>
-            <div className="space-y-2">
+
+            {!canDecide ? (
+              <div className="mb-4">
+                <Callout tone="warning">
+                  <p>
+                    Read to the end of the conversation above, then come back
+                    here.
+                  </p>
+                </Callout>
+              </div>
+            ) : null}
+
+            <div
+              className={cx(
+                "space-y-2 transition-opacity",
+                !canDecide && "pointer-events-none opacity-40",
+              )}
+              aria-disabled={!canDecide}
+            >
               {(
                 [
                   ["ratify", "Accept it", "Settle on this package"],
@@ -661,6 +710,7 @@ export function ProxySession({
                 <button
                   key={value}
                   type="button"
+                  disabled={!canDecide}
                   onClick={() => setChoice(value)}
                   className={cx(
                     "block w-full rounded-[var(--radius)] border-2 p-3.5 text-left transition-colors",
@@ -714,7 +764,13 @@ export function ProxySession({
         label={sessionIndex === 1 ? "Continue to the next session" : "Continue"}
         onClick={submitDecision}
         disabled={!canSubmit}
-        note={canSubmit ? "" : "Make a decision and rate the outcome."}
+        note={
+          !canDecide
+            ? "Read the conversation to the end first."
+            : canSubmit
+              ? ""
+              : "Make a decision and rate the outcome."
+        }
       />
     </>
   );
