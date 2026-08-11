@@ -4,55 +4,65 @@
  * Power dynamics manipulation check (Methods §7, Appendix A6).
  *
  * Placed AFTER the outcome questionnaire so the power items do not prime the
- * negotiation experience or the outcome evaluations.
+ * negotiation experience or the outcome evaluations. Items live in
+ * `lib/measures`.
  */
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  MeasureBlock,
+  answeredNote,
+  missingIds,
+  type Answers,
+} from "@/components/measure";
+import { ActionBar } from "@/components/study-chrome";
+import { Page, PageHeader } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
+import { POWER_BLOCK, dummyAnswer } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { nextHref } from "@/lib/study-config";
-import {
-  Button,
-  Card,
-  Likert,
-  PageHeader,
-  PageShell,
-} from "@/components/ui";
-import type { SurveyResponses } from "@/lib/types";
 
-const POWER_ITEMS = [
-  { id: "POW1", text: "The Project Leader had formal authority to direct and evaluate the Team Member's work." },
-  { id: "POW2", text: "The Project Leader could influence additional rewards and future opportunities received by the Team Member." },
-  { id: "POW3", text: "Compared with the counterpart, I had greater control over important outcomes." },
-  { id: "POW4", text: "I needed the counterpart's cooperation to achieve an acceptable outcome." },
-  { id: "POW5", text: "Despite the authority difference, both parties needed to negotiate rather than one party simply issuing instructions." },
-  { id: "POW6_R", text: "During the session where assistants negotiated, one assistant had more procedural authority or speaking rights than the other." },
-];
+const BLOCKS = [POWER_BLOCK];
 
 export default function ManipulationCheckPage() {
   usePageEnter("manipulation-check");
   const router = useRouter();
   const { saveResponses, logEvent } = useParticipant();
-  const [r, setR] = useState<SurveyResponses>({});
+  const [answers, setAnswers] = useState<Answers>({});
+  const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
-  const num = (id: string) => (r[id] as number) ?? null;
-  const complete = POWER_ITEMS.every((i) => num(i.id) !== null);
+  const missing = missingIds(BLOCKS, answers);
+  const canContinue = useDevGate(missing.length === 0);
 
-  useDevAutofill(() => {
-    setR((prev) => ({
+  useDevAutofill(() =>
+    setAnswers((prev) => ({
       ...prev,
-      ...Object.fromEntries(POWER_ITEMS.map((i) => [i.id, 4])),
-    }));
-  });
+      ...Object.fromEntries(
+        POWER_BLOCK.items.map((i) => [i.id, dummyAnswer(i)]),
+      ),
+    })),
+  );
 
-  const canContinue = useDevGate(complete);
+  function answer(id: string, value: string | number) {
+    setAnswers((prev) => ({ ...prev, [id]: value }));
+    setFlagged((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
 
   async function handleNext() {
+    if (!canContinue) {
+      setFlagged(new Set(missing));
+      return;
+    }
     setBusy(true);
     try {
-      await saveResponses("manipulation_check", r);
+      await saveResponses("manipulation_check", answers);
       logEvent("page_complete", undefined, { page: "manipulation-check" });
       router.push(nextHref("manipulation-check"));
     } finally {
@@ -61,29 +71,30 @@ export default function ManipulationCheckPage() {
   }
 
   return (
-    <PageShell>
-      <PageHeader
-        title="About the roles"
-        subtitle="A few questions about how you experienced the roles in the scenario. 1 = Strongly disagree, 7 = Strongly agree."
+    <>
+      <Page>
+        <PageHeader
+          eyebrow="Almost done"
+          title="How the roles felt"
+          subtitle="A few questions about the roles in the scenario you worked through."
+        />
+
+        <MeasureBlock
+          block={POWER_BLOCK}
+          answers={answers}
+          onChange={answer}
+          flagged={flagged}
+        />
+      </Page>
+
+      <ActionBar
+        label="Continue"
+        onClick={handleNext}
+        busy={busy}
+        remaining={flagged.size > 0 ? missing.length : 0}
+        firstUnansweredId={missing[0] ?? null}
+        note={answeredNote(BLOCKS, answers)}
       />
-
-      <Card className="mb-8">
-        {POWER_ITEMS.map((item) => (
-          <Likert
-            key={item.id}
-            id={item.id}
-            statement={item.text}
-            value={num(item.id)}
-            onChange={(v) => setR((prev) => ({ ...prev, [item.id]: v }))}
-          />
-        ))}
-      </Card>
-
-      <div className="flex justify-end">
-        <Button onClick={handleNext} disabled={!canContinue || busy}>
-          {busy ? "Saving…" : "Continue"}
-        </Button>
-      </div>
-    </PageShell>
+    </>
   );
 }
