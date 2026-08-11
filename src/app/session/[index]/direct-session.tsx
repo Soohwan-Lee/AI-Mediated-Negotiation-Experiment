@@ -3,42 +3,44 @@
 /**
  * Direct condition session (Methods §Direct session).
  *
- * The participant writes their own messages and submits their own offers. The
+ * The participant writes their own messages and makes their own offers. The
  * counterpart is presented as another participant; it is a controlled LLM
  * behind /api/counterpart.
  *
- * Phases: brief -> initial preference -> negotiate -> final decision.
+ * Phases: brief -> priorities -> negotiate -> decide. The briefing sits in the
+ * rail from the second phase on, so nothing has to be remembered.
  */
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useDevActions, useDevMockAi } from "@/lib/dev-mode";
-import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { getStore } from "@/lib/store";
-import { getTask } from "@/lib/tasks";
-import { NEGOTIATION, nextHref } from "@/lib/study-config";
-import type { Role, TaskId } from "@/lib/types";
-import { Button, Card, PageHeader, PageShell } from "@/components/ui";
+import { OptionChips } from "@/components/issues";
 import {
   CountdownTimer,
-  IssueReference,
   MessageComposer,
-  OfferPanel,
-  RoleScorecard,
   Transcript,
   type DisplayMessage,
 } from "@/components/negotiation";
-import { SessionBrief, InitialPreferenceForm, FinalDecision } from "./shared";
+import { BriefingPanel, SessionHeader, SessionLayout } from "@/components/session";
+import { ActionBar } from "@/components/study-chrome";
+import { Card, CardTitle, Page } from "@/components/ui";
+import { useDevActions, useDevMockAi } from "@/lib/dev-mode";
+import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { getStore } from "@/lib/store";
+import { NEGOTIATION, nextHref } from "@/lib/study-config";
+import { getTask } from "@/lib/tasks";
+import type { Role, TaskId } from "@/lib/types";
+import { FinalDecision, InitialPreferenceForm, SessionBrief } from "./shared";
 
 type Phase = "brief" | "preference" | "negotiate" | "decide";
 
 const PHASES: Phase[] = ["brief", "preference", "negotiate", "decide"];
+const STEP_LABELS = ["Your briefing", "Your priorities", "Negotiate", "Decide"];
 
-/** Dev-mode stand-ins, so the chat surface fills up with no model call. */
-const MOCK_COUNTERPART_REPLIES = [
-  "[mock] Thanks for laying that out. Timeline is where I have the least room — could we trade there?",
+/** Dev-mode stand-ins, so the chat fills up with no model call. */
+const MOCK_REPLIES = [
+  "[mock] Thanks for setting that out. Timeline is where I have least room — could we trade there?",
   "[mock] I can live with that on credit if the review rights stay with me.",
-  "[mock] That package works for me apart from the workload split. Counter-proposal below.",
+  "[mock] That works apart from the workload split. Here is a counter-proposal.",
 ];
 
 export function DirectSession({
@@ -59,17 +61,16 @@ export function DirectSession({
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [pending, setPending] = useState(false);
   const [offer, setOffer] = useState<Record<string, string>>({});
-  const [confidence, setConfidence] = useState(50);
   const [turnsUsed, setTurnsUsed] = useState(0);
 
   const turnsRemaining = NEGOTIATION.maxTurnsPerSide - turnsUsed;
-
   const mockAi = useDevMockAi();
+
   useDevActions(
     `session-${sessionIndex}`,
-    PHASES.map((p) => ({
+    PHASES.map((p, i) => ({
       id: p,
-      label: p,
+      label: STEP_LABELS[i],
       active: phase === p,
       run: () => setPhase(p),
     })),
@@ -101,12 +102,7 @@ export function DirectSession({
       let reply: string;
 
       if (mockAi) {
-        // Dev mode: no round trip and no model, so the surface can be reviewed
-        // offline and without spending tokens.
-        reply =
-          MOCK_COUNTERPART_REPLIES[
-            turnsUsed % MOCK_COUNTERPART_REPLIES.length
-          ];
+        reply = MOCK_REPLIES[turnsUsed % MOCK_REPLIES.length];
         await new Promise((r) => setTimeout(r, 300));
       } else {
         const res = await fetch("/api/counterpart", {
@@ -123,16 +119,14 @@ export function DirectSession({
           }),
         });
 
-        const data = (await res.json()) as { message?: string; error?: string };
+        const data = (await res.json()) as { message?: string };
         reply =
           data.message ??
-          "Sorry, I got distracted for a second — could you say that again?";
+          "Sorry, I lost my train of thought — could you say that again?";
 
         // A small delay keeps the exchange from feeling instantaneous.
         // TBD (Methods §B3): fixed delay vs. naturalistic jitter.
-        await new Promise((r) =>
-          setTimeout(r, NEGOTIATION.counterpartDelayMs),
-        );
+        await new Promise((r) => setTimeout(r, NEGOTIATION.counterpartDelayMs));
       }
 
       const counter: DisplayMessage = {
@@ -156,25 +150,25 @@ export function DirectSession({
     }
   }
 
-  // --- phase: brief ------------------------------------------------------
   if (phase === "brief") {
     return (
       <SessionBrief
         sessionIndex={sessionIndex}
         task={task}
         role={role}
+        steps={STEP_LABELS}
         onContinue={() => setPhase("preference")}
       />
     );
   }
 
-  // --- phase: initial preference ----------------------------------------
   if (phase === "preference") {
     return (
       <InitialPreferenceForm
         sessionIndex={sessionIndex}
         task={task}
         role={role}
+        steps={STEP_LABELS}
         onContinue={() => {
           logEvent("negotiation_started", undefined, { sessionIndex });
           setPhase("negotiate");
@@ -183,16 +177,14 @@ export function DirectSession({
     );
   }
 
-  // --- phase: final decision --------------------------------------------
   if (phase === "decide") {
     return (
       <FinalDecision
         sessionIndex={sessionIndex}
         task={task}
         role={role}
+        steps={STEP_LABELS}
         terms={offer}
-        confidence={confidence}
-        onConfidenceChange={setConfidence}
         onDone={() => {
           logEvent("page_complete", undefined, {
             page: `session-${sessionIndex}`,
@@ -206,68 +198,91 @@ export function DirectSession({
     );
   }
 
-  // --- phase: negotiate --------------------------------------------------
+  const offered = task.issues.filter((i) => offer[i.id]).length;
+
   return (
-    <PageShell wide>
-      <div className="mb-6 flex items-baseline justify-between">
-        <PageHeader
-          eyebrow={`Session ${sessionIndex} of 2`}
-          title={task.title}
-        />
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-[var(--muted)]">
-            Turns left: {Math.max(turnsRemaining, 0)}
-          </span>
-          <CountdownTimer
-            seconds={NEGOTIATION.sessionSeconds}
-            onExpire={() => setPhase("decide")}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <Card className="flex flex-col p-0">
-          <div className="border-b border-[var(--border)] px-4 py-3">
-            <p className="text-sm font-medium">Negotiation</p>
-            <p className="text-xs text-[var(--muted)]">
-              You are messaging the other participant directly.
-            </p>
-          </div>
-          <Transcript
-            messages={messages}
-            pending={pending}
-            emptyHint="Send the first message to begin. You might open with what matters most to you."
-          />
-          <MessageComposer
-            onSend={sendMessage}
-            disabled={pending || turnsRemaining <= 0}
-            placeholder={
-              turnsRemaining <= 0
-                ? "No turns remaining — please finalize below."
-                : "Write your message…"
+    <>
+      <Page width="wide">
+        <SessionLayout briefing={<BriefingPanel task={task} role={role} />}>
+          <SessionHeader
+            sessionIndex={sessionIndex}
+            title={task.title}
+            steps={STEP_LABELS}
+            current={2}
+            aside={
+              <div className="flex shrink-0 items-center gap-3 text-[0.8125rem] text-[var(--ink-2)]">
+                <span>
+                  <span className="tabular font-medium text-[var(--ink)]">
+                    {Math.max(turnsRemaining, 0)}
+                  </span>{" "}
+                  turns left
+                </span>
+                <CountdownTimer
+                  seconds={NEGOTIATION.sessionSeconds}
+                  onExpire={() => setPhase("decide")}
+                />
+              </div>
             }
           />
-        </Card>
 
-        <div className="space-y-4">
-          <OfferPanel
-            issues={task.issues}
-            selection={offer}
-            onChange={(issueId, optionId) =>
-              setOffer((prev) => ({ ...prev, [issueId]: optionId }))
-            }
-          />
-          <Button
-            onClick={() => setPhase("decide")}
-            variant="secondary"
-            className="w-full"
-          >
-            Finalize this session
-          </Button>
-          <RoleScorecard task={task} role={role} />
-          <IssueReference issues={task.issues} role={role} showPoints />
-        </div>
-      </div>
-    </PageShell>
+          <Card className="mb-5 flex flex-col" padded={false}>
+            <div className="border-b border-[var(--line)] px-4 py-3">
+              <p className="text-[0.875rem] font-medium">
+                Messages with the other party
+              </p>
+              <p className="text-[0.8125rem] text-[var(--ink-2)]">
+                They can see everything you write here.
+              </p>
+            </div>
+            <Transcript
+              messages={messages}
+              pending={pending}
+              emptyHint="Send the first message to begin. Opening with what matters most to you is a reasonable start."
+            />
+            <MessageComposer
+              onSend={sendMessage}
+              disabled={pending || turnsRemaining <= 0}
+              placeholder={
+                turnsRemaining <= 0
+                  ? "No turns left — finish below."
+                  : "Write your message…"
+              }
+            />
+          </Card>
+
+          <Card>
+            <CardTitle hint="This is the package you are proposing. Update it as the conversation moves.">
+              Your current offer
+            </CardTitle>
+            <div className="space-y-4">
+              {task.issues.map((issue) => (
+                <div key={issue.id}>
+                  <p className="mb-1.5 text-[0.8125rem] font-medium">
+                    {issue.label}
+                  </p>
+                  <OptionChips
+                    issue={issue}
+                    role={role}
+                    name={`offer-${issue.id}`}
+                    value={offer[issue.id] ?? null}
+                    onChange={(v) =>
+                      setOffer((prev) => ({ ...prev, [issue.id]: v }))
+                    }
+                    allowNone
+                    noneLabel="Not specified"
+                  />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </SessionLayout>
+      </Page>
+
+      <ActionBar
+        label="Finish this session"
+        onClick={() => setPhase("decide")}
+        note={`${offered} of ${task.issues.length} issues in your offer`}
+      />
+    </>
   );
 }

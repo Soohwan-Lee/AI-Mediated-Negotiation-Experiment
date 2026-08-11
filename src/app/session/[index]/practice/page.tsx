@@ -3,31 +3,30 @@
 /**
  * Condition-specific practice (Methods §4).
  *
- * Uses the SAME interface as the upcoming main session but a short, neutral
- * scenario that does not overlap with Task A or B. Practice data is recorded
- * for comprehension and debugging only and is excluded from primary analysis.
+ * Uses the SAME interface as the upcoming main session, on a short neutral
+ * scenario that does not overlap with Task A or B. Practice data is kept for
+ * comprehension and debugging only and is excluded from primary analysis.
+ *
+ * The point is that nothing in the real session is a surprise, so this screen
+ * names what the participant is about to be asked to do rather than only
+ * letting them poke at controls.
  */
 
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
-import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { isProxyCondition, sessionPlan } from "@/lib/assignment";
-import { PRACTICE_TASK } from "@/lib/tasks";
-import { NEGOTIATION } from "@/lib/study-config";
+import { OptionChips } from "@/components/issues";
 import {
-  Button,
-  Callout,
-  Card,
-  PageHeader,
-  PageShell,
-} from "@/components/ui";
-import {
-  IssueReference,
   MessageComposer,
-  OfferPanel,
   Transcript,
   type DisplayMessage,
 } from "@/components/negotiation";
+import { BriefingPanel, SessionLayout } from "@/components/session";
+import { ActionBar } from "@/components/study-chrome";
+import { Callout, Card, CardTitle, Page, PageHeader } from "@/components/ui";
+import { isProxyCondition, sessionPlan } from "@/lib/assignment";
+import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { NEGOTIATION } from "@/lib/study-config";
+import { PRACTICE_TASK } from "@/lib/tasks";
 
 export default function PracticePage({
   params,
@@ -46,15 +45,16 @@ export default function PracticePage({
 
   if (!assignment) {
     return (
-      <PageShell>
-        <p className="text-sm text-[var(--muted)]">Loading…</p>
-      </PageShell>
+      <Page>
+        <p className="text-sm text-[var(--ink-2)]">Loading…</p>
+      </Page>
     );
   }
 
   const plan = sessionPlan(assignment, sessionIndex);
   const isProxy = isProxyCondition(plan.condition);
   const task = PRACTICE_TASK;
+  const role = assignment.role;
 
   function finish() {
     logEvent("page_complete", undefined, { page: `practice-${sessionIndex}` });
@@ -73,78 +73,97 @@ export default function PracticePage({
       {
         id: `c${m.length}`,
         speaker: "counterpart",
-        text: "Thanks — that works for me. This is just a practice round, so feel free to try the controls.",
+        text: "Thanks — that works for me. This is only practice, so try the controls however you like.",
       },
     ]);
     setPending(false);
   }
 
   return (
-    <PageShell wide>
-      <PageHeader
-        eyebrow={`Practice for session ${sessionIndex}`}
-        title="Try the interface"
-        subtitle="This is a practice round. Nothing here counts toward your results."
-      />
+    <>
+      <Page width="wide">
+        <SessionLayout briefing={<BriefingPanel task={task} role={role} />}>
+          <PageHeader
+            eyebrow={`Practice for session ${sessionIndex}`}
+            title="Try the interface"
+            subtitle="Nothing here counts. Take a minute to get used to it."
+          />
 
-      <div className="mb-6">
-        <Callout>
-          {isProxy ? (
-            <p>
-              In the upcoming session you will set instructions for an assistant
-              that negotiates for you. Here you can see how the negotiation and
-              review screens look. Take a minute to get familiar with them.
-            </p>
-          ) : (
-            <p>
-              In the upcoming session you will write messages and submit offers
-              yourself. Try sending a message and setting an offer below.
-            </p>
-          )}
-        </Callout>
-      </div>
-
-      <Card className="mb-6">
-        <h2 className="mb-2 text-sm font-semibold">Practice scenario</h2>
-        <p className="text-sm text-[var(--muted)]">{task.publicBrief}</p>
-      </Card>
-
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <Card className="flex flex-col p-0">
-          <div className="border-b border-[var(--border)] px-4 py-3">
-            <p className="text-sm font-medium">
-              {isProxy ? "Example conversation" : "Practice conversation"}
-            </p>
+          <div className="mb-5">
+            <Callout title={isProxy ? "In the session ahead" : "In the session ahead"}>
+              {isProxy ? (
+                <p>
+                  You will set instructions and limits for an assistant, which
+                  then negotiates with the other party&apos;s assistant while
+                  you wait. You review what it agreed and decide whether to
+                  accept it.
+                </p>
+              ) : (
+                <p>
+                  You will write messages to the other party yourself and build
+                  up an offer as you go. When you are done you decide whether to
+                  accept where things landed.
+                </p>
+              )}
+            </Callout>
           </div>
-          <Transcript
-            messages={messages}
-            pending={pending}
-            emptyHint="Send a message to see how this works."
-          />
-          <MessageComposer
-            onSend={sendPractice}
-            disabled={pending}
-            placeholder="Try writing something…"
-          />
-        </Card>
 
-        <div className="space-y-4">
-          <OfferPanel
-            issues={task.issues}
-            selection={offer}
-            onChange={(issueId, optionId) =>
-              setOffer((prev) => ({ ...prev, [issueId]: optionId }))
-            }
-          />
-          <IssueReference issues={task.issues} role={assignment.role} />
-        </div>
-      </div>
+          <Card className="mb-5">
+            <CardTitle>The practice scenario</CardTitle>
+            <p className="text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+              {task.publicBrief}
+            </p>
+          </Card>
 
-      <div className="mt-8 flex justify-end">
-        <Button onClick={finish}>
-          I&apos;m ready — start session {sessionIndex}
-        </Button>
-      </div>
-    </PageShell>
+          <Card className="mb-5 flex flex-col" padded={false}>
+            <div className="border-b border-[var(--line)] px-4 py-3">
+              <p className="text-[0.875rem] font-medium">Practice messages</p>
+            </div>
+            <Transcript
+              messages={messages}
+              pending={pending}
+              emptyHint="Send anything to see how this works."
+            />
+            <MessageComposer
+              onSend={sendPractice}
+              disabled={pending}
+              placeholder="Try writing something…"
+            />
+          </Card>
+
+          <Card>
+            <CardTitle hint="Choosing a level on each issue is how you make an offer.">
+              Practice offer
+            </CardTitle>
+            <div className="space-y-4">
+              {task.issues.map((issue) => (
+                <div key={issue.id}>
+                  <p className="mb-1.5 text-[0.8125rem] font-medium">
+                    {issue.label}
+                  </p>
+                  <OptionChips
+                    issue={issue}
+                    role={role}
+                    name={`practice-${issue.id}`}
+                    value={offer[issue.id] ?? null}
+                    onChange={(v) =>
+                      setOffer((prev) => ({ ...prev, [issue.id]: v }))
+                    }
+                    allowNone
+                    noneLabel="Not specified"
+                  />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </SessionLayout>
+      </Page>
+
+      <ActionBar
+        label={`Start session ${sessionIndex}`}
+        onClick={finish}
+        note="Practice is not recorded as a result."
+      />
+    </>
   );
 }

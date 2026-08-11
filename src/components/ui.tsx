@@ -82,15 +82,20 @@ export function Card({
   className,
   tone = "surface",
   padded = true,
+  id,
 }: {
   children: ReactNode;
   className?: string;
   tone?: "surface" | "private" | "muted";
   padded?: boolean;
+  /** Anchor target, for the action bar's "go to the first unanswered". */
+  id?: string;
 }) {
   return (
     <section
+      id={id}
       className={cx(
+        id && "scroll-mt-24",
         "rounded-[var(--radius-lg)] border",
         padded && "p-5 sm:p-6",
         tone === "private"
@@ -523,73 +528,6 @@ export function Scale({
         <span>{highAnchor}</span>
       </div>
     </fieldset>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// TEMPORARY COMPATIBILITY SHIMS
-//
-// The pages are being moved onto the primitives above one screen at a time.
-// These keep the build green in between and are deleted once the last page is
-// converted — do not write new code against them.
-// ---------------------------------------------------------------------------
-
-/** @deprecated use `Page` */
-export function PageShell({
-  children,
-  wide,
-}: {
-  children: ReactNode;
-  wide?: boolean;
-}) {
-  return <Page width={wide ? "wide" : "reading"}>{children}</Page>;
-}
-
-/** @deprecated use `Scale` */
-export const Likert = Scale;
-
-/** @deprecated use `ChoiceList` */
-export const RadioGroup = ChoiceList;
-
-/**
- * @deprecated use `Scale` or `AmountScale`.
- *
- * Kept as the original range input on purpose: mapping its value onto the new
- * dot scale would show the wrong point until the call site is converted. It
- * still carries the flaw the new controls fix — it submits a midpoint nobody
- * chose — which is why every remaining call site is being replaced.
- */
-export function Slider({
-  value,
-  onChange,
-  min = 0,
-  max = 100,
-  lowAnchor,
-  highAnchor,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  min?: number;
-  max?: number;
-  lowAnchor?: string;
-  highAnchor?: string;
-}) {
-  return (
-    <div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-[var(--accent)]"
-      />
-      <div className="flex justify-between text-xs text-[var(--ink-2)]">
-        <span>{lowAnchor ?? min}</span>
-        <span className="tabular font-medium text-[var(--ink)]">{value}</span>
-        <span>{highAnchor ?? max}</span>
-      </div>
-    </div>
   );
 }
 

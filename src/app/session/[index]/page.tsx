@@ -12,7 +12,7 @@
 import { use } from "react";
 import { useParticipant } from "@/lib/participant-context";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
-import { PageShell } from "@/components/ui";
+import { Page } from "@/components/ui";
 import { DirectSession } from "./direct-session";
 import { ProxySession } from "./proxy-session";
 
@@ -27,11 +27,9 @@ export default function SessionPage({
 
   if (!assignment) {
     return (
-      <PageShell>
-        <p className="text-sm text-[var(--muted)]">
-          Loading your session…
-        </p>
-      </PageShell>
+      <Page>
+        <p className="text-sm text-[var(--ink-2)]">Loading your session…</p>
+      </Page>
     );
   }
 

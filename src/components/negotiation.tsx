@@ -1,7 +1,10 @@
 "use client";
 
 /**
- * Negotiation-surface components shared by the Direct and Proxy sessions.
+ * The conversation surface: timer, transcript, composer.
+ *
+ * Issues and the private briefing live in `issues.tsx` and `session.tsx` —
+ * this file is only what is said and when.
  *
  * DECEPTION INTEGRITY: nothing here may reveal that the counterpart is an LLM,
  * or which condition the participant is in. Speaker labels are person-facing
@@ -10,8 +13,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { Issue, NegotiationTask, Role, Speaker } from "@/lib/types";
-import { Button, Card } from "./ui";
+import type { Speaker } from "@/lib/types";
+import { Button } from "./ui";
 
 // ---------------------------------------------------------------------------
 // Timer
@@ -56,7 +59,7 @@ export function CountdownTimer({
 
   return (
     <span
-      className={`font-mono text-sm tabular-nums ${low ? "text-red-600" : "text-[var(--muted)]"}`}
+      className={`font-mono text-sm tabular-nums ${low ? "text-red-600" : "text-[var(--ink-2)]"}`}
       aria-live="off"
     >
       {mm}:{ss}
@@ -99,7 +102,7 @@ export function Transcript({
   return (
     <div className="flex h-full min-h-80 flex-col gap-3 overflow-y-auto p-4">
       {messages.length === 0 && !pending ? (
-        <p className="m-auto max-w-xs text-center text-sm text-[var(--muted)]">
+        <p className="m-auto max-w-xs text-center text-sm text-[var(--ink-2)]">
           {emptyHint ?? "No messages yet."}
         </p>
       ) : null}
@@ -110,7 +113,7 @@ export function Transcript({
           return (
             <p
               key={m.id}
-              className="mx-auto max-w-md text-center text-xs text-[var(--muted)]"
+              className="mx-auto max-w-md text-center text-xs text-[var(--ink-2)]"
             >
               {m.text}
             </p>
@@ -121,14 +124,14 @@ export function Transcript({
             key={m.id}
             className={`flex flex-col ${own ? "items-end" : "items-start"}`}
           >
-            <span className="mb-1 text-xs text-[var(--muted)]">
+            <span className="mb-1 text-xs text-[var(--ink-2)]">
               {SPEAKER_LABEL[m.speaker]}
             </span>
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
                 own
                   ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
-                  : "border border-[var(--border)] bg-[var(--surface-muted)]"
+                  : "border border-[var(--line)] bg-[var(--surface-muted)]"
               }`}
             >
               {m.text}
@@ -139,12 +142,12 @@ export function Transcript({
 
       {pending ? (
         <div className="flex items-start">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-2.5">
+          <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-2.5">
             <span className="inline-flex gap-1">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
-                  className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--muted)]"
+                  className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ink-2)]"
                   style={{ animationDelay: `${i * 0.15}s` }}
                 />
               ))}
@@ -177,7 +180,7 @@ export function MessageComposer({
   }
 
   return (
-    <div className="flex items-end gap-2 border-t border-[var(--border)] p-3">
+    <div className="flex items-end gap-2 border-t border-[var(--line)] p-3">
       <textarea
         value={text}
         rows={2}
@@ -190,159 +193,11 @@ export function MessageComposer({
             submit();
           }
         }}
-        className="flex-1 resize-none rounded-lg border border-[var(--border)] px-3 py-2 text-sm outline-none focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)]"
+        className="flex-1 resize-none rounded-lg border border-[var(--line)] px-3 py-2 text-sm outline-none focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)]"
       />
       <Button onClick={submit} disabled={disabled || !text.trim()}>
         Send
       </Button>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Private scorecard + issue panel
-// ---------------------------------------------------------------------------
-
-export function RoleScorecard({
-  task,
-  role,
-}: {
-  task: NegotiationTask;
-  role: Role;
-}) {
-  const brief = task.roleBriefs[role];
-  return (
-    <Card className="text-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-semibold">Your confidential briefing</h2>
-        <span className="rounded-full bg-[var(--surface-muted)] px-2.5 py-0.5 text-xs text-[var(--muted)]">
-          {brief.title}
-        </span>
-      </div>
-      <p className="mb-4 text-[var(--muted)]">{brief.organizationalPosition}</p>
-
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-        Your objectives
-      </h3>
-      <ul className="mb-4 list-disc pl-5 text-[var(--muted)]">
-        {brief.objectives.map((o) => (
-          <li key={o}>{o}</li>
-        ))}
-      </ul>
-
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-        A requirement that matters to you
-      </h3>
-      <p className="mb-4">{brief.criticalRequirement}</p>
-
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-        If no agreement is reached
-      </h3>
-      <p>{brief.batnaSummary}</p>
-
-      <p className="mt-4 border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">
-        This briefing is private. The counterpart cannot see it.
-      </p>
-    </Card>
-  );
-}
-
-/** Read-only reference list of issues and their available levels. */
-export function IssueReference({
-  issues,
-  role,
-  showPoints = false,
-}: {
-  issues: Issue[];
-  role: Role;
-  showPoints?: boolean;
-}) {
-  return (
-    <Card>
-      <h2 className="mb-3 text-sm font-semibold">Issues under negotiation</h2>
-      <div className="space-y-4">
-        {issues.map((issue) => (
-          <div key={issue.id}>
-            <p className="text-sm font-medium">{issue.label}</p>
-            <p className="mb-1.5 text-xs text-[var(--muted)]">
-              {issue.description}
-            </p>
-            <ul className="space-y-0.5 text-xs text-[var(--muted)]">
-              {issue.options.map((o) => (
-                <li key={o.id} className="flex justify-between gap-2">
-                  <span>{o.label}</span>
-                  {showPoints ? (
-                    <span className="font-mono tabular-nums">
-                      {o.points[role]}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-      {showPoints ? (
-        <p className="mt-4 border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">
-          Points show what each level is worth to you. The counterpart has a
-          different set of values.
-        </p>
-      ) : null}
-    </Card>
-  );
-}
-
-/** Structured offer builder used alongside free-text chat. */
-export function OfferPanel({
-  issues,
-  selection,
-  onChange,
-  onSubmit,
-  disabled,
-  submitLabel = "Submit offer",
-}: {
-  issues: Issue[];
-  selection: Record<string, string>;
-  onChange: (issueId: string, optionId: string) => void;
-  onSubmit?: () => void;
-  disabled?: boolean;
-  submitLabel?: string;
-}) {
-  const complete = issues.every((i) => selection[i.id]);
-  return (
-    <Card>
-      <h2 className="mb-3 text-sm font-semibold">Your current offer</h2>
-      <div className="space-y-3">
-        {issues.map((issue) => (
-          <div key={issue.id}>
-            <label className="mb-1 block text-xs font-medium">
-              {issue.label}
-            </label>
-            <select
-              value={selection[issue.id] ?? ""}
-              disabled={disabled}
-              onChange={(e) => onChange(issue.id, e.target.value)}
-              className="w-full rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-sm outline-none focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)]"
-            >
-              <option value="">Not specified</option>
-              {issue.options.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ))}
-      </div>
-      {onSubmit ? (
-        <Button
-          onClick={onSubmit}
-          disabled={disabled || !complete}
-          className="mt-4 w-full"
-        >
-          {submitLabel}
-        </Button>
-      ) : null}
-    </Card>
   );
 }
