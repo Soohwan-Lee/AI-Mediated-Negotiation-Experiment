@@ -65,7 +65,7 @@ a real row would silently unbalance the design.
 
 ## Interface rules
 
-Six decisions the screens depend on. Breaking one is a regression even if it
+Seven decisions the screens depend on. Breaking one is a regression even if it
 compiles.
 
 1. **Colour encodes visibility.** Cool white and navy are the shared table;
@@ -94,6 +94,16 @@ compiles.
 6. **Items are data.** Every questionnaire item lives in `lib/measures.ts`;
    pages hold answers and never lay out a question. Item ids are the column
    names in the export — renaming one renames a variable.
+7. **Two measures, and prose keeps its own.** Column widths are the
+   `--measure-*` tokens in `globals.css`; the header and the action bar follow
+   the page through `--measure-page`, so a hardcoded width in any one of the
+   three misaligns the other two. The columns are wide because these screens
+   are mostly forms — an eighty-item battery on a narrow column is all scroll,
+   which is why a rating statement sits *beside* its buttons from `lg` up and
+   why two short answers (`half` in `lib/measures.ts`) share a row. Prose does
+   not follow the column: `.prose-study` and `max-w-prose` hold it near 70
+   characters. Widening something without capping the prose inside it is the
+   easy way to regress this.
 
 ## Dev / mockup mode
 
