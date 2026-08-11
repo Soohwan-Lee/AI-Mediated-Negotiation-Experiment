@@ -53,7 +53,15 @@ update) so two simultaneous participants cannot take the same slot. Assignment
 is idempotent per participant key, so a refresh never reassigns.
 
 Currently `lib/assignment.ts#claimSlot` is a deterministic local stand-in.
-`/api/assign` is the swap point.
+`/api/assign` is the swap point: replacing the body of `claimSlot` with the
+RPC call is the whole change, because nothing else in the app decides an
+assignment. Pages read it through `useParticipant`, and `resolveAssignment`
+expands a claimed row into the two-session plan.
+
+The dev panel's slot picker does **not** go through any of this. It swaps the
+assignment the UI renders, in memory, for previewing; it never claims a slot
+and never writes one. Keep it that way — a preview control that could consume
+a real row would silently unbalance the design.
 
 ## Interface rules
 
@@ -91,16 +99,27 @@ with dummy answers, jumps between pages *and* between the phases inside a
 session, swaps the assignment (role · proxy policy · sequence) without clearing
 storage, fakes AI turns instantly, and resets participant data.
 
-**It must never reach a participant.** It names conditions and shows the
-assignment, so availability is a build-time constant, not a runtime flag:
+It is present by default on every build, including deployed ones, so the
+layout can be checked wherever it happens to be running.
+
+**Before recruiting: set `NEXT_PUBLIC_DEV_TOOLS=off` and redeploy.** The panel
+names conditions and shows the assignment. The ON/OFF and "hide" controls in
+the panel live in one browser's localStorage — they are conveniences for
+whoever is looking, and they do not hide anything from a participant. Only the
+variable does.
 
 | Build | Panel |
 |---|---|
-| `next dev` | available, on by default |
-| build with `NEXT_PUBLIC_DEV_TOOLS=1` | available (preview deploys) |
-| build without it | not loaded — the chunk is behind a dynamic import that is never reached |
+| local / preview | present, dev mode on by default |
+| live deployment (`NEXT_PUBLIC_VERCEL_ENV=production`) | present, dev mode **off** by default, with a warning in the panel |
+| `NEXT_PUBLIC_DEV_TOOLS=off` | not loaded — the chunk is behind a dynamic import that is never reached, and no prerendered page references it |
 
-`?dev=1` / `?dev=0` in the URL forces the toggle where the panel is available.
+Dev mode starts off on the live deployment so that a forgotten launch switch
+costs a visible panel rather than a study collecting data with its validation
+bypassed.
+
+`?dev=1` / `?dev=0` in the URL forces the toggle. Ctrl/Cmd+Shift+D opens the
+panel and brings it back after "Hide".
 
 Wiring, when adding a page: gate the Continue button on
 `useDevGate(complete)` rather than `complete`, register a dummy-answer filler

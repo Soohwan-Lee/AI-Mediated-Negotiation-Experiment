@@ -8,17 +8,23 @@
  * participant-facing sequence can be reviewed while the design is still
  * unsettled.
  *
- * DECEPTION INTEGRITY — READ BEFORE CHANGING:
- * The panel this powers names conditions ("Delegate", "Explorer"), reveals the
- * assignment, and jumps between pages. A participant must never see it
- * (CLAUDE.md §"Things the participant must never learn mid-study"). It is
- * therefore gated on a BUILD-TIME constant: the real Prolific build simply has
- * no toggle to find, rather than a hidden one. Keep it that way — do not
- * replace `DEV_TOOLS_AVAILABLE` with a runtime check.
+ * The panel ships by default, including on deployed builds, so the layout can
+ * be checked wherever it is running without reconfiguring anything.
  *
- *   next dev                      -> available
- *   NEXT_PUBLIC_DEV_TOOLS=1 build -> available (preview deploys)
- *   production build w/o that var -> compiled out
+ * BEFORE RECRUITING, SET `NEXT_PUBLIC_DEV_TOOLS=off` AND REDEPLOY.
+ * The panel names conditions ("Delegate", "Explorer"), shows the assignment,
+ * and jumps between pages — all of which invalidate the study if a participant
+ * finds them (CLAUDE.md §"Things the participant must never learn mid-study").
+ * With the variable set to `off` the constant below is false at build time, so
+ * the panel is not merely hidden: its code is never downloaded.
+ *
+ * The in-panel toggle and the "hide" button are conveniences for whoever is
+ * looking at the page. They live in that browser's localStorage and have no
+ * effect on anyone else's browser, so neither of them is what protects the
+ * study. The environment variable is.
+ *
+ *   NEXT_PUBLIC_DEV_TOOLS unset or "1" -> available (default)
+ *   NEXT_PUBLIC_DEV_TOOLS="off"        -> compiled out
  */
 
 import {
@@ -34,12 +40,18 @@ import {
 import type { ProxyPolicy, Role, SequenceId } from "./types";
 
 /**
- * Build-time gate. Both operands are inlined by Next at compile time, so when
- * this is false the dev panel is dead code the bundler can drop.
+ * The launch switch. Inlined by Next at compile time, so setting the variable
+ * to "off" leaves the panel as dead code behind a dynamic import that is never
+ * reached — see components/dev-panel-mount.
  */
-export const DEV_TOOLS_AVAILABLE =
-  process.env.NEXT_PUBLIC_DEV_TOOLS === "1" ||
-  process.env.NODE_ENV !== "production";
+export const DEV_TOOLS_AVAILABLE = process.env.NEXT_PUBLIC_DEV_TOOLS !== "off";
+
+/**
+ * True on a Vercel production deployment. Used only to warn that the panel is
+ * live where participants could reach it.
+ */
+export const IS_LIVE_DEPLOYMENT =
+  process.env.NEXT_PUBLIC_VERCEL_ENV === "production";
 
 /** The three factors a slot carries — mirrors `assignment_slots`. */
 export interface DevSlot {
@@ -64,6 +76,8 @@ export interface DevAction {
 interface DevSettings {
   /** Master switch. Everything else is inert while this is false. */
   enabled: boolean;
+  /** Takes the panel off screen for this browser. Ctrl/Cmd+Shift+D brings it back. */
+  hidden: boolean;
   /** Let "Continue" through with required items unanswered. */
   skipValidation: boolean;
   /** Answer AI turns locally and instantly instead of calling the route. */
@@ -74,7 +88,12 @@ interface DevSettings {
 }
 
 const DEFAULTS: DevSettings = {
-  enabled: DEV_TOOLS_AVAILABLE,
+  // On locally and on previews. On the live deployment the panel is there but
+  // starts OFF, so if the launch switch is ever forgotten the worst case is a
+  // visible panel rather than a study running with its validation bypassed.
+  // One click turns it on, and the choice sticks.
+  enabled: DEV_TOOLS_AVAILABLE && !IS_LIVE_DEPLOYMENT,
+  hidden: false,
   skipValidation: true,
   mockAi: true,
   slotOverride: false,

@@ -3,11 +3,11 @@
 /**
  * Floating developer / mockup panel.
  *
- * NEVER SHIPS TO PARTICIPANTS. It names conditions and reveals the assignment,
- * both of which invalidate the study if seen (CLAUDE.md §"Things the
- * participant must never learn mid-study"). Rendering is gated on the
- * build-time `DEV_TOOLS_AVAILABLE` constant in `lib/dev-mode`; see the note
- * there before changing how it is enabled.
+ * Present by default on every build, including deployed ones, so the layout
+ * can be walked wherever it is running. It names conditions and shows the
+ * assignment, so it must be gone before recruiting:
+ * `NEXT_PUBLIC_DEV_TOOLS=off` — see the note in `lib/dev-mode`. The ON/OFF and
+ * hide controls here are per-browser and protect nothing on their own.
  *
  * Deliberately styled as a dark, cramped tool so it can never be mistaken for
  * part of the instrument.
@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { resolveAssignment } from "@/lib/assignment";
 import {
   DEV_TOOLS_AVAILABLE,
+  IS_LIVE_DEPLOYMENT,
   useDevMode,
   type DevSlot,
 } from "@/lib/dev-mode";
@@ -39,19 +40,23 @@ export function DevPanel() {
   const { assignment, participantKey } = useParticipant();
   const [open, setOpen] = useState(false);
 
-  // Ctrl/Cmd + Shift + D toggles the panel.
+  // Ctrl/Cmd + Shift + D toggles the panel, and brings it back after "Hide".
+  // Without this, hiding it would be one-way per browser.
+  const { update, hidden } = dev;
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.shiftKey && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
         e.preventDefault();
-        setOpen((o) => !o);
+        if (hidden) update({ hidden: false });
+        setOpen((o) => hidden || !o);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [hidden, update]);
 
   if (!DEV_TOOLS_AVAILABLE) return null;
+  if (dev.hidden && !open) return null;
 
   function setSlot(patch: Partial<DevSlot>) {
     dev.update({ slot: { ...dev.slot, ...patch }, slotOverride: true });
@@ -123,6 +128,15 @@ export function DevPanel() {
           </button>
         </div>
       </div>
+
+      {IS_LIVE_DEPLOYMENT ? (
+        <p className="border-b border-amber-700/40 bg-amber-950/60 px-3 py-2 text-[10px] leading-relaxed text-amber-200">
+          This is the live deployment. Set{" "}
+          <code className="font-mono">NEXT_PUBLIC_DEV_TOOLS=off</code> and
+          redeploy before recruiting — hiding the panel only affects this
+          browser.
+        </p>
+      ) : null}
 
       <div className="flex-1 overflow-y-auto px-3 py-2">
         {!dev.enabled ? (
@@ -270,6 +284,23 @@ export function DevPanel() {
               </button>
               <p className="mt-1 font-mono text-[10px] text-neutral-500">
                 key: {participantKey ?? "—"}
+              </p>
+            </Section>
+
+            <Section title="Get it out of the way">
+              <button
+                type="button"
+                onClick={() => {
+                  dev.update({ hidden: true });
+                  setOpen(false);
+                }}
+                className="w-full rounded bg-neutral-700 px-2 py-1.5 text-left hover:bg-neutral-600"
+              >
+                Hide the panel
+              </button>
+              <p className="mt-1 text-[10px] leading-relaxed text-neutral-500">
+                Press Ctrl/Cmd+Shift+D to bring it back. This browser only — it
+                does not hide the panel from anyone else.
               </p>
             </Section>
           </>
