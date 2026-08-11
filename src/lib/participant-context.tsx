@@ -16,6 +16,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { claimSlot, resolveAssignment } from "./assignment";
 import { useDevMode } from "./dev-mode";
@@ -32,7 +33,6 @@ interface ParticipantState {
   prolific: ProlificContext;
   assignment: Assignment | null;
   consented: boolean;
-  ready: boolean;
 }
 
 interface ParticipantContextValue extends ParticipantState {
@@ -57,6 +57,26 @@ const STORAGE_KEY = "amne:session";
 const DEV_PARTICIPANT_KEY = "P-devpreview";
 const DEV_ASSIGNED_AT = "1970-01-01T00:00:00.000Z";
 
+/**
+ * "Has the client taken over yet?", without a hydration mismatch.
+ *
+ * The session state comes from localStorage and URL params, neither of which
+ * exists on the server, so children cannot be rendered until the client is
+ * running. Reading that as ordinary state makes the FIRST client render
+ * differ from the server's and React throws the tree away; useSyncExternalStore
+ * is the supported way to say "server said false, client says true" without a
+ * mismatch.
+ */
+const NEVER_CHANGES = () => () => {};
+
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    NEVER_CHANGES,
+    () => true,
+    () => false,
+  );
+}
+
 function newParticipantKey(): string {
   // Pseudonymous research key. The raw Prolific PID is stored separately so
   // exports can be de-identified (Methods §Data logging).
@@ -75,7 +95,6 @@ function readInitialState(): ParticipantState {
       prolific: { prolificPid: null, studyId: null, sessionId: null },
       assignment: null,
       consented: false,
-      ready: false,
     };
   }
 
@@ -93,7 +112,6 @@ function readInitialState(): ParticipantState {
       prolific: urlProlific,
       assignment: null,
       consented: false,
-      ready: true,
     };
   }
 
@@ -110,7 +128,6 @@ function readInitialState(): ParticipantState {
     // Loaded asynchronously below.
     assignment: null,
     consented: parsed.consented,
-    ready: true,
   };
 }
 
@@ -120,6 +137,7 @@ export function ParticipantProvider({
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<ParticipantState>(readInitialState);
+  const hydrated = useHydrated();
   const dev = useDevMode();
 
   // Rehydrate the assignment for a returning participant. This is a genuine
@@ -228,15 +246,15 @@ export function ParticipantProvider({
     [state, assignment, beginStudy, logEvent, saveResponses],
   );
 
-  // The initial state is read from localStorage + URL params, which do not
-  // exist during SSR. Rendering children only after mount keeps the server and
-  // first client paint identical and avoids a hydration mismatch.
-  if (!state.ready) {
+  // Children need localStorage and URL params, so they wait for the client.
+  // `hydrated` is false during the server render AND during the hydrating
+  // render, which is what keeps the two identical — see useHydrated.
+  if (!hydrated) {
     return (
       <ParticipantContext.Provider value={value}>
         <div
           aria-busy="true"
-          className="flex min-h-screen items-center justify-center text-sm text-neutral-500"
+          className="flex min-h-screen items-center justify-center text-sm text-[var(--ink-3)]"
         >
           Loading…
         </div>

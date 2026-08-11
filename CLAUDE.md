@@ -55,6 +55,34 @@ is idempotent per participant key, so a refresh never reassigns.
 Currently `lib/assignment.ts#claimSlot` is a deterministic local stand-in.
 `/api/assign` is the swap point.
 
+## Interface rules
+
+Six decisions the screens depend on. Breaking one is a regression even if it
+compiles.
+
+1. **Colour encodes visibility.** Cool white and navy are the shared table;
+   sand is private to the participant. Never render a private value — a point
+   total, a reservation position, a briefing — on a plain white card. The study
+   is about what people are willing to expose, so "can they see this?" must
+   never be a question the participant has to ask. Tokens in `globals.css`.
+2. **Nothing starts answered.** `Scale` and `AmountScale` have no default
+   position. A slider's midpoint gets submitted by everyone who does not
+   engage, and is indistinguishable from a considered midpoint. Do not
+   reintroduce a control with a starting value.
+3. **One progress bar, derived from the URL.** `flowKeyFromPath` is the single
+   source; pages never declare their own step. This is what makes progress
+   assignment-order-proof — the URL carries only the session index.
+4. **The study only moves forward.** `NavigationGuard` absorbs the back press
+   with a sentinel history entry. Do not "fix" it by redirecting forward
+   instead: a session's phase is component state, so a remount restarts the
+   negotiation.
+5. **The briefing is never taken away.** `SessionLayout` pins it beside the
+   work from `lg` up and behind one tap below that, at every phase. Anything a
+   participant is expected to negotiate from belongs in it.
+6. **Items are data.** Every questionnaire item lives in `lib/measures.ts`;
+   pages hold answers and never lay out a question. Item ids are the column
+   names in the export — renaming one renames a variable.
+
 ## Dev / mockup mode
 
 A floating panel (bottom-right, or Ctrl/Cmd+Shift+D) makes the flow walkable
@@ -91,6 +119,11 @@ the URL cannot reach. All of them are no-ops in a production build. See
 | Agent behavior rules | `lib/ai/prompts.ts` |
 | Guardrails | `lib/ai/validator.ts` |
 | Timings, payment, IRB text, completion code | `lib/study-config.ts` |
+| Questionnaire items, scales, response options | `lib/measures.ts` |
+| Design tokens, type scale | `app/globals.css` |
+| Controls (scale, chips, buttons, cards) | `components/ui.tsx` |
+| Progress bar and sticky action bar | `components/study-chrome.tsx` |
+| Briefing panel and session layout | `components/session.tsx` |
 | Dev-mode gating, autofill, phase jumps | `lib/dev-mode.tsx` · `components/dev-panel.tsx` |
 
 Pages never touch persistence or the network directly — they go through
