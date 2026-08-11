@@ -10,6 +10,7 @@
  */
 
 import type { Block, Item } from "@/lib/measures";
+
 import { requiredIds } from "@/lib/measures";
 import type { SurveyResponses } from "@/lib/types";
 import {
@@ -42,18 +43,57 @@ export function MeasureBlock({
   return (
     <Card className="mb-5">
       <CardTitle hint={block.hint}>{block.title}</CardTitle>
-      {block.items.map((item) => (
-        <MeasureItem
-          key={item.id}
-          item={item}
-          value={answers[item.id]}
-          onChange={onChange}
-          optional={optional.has(item.id)}
-          flagged={flagged?.has(item.id)}
-        />
-      ))}
+      {pairShortItems(block.items).map((row) =>
+        row.length === 1 ? (
+          <MeasureItem
+            key={row[0].id}
+            item={row[0]}
+            value={answers[row[0].id]}
+            onChange={onChange}
+            optional={optional.has(row[0].id)}
+            flagged={flagged?.has(row[0].id)}
+          />
+        ) : (
+          // Two short answers on one line. `items-start` so a wrapped label on
+          // one side does not drag its neighbour's input down with it.
+          <div
+            key={row.map((i) => i.id).join("+")}
+            className="grid items-start gap-x-5 sm:grid-cols-2"
+          >
+            {row.map((item) => (
+              <MeasureItem
+                key={item.id}
+                item={item}
+                value={answers[item.id]}
+                onChange={onChange}
+                optional={optional.has(item.id)}
+                flagged={flagged?.has(item.id)}
+              />
+            ))}
+          </div>
+        ),
+      )}
     </Card>
   );
+}
+
+/**
+ * Groups runs of `half` items into pairs, leaving everything else on its own
+ * line. Order is preserved exactly — an item never moves past a neighbour, so
+ * the sequence a participant reads is still the sequence in `lib/measures`.
+ */
+function pairShortItems(items: Item[]): Item[][] {
+  const rows: Item[][] = [];
+  for (const item of items) {
+    const half = "half" in item && item.half;
+    const last = rows[rows.length - 1];
+    const lastIsOpenPair =
+      last?.length === 1 && "half" in last[0] && last[0].half;
+
+    if (half && lastIsOpenPair) last.push(item);
+    else rows.push([item]);
+  }
+  return rows;
 }
 
 function MeasureItem({

@@ -11,6 +11,15 @@
  * rename an id and you have renamed a variable.
  */
 
+/**
+ * `half` marks an item whose answer is short — an age, a dropdown, a job
+ * title. Two of them share a row on a wide screen instead of each taking a
+ * full one, which is the difference between a demographics block that fits on
+ * a screen and one that has to be scrolled. It is a hint about the shape of
+ * the answer, not about layout: the renderer decides what to do with it, and
+ * ignores it when there is no room. Anything with a long label or a long
+ * answer should leave it off.
+ */
 export type Item =
   | {
       kind: "scale";
@@ -33,9 +42,10 @@ export type Item =
       id: string;
       text: string;
       options: Array<{ value: string; label: string }>;
+      half?: boolean;
     }
-  | { kind: "number"; id: string; text: string; placeholder?: string }
-  | { kind: "line"; id: string; text: string; placeholder?: string }
+  | { kind: "number"; id: string; text: string; placeholder?: string; half?: boolean }
+  | { kind: "line"; id: string; text: string; placeholder?: string; half?: boolean }
   | { kind: "text"; id: string; text: string; placeholder?: string; rows?: number };
 
 export interface Block {
@@ -62,11 +72,12 @@ export const BACKGROUND_BLOCKS: Block[] = [
     title: "About you",
     optional: ["occupation", "years_experience"],
     items: [
-      { kind: "number", id: "age", text: "Age", placeholder: "e.g. 34" },
+      { kind: "number", id: "age", text: "Age", placeholder: "e.g. 34", half: true },
       {
         kind: "select",
         id: "gender",
         text: "Gender",
+        half: true,
         options: [
           { value: "male", label: "Male" },
           { value: "female", label: "Female" },
@@ -79,6 +90,7 @@ export const BACKGROUND_BLOCKS: Block[] = [
         kind: "select",
         id: "education",
         text: "Highest level of education completed",
+        half: true,
         options: [
           { value: "hs_or_below", label: "High school or below" },
           { value: "some_college", label: "Some college" },
@@ -92,6 +104,7 @@ export const BACKGROUND_BLOCKS: Block[] = [
         kind: "select",
         id: "employment",
         text: "Employment status",
+        half: true,
         options: [
           { value: "full_time", label: "Employed full-time" },
           { value: "part_time", label: "Employed part-time" },
@@ -106,12 +119,14 @@ export const BACKGROUND_BLOCKS: Block[] = [
         id: "occupation",
         text: "Occupation or industry",
         placeholder: "e.g. Software, Healthcare, Education",
+        half: true,
       },
       {
         kind: "number",
         id: "years_experience",
         text: "Years of professional or organizational experience",
         placeholder: "e.g. 8",
+        half: true,
       },
       {
         kind: "choice",
