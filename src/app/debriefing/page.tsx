@@ -9,9 +9,11 @@
  *  - the reward decision was scenario-only and changed nobody's payment
  *  - why this could not be disclosed up front
  *
- * Also offers data withdrawal, which must not cost the participant their
- * payment. The completion code is on the NEXT page and is issued regardless of
- * the withdrawal choice.
+ * The completion code is on the NEXT page and is issued unconditionally.
+ *
+ * NOTE: there is deliberately no post-debriefing data-withdrawal option here.
+ * Confirm that against the approved protocol before recruitment — an IRB
+ * reviewing a deception study often requires one.
  */
 
 import { useRouter } from "next/navigation";
@@ -36,7 +38,6 @@ export default function DebriefingPage() {
   const router = useRouter();
   const { assignment, saveResponses, logEvent } = useParticipant();
   const [acknowledged, setAcknowledged] = useState(false);
-  const [withdraw, setWithdraw] = useState(false);
   const [comments, setComments] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -50,12 +51,8 @@ export default function DebriefingPage() {
     if (!canContinue) return;
     setBusy(true);
     try {
-      await saveResponses("debriefing", {
-        acknowledged,
-        withdrawRequested: withdraw,
-        comments,
-      });
-      logEvent("debriefing_acknowledged", { withdrawRequested: withdraw });
+      await saveResponses("debriefing", { acknowledged, comments });
+      logEvent("debriefing_acknowledged");
       router.push(nextHref("debriefing"));
     } finally {
       setBusy(false);
@@ -153,24 +150,11 @@ export default function DebriefingPage() {
         </div>
 
         <Card>
-          <CardTitle>Your choices</CardTitle>
+          <CardTitle>Before you finish</CardTitle>
 
-          <div className="space-y-4">
-            <Checkbox checked={acknowledged} onChange={setAcknowledged}>
-              I have read and understood this explanation.
-            </Checkbox>
-
-            <div className="rounded-[var(--radius)] border border-[var(--line)] p-3.5">
-              <Checkbox checked={withdraw} onChange={setWithdraw}>
-                Now that I know the full details, I would like my data withdrawn
-                from the study.
-                <span className="mt-1 block text-sm text-[var(--ink-2)]">
-                  You still receive your full payment, and you still get your
-                  completion code on the next page.
-                </span>
-              </Checkbox>
-            </div>
-          </div>
+          <Checkbox checked={acknowledged} onChange={setAcknowledged}>
+            I have read and understood this explanation.
+          </Checkbox>
 
           <div className="mt-6">
             <Field label="Anything you would like to tell the research team?">

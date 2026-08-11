@@ -3,9 +3,8 @@
 /**
  * Completion (Methods §9).
  *
- * Issues the Prolific completion code. Reached regardless of the
- * data-withdrawal choice on the debriefing page — withdrawing data must never
- * cost the participant their payment.
+ * Issues the Prolific completion code, unconditionally. Whatever a participant
+ * did or did not do earlier, reaching this page means they are paid.
  */
 
 import { useEffect, useState } from "react";

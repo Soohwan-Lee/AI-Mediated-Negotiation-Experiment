@@ -15,10 +15,11 @@ export const STUDY = {
   hourlyEquivalentUsd: "9.80",
   irb: {
     protocolNumber: "TBD-IRB-0000",
-    institution: "[Institution Name]",
+    institution: "UNIST",
     principalInvestigator: "[PI Name]",
-    contactEmail: "[irb-contact@institution.edu]",
-    researcherEmail: "[researcher@institution.edu]",
+    /** IRB office address — TBD, must be the approved one before recruitment. */
+    contactEmail: "[irb-contact@unist.ac.kr]",
+    researcherEmail: "soohwanlee@unist.ac.kr",
   },
   /** Issued on the completion page. Replace with the real Prolific code. */
   prolificCompletionCode: "TBD-COMPLETION-CODE",
