@@ -57,6 +57,21 @@
   /* Fixed chrome heights, so sticky offsets stay in one place. */
   --header-h: 56px;
   --actionbar-h: 68px;
+
+  /* Content measures. One place, because the header, the action bar and the
+     page column must agree — chrome that is wider than its content reads as
+     a misalignment rather than as a frame.
+
+     `--measure-reading` is deliberately wider than a pure prose measure: most
+     of these screens are forms, where a row is a statement plus its control,
+     not a sentence. Long prose gets `.prose-study`, which pulls its own
+     narrower measure back in. */
+  --measure-reading: 56rem;
+  --measure-wide: 84rem;
+
+  /* Prose sits narrower than the column it lives in: ~70 characters, the
+     point past which a reader starts losing the line they are on. */
+  --measure-prose: 34rem;
 }
 
 @theme inline {
@@ -86,6 +101,20 @@ html {
   color-scheme: light;
 }
 
+/* The action bar is fixed, so it cannot inherit the column's width from the
+   DOM. `Page` marks itself with `data-measure`, and the body republishes that
+   as `--measure-page` for the bar to read — the bar then ends where the
+   content ends instead of running past it. `:has` is the whole mechanism;
+   without support the bar falls back to the reading measure, which is the
+   width most pages use anyway. */
+body:has(main[data-measure="wide"]) {
+  --measure-page: var(--measure-wide);
+}
+
+body:has(main[data-measure="reading"]) {
+  --measure-page: var(--measure-reading);
+}
+
 body {
   background: var(--ground);
   color: var(--ink);
@@ -103,6 +132,10 @@ body {
   font-size: 1.0625rem;
   line-height: 1.7;
   color: var(--ink);
+  /* Holds the reading measure even when the surrounding column is wide. The
+     column widened for forms and tables; a paragraph still wants ~70
+     characters, so prose opts out rather than following it. */
+  max-width: var(--measure-prose);
 }
 
 .prose-study p {

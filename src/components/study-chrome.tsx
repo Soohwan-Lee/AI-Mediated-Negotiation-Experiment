@@ -35,7 +35,12 @@ export function StudyChrome({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--surface)]">
-        <div className="mx-auto flex h-[var(--header-h)] w-full max-w-6xl items-center justify-between gap-4 px-5 sm:px-6">
+        {/* Same width as the column below it, for the same reason as the
+            action bar: chrome that overhangs its content reads as a mistake. */}
+        <div
+          className="mx-auto flex h-[var(--header-h)] w-full items-center justify-between gap-4 px-5 sm:px-6 lg:px-8"
+          style={{ maxWidth: "var(--measure-page, var(--measure-reading))" }}
+        >
           <div className="flex items-center gap-2.5">
             <span
               aria-hidden
@@ -117,7 +122,14 @@ export function ActionBar({
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--line)] bg-[var(--surface)]">
-      <div className="mx-auto flex min-h-[var(--actionbar-h)] w-full max-w-6xl items-center justify-between gap-4 px-5 py-3 sm:px-6">
+      {/* Tracks the width of the column it sits under, so the primary button
+          lines up with the content rather than floating past its edge. `Page`
+          publishes that width as `--measure-page`; the fallback covers an
+          action bar rendered outside one. */}
+      <div
+        className="mx-auto flex min-h-[var(--actionbar-h)] w-full items-center justify-between gap-4 px-5 py-3 sm:px-6 lg:px-8"
+        style={{ maxWidth: "var(--measure-page, var(--measure-reading))" }}
+      >
         <p className="text-[0.8125rem] text-[var(--ink-2)]">
           {remaining > 0 ? (
             <>

@@ -29,6 +29,13 @@ export function cx(...parts: Array<string | false | null | undefined>) {
  * Content column. `reading` for forms and prose, `wide` for the session
  * surfaces that carry a briefing rail. Bottom padding clears the sticky
  * action bar.
+ *
+ * Both measures come from `globals.css`, which is also where the header and
+ * the action bar read theirs — the three have to agree, or the chrome reads as
+ * misaligned with the page it frames. They are deliberately generous: a narrow
+ * column on a laptop turns a questionnaire into a long scroll while half the
+ * screen sits empty. Long prose keeps a reading measure of its own by way of
+ * `.prose-study`, so widening here does not stretch paragraphs.
  */
 export function Page({
   children,
@@ -39,9 +46,13 @@ export function Page({
 }) {
   return (
     <main
+      // `data-measure` is what the sticky action bar keys off to match this
+      // column's width — see the rule in globals.css. It is a plain attribute
+      // rather than state so the server and client render the same thing.
+      data-measure={width}
       className={cx(
-        "mx-auto w-full px-5 pb-32 pt-8 sm:px-6 sm:pt-12",
-        width === "wide" ? "max-w-6xl" : "max-w-2xl",
+        "mx-auto w-full px-5 pb-32 pt-8 sm:px-6 sm:pt-12 lg:px-8",
+        width === "wide" ? "max-w-(--measure-wide)" : "max-w-(--measure-reading)",
       )}
     >
       {children}
