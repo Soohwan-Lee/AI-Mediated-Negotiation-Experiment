@@ -3,15 +3,15 @@
 /**
  * Completion (Methods §9).
  *
- * Issues the Prolific completion code. This page is reached regardless of the
+ * Issues the Prolific completion code. Reached regardless of the
  * data-withdrawal choice on the debriefing page — withdrawing data must never
  * cost the participant their payment.
  */
 
 import { useEffect, useState } from "react";
+import { Card, CardTitle, Page, PageHeader } from "@/components/ui";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { STUDY } from "@/lib/study-config";
-import { Button, Card, PageHeader, PageShell } from "@/components/ui";
 
 export default function CompletePage() {
   usePageEnter("complete");
@@ -29,53 +29,57 @@ export default function CompletePage() {
   }
 
   return (
-    <PageShell>
-      <div className="py-8">
-        <PageHeader
-          title="You're all done"
-          subtitle="Thank you for taking part in this research."
-        />
+    <Page>
+      <PageHeader
+        eyebrow="Finished"
+        title="You're all done"
+        subtitle="Thank you for taking part in this research."
+      />
 
-        <Card className="mb-6 text-center">
-          <p className="mb-2 text-xs uppercase tracking-widest text-[var(--muted)]">
-            Your completion code
-          </p>
-          <p className="mb-4 font-mono text-2xl font-semibold tracking-wider">
-            {STUDY.prolificCompletionCode}
-          </p>
-          <Button onClick={copyCode} variant="secondary">
-            {copied ? "Copied" : "Copy code"}
-          </Button>
-        </Card>
+      <Card className="mb-5 text-center">
+        <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-3)]">
+          Your completion code
+        </p>
+        <p className="tabular my-4 text-3xl font-semibold tracking-wide">
+          {STUDY.prolificCompletionCode}
+        </p>
+        <button
+          type="button"
+          onClick={copyCode}
+          className="rounded-[var(--radius)] border border-[var(--line-strong)] px-4 py-2 text-[0.875rem] font-medium transition-colors hover:bg-[var(--surface-muted)]"
+        >
+          {copied ? "Copied" : "Copy code"}
+        </button>
+      </Card>
 
-        <Card className="mb-6">
-          <h2 className="mb-2 text-sm font-semibold">To get paid</h2>
-          <p className="mb-4 text-sm text-[var(--muted)]">
-            Return to Prolific and submit the code above, or use the button
-            below to complete your submission automatically. Your payment will
-            be approved once your submission is recorded.
-          </p>
-          <a
-            href={STUDY.prolificCompletionUrl}
-            className="inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition-colors hover:bg-black"
-          >
-            Return to Prolific
-          </a>
-        </Card>
+      <Card className="mb-5">
+        <CardTitle hint="Your payment is approved once your submission is recorded.">
+          To get paid
+        </CardTitle>
+        <p className="mb-4 text-[0.9375rem] text-[var(--ink-2)]">
+          Go back to Prolific and submit the code above, or use the button below
+          to complete your submission automatically.
+        </p>
+        <a
+          href={STUDY.prolificCompletionUrl}
+          className="inline-flex items-center gap-2 rounded-[var(--radius)] bg-[var(--accent)] px-5 py-2.5 text-[0.9375rem] font-medium text-[var(--accent-foreground)] transition-colors hover:bg-[var(--accent-hover)]"
+        >
+          Return to Prolific
+          <span aria-hidden>→</span>
+        </a>
+      </Card>
 
-        <Card>
-          <h2 className="mb-2 text-sm font-semibold">Questions?</h2>
-          <p className="text-sm text-[var(--muted)]">
-            If you have any questions about this study, contact the research
-            team at {STUDY.irb.researcherEmail}. For questions about your rights
-            as a research participant, contact {STUDY.irb.contactEmail}{" "}
-            (protocol {STUDY.irb.protocolNumber}).
-          </p>
-          <p className="mt-4 text-xs text-[var(--muted)]">
-            You may now close this window.
-          </p>
-        </Card>
-      </div>
-    </PageShell>
+      <Card tone="muted">
+        <CardTitle>Questions</CardTitle>
+        <p className="text-[0.9375rem] text-[var(--ink-2)]">
+          About the study, contact {STUDY.irb.researcherEmail}. About your
+          rights as a research participant, contact {STUDY.irb.contactEmail}{" "}
+          (protocol {STUDY.irb.protocolNumber}).
+        </p>
+        <p className="mt-4 text-sm text-[var(--ink-3)]">
+          You may now close this window.
+        </p>
+      </Card>
+    </Page>
   );
 }
