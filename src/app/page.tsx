@@ -16,6 +16,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
 import { STUDY, nextHref } from "@/lib/study-config";
 import {
@@ -34,7 +35,12 @@ export default function ConsentPage() {
   const [isAdult, setIsAdult] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const canProceed = agreed && isAdult && !busy;
+  useDevAutofill(() => {
+    setIsAdult(true);
+    setAgreed(true);
+  });
+
+  const canProceed = useDevGate(agreed && isAdult) && !busy;
 
   async function handleConsent() {
     if (!canProceed) return;

@@ -15,6 +15,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  useDevActions,
+  useDevAutofill,
+  useDevGate,
+  useDevMockAi,
+} from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { getTask } from "@/lib/tasks";
@@ -54,6 +60,28 @@ type Phase =
   | "mandate_review"
   | "negotiating"
   | "review";
+
+const PHASES: Phase[] = [
+  "brief",
+  "preference",
+  "mandate",
+  "mandate_review",
+  "negotiating",
+  "review",
+];
+
+/**
+ * Dev-mode stand-in transcript. Speaker labels match the real surface so the
+ * review screen can be judged without running (or paying for) the AI-AI loop.
+ */
+const MOCK_TRANSCRIPT: DisplayMessage[] = [
+  { id: "m0", speaker: "participant_proxy", text: "[mock] Opening on behalf of my principal: timeline and review rights are the priorities." },
+  { id: "m1", speaker: "counterpart_proxy", text: "[mock] Understood. My side needs the workload split held, but has room on timeline." },
+  { id: "m2", speaker: "participant_proxy", text: "[mock] Then a trade: we move on workload if the timeline extends by two weeks." },
+  { id: "m3", speaker: "counterpart_proxy", text: "[mock] Acceptable in principle. Credit attribution still needs to be settled." },
+  { id: "m4", speaker: "participant_proxy", text: "[mock] Shared credit with lead billing on the technical section." },
+  { id: "m5", speaker: "counterpart_proxy", text: "[mock] Agreed. Recording that as the tentative package for review." },
+];
 
 const PRIORITY_OPTIONS: Array<{ value: MandatePriority; label: string }> = [
   { value: "low", label: "Low" },
@@ -122,6 +150,47 @@ export function ProxySession({
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
+  const mockAi = useDevMockAi();
+
+  useDevActions(
+    `session-${sessionIndex}`,
+    PHASES.map((p) => ({
+      id: p,
+      label: p.replace("_", " "),
+      active: phase === p,
+      run: () => {
+        // Jumping straight to review needs something to review; jumping to the
+        // waiting screen needs a progress value or it renders bare.
+        if (p === "review" && transcript.length === 0) {
+          setTranscript(MOCK_TRANSCRIPT);
+        }
+        if (p === "negotiating" && progress.total === 0) {
+          setProgress({ done: 4, total: NEGOTIATION.maxTurnsPerSide * 2 });
+        }
+        setPhase(p);
+      },
+    })),
+  );
+
+  /** Fills the mandate builder; harmless on the other phases. */
+  useDevAutofill(() => {
+    setMandate((m) => ({
+      ...m,
+      issues: m.issues.map((im) => {
+        const issue = task.issues.find((i) => i.id === im.issueId);
+        return {
+          ...im,
+          idealOptionId: im.idealOptionId ?? issue?.options[0].id ?? null,
+          reservationOptionId:
+            im.reservationOptionId ??
+            issue?.options[issue.options.length - 1].id ??
+            null,
+        };
+      }),
+    }));
+    setChoice((c) => c ?? "ratify");
+  });
+
   function updateIssue(issueId: string, patch: Partial<IssueMandate>) {
     setMandate((m) => ({
       ...m,
@@ -144,6 +213,24 @@ export function ProxySession({
     setTranscript([]);
     setProgress({ done: 0, total: NEGOTIATION.maxTurnsPerSide * 2 });
     logEvent("negotiation_started", { policy }, { sessionIndex });
+
+    if (mockAi) {
+      // Dev mode: play the canned transcript so the waiting screen and the
+      // review screen can both be seen in a few seconds, with no model calls.
+      setProgress({ done: 0, total: MOCK_TRANSCRIPT.length });
+      for (let i = 0; i < MOCK_TRANSCRIPT.length; i += 1) {
+        await new Promise((r) => setTimeout(r, 250));
+        setTranscript(MOCK_TRANSCRIPT.slice(0, i + 1));
+        setProgress({ done: i + 1, total: MOCK_TRANSCRIPT.length });
+      }
+      logEvent(
+        "negotiation_ended",
+        { turns: MOCK_TRANSCRIPT.length, mock: true },
+        { sessionIndex },
+      );
+      setPhase("review");
+      return;
+    }
 
     const collected: DisplayMessage[] = [];
 
@@ -202,17 +289,28 @@ export function ProxySession({
     }
   }
 
+  /**
+   * "Ratify" is only substituted for an unmade choice while validation is being
+   * bypassed — outside dev mode `canSubmit` is false until a choice exists.
+   */
+  const canSubmit = useDevGate(
+    choice !== null &&
+      (choice !== "request_revision" || revisionNote.trim().length > 0),
+  );
+
   async function submitDecision() {
-    if (!choice) return;
+    const decided: RatificationChoice | null =
+      choice ?? (canSubmit ? "ratify" : null);
+    if (!decided) return;
     if (participantKey) {
-      await getStore().saveRatification(participantKey, sessionIndex, choice);
+      await getStore().saveRatification(participantKey, sessionIndex, decided);
       await getStore().saveResponses(
         participantKey,
         `session_outcome_s${sessionIndex}`,
-        { satisfaction, revisionNote, choice },
+        { satisfaction, revisionNote, choice: decided },
       );
     }
-    logEvent("ratification_choice", { choice }, { sessionIndex });
+    logEvent("ratification_choice", { choice: decided }, { sessionIndex });
     logEvent("page_complete", undefined, {
       page: `session-${sessionIndex}`,
       sessionIndex,
@@ -639,10 +737,7 @@ export function ProxySession({
 
             <Button
               onClick={submitDecision}
-              disabled={
-                !choice ||
-                (choice === "request_revision" && !revisionNote.trim())
-              }
+              disabled={!canSubmit}
               className="mt-2 w-full"
             >
               Submit decision

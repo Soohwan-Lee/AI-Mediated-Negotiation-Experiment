@@ -16,6 +16,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { STUDY, nextHref, stepNumber } from "@/lib/study-config";
 import {
@@ -39,6 +40,10 @@ export default function DebriefingPage() {
   const [busy, setBusy] = useState(false);
 
   const isMember = assignment?.role === "member";
+
+  useDevAutofill(() => setAcknowledged(true));
+
+  const canContinue = useDevGate(acknowledged);
 
   async function handleFinish() {
     setBusy(true);
@@ -198,7 +203,7 @@ export default function DebriefingPage() {
         </div>
 
         <div className="mt-6 flex justify-end">
-          <Button onClick={handleFinish} disabled={!acknowledged || busy}>
+          <Button onClick={handleFinish} disabled={!canContinue || busy}>
             {busy ? "Saving…" : "Continue"}
           </Button>
         </div>

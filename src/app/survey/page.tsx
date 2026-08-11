@@ -16,6 +16,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { nextHref, stepNumber } from "@/lib/study-config";
@@ -114,6 +115,25 @@ export default function SurveyPage() {
     requiredIds.every((id) => num(id) !== null) &&
     Boolean(str("preferred_session")) &&
     Boolean(str("SUS1"));
+
+  useDevAutofill(() => {
+    setR((prev) => ({
+      ...prev,
+      ...Object.fromEntries(requiredIds.map((id) => [id, 4])),
+      WORK1_s1: 4,
+      WORK1_s2: 4,
+      preferred_session: "s1",
+      preference_reason: "[dev] placeholder",
+      open_requirement_power: "[dev] placeholder",
+      open_final_decision: "[dev] placeholder",
+      open_withheld: "[dev] placeholder",
+      open_proxy_branch: "[dev] placeholder",
+      SUS1: "not_sure",
+      SUS2: "[dev] placeholder",
+    }));
+  });
+
+  const canContinue = useDevGate(complete);
 
   async function handleNext() {
     setBusy(true);
@@ -275,7 +295,7 @@ export default function SurveyPage() {
         <p className="text-xs text-[var(--muted)]">
           {complete ? "All required items answered." : "Please answer all rating items."}
         </p>
-        <Button onClick={handleNext} disabled={!complete || busy}>
+        <Button onClick={handleNext} disabled={!canContinue || busy}>
           {busy ? "Saving…" : "Continue"}
         </Button>
       </div>

@@ -16,6 +16,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { nextHref, stepNumber } from "@/lib/study-config";
 import {
@@ -44,6 +45,13 @@ export default function RewardPage() {
   const [busy, setBusy] = useState(false);
 
   const isLeader = assignment?.role === "leader";
+
+  useDevAutofill(() => {
+    setFairness(4);
+    setRationale("[dev] placeholder");
+  });
+
+  const canContinue = useDevGate(fairness !== null);
 
   async function handleNext() {
     setBusy(true);
@@ -146,7 +154,7 @@ export default function RewardPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleNext} disabled={busy || fairness === null}>
+        <Button onClick={handleNext} disabled={busy || !canContinue}>
           {busy ? "Saving…" : "Continue"}
         </Button>
       </div>

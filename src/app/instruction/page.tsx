@@ -17,6 +17,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { useDevAutofill, useDevBypass } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { nextHref, stepNumber } from "@/lib/study-config";
 import {
@@ -105,6 +106,20 @@ export default function InstructionPage() {
   );
   const allAnswered = CHECKS.every((c) => answers[c.id]);
   const allCorrect = allAnswered && wrong.length === 0;
+
+  useDevAutofill(() =>
+    setAnswers(Object.fromEntries(CHECKS.map((c) => [c.id, c.correct]))),
+  );
+
+  // Dev mode skips the answer-and-retry loop entirely rather than just
+  // enabling the button, so an unanswered check does not trap the walkthrough.
+  const bypass = useDevBypass();
+  const canContinue = (submitted && allCorrect) || bypass;
+
+  function goNext() {
+    logEvent("page_complete", undefined, { page: "instruction" });
+    router.push(nextHref("instruction"));
+  }
 
   function handleCheck() {
     setSubmitted(true);
@@ -279,24 +294,14 @@ export default function InstructionPage() {
                 ? `${wrong.length} to review.`
                 : ""}
           </p>
-          {!submitted || allCorrect ? (
-            <Button
-              onClick={
-                allCorrect && submitted
-                  ? () => {
-                      logEvent("page_complete", undefined, {
-                        page: "instruction",
-                      });
-                      router.push(nextHref("instruction"));
-                    }
-                  : handleCheck
-              }
-              disabled={!allAnswered}
-            >
-              {allCorrect && submitted ? "Continue" : "Check answers"}
-            </Button>
-          ) : (
+          {canContinue ? (
+            <Button onClick={goNext}>Continue</Button>
+          ) : submitted ? (
             <Button onClick={handleRetry}>Try again</Button>
+          ) : (
+            <Button onClick={handleCheck} disabled={!allAnswered}>
+              Check answers
+            </Button>
           )}
         </div>
       </Card>

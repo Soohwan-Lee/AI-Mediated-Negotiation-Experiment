@@ -17,7 +17,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import { claimSlot } from "./assignment";
+import { claimSlot, resolveAssignment } from "./assignment";
+import { useDevMode } from "./dev-mode";
 import { getStore } from "./store";
 import type {
   Assignment,
@@ -48,6 +49,13 @@ interface ParticipantContextValue extends ParticipantState {
 const ParticipantContext = createContext<ParticipantContextValue | null>(null);
 
 const STORAGE_KEY = "amne:session";
+
+/**
+ * Stand-in identity and timestamp for a dev-mode assignment. Fixed values, so
+ * a synthesized assignment keeps a stable object identity across renders.
+ */
+const DEV_PARTICIPANT_KEY = "P-devpreview";
+const DEV_ASSIGNED_AT = "1970-01-01T00:00:00.000Z";
 
 function newParticipantKey(): string {
   // Pseudonymous research key. The raw Prolific PID is stored separately so
@@ -112,6 +120,7 @@ export function ParticipantProvider({
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<ParticipantState>(readInitialState);
+  const dev = useDevMode();
 
   // Rehydrate the assignment for a returning participant. This is a genuine
   // external-store read, so it belongs in an effect.
@@ -198,9 +207,25 @@ export function ParticipantProvider({
     [logEvent, state.participantKey],
   );
 
+  /**
+   * In dev mode the panel's slot can stand in for a claimed one, so a session
+   * page opened directly — without consenting first — still has something to
+   * render, and so both proxy policies and both roles can be previewed without
+   * clearing storage. Off in production: `dev.enabled` is a build-time false.
+   */
+  const useDevSlot = dev.enabled && (dev.slotOverride || !state.assignment);
+  const assignment = useMemo(() => {
+    if (!useDevSlot) return state.assignment;
+    return resolveAssignment(
+      state.participantKey ?? DEV_PARTICIPANT_KEY,
+      dev.slot,
+      DEV_ASSIGNED_AT,
+    );
+  }, [useDevSlot, state.assignment, state.participantKey, dev.slot]);
+
   const value = useMemo(
-    () => ({ ...state, beginStudy, logEvent, saveResponses }),
-    [state, beginStudy, logEvent, saveResponses],
+    () => ({ ...state, assignment, beginStudy, logEvent, saveResponses }),
+    [state, assignment, beginStudy, logEvent, saveResponses],
   );
 
   // The initial state is read from localStorage + URL params, which do not

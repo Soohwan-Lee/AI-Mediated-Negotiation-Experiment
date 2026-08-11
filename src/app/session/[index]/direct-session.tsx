@@ -12,6 +12,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useDevActions, useDevMockAi } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { getTask } from "@/lib/tasks";
@@ -30,6 +31,15 @@ import {
 import { SessionBrief, InitialPreferenceForm, FinalDecision } from "./shared";
 
 type Phase = "brief" | "preference" | "negotiate" | "decide";
+
+const PHASES: Phase[] = ["brief", "preference", "negotiate", "decide"];
+
+/** Dev-mode stand-ins, so the chat surface fills up with no model call. */
+const MOCK_COUNTERPART_REPLIES = [
+  "[mock] Thanks for laying that out. Timeline is where I have the least room — could we trade there?",
+  "[mock] I can live with that on credit if the review rights stay with me.",
+  "[mock] That package works for me apart from the workload split. Counter-proposal below.",
+];
 
 export function DirectSession({
   sessionIndex,
@@ -54,6 +64,17 @@ export function DirectSession({
 
   const turnsRemaining = NEGOTIATION.maxTurnsPerSide - turnsUsed;
 
+  const mockAi = useDevMockAi();
+  useDevActions(
+    `session-${sessionIndex}`,
+    PHASES.map((p) => ({
+      id: p,
+      label: p,
+      active: phase === p,
+      run: () => setPhase(p),
+    })),
+  );
+
   async function sendMessage(text: string) {
     const own: DisplayMessage = {
       id: `p${messages.length}`,
@@ -77,30 +98,42 @@ export function DirectSession({
 
     setPending(true);
     try {
-      const res = await fetch("/api/counterpart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskId,
-          participantRole: role,
-          turnsRemaining,
-          history: next.map((m) => ({
-            role: m.speaker === "participant" ? "user" : "assistant",
-            content: m.text,
-          })),
-        }),
-      });
+      let reply: string;
 
-      const data = (await res.json()) as { message?: string; error?: string };
-      const reply =
-        data.message ??
-        "Sorry, I got distracted for a second — could you say that again?";
+      if (mockAi) {
+        // Dev mode: no round trip and no model, so the surface can be reviewed
+        // offline and without spending tokens.
+        reply =
+          MOCK_COUNTERPART_REPLIES[
+            turnsUsed % MOCK_COUNTERPART_REPLIES.length
+          ];
+        await new Promise((r) => setTimeout(r, 300));
+      } else {
+        const res = await fetch("/api/counterpart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskId,
+            participantRole: role,
+            turnsRemaining,
+            history: next.map((m) => ({
+              role: m.speaker === "participant" ? "user" : "assistant",
+              content: m.text,
+            })),
+          }),
+        });
 
-      // A small delay keeps the exchange from feeling instantaneous.
-      // TBD (Methods §B3): fixed delay vs. naturalistic jitter.
-      await new Promise((r) =>
-        setTimeout(r, NEGOTIATION.counterpartDelayMs),
-      );
+        const data = (await res.json()) as { message?: string; error?: string };
+        reply =
+          data.message ??
+          "Sorry, I got distracted for a second — could you say that again?";
+
+        // A small delay keeps the exchange from feeling instantaneous.
+        // TBD (Methods §B3): fixed delay vs. naturalistic jitter.
+        await new Promise((r) =>
+          setTimeout(r, NEGOTIATION.counterpartDelayMs),
+        );
+      }
 
       const counter: DisplayMessage = {
         id: `c${next.length}`,

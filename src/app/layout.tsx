@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { DevPanelMount } from "@/components/dev-panel-mount";
+import { DevModeProvider } from "@/lib/dev-mode";
 import { ParticipantProvider } from "@/lib/participant-context";
 import { STUDY } from "@/lib/study-config";
 import "./globals.css";
@@ -15,7 +17,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen antialiased">
-        <ParticipantProvider>{children}</ParticipantProvider>
+        {/*
+          DevModeProvider wraps the participant context because the dev slot
+          override feeds into it. Both are inert in a production build — see
+          lib/dev-mode.
+        */}
+        <DevModeProvider>
+          <ParticipantProvider>
+            {children}
+            <DevPanelMount />
+          </ParticipantProvider>
+        </DevModeProvider>
       </body>
     </html>
   );

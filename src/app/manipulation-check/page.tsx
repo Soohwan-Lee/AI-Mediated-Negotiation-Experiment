@@ -9,6 +9,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { nextHref, stepNumber } from "@/lib/study-config";
 import {
@@ -39,6 +40,15 @@ export default function ManipulationCheckPage() {
 
   const num = (id: string) => (r[id] as number) ?? null;
   const complete = POWER_ITEMS.every((i) => num(i.id) !== null);
+
+  useDevAutofill(() => {
+    setR((prev) => ({
+      ...prev,
+      ...Object.fromEntries(POWER_ITEMS.map((i) => [i.id, 4])),
+    }));
+  });
+
+  const canContinue = useDevGate(complete);
 
   async function handleNext() {
     setBusy(true);
@@ -74,7 +84,7 @@ export default function ManipulationCheckPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleNext} disabled={!complete || busy}>
+        <Button onClick={handleNext} disabled={!canContinue || busy}>
           {busy ? "Saving…" : "Continue"}
         </Button>
       </div>

@@ -12,6 +12,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { nextHref, stepNumber } from "@/lib/study-config";
 import {
@@ -107,6 +108,22 @@ export default function BackgroundPage() {
   const complete =
     Boolean(str("age") && str("gender") && str("education") && str("employment")) &&
     likertIds.every((id) => num(id) !== null);
+
+  useDevAutofill(() => {
+    setR((prev) => ({
+      ...prev,
+      age: "34",
+      gender: "female",
+      education: "bachelors",
+      employment: "full_time",
+      occupation: "Software",
+      years_experience: "8",
+      manager_experience: "previously",
+      ...Object.fromEntries(likertIds.map((id) => [id, 4])),
+    }));
+  });
+
+  const canContinue = useDevGate(complete);
 
   async function handleNext() {
     setBusy(true);
@@ -303,7 +320,7 @@ export default function BackgroundPage() {
         <p className="text-xs text-[var(--muted)]">
           {complete ? "All required items answered." : "Please answer all required items."}
         </p>
-        <Button onClick={handleNext} disabled={!complete || busy}>
+        <Button onClick={handleNext} disabled={!canContinue || busy}>
           {busy ? "Saving…" : "Continue"}
         </Button>
       </div>

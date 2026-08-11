@@ -55,6 +55,31 @@ is idempotent per participant key, so a refresh never reassigns.
 Currently `lib/assignment.ts#claimSlot` is a deterministic local stand-in.
 `/api/assign` is the swap point.
 
+## Dev / mockup mode
+
+A floating panel (bottom-right, or Ctrl/Cmd+Shift+D) makes the flow walkable
+while the design is unsettled: it skips required-field gating, fills a page
+with dummy answers, jumps between pages *and* between the phases inside a
+session, swaps the assignment (role · proxy policy · sequence) without clearing
+storage, fakes AI turns instantly, and resets participant data.
+
+**It must never reach a participant.** It names conditions and shows the
+assignment, so availability is a build-time constant, not a runtime flag:
+
+| Build | Panel |
+|---|---|
+| `next dev` | available, on by default |
+| build with `NEXT_PUBLIC_DEV_TOOLS=1` | available (preview deploys) |
+| build without it | not loaded — the chunk is behind a dynamic import that is never reached |
+
+`?dev=1` / `?dev=0` in the URL forces the toggle where the panel is available.
+
+Wiring, when adding a page: gate the Continue button on
+`useDevGate(complete)` rather than `complete`, register a dummy-answer filler
+with `useDevAutofill`, and register phase jumps with `useDevActions` for state
+the URL cannot reach. All of them are no-ops in a production build. See
+`lib/dev-mode.tsx`.
+
 ## Where to plug things in
 
 | Task | File |
@@ -66,6 +91,7 @@ Currently `lib/assignment.ts#claimSlot` is a deterministic local stand-in.
 | Agent behavior rules | `lib/ai/prompts.ts` |
 | Guardrails | `lib/ai/validator.ts` |
 | Timings, payment, IRB text, completion code | `lib/study-config.ts` |
+| Dev-mode gating, autofill, phase jumps | `lib/dev-mode.tsx` · `components/dev-panel.tsx` |
 
 Pages never touch persistence or the network directly — they go through
 `lib/store.ts` and `lib/participant-context.tsx`.

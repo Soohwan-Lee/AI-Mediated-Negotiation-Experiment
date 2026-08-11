@@ -9,6 +9,7 @@
  */
 
 import { useState } from "react";
+import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import type { NegotiationTask, Role } from "@/lib/types";
@@ -91,6 +92,19 @@ export function InitialPreferenceForm({
   const [confidence, setConfidence] = useState(50);
 
   const complete = task.issues.every((i) => ideal[i.id]);
+
+  useDevAutofill(() => {
+    setIdeal(
+      Object.fromEntries(task.issues.map((i) => [i.id, i.options[0].id])),
+    );
+    setRedLine(
+      Object.fromEntries(
+        task.issues.map((i) => [i.id, i.options[i.options.length - 1].id]),
+      ),
+    );
+  });
+
+  const canContinue = useDevGate(complete);
 
   async function save() {
     if (participantKey) {
@@ -196,7 +210,7 @@ export function InitialPreferenceForm({
         <p className="text-xs text-[var(--muted)]">
           {complete ? "Ready to begin." : "Please choose an ideal outcome for each issue."}
         </p>
-        <Button onClick={save} disabled={!complete}>
+        <Button onClick={save} disabled={!canContinue}>
           Begin session
         </Button>
       </div>
@@ -229,8 +243,15 @@ export function FinalDecision({
   const [choice, setChoice] = useState<"accept" | "reject" | null>(null);
   const anyTerms = Object.keys(terms).length > 0;
 
+  useDevAutofill(() => setChoice("accept"));
+
+  const canSubmit = useDevGate(choice !== null);
+
   async function submit() {
-    if (!choice) return;
+    // `canSubmit` is `choice !== null` outside dev mode, so this falls back to
+    // "accept" only when validation is being bypassed.
+    const decided = choice ?? (canSubmit ? "accept" : null);
+    if (!decided) return;
     if (participantKey) {
       await getStore().saveAgreement(participantKey, {
         sessionIndex,
@@ -246,10 +267,10 @@ export function FinalDecision({
       await getStore().saveRatification(
         participantKey,
         sessionIndex,
-        choice === "accept" ? "ratify" : "reject",
+        decided === "accept" ? "ratify" : "reject",
       );
     }
-    logEvent("ratification_choice", { choice }, { sessionIndex });
+    logEvent("ratification_choice", { choice: decided }, { sessionIndex });
     logEvent("negotiation_ended", undefined, { sessionIndex });
     onDone();
   }
@@ -322,7 +343,7 @@ export function FinalDecision({
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={submit} disabled={!choice}>
+        <Button onClick={submit} disabled={!canSubmit}>
           {sessionIndex === 1 ? "Continue to next session" : "Continue"}
         </Button>
       </div>
