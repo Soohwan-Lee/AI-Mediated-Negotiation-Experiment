@@ -180,7 +180,11 @@ export function SessionLayout({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+    /* The rail carries the whole briefing — six issues, their levels and what
+       each is worth — so it widens with the page rather than staying at the
+       width it needed when the column was narrower. Past `xl` it takes a
+       little more, which keeps the value table off a second line. */
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px] xl:gap-8">
       <div className="min-w-0">{children}</div>
 
       <aside className="hidden lg:block">
