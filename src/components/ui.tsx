@@ -80,7 +80,9 @@ export function PageHeader({
         {title}
       </h1>
       {subtitle ? (
-        <p className="mt-3 text-[1.0625rem] leading-relaxed text-[var(--ink-2)]">
+        // Held to a reading measure: the column is wide for forms and tables,
+        // but a sentence introducing the page is still a sentence.
+        <p className="mt-3 max-w-prose text-[1.0625rem] leading-relaxed text-[var(--ink-2)]">
           {subtitle}
         </p>
       ) : null}
@@ -166,7 +168,10 @@ export function Callout({
   return (
     <div className={cx("rounded-[var(--radius)] border p-4 text-sm", toneClass)}>
       {title ? <p className="mb-1 font-semibold">{title}</p> : null}
-      <div className="[&>p+p]:mt-2">{children}</div>
+      {/* A callout is prose, and prose does not want the full width of a wide
+          column — `max-w-prose` holds the line length while the panel itself
+          still spans the card. */}
+      <div className="max-w-prose [&>p+p]:mt-2">{children}</div>
     </div>
   );
 }

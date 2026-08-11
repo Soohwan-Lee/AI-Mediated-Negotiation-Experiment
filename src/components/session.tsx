@@ -107,7 +107,10 @@ export function BriefingPanel({
       <p className="mb-3 text-[0.9375rem] font-semibold text-[var(--ink)]">
         {brief.title}
       </p>
-      <p className="mb-5 text-[0.8125rem] leading-relaxed">
+      {/* The panel is read in the rail most of the time, but on the brief
+          phase it sits in the full-width column — so its prose keeps a
+          reading measure of its own rather than following the container. */}
+      <p className="mb-5 max-w-prose text-[0.8125rem] leading-relaxed">
         {brief.organizationalPosition}
       </p>
 
@@ -120,13 +123,13 @@ export function BriefingPanel({
       </Section>
 
       <Section title="Matters most to you">
-        <p className="rounded-[var(--radius)] border border-[var(--private-line)] bg-[#fff9ef] p-3 text-[0.8125rem]">
+        <p className="max-w-prose rounded-[var(--radius)] border border-[var(--private-line)] bg-[#fff9ef] p-3 text-[0.8125rem]">
           {brief.criticalRequirement}
         </p>
       </Section>
 
       <Section title="If there is no agreement">
-        <p className="text-[0.8125rem]">{brief.batnaSummary}</p>
+        <p className="max-w-prose text-[0.8125rem]">{brief.batnaSummary}</p>
       </Section>
 
       <Section title="What each level is worth to you" last>

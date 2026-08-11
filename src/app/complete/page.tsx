@@ -55,7 +55,7 @@ export default function CompletePage() {
         <CardTitle hint="Your payment is approved once your submission is recorded.">
           To get paid
         </CardTitle>
-        <p className="mb-4 text-[0.9375rem] text-[var(--ink-2)]">
+        <p className="mb-4 max-w-prose text-[0.9375rem] text-[var(--ink-2)]">
           Go back to Prolific and submit the code above, or use the button below
           to complete your submission automatically.
         </p>
@@ -70,7 +70,7 @@ export default function CompletePage() {
 
       <Card tone="muted">
         <CardTitle>Questions</CardTitle>
-        <p className="text-[0.9375rem] text-[var(--ink-2)]">
+        <p className="max-w-prose text-[0.9375rem] text-[var(--ink-2)]">
           About the study, contact {STUDY.irb.researcherEmail}. About your
           rights as a research participant, contact {STUDY.irb.contactEmail}{" "}
           (protocol {STUDY.irb.protocolNumber}).

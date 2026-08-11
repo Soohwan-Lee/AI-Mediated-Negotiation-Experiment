@@ -58,7 +58,9 @@ export function SessionBrief({
 
         <Card className="mb-5">
           <CardTitle>The situation</CardTitle>
-          <p className="text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+          {/* The scenario is read once and carefully, so it keeps a reading
+              measure even though the session column is wide. */}
+          <p className="max-w-prose text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
             {task.publicBrief}
           </p>
           <p className="mt-3 text-[0.875rem] text-[var(--ink-3)]">

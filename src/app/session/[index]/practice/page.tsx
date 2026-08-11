@@ -110,7 +110,7 @@ export default function PracticePage({
 
           <Card className="mb-5">
             <CardTitle>The practice scenario</CardTitle>
-            <p className="text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+            <p className="max-w-prose text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
               {task.publicBrief}
             </p>
           </Card>
