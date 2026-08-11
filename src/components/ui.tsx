@@ -1,15 +1,23 @@
 "use client";
 
 /**
- * Shared primitives. Intentionally small and plain — this is a research
- * instrument, so visual consistency across participants matters more than
- * expressiveness.
+ * Interface primitives.
+ *
+ * Two rules run through all of them:
+ *
+ * 1. COLOUR ENCODES VISIBILITY. `tone="private"` marks anything the
+ *    counterpart cannot see. See the note in globals.css — this is not
+ *    decoration, and private content must never land on a plain white card.
+ *
+ * 2. NOTHING STARTS ANSWERED. Rating inputs have no default position, so a
+ *    participant who skips an item leaves it visibly empty instead of
+ *    submitting a midpoint they never chose.
  */
 
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-function cx(...parts: Array<string | false | null | undefined>) {
+export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
@@ -17,18 +25,23 @@ function cx(...parts: Array<string | false | null | undefined>) {
 // Layout
 // ---------------------------------------------------------------------------
 
-export function PageShell({
+/**
+ * Content column. `reading` for forms and prose, `wide` for the session
+ * surfaces that carry a briefing rail. Bottom padding clears the sticky
+ * action bar.
+ */
+export function Page({
   children,
-  wide = false,
+  width = "reading",
 }: {
   children: ReactNode;
-  wide?: boolean;
+  width?: "reading" | "wide";
 }) {
   return (
     <main
       className={cx(
-        "mx-auto w-full px-6 py-10 sm:py-14",
-        wide ? "max-w-5xl" : "max-w-2xl",
+        "mx-auto w-full px-5 pb-32 pt-8 sm:px-6 sm:pt-12",
+        width === "wide" ? "max-w-6xl" : "max-w-2xl",
       )}
     >
       {children}
@@ -48,15 +61,17 @@ export function PageHeader({
   return (
     <header className="mb-8">
       {eyebrow ? (
-        <p className="mb-2 text-xs font-medium uppercase tracking-widest text-[var(--muted)]">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
           {eyebrow}
         </p>
       ) : null}
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+      <h1 className="text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2rem]">
         {title}
       </h1>
       {subtitle ? (
-        <p className="mt-2 text-[var(--muted)]">{subtitle}</p>
+        <p className="mt-3 text-[1.0625rem] leading-relaxed text-[var(--ink-2)]">
+          {subtitle}
+        </p>
       ) : null}
     </header>
   );
@@ -65,19 +80,54 @@ export function PageHeader({
 export function Card({
   children,
   className,
+  tone = "surface",
+  padded = true,
 }: {
   children: ReactNode;
   className?: string;
+  tone?: "surface" | "private" | "muted";
+  padded?: boolean;
 }) {
   return (
     <section
       className={cx(
-        "rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6",
+        "rounded-[var(--radius-lg)] border",
+        padded && "p-5 sm:p-6",
+        tone === "private"
+          ? "border-[var(--private-line)] bg-[var(--private)]"
+          : tone === "muted"
+            ? "border-[var(--line)] bg-[var(--surface-muted)]"
+            : "border-[var(--line)] bg-[var(--surface)]",
         className,
       )}
     >
       {children}
     </section>
+  );
+}
+
+/** Section heading inside a card. */
+export function CardTitle({
+  children,
+  hint,
+  aside,
+}: {
+  children: ReactNode;
+  hint?: string;
+  aside?: ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-4">
+      <div>
+        <h2 className="text-[0.95rem] font-semibold tracking-[-0.01em]">
+          {children}
+        </h2>
+        {hint ? (
+          <p className="mt-1 text-sm text-[var(--ink-2)]">{hint}</p>
+        ) : null}
+      </div>
+      {aside}
+    </div>
   );
 }
 
@@ -87,31 +137,57 @@ export function Callout({
   title,
 }: {
   children: ReactNode;
-  tone?: "neutral" | "warning";
+  tone?: "neutral" | "warning" | "private";
   title?: string;
 }) {
+  const toneClass =
+    tone === "warning"
+      ? "border-[#f0dcc0] bg-[var(--caution-soft)] text-[#6d3d05]"
+      : tone === "private"
+        ? "border-[var(--private-line)] bg-[var(--private)] text-[var(--private-ink)]"
+        : "border-[var(--line)] bg-[var(--surface-muted)] text-[var(--ink)]";
+
   return (
-    <div
-      className={cx(
-        "rounded-lg border p-4 text-sm",
-        tone === "warning"
-          ? "border-amber-200 bg-amber-50 text-amber-900"
-          : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)]",
-      )}
-    >
+    <div className={cx("rounded-[var(--radius)] border p-4 text-sm", toneClass)}>
       {title ? <p className="mb-1 font-semibold">{title}</p> : null}
-      {children}
+      <div className="[&>p+p]:mt-2">{children}</div>
     </div>
   );
 }
 
-export function Divider() {
-  return <hr className="my-8 border-[var(--border)]" />;
+/** Small caps label used to mark a private zone. */
+export function PrivateTag({ children = "Private to you" }: { children?: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--private-line)] bg-[#fff9ef] px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[var(--private-strong)]">
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--private-strong)]" />
+      {children}
+    </span>
+  );
+}
+
+export function Divider({ className }: { className?: string }) {
+  return <hr className={cx("border-[var(--line)]", className ?? "my-8")} />;
 }
 
 // ---------------------------------------------------------------------------
-// Controls
+// Buttons
 // ---------------------------------------------------------------------------
+
+const BUTTON_BASE =
+  "inline-flex items-center justify-center gap-2 rounded-[var(--radius)] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+
+const BUTTON_SIZE = {
+  sm: "px-3 py-1.5 text-[0.8125rem]",
+  md: "px-5 py-2.5 text-[0.9375rem]",
+} as const;
+
+const BUTTON_VARIANT = {
+  primary:
+    "bg-[var(--accent)] text-[var(--accent-foreground)] hover:bg-[var(--accent-hover)]",
+  secondary:
+    "border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--surface-muted)]",
+  quiet: "text-[var(--ink-2)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]",
+} as const;
 
 export function Button({
   children,
@@ -119,13 +195,15 @@ export function Button({
   disabled,
   type = "button",
   variant = "primary",
+  size = "md",
   className,
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   type?: "button" | "submit";
-  variant?: "primary" | "secondary";
+  variant?: keyof typeof BUTTON_VARIANT;
+  size?: keyof typeof BUTTON_SIZE;
   className?: string;
 }) {
   return (
@@ -134,11 +212,9 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        "inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-medium transition-colors",
-        "disabled:cursor-not-allowed disabled:opacity-40",
-        variant === "primary"
-          ? "bg-[var(--accent)] text-[var(--accent-foreground)] hover:bg-black"
-          : "border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-muted)]",
+        BUTTON_BASE,
+        BUTTON_SIZE[size],
+        BUTTON_VARIANT[variant],
         className,
       )}
     >
@@ -150,48 +226,52 @@ export function Button({
 export function LinkButton({
   href,
   children,
-  disabled,
 }: {
   href: string;
   children: ReactNode;
-  disabled?: boolean;
 }) {
-  if (disabled) {
-    return (
-      <span className="inline-flex cursor-not-allowed items-center justify-center rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm font-medium text-[var(--accent-foreground)] opacity-40">
-        {children}
-      </span>
-    );
-  }
   return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-5 py-2.5 text-sm font-medium text-[var(--accent-foreground)] transition-colors hover:bg-black"
-    >
+    <Link href={href} className={cx(BUTTON_BASE, BUTTON_SIZE.md, BUTTON_VARIANT.primary)}>
       {children}
     </Link>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Fields
+// ---------------------------------------------------------------------------
+
 export function Field({
   label,
   hint,
-  required,
   children,
+  required,
+  flagged,
 }: {
   label: string;
   hint?: string;
-  required?: boolean;
   children: ReactNode;
+  required?: boolean;
+  /** Marks an unanswered item after the participant tried to continue. */
+  flagged?: boolean;
 }) {
   return (
-    <div className="mb-6">
-      <label className="mb-2 block text-sm font-medium">
+    <div
+      className={cx(
+        "mb-6 last:mb-0",
+        flagged && "-ml-4 border-l-2 border-[var(--caution)] pl-4",
+      )}
+    >
+      <label className="mb-1.5 block text-[0.9375rem] font-medium">
         {label}
-        {required ? <span className="ml-1 text-red-600">*</span> : null}
+        {required ? (
+          <span className="ml-1 text-[var(--caution)]" aria-hidden>
+            *
+          </span>
+        ) : null}
       </label>
       {hint ? (
-        <p className="mb-2 text-xs text-[var(--muted)]">{hint}</p>
+        <p className="mb-2 text-sm text-[var(--ink-2)]">{hint}</p>
       ) : null}
       {children}
     </div>
@@ -199,22 +279,25 @@ export function Field({
 }
 
 const INPUT_CLASS =
-  "w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--focus)]";
+  "w-full rounded-[var(--radius)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-[0.9375rem] outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-[var(--accent)]";
 
 export function TextInput({
   value,
   onChange,
   placeholder,
   type = "text",
+  inputMode,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: "text" | "number";
+  inputMode?: "numeric";
 }) {
   return (
     <input
       type={type}
+      inputMode={inputMode}
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
@@ -227,7 +310,7 @@ export function TextArea({
   value,
   onChange,
   placeholder,
-  rows = 4,
+  rows = 3,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -240,7 +323,7 @@ export function TextArea({
       rows={rows}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
-      className={cx(INPUT_CLASS, "resize-y")}
+      className={cx(INPUT_CLASS, "resize-y leading-relaxed")}
     />
   );
 }
@@ -249,7 +332,7 @@ export function Select({
   value,
   onChange,
   options,
-  placeholder = "Select…",
+  placeholder = "Choose…",
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -260,7 +343,7 @@ export function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={INPUT_CLASS}
+      className={cx(INPUT_CLASS, "cursor-pointer")}
     >
       <option value="">{placeholder}</option>
       {options.map((o) => (
@@ -272,48 +355,91 @@ export function Select({
   );
 }
 
-export function RadioGroup({
+/** Radio options as full-width cards — a larger target than a bare radio. */
+export function ChoiceList({
   name,
   value,
   onChange,
   options,
+  columns = 1,
 }: {
   name: string;
   value: string;
   onChange: (v: string) => void;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{ value: string; label: string; hint?: string }>;
+  columns?: 1 | 2;
 }) {
   return (
-    <div className="space-y-2">
-      {options.map((o) => (
-        <label
-          key={o.value}
-          className={cx(
-            "flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors",
-            value === o.value
-              ? "border-[var(--accent)] bg-[var(--surface-muted)]"
-              : "border-[var(--border)] hover:bg-[var(--surface-muted)]",
-          )}
-        >
-          <input
-            type="radio"
-            name={name}
-            checked={value === o.value}
-            onChange={() => onChange(o.value)}
-            className="mt-1"
-          />
-          <span>{o.label}</span>
-        </label>
-      ))}
+    <div className={cx("grid gap-2", columns === 2 && "sm:grid-cols-2")}>
+      {options.map((o) => {
+        const selected = value === o.value;
+        return (
+          <label
+            key={o.value}
+            className={cx(
+              "flex cursor-pointer items-start gap-3 rounded-[var(--radius)] border p-3.5 text-[0.9375rem] transition-colors",
+              selected
+                ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                : "border-[var(--line-strong)] bg-[var(--surface)] hover:border-[var(--ink-3)]",
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              checked={selected}
+              onChange={() => onChange(o.value)}
+              className="mt-1 h-4 w-4 shrink-0 accent-[var(--accent)]"
+            />
+            <span>
+              {o.label}
+              {o.hint ? (
+                <span className="mt-0.5 block text-sm text-[var(--ink-2)]">
+                  {o.hint}
+                </span>
+              ) : null}
+            </span>
+          </label>
+        );
+      })}
     </div>
   );
 }
 
+export function Checkbox({
+  checked,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 text-[0.9375rem] leading-relaxed">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-1 h-4 w-4 shrink-0 accent-[var(--accent)]"
+      />
+      <span>{children}</span>
+    </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scale
+// ---------------------------------------------------------------------------
+
 /**
- * 7-point Likert row. Default anchors are the study default
- * (1 = Strongly disagree, 7 = Strongly agree) per Methods §A1.
+ * Discrete rating scale — the only rating control in the study.
+ *
+ * Deliberately NOT a slider: a slider starts somewhere, and "somewhere" gets
+ * submitted by everyone who does not engage. Here nothing is selected until
+ * the participant picks a point, so a skipped item stays visibly empty and is
+ * counted as unanswered by the action bar.
  */
-export function Likert({
+export function Scale({
   id,
   statement,
   value,
@@ -321,56 +447,137 @@ export function Likert({
   lowAnchor = "Strongly disagree",
   highAnchor = "Strongly agree",
   points = 7,
+  flagged,
+  compact,
 }: {
   id: string;
-  statement: string;
+  statement?: string;
   value: number | null;
   onChange: (v: number) => void;
   lowAnchor?: string;
   highAnchor?: string;
   points?: number;
+  flagged?: boolean;
+  /** Drops the divider — for a scale sitting alone inside a Field. */
+  compact?: boolean;
 }) {
+  const steps = Array.from({ length: points }, (_, i) => i + 1);
+
   return (
-    <div className="border-b border-[var(--border)] py-4 last:border-b-0">
-      <p className="mb-3 text-sm">{statement}</p>
-      <div className="flex items-center gap-2">
-        <span className="hidden w-28 shrink-0 text-right text-xs text-[var(--muted)] sm:block">
+    <fieldset
+      className={cx(
+        "scroll-mt-24",
+        !compact && "border-b border-[var(--line)] py-5 last:border-b-0",
+        flagged && "-ml-4 border-l-2 border-l-[var(--caution)] pl-4",
+      )}
+      id={`q-${id}`}
+    >
+      {statement ? (
+        <legend className="mb-3 text-[0.9375rem] leading-snug">
+          {statement}
+        </legend>
+      ) : null}
+
+      <div className="flex items-center gap-3">
+        <span className="hidden w-24 shrink-0 text-right text-xs leading-tight text-[var(--ink-2)] sm:block">
           {lowAnchor}
         </span>
-        <div className="flex flex-1 justify-between gap-1">
-          {Array.from({ length: points }, (_, i) => i + 1).map((n) => (
-            <label
-              key={n}
-              className={cx(
-                "flex flex-1 cursor-pointer flex-col items-center rounded-md border py-2 text-xs transition-colors",
-                value === n
-                  ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-                  : "border-[var(--border)] hover:bg-[var(--surface-muted)]",
-              )}
-            >
-              <input
-                type="radio"
-                name={id}
-                checked={value === n}
-                onChange={() => onChange(n)}
-                className="sr-only"
-              />
-              {n}
-            </label>
-          ))}
+
+        <div className="flex flex-1 justify-between gap-1.5">
+          {steps.map((n) => {
+            const selected = value === n;
+            return (
+              <label
+                key={n}
+                className="group flex flex-1 cursor-pointer flex-col items-center gap-1"
+              >
+                <input
+                  type="radio"
+                  name={id}
+                  checked={selected}
+                  onChange={() => onChange(n)}
+                  className="sr-only"
+                />
+                <span
+                  className={cx(
+                    "flex h-9 w-9 items-center justify-center rounded-full border-2 text-[0.8125rem] font-medium transition-all",
+                    selected
+                      ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+                      : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-3)] group-hover:border-[var(--accent)] group-hover:text-[var(--ink)]",
+                  )}
+                >
+                  {n}
+                </span>
+              </label>
+            );
+          })}
         </div>
-        <span className="hidden w-28 shrink-0 text-xs text-[var(--muted)] sm:block">
+
+        <span className="hidden w-24 shrink-0 text-xs leading-tight text-[var(--ink-2)] sm:block">
           {highAnchor}
         </span>
       </div>
-      <div className="mt-1 flex justify-between text-xs text-[var(--muted)] sm:hidden">
+
+      <div className="mt-2 flex justify-between text-xs text-[var(--ink-2)] sm:hidden">
         <span>{lowAnchor}</span>
         <span>{highAnchor}</span>
       </div>
+    </fieldset>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TEMPORARY COMPATIBILITY SHIMS
+//
+// The pages are being moved onto the primitives above one screen at a time.
+// These keep the build green in between and are deleted once the last page is
+// converted — do not write new code against them.
+// ---------------------------------------------------------------------------
+
+/** @deprecated use `Page` */
+export function PageShell({
+  children,
+  wide,
+}: {
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  return <Page width={wide ? "wide" : "reading"}>{children}</Page>;
+}
+
+/** @deprecated use `Scale` */
+export const Likert = Scale;
+
+/** @deprecated use `ChoiceList` */
+export const RadioGroup = ChoiceList;
+
+/** @deprecated the study-wide progress bar now lives in the page chrome */
+export function ProgressBar({
+  step,
+  total,
+}: {
+  step: number;
+  total: number;
+  label?: string;
+}) {
+  return (
+    <div className="mb-8 h-1 w-full overflow-hidden rounded-full bg-[var(--line)]">
+      <div
+        className="h-full bg-[var(--accent)]"
+        style={{ width: `${Math.round((step / total) * 100)}%` }}
+      />
     </div>
   );
 }
 
+/**
+ * @deprecated use `Scale` or `AmountScale`.
+ *
+ * Kept as the original range input on purpose: mapping its value onto the new
+ * dot scale would show the wrong point until the call site is converted. It
+ * still carries the flaw the new controls fix — it submits a midpoint nobody
+ * chose — which is why every remaining call site is being replaced.
+ */
 export function Slider({
   value,
   onChange,
@@ -396,47 +603,71 @@ export function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-[var(--accent)]"
       />
-      <div className="flex justify-between text-xs text-[var(--muted)]">
+      <div className="flex justify-between text-xs text-[var(--ink-2)]">
         <span>{lowAnchor ?? min}</span>
-        <span className="font-medium text-[var(--foreground)]">{value}</span>
+        <span className="tabular font-medium text-[var(--ink)]">{value}</span>
         <span>{highAnchor ?? max}</span>
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Progress
-// ---------------------------------------------------------------------------
-
-export function ProgressBar({
-  step,
-  total,
-  label,
+/**
+ * Quantity picker in the same visual language as `Scale`, for values that are
+ * an amount rather than an opinion. Same reason for having no default.
+ */
+export function AmountScale({
+  id,
+  value,
+  onChange,
+  max = 100,
+  step = 10,
+  unit,
 }: {
-  step: number;
-  total: number;
-  label?: string;
+  id: string;
+  value: number | null;
+  onChange: (v: number) => void;
+  max?: number;
+  step?: number;
+  unit?: string;
 }) {
-  const pct = Math.round((step / total) * 100);
+  const steps = Array.from({ length: max / step + 1 }, (_, i) => i * step);
+
   return (
-    <div className="mb-8">
-      <div className="mb-2 flex items-baseline justify-between text-xs text-[var(--muted)]">
-        <span>{label ?? `Step ${step} of ${total}`}</span>
-        <span>{pct}%</span>
+    <fieldset id={`q-${id}`} className="scroll-mt-24">
+      <div className="flex flex-wrap gap-1.5">
+        {steps.map((n) => {
+          const selected = value === n;
+          return (
+            <label
+              key={n}
+              className="group flex-1 cursor-pointer"
+              style={{ minWidth: "3rem" }}
+            >
+              <input
+                type="radio"
+                name={id}
+                checked={selected}
+                onChange={() => onChange(n)}
+                className="sr-only"
+              />
+              <span
+                className={cx(
+                  "tabular flex h-11 items-center justify-center rounded-[var(--radius)] border-2 text-[0.875rem] transition-all",
+                  selected
+                    ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+                    : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-2)] group-hover:border-[var(--accent)] group-hover:text-[var(--ink)]",
+                )}
+              >
+                {n}
+              </span>
+            </label>
+          );
+        })}
       </div>
-      <div
-        className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-muted)]"
-        role="progressbar"
-        aria-valuenow={pct}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        <div
-          className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
+      {unit ? (
+        <p className="mt-2 text-xs text-[var(--ink-2)]">{unit}</p>
+      ) : null}
+    </fieldset>
   );
 }

@@ -1,35 +1,85 @@
 @import "tailwindcss";
 
 /**
- * Modern, quiet, survey-appropriate. Light theme only: participants complete
- * this once in a browser we do not control, and a forced light surface keeps
- * the reading experience identical across participants.
+ * Design tokens.
+ *
+ * Light theme only: participants complete this once, in a browser we do not
+ * control, and a forced light surface keeps the reading experience identical
+ * across participants.
+ *
+ * COLOUR ENCODES VISIBILITY. This is the one structural idea in the interface
+ * and it is load-bearing, not decorative:
+ *
+ *   cool white / navy  -> the shared table. The counterpart can see this.
+ *   sand ("private")   -> yours alone. The counterpart cannot see this.
+ *
+ * The study is about what people are willing to expose, so a participant
+ * always needing to ask "can they see this?" would be a confound. Keep the two
+ * zones visually separate, and never render private content on a white card.
  */
 
 :root {
-  --background: #ffffff;
+  /* Ground and surfaces */
+  --ground: #f2f4f8;
   --surface: #ffffff;
-  --surface-muted: #f6f7f9;
-  --foreground: #16181d;
-  --muted: #6b7280;
-  --border: #e4e7ec;
-  --accent: #1f2937;
+  --surface-muted: #f7f8fb;
+
+  /* Ink */
+  --ink: #111725;
+  --ink-2: #59617a;
+  --ink-3: #8b93a7;
+  --line: #e1e5ee;
+  --line-strong: #ccd2df;
+
+  /* Primary action. Deep petrol navy — institutional, not product-blue. */
+  --accent: #16324f;
+  --accent-hover: #0e2338;
+  --accent-soft: #e8eef5;
   --accent-foreground: #ffffff;
+
+  /* Private zone: yours alone. */
+  --private: #fbf5ea;
+  --private-line: #e7d9bf;
+  --private-ink: #6a5124;
+  --private-strong: #8a6a2f;
+
+  /* Signals. One caution colour, one positive; no others. */
+  --caution: #a35a08;
+  --caution-soft: #fdf3e6;
+  --positive: #1f6b4a;
+  --positive-soft: #e9f4ef;
+
   --focus: #2563eb;
+
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  /* Fixed chrome heights, so sticky offsets stay in one place. */
+  --header-h: 56px;
+  --actionbar-h: 68px;
 }
 
 @theme inline {
-  --color-background: var(--background);
+  --color-ground: var(--ground);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-border: var(--border);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-accent-foreground: var(--accent-foreground);
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  --color-private: var(--private);
+  --color-private-line: var(--private-line);
+  --color-private-ink: var(--private-ink);
+  --color-caution: var(--caution);
+  --color-positive: var(--positive);
+
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-plex-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
 html {
@@ -37,34 +87,78 @@ html {
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--ground);
+  color: var(--ink);
   font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
+  font-size: 16px;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Participants read a lot of instructional prose; give it a serif and a
+   comfortable measure rather than reusing the UI face. */
+.prose-study {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.prose-study p {
+  margin-bottom: 1rem;
+}
+
+.prose-study ul {
+  list-style: disc;
+  padding-left: 1.35rem;
+  margin-bottom: 1rem;
+}
+
+.prose-study li {
+  margin-bottom: 0.4rem;
+}
+
+.prose-study strong {
+  font-weight: 600;
+}
+
+/* Subheads inside long prose: the UI face, so they read as structure rather
+   than as more of the same paragraph. Sentence case — these are real section
+   headings ("What will you be asked to do?"), not micro-labels. */
+.prose-study h2 {
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose-study h2:first-child {
+  margin-top: 0;
 }
 
 /* Visible, consistent focus for keyboard participants. */
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
-/* Long instructional prose. */
-.prose-study p {
-  margin-bottom: 0.875rem;
+/* Numerals in tables and scorecards must align. */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
-.prose-study ul {
-  list-style: disc;
-  padding-left: 1.25rem;
-  margin-bottom: 0.875rem;
-}
-
-.prose-study li {
-  margin-bottom: 0.375rem;
-}
-
-.prose-study strong {
-  font-weight: 600;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
