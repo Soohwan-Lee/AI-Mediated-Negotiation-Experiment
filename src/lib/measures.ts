@@ -1,24 +1,35 @@
 /**
- * Every questionnaire item in the study, in one place.
+ * Every questionnaire item in the study, in one place (Methods ver.1.8
+ * Appendix D).
  *
- * The measurement battery is expected to change substantially before data
- * collection (Methods §Measurement principles: the bank is trimmed after
- * pilot). Items are therefore DATA, not markup — adding, cutting, or rewording
- * one means editing this file only, and nothing in the page components needs
- * to know what an item says or how many there are.
+ * WHY THIS FILE GOT SHORTER. ver.1.8's measurement principles are explicit:
+ * do not ask by survey what the system already logs, do not repeat items that
+ * are irrelevant to a role or condition, and do not call a trimmed instrument
+ * by the name of the full scale it came from. The multi-item individual
+ * difference batteries — fear of negative evaluation, negotiation
+ * self-efficacy, AI expectations — are gone because §Background survey rules
+ * them out of the confirmatory models: at N=120 there is no power to test them
+ * as moderators, and random assignment already carries identification. Adding
+ * them back costs participant time and buys nothing.
  *
- * Item ids are the column names in the exported dataset. Treat them as stable:
- * rename an id and you have renamed a variable.
+ * Items are DATA, not markup. Adding, cutting, or rewording one means editing
+ * this file only; nothing in a page component knows what an item says or how
+ * many there are.
+ *
+ * Item ids are the column names in the exported dataset, and they match the
+ * ids in Appendix D so that the analysis plan and the instrument can be read
+ * side by side. Treat them as stable: renaming an id renames a variable.
  */
 
+import type { NegotiationTask, Role } from "./types";
+
 /**
- * `half` marks an item whose answer is short — an age, a dropdown, a job
- * title. Two of them share a row on a wide screen instead of each taking a
- * full one, which is the difference between a demographics block that fits on
- * a screen and one that has to be scrolled. It is a hint about the shape of
- * the answer, not about layout: the renderer decides what to do with it, and
- * ignores it when there is no room. Anything with a long label or a long
- * answer should leave it off.
+ * `half` marks an item whose answer is short — an age, a dropdown. Two of them
+ * share a row on a wide screen instead of each taking a full one, which is the
+ * difference between a demographics block that fits on a screen and one that
+ * has to be scrolled. It is a hint about the shape of the answer, not about
+ * layout: the renderer decides what to do with it and ignores it when there is
+ * no room.
  */
 export type Item =
   | {
@@ -28,6 +39,20 @@ export type Item =
       low?: string;
       high?: string;
       points?: number;
+    }
+  | {
+      /**
+       * 0–100, for the likelihood and importance judgements and the bonus
+       * allocation. Rendered as a stepped picker rather than a slider, for the
+       * same reason `Scale` has no default: a slider handle sitting at 50 gets
+       * submitted by everyone who does not engage, and is indistinguishable
+       * from a considered 50.
+       */
+      kind: "amount";
+      id: string;
+      text: string;
+      unit?: string;
+      step?: number;
     }
   | {
       kind: "choice";
@@ -62,33 +87,49 @@ export interface Block {
 
 const AGREE = { low: "Strongly disagree", high: "Strongly agree" };
 
+/**
+ * The placeholder Appendix D leaves in the item text, filled in per task.
+ * Task A's focal is remote work days; Task B's is the weekly on-call cap.
+ * Substituting rather than duplicating the items keeps one id per construct,
+ * which is what the analysis expects.
+ */
+export const FOCAL_PLACEHOLDER = "[FOCAL REQUIREMENT]";
+
+export function withFocal(items: Item[], task: NegotiationTask): Item[] {
+  const focal = task.issues.find((i) => i.id === task.focalIssueId);
+  const name = focal ? focal.label.toLowerCase() : "requirement";
+  return items.map((item) => ({
+    ...item,
+    text: item.text.split(FOCAL_PLACEHOLDER).join(name),
+  }));
+}
+
 // ---------------------------------------------------------------------------
-// Background survey (Methods §2, Appendix A2–A5)
+// D2. Background questionnaire
 // ---------------------------------------------------------------------------
 
 export const BACKGROUND_BLOCKS: Block[] = [
   {
     id: "demographics",
     title: "About you",
-    optional: ["occupation", "years_experience"],
     items: [
-      { kind: "number", id: "age", text: "Age", placeholder: "e.g. 34", half: true },
+      { kind: "number", id: "BG1", text: "Age", placeholder: "e.g. 34", half: true },
       {
         kind: "select",
-        id: "gender",
-        text: "Gender",
+        id: "BG2",
+        text: "Gender identity",
         half: true,
         options: [
-          { value: "male", label: "Male" },
-          { value: "female", label: "Female" },
-          { value: "nonbinary", label: "Non-binary or gender diverse" },
+          { value: "woman", label: "Woman" },
+          { value: "man", label: "Man" },
+          { value: "nonbinary", label: "Non-binary" },
           { value: "self_describe", label: "Prefer to self-describe" },
-          { value: "no_answer", label: "Prefer not to answer" },
+          { value: "no_answer", label: "Prefer not to say" },
         ],
       },
       {
         kind: "select",
-        id: "education",
+        id: "BG3",
         text: "Highest level of education completed",
         half: true,
         options: [
@@ -102,8 +143,8 @@ export const BACKGROUND_BLOCKS: Block[] = [
       },
       {
         kind: "select",
-        id: "employment",
-        text: "Employment status",
+        id: "BG4",
+        text: "Current employment status",
         half: true,
         options: [
           { value: "full_time", label: "Employed full-time" },
@@ -115,29 +156,18 @@ export const BACKGROUND_BLOCKS: Block[] = [
         ],
       },
       {
-        kind: "line",
-        id: "occupation",
-        text: "Occupation or industry",
-        placeholder: "e.g. Software, Healthcare, Education",
-        half: true,
-      },
-      {
         kind: "number",
-        id: "years_experience",
+        id: "BG5",
         text: "Years of professional or organizational experience",
         placeholder: "e.g. 8",
         half: true,
       },
       {
-        kind: "choice",
-        id: "manager_experience",
-        text: "Have you held a manager or team-leader role?",
-        columns: 2,
-        options: [
-          { value: "never", label: "Never" },
-          { value: "previously", label: "Previously" },
-          { value: "currently", label: "Currently" },
-        ],
+        kind: "number",
+        id: "BG6",
+        text: "Years in a supervisory or managerial role (0 if none)",
+        placeholder: "e.g. 0",
+        half: true,
       },
     ],
   },
@@ -148,180 +178,403 @@ export const BACKGROUND_BLOCKS: Block[] = [
     items: [
       {
         kind: "scale",
-        id: "english_proficiency",
-        text: "How proficient are you in English?",
-        low: "Not at all",
-        high: "Native-like",
-      },
-      {
-        kind: "scale",
-        id: "negotiation_frequency",
-        text: "How often do you negotiate at work or in a team?",
+        id: "BG7",
+        text: "How often do you negotiate work arrangements, responsibilities, deadlines, or resources with others?",
         low: "Never",
         high: "Very often",
       },
       {
         kind: "scale",
-        id: "power_negotiation_experience",
-        text: "How often have you negotiated with someone who could affect your evaluation, reward, or opportunities?",
+        id: "BG8",
+        text: "How often do you use generative-AI tools?",
         low: "Never",
         high: "Very often",
       },
       {
-        kind: "scale",
-        id: "llm_use_frequency",
-        text: "How often have you used AI chat tools in the past six months?",
-        low: "Never",
-        high: "Very often",
-      },
-      {
-        kind: "scale",
-        id: "agent_familiarity",
-        text: "How familiar are you with AI agents that can act on your behalf?",
-        low: "Not at all",
-        high: "Very familiar",
-      },
-    ],
-  },
-  {
-    id: "self",
-    title: "How you see yourself",
-    hint: "1 = Strongly disagree, 7 = Strongly agree",
-    items: [
-      // Fear of negative evaluation (FNE)
-      {
-        kind: "scale",
-        id: "FNE1",
-        text: "I tend to worry about the possibility that other people will evaluate me negatively.",
-        ...AGREE,
-      },
-      {
-        kind: "scale",
-        id: "FNE2",
-        text: "After expressing my opinion, I worry about what other people may think of me.",
-        ...AGREE,
-      },
-      {
-        kind: "scale",
-        id: "FNE3_R",
-        text: "I generally feel comfortable even when other people are evaluating me.",
-        ...AGREE,
-      },
-      // Negotiation self-efficacy (NSE)
-      {
-        kind: "scale",
-        id: "NSE1",
-        text: "I can clearly express the requirements that matter to me in a negotiation.",
-        ...AGREE,
-      },
-      {
-        kind: "scale",
-        id: "NSE2",
-        text: "I can maintain an important priority even when the counterpart disagrees.",
-        ...AGREE,
-      },
-      {
-        kind: "scale",
-        id: "NSE3",
-        text: "I can identify trade-offs that benefit both sides across multiple issues.",
-        ...AGREE,
-      },
-      {
-        kind: "scale",
-        id: "NSE4",
-        text: "I can judge when to concede and when to protect a minimum acceptable condition.",
-        ...AGREE,
-      },
-    ],
-  },
-  {
-    id: "ai_expectations",
-    title: "Your expectations about AI tools",
-    hint: "1 = Strongly disagree, 7 = Strongly agree",
-    items: [
-      {
-        kind: "scale",
-        id: "AIAE1",
-        text: "Having access to an AI agent can improve my performance in a task like this.",
-        ...AGREE,
-      },
-      {
-        kind: "scale",
-        id: "AIAE2",
-        text: "An AI agent can provide information or proposals I can trust.",
-        ...AGREE,
-      },
-      {
-        kind: "scale",
-        id: "AIAE3",
-        text: "An AI agent can help me see options or strategies I might otherwise miss.",
-        ...AGREE,
-      },
-      {
-        kind: "scale",
-        id: "AIAE4",
-        text: "An AI agent can reduce the mental workload of a task like this.",
-        ...AGREE,
+        kind: "choice",
+        id: "BG9",
+        text: "Have you used an AI agent that took actions or communicated on your behalf?",
+        columns: 2,
+        options: [
+          { value: "no", label: "No" },
+          { value: "yes", label: "Yes" },
+        ],
       },
     ],
   },
 ];
 
 // ---------------------------------------------------------------------------
-// Post-task questionnaire (Methods §6, Appendix A9–A16)
+// D3. Pre-task perceived likelihood of jeopardizing the deal
 //
-// Asked once per session. The page suffixes every id with `_s1` / `_s2`;
-// write them here unsuffixed.
+// Adapted from Hart et al. (2024)'s two-item wording. Deliberately NOT called
+// that full scale — this is a two-item adaptation, and ver.1.8's measurement
+// principle 3 says to say so.
+//
+// Asked before the negotiation, after the briefing. Role-paired: the Member is
+// asked about their own exposure, the Leader about the Member's.
 // ---------------------------------------------------------------------------
 
-export const SESSION_ITEMS: Item[] = [
-  { kind: "scale", id: "SAFE1", text: "I could keep a difficult-to-raise requirement in play without having to defend it as my settled position.", ...AGREE },
-  { kind: "scale", id: "SAFE2_R", text: "I felt I had to hold back an important requirement because of how the counterpart might react.", ...AGREE },
-  { kind: "scale", id: "EXP1", text: "I worried the counterpart would think less of me because of the requirements raised.", ...AGREE },
-  { kind: "scale", id: "EXP2", text: "The negotiation made my personally sensitive priorities feel exposed.", ...AGREE },
-  { kind: "scale", id: "DIAG1", text: "The proposals made on my behalf revealed my actual priorities to the counterpart.", ...AGREE },
-  { kind: "scale", id: "DIAG2", text: "The counterpart could work out which requirements genuinely mattered to me.", ...AGREE },
-  { kind: "scale", id: "DIAG3", text: "Each proposal made on my behalf was likely to be read as my settled position.", ...AGREE },
-  { kind: "scale", id: "REP1", text: "The requirements that mattered to me were adequately represented.", ...AGREE },
-  { kind: "scale", id: "OWN1", text: "The final negotiating position still felt like mine.", ...AGREE },
-  { kind: "scale", id: "PROC1", text: "Overall, I was satisfied with how the negotiation went.", ...AGREE },
-  { kind: "scale", id: "PROC2", text: "The process was fair and gave real consideration to my requirements.", ...AGREE },
-  { kind: "scale", id: "PROC3", text: "I came to understand the counterpart's priorities and constraints.", ...AGREE },
-  { kind: "scale", id: "OUT1", text: "I am satisfied with the outcome.", ...AGREE },
-  { kind: "scale", id: "OUT2", text: "I would accept and implement this agreement in a real situation.", ...AGREE },
-  { kind: "scale", id: "WORK1", text: "Taking both the difficulty and your own effort into account, how mentally intensive was this?", low: "Not at all", high: "Extremely" },
-  { kind: "scale", id: "WORK2", text: "I felt frustrated or stressed during the negotiation.", ...AGREE },
-  { kind: "scale", id: "CRED1", text: "The requirements the counterpart raised seemed accurate.", ...AGREE },
-  { kind: "scale", id: "CRED2", text: "The requirements the counterpart raised seemed authentic.", ...AGREE },
-  { kind: "scale", id: "CRED3", text: "The requirements the counterpart raised seemed believable.", ...AGREE },
-  { kind: "scale", id: "SER1", text: "I treated the counterpart's requirements as genuinely important to them.", ...AGREE },
-  { kind: "scale", id: "ACC1", text: "I was willing to accommodate their important requirements when a workable trade was available.", ...AGREE },
-  { kind: "scale", id: "NEG1", text: "The requirements raised made me think less of the counterpart.", ...AGREE },
+const JEOPARDY_MEMBER: Item[] = [
+  {
+    kind: "scale",
+    id: "JEOP1",
+    text: `I might jeopardize the agreement with the Leader if I raise the ${FOCAL_PLACEHOLDER}.`,
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "JEOP2",
+    text: `I might lose the opportunity to participate in this project if I raise the ${FOCAL_PLACEHOLDER}.`,
+    ...AGREE,
+  },
 ];
 
-/** Asked only for the session that used an assistant. */
-export const PROXY_ITEMS: Item[] = [
-  { kind: "scale", id: "PROXY1", text: "My assistant accurately represented my requirements and priorities.", ...AGREE },
-  { kind: "scale", id: "PROXY2", text: "My assistant stayed within the limits I set.", ...AGREE },
-  { kind: "scale", id: "PROXY3", text: "Given my instructions, I could see why it made the proposals and concessions it did.", ...AGREE },
-  { kind: "scale", id: "PROXY4", text: "I trusted my assistant's decisions.", ...AGREE },
-  { kind: "scale", id: "PROXY5", text: "Setting the instructions and reviewing the result gave me the right amount of control.", ...AGREE },
-  { kind: "scale", id: "PROXY6", text: "I worried my assistant's actions could damage how the counterpart saw me.", ...AGREE },
-  { kind: "scale", id: "COVER1", text: "The assistant could test options without making each one my settled position.", ...AGREE },
-  { kind: "scale", id: "COVER2", text: "The counterpart could not be sure which proposals were my own priorities and which the assistant explored.", ...AGREE },
-  { kind: "scale", id: "COVER3", text: "That uncertainty made it easier to keep difficult requirements in play.", ...AGREE },
-  { kind: "scale", id: "COVER4_R", text: "Even with the assistant, every proposal felt like a direct reflection of what I personally wanted.", ...AGREE },
-  { kind: "scale", id: "UTIL1", text: "Having the assistant helped me negotiate more effectively.", ...AGREE },
-  { kind: "scale", id: "UTIL2", text: "The assistant considered options I would not have thought of.", ...AGREE },
-  { kind: "scale", id: "UTIL3", text: "The assistant reduced the mental workload of negotiating.", ...AGREE },
-  { kind: "scale", id: "UTIL4", text: "I would use an assistant like this in a real workplace negotiation if I could set its limits.", ...AGREE },
-  { kind: "scale", id: "RAT1", text: "The conversation changed what I believed was the best agreement.", ...AGREE },
-  { kind: "scale", id: "RAT2", text: "I accepted parts of the agreement that differed from what I personally preferred.", ...AGREE },
-  { kind: "scale", id: "RAT3", text: "The fact that both assistants converged made me feel I should accept it.", ...AGREE },
-  { kind: "scale", id: "RAT4", text: "Because two assistants reached it, the agreement seemed more objective.", ...AGREE },
-  { kind: "scale", id: "RAT5", text: "I would have decided the same way without seeing that the two assistants agreed.", ...AGREE },
-  { kind: "scale", id: "RAT6", text: "I accepted partly because reopening the negotiation seemed like too much trouble.", ...AGREE },
+const JEOPARDY_LEADER: Item[] = [
+  {
+    kind: "scale",
+    id: "JEOP1",
+    text: `The Member might jeopardize the agreement with me if they raise the ${FOCAL_PLACEHOLDER}.`,
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "JEOP2",
+    text: `The Member might lose the opportunity to participate in this project if they raise the ${FOCAL_PLACEHOLDER}.`,
+    ...AGREE,
+  },
 ];
+
+export function jeopardyItems(role: Role): Item[] {
+  return role === "member" ? JEOPARDY_MEMBER : JEOPARDY_LEADER;
+}
+
+// ---------------------------------------------------------------------------
+// D5. Common post-task items
+//
+// EXP1-2 are Member-only: they ask about the exposure of having raised the
+// requirement, which is not a thing the Leader did.
+// ---------------------------------------------------------------------------
+
+const EXPOSURE_ITEMS: Item[] = [
+  {
+    kind: "scale",
+    id: "EXP1",
+    text: "I worried that the requirements raised in the negotiation would make the Leader evaluate me less favorably.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "EXP2",
+    text: `The possibility of being evaluated by the Leader affected how I raised or maintained the ${FOCAL_PLACEHOLDER}.`,
+    ...AGREE,
+  },
+];
+
+const COMMON_POST_TASK: Item[] = [
+  {
+    kind: "scale",
+    id: "REP1",
+    text: "The requirements that mattered to me were adequately represented in the negotiation.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OWN1",
+    text: "The final negotiating position still felt like mine.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PROC1",
+    text: "Overall, I was satisfied with the negotiation process.",
+    ...AGREE,
+  },
+];
+
+// ---------------------------------------------------------------------------
+// D6. Receiver-side items (Leader only)
+//
+// ATTR1-2 average to Attributional Leakage, the second primary outcome. There
+// is no validated direct measure of proposal-to-principal diagnosticity, so
+// this is declared as a scenario-anchored two-item index rather than borrowed
+// legitimacy from an existing scale.
+//
+// SRC1 (in the proxy-only block) is a manipulation check and stays OUT of this
+// index: source certainty and settled priority are different judgements, and
+// collapsing them would make the manipulation check circular.
+// ---------------------------------------------------------------------------
+
+const RECEIVER_ITEMS: Item[] = [
+  {
+    kind: "amount",
+    id: "ATTR1",
+    text: `How likely is it that the ${FOCAL_PLACEHOLDER} reflected a settled personal priority of the Member?`,
+    unit: "0 = not at all · 100 = completely",
+  },
+  {
+    kind: "amount",
+    id: "ATTR2",
+    text: `Even if the AI shaped the proposal, how strongly did the ${FOCAL_PLACEHOLDER} reveal what the Member personally wanted?`,
+    unit: "0 = not at all · 100 = completely",
+  },
+  {
+    kind: "amount",
+    id: "IMP1",
+    text: `How important did the ${FOCAL_PLACEHOLDER} seem to the Member?`,
+    unit: "0 = not at all · 100 = completely",
+  },
+  {
+    kind: "scale",
+    id: "NEG1",
+    text: `The ${FOCAL_PLACEHOLDER} made me evaluate the Member less favorably.`,
+    ...AGREE,
+  },
+  {
+    kind: "amount",
+    id: "BONUS1",
+    text: "Allocate a project bonus to the Member based on this interaction.",
+    unit: "0–100 points",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// D7. Proxy-only items
+// ---------------------------------------------------------------------------
+
+const PROXY_COMMON: Item[] = [
+  {
+    kind: "scale",
+    id: "COVER1",
+    text: "The other side could not be certain whether each proposal reflected my own priority or an option explored by the AI.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "CTRL1",
+    text: "The mandate settings and final review gave me an appropriate level of control.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "TRUST1",
+    text: "I trusted the Proxy to act within the mandate and boundaries that had been set.",
+    ...AGREE,
+  },
+];
+
+/** Manipulation check, Leader in a Proxy session only. */
+const PROXY_LEADER_ONLY: Item[] = [
+  {
+    kind: "amount",
+    id: "SRC1",
+    text: `How certain are you that the ${FOCAL_PLACEHOLDER} originated from the Member rather than being an option tested by the AI?`,
+    unit: "0 = definitely AI-tested · 100 = definitely from the Member",
+  },
+];
+
+/**
+ * The post-task block for one session, assembled from role and condition.
+ *
+ * Burden by cell (Methods ver.1.8 §Estimated survey burden), pre-task jeopardy
+ * excluded: Baseline Member 5, Proxy Member 8, Baseline Leader 8, Proxy Leader
+ * 12. Under two minutes on the estimate.
+ */
+export function postTaskItems(role: Role, isProxy: boolean): Item[] {
+  const items: Item[] = [];
+  if (role === "member") items.push(...EXPOSURE_ITEMS);
+  items.push(...COMMON_POST_TASK);
+  if (role === "leader") items.push(...RECEIVER_ITEMS);
+  if (isProxy) {
+    items.push(...PROXY_COMMON);
+    if (role === "leader") items.push(...PROXY_LEADER_ONLY);
+  }
+  return items;
+}
+
+// ---------------------------------------------------------------------------
+// D8. Comprehension and power checks
+// ---------------------------------------------------------------------------
+
+/**
+ * Objective comprehension, four items (down from five, with the issue count).
+ * A wrong answer re-shows the relevant instruction and allows one retry;
+ * failing twice is an exclusion criterion.
+ */
+export const COMPREHENSION_BLOCK: Block = {
+  id: "comprehension",
+  title: "Before you start",
+  hint: "Four quick questions about how this works.",
+  items: [
+    {
+      kind: "choice",
+      id: "COMP1",
+      text: "Who can directly influence the Member's simulated evaluation, project bonus, and future assignments?",
+      options: [
+        { value: "leader", label: "The Leader" },
+        { value: "member", label: "The Member" },
+        { value: "both", label: "Both equally" },
+        { value: "neither", label: "Neither" },
+      ],
+    },
+    {
+      kind: "choice",
+      id: "COMP2",
+      text: "Can the Leader finalize all three project terms without the Member's agreement?",
+      columns: 2,
+      options: [
+        { value: "no", label: "No" },
+        { value: "yes", label: "Yes" },
+      ],
+    },
+    {
+      kind: "choice",
+      id: "COMP3",
+      text: "One term matters more to the Leader and another matters more to the Member. What creates value for both sides?",
+      options: [
+        {
+          value: "trade",
+          label: "Trade them — each side takes the term it cares about more",
+        },
+        { value: "split", label: "Split the difference on both terms" },
+        { value: "concede", label: "Whoever has more authority decides both" },
+        { value: "drop", label: "Drop the term the two sides disagree on" },
+      ],
+    },
+    {
+      kind: "choice",
+      id: "COMP4",
+      text: "May you tell the other side the exact numbers or the ranking on your private point sheet?",
+      columns: 2,
+      options: [
+        { value: "no", label: "No" },
+        { value: "yes", label: "Yes" },
+      ],
+    },
+  ],
+};
+
+export const COMPREHENSION_ANSWERS: Record<string, string> = {
+  COMP1: "leader",
+  COMP2: "no",
+  COMP3: "trade",
+  COMP4: "no",
+};
+
+/** Which instruction to re-show when an answer is wrong. */
+export const COMPREHENSION_REMEDIATION: Record<string, string> = {
+  COMP1:
+    "The Leader has formal authority over the project and influences the Member's evaluation, project reward, and future assignments.",
+  COMP2:
+    "Neither side can settle the three terms alone. Both sides must agree, and the Member can decline or accept only on agreed conditions.",
+  COMP3:
+    "When two terms matter unequally to the two sides, trading them — each side taking the one it values more — produces more total value than splitting both down the middle.",
+  COMP4:
+    "Your point sheet is private. You may explain why a term matters and ask about the other side's priorities, but not disclose exact values or rankings.",
+};
+
+/** Subjective power check, asked once at the end. */
+export const POWER_BLOCK: Block = {
+  id: "power",
+  title: "About the roles",
+  hint: "1 = Strongly disagree, 7 = Strongly agree",
+  items: [
+    {
+      kind: "scale",
+      id: "POW1",
+      text: "The Leader had more influence over the Member's evaluation, bonus, and future opportunities than the Member had over the Leader's.",
+      ...AGREE,
+    },
+    {
+      kind: "scale",
+      id: "POW2",
+      text: "The Member depended more on the Leader for important outcomes than the Leader depended on the Member.",
+      ...AGREE,
+    },
+    {
+      kind: "scale",
+      id: "POW3",
+      text: "Despite the power difference, both sides needed the other side's agreement.",
+      ...AGREE,
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// D9. Open-ended
+// ---------------------------------------------------------------------------
+
+const OPEN_COMMON: Item = {
+  kind: "text",
+  id: "OPEN1",
+  text: "What most influenced the level at which the difficult requirement was opened, protected, traded, or dropped? Which reasons were useful to explain it, and which were better kept private? If the role relationship or the possibility of evaluation mattered, say how.",
+  placeholder: "Two to four sentences.",
+  rows: 5,
+};
+
+const OPEN_PROXY_MEMBER: Item = {
+  kind: "text",
+  id: "OPEN2",
+  text: "What did you choose to entrust to your assistant? Did uncertainty about which proposals came from you and which from the assistant make it easier or harder to protect the requirement?",
+  placeholder: "Two to four sentences.",
+  rows: 4,
+};
+
+const OPEN_PROXY_LEADER: Item = {
+  kind: "text",
+  id: "OPEN2",
+  text: "How did you decide whether the other side's difficult requirement was genuinely important to them or an option their assistant explored? How did that judgement affect what you accepted?",
+  placeholder: "Two to four sentences.",
+  rows: 4,
+};
+
+export function openEndedBlock(role: Role): Block {
+  return {
+    id: "open",
+    title: "In your own words",
+    hint: "A few sentences is plenty.",
+    items: [
+      OPEN_COMMON,
+      role === "member" ? OPEN_PROXY_MEMBER : OPEN_PROXY_LEADER,
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// D10. Suspicion probe
+//
+// Must stay LAST, before any disclosure. Asking it after the debriefing would
+// measure nothing.
+// ---------------------------------------------------------------------------
+
+export const SUSPICION_BLOCK: Block = {
+  id: "suspicion",
+  title: "Two last questions",
+  items: [
+    {
+      kind: "choice",
+      id: "SUS1",
+      text: "Who or what do you believe generated the other party's negotiation behaviour?",
+      options: [
+        { value: "another_person", label: "Another person taking part in the study" },
+        { value: "software", label: "A software system" },
+        { value: "mixed", label: "Some combination of the two" },
+        { value: "not_sure", label: "I am not sure" },
+      ],
+    },
+    {
+      kind: "text",
+      id: "SUS2",
+      text: "What do you think this study was trying to test?",
+      placeholder: "Your best guess.",
+      rows: 3,
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Cross-session comparison
+// ---------------------------------------------------------------------------
 
 export const COMPARISON_BLOCK: Block = {
   id: "comparison",
@@ -348,84 +601,6 @@ export const COMPARISON_BLOCK: Block = {
   ],
 };
 
-export const OPEN_BLOCK: Block = {
-  id: "open",
-  title: "In your own words",
-  hint: "Short answers are fine. You may leave any of these blank.",
-  optional: [
-    "open_requirement_power",
-    "open_final_decision",
-    "open_withheld",
-    "open_proxy_branch",
-  ],
-  items: [
-    {
-      kind: "text",
-      id: "open_requirement_power",
-      text: "What most influenced whether you protected, traded, or gave up an important requirement?",
-    },
-    {
-      kind: "text",
-      id: "open_final_decision",
-      text: "Why did you accept, ask to revise, or reject the agreement?",
-    },
-    {
-      kind: "text",
-      id: "open_withheld",
-      text: "Was there anything you did not raise, or softened, because of how the counterpart might judge you?",
-    },
-    {
-      kind: "text",
-      id: "open_proxy_branch",
-      text: "What did you entrust to your assistant, and what did you keep to yourself?",
-    },
-  ],
-};
-
-/** Suspicion probe. Must stay LAST, before any disclosure (Methods §A17). */
-export const SUSPICION_BLOCK: Block = {
-  id: "suspicion",
-  title: "Two last questions",
-  optional: ["SUS2"],
-  items: [
-    {
-      kind: "choice",
-      id: "SUS1",
-      text: "Who or what do you think produced the counterpart's behaviour?",
-      options: [
-        { value: "another_person", label: "Another person taking part in the study" },
-        { value: "software", label: "A software system" },
-        { value: "mixed", label: "Some combination of the two" },
-        { value: "not_sure", label: "I am not sure" },
-      ],
-    },
-    {
-      kind: "text",
-      id: "SUS2",
-      text: "What do you think this study was testing?",
-      placeholder: "Your best guess.",
-    },
-  ],
-};
-
-// ---------------------------------------------------------------------------
-// Power manipulation check (Methods §7, Appendix A6)
-// ---------------------------------------------------------------------------
-
-export const POWER_BLOCK: Block = {
-  id: "power",
-  title: "About the roles",
-  hint: "1 = Strongly disagree, 7 = Strongly agree",
-  items: [
-    { kind: "scale", id: "POW1", text: "The Project Leader had formal authority to direct and evaluate the Team Member's work.", ...AGREE },
-    { kind: "scale", id: "POW2", text: "The Project Leader could influence rewards and future opportunities for the Team Member.", ...AGREE },
-    { kind: "scale", id: "POW3", text: "Compared with the counterpart, I had more control over important outcomes.", ...AGREE },
-    { kind: "scale", id: "POW4", text: "I needed the counterpart's cooperation to get an acceptable outcome.", ...AGREE },
-    { kind: "scale", id: "POW5", text: "Despite the authority difference, both sides had to negotiate rather than one simply issuing instructions.", ...AGREE },
-    { kind: "scale", id: "POW6_R", text: "In the session where assistants negotiated, one assistant had more say than the other.", ...AGREE },
-  ],
-};
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -436,7 +611,7 @@ export function requiredIds(block: Block): string[] {
   return block.items.map((i) => i.id).filter((id) => !optional.has(id));
 }
 
-/** Appends `_s1` / `_s2` to every id, for the per-session questionnaire blocks. */
+/** Appends `_s1` / `_s2` to every id, for the per-session blocks. */
 export function forSession(items: Item[], sessionIndex: 1 | 2): Item[] {
   return items.map((i) => ({ ...i, id: `${i.id}_s${sessionIndex}` }));
 }
@@ -445,7 +620,9 @@ export function forSession(items: Item[], sessionIndex: 1 | 2): Item[] {
 export function dummyAnswer(item: Item): string | number {
   switch (item.kind) {
     case "scale":
-      return 4;
+      return 5;
+    case "amount":
+      return 60;
     case "choice":
     case "select":
       return item.options[0].value;

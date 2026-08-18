@@ -14,6 +14,7 @@ import type { Block, Item } from "@/lib/measures";
 import { requiredIds } from "@/lib/measures";
 import type { SurveyResponses } from "@/lib/types";
 import {
+  AmountScale,
   Card,
   CardTitle,
   ChoiceList,
@@ -124,6 +125,25 @@ function MeasureItem({
         points={item.points}
         flagged={flagged}
       />
+    );
+  }
+
+  // 0-100 judgements get their own control rather than a 7-point row: the
+  // receiver-side items are read on a hundred-point scale in the analysis, and
+  // a stepped picker keeps them free of a starting position.
+  if (item.kind === "amount") {
+    return (
+      <div id={`q-${item.id}`} className="scroll-mt-24">
+        <Field label={item.text} required={!optional} flagged={flagged}>
+          <AmountScale
+            id={item.id}
+            value={asNumber}
+            onChange={(v) => onChange(item.id, v)}
+            step={item.step ?? 10}
+            unit={item.unit}
+          />
+        </Field>
+      </div>
     );
   }
 

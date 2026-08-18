@@ -1,19 +1,22 @@
 "use client";
 
 /**
- * Post-task questionnaire (Methods §6, Appendix A9-A16).
+ * End-of-study questionnaire (Methods ver.1.8 §Post-study).
  *
- * Split into parts rather than one long scroll. The full bank runs to roughly
- * eighty rating items; presented as a single page it reads as a wall and
- * answer quality drops off. Parts follow the participant's own experience —
- * one session, then the next — which also keeps the assistant items adjacent
- * to the session they are about.
+ * WHY THIS IS SHORT NOW. The post-task items used to be collected here, all of
+ * them, after both sessions were over — which asked participants to remember
+ * how a negotiation felt two tasks ago. ver.1.8 puts them where they belong:
+ * each session carries its own seven-to-fourteen item block, answered while
+ * the session is still in mind. What is left for the end is the handful of
+ * things that are genuinely about the study as a whole.
+ *
+ * Two parts: the open-ended questions and the suspicion probe. The subjective
+ * power check has its own page immediately after this one.
  *
  * Two things this page must not do:
  *  - name a condition. Sessions are "Session 1" and "Session 2", reminded by
  *    scenario title, never by "Baseline"/"Delegate"/"Explorer".
- *  - ask the suspicion probe anywhere but last, before any disclosure
- *    (Methods §A17).
+ *  - ask the suspicion probe anywhere but last, before any disclosure.
  *
  * Item wording lives in `lib/measures`.
  */
@@ -28,22 +31,17 @@ import {
 } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { Button, Page, PageHeader } from "@/components/ui";
-import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import {
   COMPARISON_BLOCK,
-  OPEN_BLOCK,
-  PROXY_ITEMS,
-  SESSION_ITEMS,
   SUSPICION_BLOCK,
   dummyAnswer,
-  forSession,
+  openEndedBlock,
   type Block,
 } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { useRestoreAnswers } from "@/lib/saved-answers";
 import { nextHref } from "@/lib/study-config";
-import { getTask } from "@/lib/tasks";
 
 interface Part {
   id: string;
@@ -64,70 +62,25 @@ export default function SurveyPage() {
   const parts = useMemo<Part[]>(() => {
     if (!assignment) return [];
 
-    /** Which session used an assistant. Exactly one always did. */
-    const proxyIndex = isProxyCondition(sessionPlan(assignment, 1).condition)
-      ? 1
-      : 2;
-
-    const built: Part[] = [];
-
-    for (const index of [1, 2] as const) {
-      // Remind them which session was which. "Session 2" on its own is
-      // abstract by the time they reach this page; the scenario title is what
-      // they remember, and it reveals nothing they have not already seen.
-      const task = getTask(sessionPlan(assignment, index).taskId);
-
-      built.push({
-        id: `s${index}`,
-        eyebrow: `Session ${index}`,
-        title: task.title,
-        blocks: [
-          {
-            id: `session_${index}`,
-            title: "Thinking back to this session",
-            hint: "1 = Strongly disagree, 7 = Strongly agree",
-            items: forSession(SESSION_ITEMS, index),
-          },
-        ],
-      });
-
-      if (proxyIndex === index) {
-        built.push({
-          id: `s${index}_proxy`,
-          eyebrow: `Session ${index}`,
-          title: "The session where an assistant negotiated for you",
-          blocks: [
-            {
-              id: `proxy_${index}`,
-              title: "About your assistant",
-              hint: "1 = Strongly disagree, 7 = Strongly agree",
-              items: forSession(PROXY_ITEMS, index),
-            },
-          ],
-        });
-      }
-    }
-
-    built.push({
-      id: "comparison",
-      eyebrow: "Both sessions",
-      title: "Comparing the two",
-      blocks: [COMPARISON_BLOCK],
-    });
-    built.push({
-      id: "open",
-      eyebrow: "Both sessions",
-      title: "In your own words",
-      blocks: [OPEN_BLOCK],
-    });
-    built.push({
-      id: "suspicion",
-      eyebrow: "Last part",
-      title: "Two final questions",
-      blocks: [SUSPICION_BLOCK],
-    });
-
-    return built;
+    // The subjective power check has its own page (`/manipulation-check`) and
+    // is not repeated here.
+    return [
+      {
+        id: "comparison",
+        eyebrow: "Both sessions",
+        title: "Comparing the two",
+        blocks: [COMPARISON_BLOCK, openEndedBlock(assignment.role)],
+      },
+      {
+        // The probe has to come before anything that would give the design
+        // away, which is why it sits here rather than next to the debriefing
+        // it logically pairs with.
+        id: "suspicion",
+        eyebrow: "Last part",
+        title: "Two final questions",
+        blocks: [SUSPICION_BLOCK],
+      },
+    ];
   }, [assignment]);
 
   /**
@@ -189,9 +142,8 @@ export default function SurveyPage() {
     setBusy(true);
     try {
       // Save on every part, not just at the end: a participant who drops out
-      // during an eighty-item questionnaire should not take all of it with
-      // them. The block is rewritten each time, so the last write is the
-      // fullest one.
+      // partway should not take their answers with them. The block is
+      // rewritten each time, so the last write is the fullest one.
       await saveResponses("survey", answers);
 
       if (!isLast) {
@@ -222,7 +174,7 @@ export default function SurveyPage() {
           title={part.title}
           subtitle={
             partIndex === 0
-              ? "Please answer for each session separately. There are no right or wrong answers."
+              ? "A few questions about the study as a whole. There are no right or wrong answers."
               : undefined
           }
         />
