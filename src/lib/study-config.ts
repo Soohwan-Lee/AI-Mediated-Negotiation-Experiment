@@ -29,11 +29,22 @@ export const STUDY = {
 } as const;
 
 /**
- * Minutes per stage, from Methods ver.1.8 §Overall timeline (total 40-45 min).
+ * Minutes per stage, from Methods ver.1.8 §Overall timeline.
  *
  * Shorter than before because the task shrank from six issues to three and the
  * eighty-item end-of-study battery became a short block inside each session.
- * Confirm against the pilot median before fixing the advertised time.
+ *
+ * THESE SUM TO ~49 MINUTES against the spec's 40-45, and the gap is real
+ * rather than arithmetic: ver.1.8 budgets 11-13 minutes per task including the
+ * mandate and review, and the 12 here sits at the top of that. The waiting is
+ * what makes it tight — an AI-AI exchange is about 75s of watching a progress
+ * bar, and a Baseline session spends 40-125s on counterpart reply delays alone
+ * (Appendix E7's 8-25s, five times).
+ *
+ * Do not resolve this by shaving the estimate. The pilot median decides it,
+ * and the levers if it runs long are the reply-delay range and the turn
+ * budget, not the advertised time. `STUDY.estimatedMinutes` is what a
+ * participant is told, and it must not drift below what the study takes.
  */
 export const STAGE_MINUTES = {
   consent: 2,

@@ -271,6 +271,11 @@ to decide:
   acceptance thresholds (T4 = 3,600 / T5 = 2,600, targeting an impasse rate
   below 10%), the bonus conversion, the advertised time and payment, and the
   Prolific completion code.
+- **The timing does not close.** `STAGE_MINUTES` sums to about 49 against the
+  spec's 40-45, mostly because waiting is expensive: ~75s watching an AI-AI
+  exchange, and 40-125s of counterpart reply delays in a Baseline session.
+  The levers are the E7 delay range and the turn budget — not the advertised
+  figure, which must not drift below what the study actually takes.
 - **Whether three issues survive the demand-characteristic check.** With only
   three terms the focal one is salient, and the suspicion probe may show that
   participants guessed the design. The preregistered fallback is a fourth
