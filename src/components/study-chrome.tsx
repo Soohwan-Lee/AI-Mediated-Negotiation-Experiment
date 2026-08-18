@@ -101,8 +101,14 @@ export function ActionBar({
   note,
   secondary,
 }: {
-  label: string;
-  onClick: () => void;
+  /**
+   * Omit both `label` and `onClick` for a status-only bar. The negotiate
+   * screen wants one: its next step is the Send button inside the
+   * conversation, and putting a second, dead primary button down here would
+   * either be a lie or a way to skip the negotiation.
+   */
+  label?: string;
+  onClick?: () => void;
   disabled?: boolean;
   busy?: boolean;
   /** Count of required items with no answer yet. */
@@ -157,19 +163,21 @@ export function ActionBar({
 
         <div className="flex shrink-0 items-center gap-2">
           {secondary}
-          <button
-            type="button"
-            onClick={onClick}
-            disabled={disabled || busy}
-            className={cx(
-              "inline-flex items-center gap-2 rounded-[var(--radius)] px-6 py-2.5 text-[0.9375rem] font-medium transition-colors",
-              "bg-[var(--accent)] text-[var(--accent-foreground)] hover:bg-[var(--accent-hover)]",
-              "disabled:cursor-not-allowed disabled:opacity-40",
-            )}
-          >
-            {busy ? "Saving…" : label}
-            <span aria-hidden>→</span>
-          </button>
+          {label && onClick ? (
+            <button
+              type="button"
+              onClick={onClick}
+              disabled={disabled || busy}
+              className={cx(
+                "inline-flex items-center gap-2 rounded-[var(--radius)] px-6 py-2.5 text-[0.9375rem] font-medium transition-colors",
+                "bg-[var(--accent)] text-[var(--accent-foreground)] hover:bg-[var(--accent-hover)]",
+                "disabled:cursor-not-allowed disabled:opacity-40",
+              )}
+            >
+              {busy ? "Saving…" : label}
+              <span aria-hidden>→</span>
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

@@ -404,13 +404,17 @@ export function BaselineSession({
         </SessionLayout>
       </Page>
 
+      {/* No "finish early" control.
+          The five stages have to be walked, because the trajectory this study
+          measures is made of the transitions between them — what was opened
+          with, what survived the standardized challenge, what reached the
+          final package. An action bar that jumped to the review from stage 1
+          would produce a session with an opening and a final position and
+          nothing in between, and it would do so precisely for the
+          participants least engaged with the negotiation. The session ends
+          when the last message is sent. */}
       <ActionBar
-        label="Finish this session"
-        onClick={() => {
-          setTentative(Object.keys(offer).length > 0 ? offer : null);
-          setPhase("review");
-        }}
-        note={`${chosen} of ${task.issues.length} terms chosen`}
+        note={`${chosen} of ${task.issues.length} terms chosen · step ${stage} of ${STAGES.length}`}
       />
     </>
   );
