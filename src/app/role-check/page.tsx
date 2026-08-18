@@ -27,7 +27,7 @@ import { nextHref } from "@/lib/study-config";
 const BLOCKS = [POWER_BLOCK];
 
 export default function ManipulationCheckPage() {
-  usePageEnter("manipulation-check");
+  usePageEnter("role-check");
   const router = useRouter();
   const { saveResponses, logEvent } = useParticipant();
   const [answers, setAnswers] = useState<Answers>({});
@@ -69,8 +69,8 @@ export default function ManipulationCheckPage() {
     setBusy(true);
     try {
       await saveResponses("manipulation_check", answers);
-      logEvent("page_complete", undefined, { page: "manipulation-check" });
-      router.push(nextHref("manipulation-check"));
+      logEvent("page_complete", undefined, { page: "role-check" });
+      router.push(nextHref("role-check"));
     } finally {
       setBusy(false);
     }
@@ -100,7 +100,7 @@ export default function ManipulationCheckPage() {
         remaining={flagged.size > 0 ? missing.length : 0}
         firstUnansweredId={missing[0] ?? null}
         note={answeredNote(BLOCKS, answers)}
-        secondary={<BackButton from="manipulation-check" />}
+        secondary={<BackButton from="role-check" />}
       />
     </>
   );

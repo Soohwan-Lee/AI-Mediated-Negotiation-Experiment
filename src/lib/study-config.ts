@@ -106,7 +106,11 @@ export const FLOW = [
   { key: "practice-2", href: "/session/2/practice", label: "Practice 2" },
   { key: "session-2", href: "/session/2", label: "Session 2" },
   { key: "survey", href: "/survey", label: "Questionnaire" },
-  { key: "manipulation-check", href: "/manipulation-check", label: "Final Check" },
+  // The URL is the one label a participant can read that the interface does
+  // not choose — "/manipulation-check" would tell anyone who looked at the
+  // address bar, or searched the phrase, that something was being manipulated.
+  // The stored response block keeps its analysis name.
+  { key: "role-check", href: "/role-check", label: "Final Check" },
   { key: "reward", href: "/reward", label: "Reward Decision" },
   { key: "debriefing", href: "/debriefing", label: "Debriefing" },
   { key: "complete", href: "/complete", label: "Completion" },
@@ -169,8 +173,8 @@ export function flowLabel(key: FlowKey): string {
 const BACK_STEPS: Partial<Record<FlowKey, FlowKey>> = {
   instruction: "background",
   "practice-1": "instruction",
-  "manipulation-check": "survey",
-  reward: "manipulation-check",
+  "role-check": "survey",
+  reward: "role-check",
 };
 
 export function backStep(

@@ -62,8 +62,8 @@ export default function SurveyPage() {
   const parts = useMemo<Part[]>(() => {
     if (!assignment) return [];
 
-    // The subjective power check has its own page (`/manipulation-check`) and
-    // is not repeated here.
+    // The subjective power check has its own page (`/role-check`) and is not
+    // repeated here.
     return [
       {
         id: "comparison",
