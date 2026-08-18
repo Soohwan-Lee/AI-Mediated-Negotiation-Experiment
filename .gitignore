@@ -44,3 +44,6 @@ next-env.d.ts
 .omc/handoffs/
 .omc/notepad.md
 .omc/project-memory.json
+
+# Browser-automation scratch output (snapshots, screenshots, console logs)
+.playwright-mcp/
