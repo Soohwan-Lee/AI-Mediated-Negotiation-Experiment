@@ -87,6 +87,14 @@ export function ReviewPhase({
   const [focalResponse, setFocalResponse] = useState<FocalResponse | null>(null);
   const [choice, setChoice] = useState<RatificationChoice | null>(null);
   const [revisionNote, setRevisionNote] = useState("");
+  /**
+   * "One revision" is a real limit, not a phrase in a hint.
+   *
+   * The spec gives the participant exactly one, and the option's own hint says
+   * so — so once it has been used the option has to stop being offered, or the
+   * interface is promising a constraint it does not apply.
+   */
+  const [revisionsUsed, setRevisionsUsed] = useState(0);
 
   const isReceiver = role === "leader";
 
@@ -125,6 +133,7 @@ export function ReviewPhase({
   async function submit() {
     const decided = choice ?? (canSubmit ? "ratify" : null);
     if (!decided) return;
+    if (decided === "request_revision") setRevisionsUsed((n) => n + 1);
 
     if (participantKey) {
       await getStore().saveAgreement(participantKey, {
@@ -267,7 +276,9 @@ export function ReviewPhase({
               )}
               aria-disabled={!canDecide}
             >
-              {RATIFY_OPTIONS.map(([value, label, hint]) => (
+              {RATIFY_OPTIONS.filter(
+                ([value]) => value !== "request_revision" || revisionsUsed < 1,
+              ).map(([value, label, hint]) => (
                 <button
                   key={value}
                   type="button"

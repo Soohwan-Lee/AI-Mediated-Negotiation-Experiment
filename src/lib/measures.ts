@@ -213,18 +213,23 @@ export const BACKGROUND_BLOCKS: Block[] = [
 //
 // Asked before the negotiation, after the briefing. Role-paired: the Member is
 // asked about their own exposure, the Leader about the Member's.
+//
+// The `-M` / `-L` suffixes are not decoration. The two versions ask different
+// questions — one is self-referential, the other is a judgement about someone
+// else — so sharing an id would put two variables in one export column and
+// leave the analysis to recover them by joining on role.
 // ---------------------------------------------------------------------------
 
 const JEOPARDY_MEMBER: Item[] = [
   {
     kind: "scale",
-    id: "JEOP1",
+    id: "JEOP1-M",
     text: `I might jeopardize the agreement with the Leader if I raise the ${FOCAL_PLACEHOLDER}.`,
     ...AGREE,
   },
   {
     kind: "scale",
-    id: "JEOP2",
+    id: "JEOP2-M",
     text: `I might lose the opportunity to participate in this project if I raise the ${FOCAL_PLACEHOLDER}.`,
     ...AGREE,
   },
@@ -233,13 +238,13 @@ const JEOPARDY_MEMBER: Item[] = [
 const JEOPARDY_LEADER: Item[] = [
   {
     kind: "scale",
-    id: "JEOP1",
+    id: "JEOP1-L",
     text: `The Member might jeopardize the agreement with me if they raise the ${FOCAL_PLACEHOLDER}.`,
     ...AGREE,
   },
   {
     kind: "scale",
-    id: "JEOP2",
+    id: "JEOP2-L",
     text: `The Member might lose the opportunity to participate in this project if they raise the ${FOCAL_PLACEHOLDER}.`,
     ...AGREE,
   },

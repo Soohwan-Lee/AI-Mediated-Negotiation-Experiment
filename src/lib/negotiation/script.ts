@@ -91,7 +91,8 @@ function words(taskId: TaskId) {
   return taskId === "task_a"
     ? {
         scope: "pilot scope",
-        focalLower: "remote days",
+        /** Bare noun: follows "the lowest", where an article would double up. */
+        focalBare: "remote days",
         /** Reads as a sentence opener in both tasks, singular or plural. */
         focalMattersMost: "Remote days are what matter most",
         timing: "launch date",
@@ -108,7 +109,7 @@ function words(taskId: TaskId) {
       }
     : {
         scope: "migration scope",
-        focalLower: "the on-call cap",
+        focalBare: "on-call cap",
         focalMattersMost: "The on-call cap is what matters most",
         timing: "completion date",
         focalAsk: "an eight-hour weekly on-call cap",
@@ -161,8 +162,8 @@ function memberScript(
       proposal: theirOpening,
       text:
         mode === "baseline"
-          ? `hi — good to be working on this. my opening: the widest ${w.scope}, the lowest ${w.focalLower}, and the earliest ${w.timing}. breadth is what makes this worth doing for us.`
-          : `Opening on behalf of ${COUNTERPART_PERSONA.name}: the widest ${w.scope}, the lowest ${w.focalLower}, and the earliest ${w.timing}. Breadth and timing are the priorities on this side.`,
+          ? `hi — good to be working on this. my opening: the widest ${w.scope}, the lowest ${w.focalBare}, and the earliest ${w.timing}. breadth is what makes this worth doing for us.`
+          : `Opening on behalf of ${COUNTERPART_PERSONA.name}: the widest ${w.scope}, the lowest ${w.focalBare}, and the earliest ${w.timing}. Breadth and timing are the priorities on this side.`,
     },
     {
       id: "s1b",
@@ -301,7 +302,7 @@ function leaderScript(
       stage: 1,
       speaker: own,
       proposal: myOpening,
-      text: `Opening: the widest ${w.scope}, the lowest ${w.focalLower}, and the earliest ${w.timing}. Breadth is what makes this worth doing.`,
+      text: `Opening: the widest ${w.scope}, the lowest ${w.focalBare}, and the earliest ${w.timing}. Breadth is what makes this worth doing.`,
     },
     {
       id: "l1b",

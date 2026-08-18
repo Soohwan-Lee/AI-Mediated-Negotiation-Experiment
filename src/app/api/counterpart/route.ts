@@ -107,14 +107,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // TODO(supabase): persist `action` and `validation` here. They must not
+    // travel to the client — the sibling proxy route strips provenance for the
+    // same reason, and this one carries `focalRequirementStatus`,
+    // `reasonSourceId` and the validator's reasoning besides. A participant
+    // who opens the network tab and finds structured negotiation state has
+    // learned that the other party is machinery, which is deception rule 1.
     return NextResponse.json({
       message: action.rationale,
       stage,
       proposal: decision.proposal,
       accepted: decision.accepts,
       impasse: decision.impasse,
-      action,
-      validation,
       stubbed,
     });
   } catch (error) {

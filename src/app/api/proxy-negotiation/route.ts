@@ -46,6 +46,8 @@ interface RequestBody {
   /** The package each side last put on the table. */
   lastParticipantPackage?: Package | null;
   lastCounterpartPackage?: Package | null;
+  /** Reason card ids this side has already voiced, for the budget check. */
+  reasonsUsed?: string[];
 }
 
 /**
@@ -103,6 +105,32 @@ function reasonsFor(
   }));
 }
 
+/**
+ * What a proxy says when the model's wording was blocked.
+ *
+ * Plain, package-only, and carrying no rationale at all — a rationale is
+ * exactly the thing most likely to have been blocked, so the safe fallback
+ * states the position and nothing else.
+ */
+function fallbackText(
+  task: ReturnType<typeof getTask>,
+  stage: StageId,
+  proposal: Package | null,
+  isParticipantSide: boolean,
+): string {
+  const side = isParticipantSide ? "On my principal's behalf" : "On Alex's behalf";
+  if (!proposal) {
+    return stage === 3
+      ? `${side}: noted. The position on that term stands.`
+      : `${side}: no change to the position this turn.`;
+  }
+  const terms = task.issues
+    .map((i) => i.options.find((o) => o.id === proposal[i.id])?.label)
+    .filter(Boolean)
+    .join(", ");
+  return `${side}: ${terms}.`;
+}
+
 export async function POST(request: Request) {
   let body: RequestBody;
   try {
@@ -150,7 +178,14 @@ export async function POST(request: Request) {
         decidedAction = "Open with your principal's preferred package.";
         break;
       case 2:
-        proposal = plan.probe;
+        // The Explorer's probe is floated in words only. It deliberately does
+        // NOT become `proposal`, because `proposal` is what the counterpart
+        // evaluates at stage 4 — and a probe is by definition not a
+        // commitment ("one option could be…"). Sending it would give the
+        // Explorer a fourth substantive package where the Delegate has three,
+        // which §Delegate–Explorer matching forbids, and could flip the
+        // acceptance test between conditions for identical mandates.
+        proposal = null;
         decidedAction = plan.probe
           ? "Name the term that matters most, and float one alternative combination as an option rather than a position."
           : "Name the term that matters most, with one authorized reason.";
@@ -232,28 +267,32 @@ export async function POST(request: Request) {
       mandate: isParticipantSide ? body.mandate : undefined,
       policy: body.policy,
       actorRole,
+      stage,
+      // The budget spans the whole task, so the client carries the history —
+      // this route is stateless and one action cannot know what came before.
+      reasonsUsed: isParticipantSide ? (body.reasonsUsed ?? []) : undefined,
     });
 
-    // A blocked action never reaches the transcript. The state machine's move
-    // stands regardless — only its wording is discarded — so a guardrail
-    // failure cannot change the course of the negotiation.
-    if (!validation.valid && validation.disposition === "regenerate") {
-      return NextResponse.json({
-        turn,
-        stage,
-        skipped: true,
-        guardrailViolations: validation.violations,
-        done: turn + 1 >= TOTAL_TURNS,
-        totalTurns: TOTAL_TURNS,
-        stubbed,
-      });
-    }
+    // A blocked action loses its WORDING, not the move behind it.
+    //
+    // Dropping the turn entirely — which is what returning `skipped` did —
+    // took the state machine's package with it, because the package rides on
+    // the message. The exchange then had a hole where a stage should be, the
+    // counterpart evaluated a stale package at stage 4, and the participant
+    // saw nine messages instead of ten. Appendix E6 asks for a deterministic
+    // fallback action, so that is what a block produces.
+    const blocked =
+      !validation.valid && validation.disposition === "regenerate";
+
+    const text = blocked
+      ? fallbackText(task, stage, proposal, isParticipantSide)
+      : action.rationale;
 
     const message: TranscriptMessage = {
       id: `m${turn}`,
       sessionIndex: body.sessionIndex,
       speaker: isParticipantSide ? "participant_proxy" : "counterpart_proxy",
-      text: action.rationale,
+      text,
       createdAt: new Date().toISOString(),
       stage,
       ...(proposal ? { proposal } : {}),
@@ -274,6 +313,9 @@ export async function POST(request: Request) {
       focalOption: proposal?.[focalIssue(task).id] ?? null,
       accepted,
       impasse,
+      blocked,
+      // So the client can carry the budget forward to the next turn.
+      reasonUsed: action.reasonSourceId,
       guardrailViolations: validation.valid ? [] : validation.violations,
       done: turn + 1 >= TOTAL_TURNS,
       totalTurns: TOTAL_TURNS,

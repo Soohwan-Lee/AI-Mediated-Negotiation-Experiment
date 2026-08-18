@@ -25,7 +25,6 @@ import { ActionBar, BackButton } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Page, PageHeader } from "@/components/ui";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { NEGOTIATION } from "@/lib/study-config";
 import { PRACTICE_TASK } from "@/lib/tasks";
 
 export default function PracticePage({
@@ -68,7 +67,10 @@ export default function PracticePage({
       { id: `p${m.length}`, speaker: "participant", text },
     ]);
     setPending(true);
-    await new Promise((r) => setTimeout(r, NEGOTIATION.counterpartDelayMs));
+    // Practice keeps a short fixed delay rather than the E7 range: this round
+    // is for learning the controls, and eight seconds of typing indicator to
+    // see a canned reply teaches nothing.
+    await new Promise((r) => setTimeout(r, 1200));
     setMessages((m) => [
       ...m,
       {

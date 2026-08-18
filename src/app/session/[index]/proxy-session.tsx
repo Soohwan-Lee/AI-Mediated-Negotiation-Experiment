@@ -25,7 +25,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { OptionChips } from "@/components/issues";
 import { type DisplayMessage } from "@/components/negotiation";
 import { BriefingPanel, SessionHeader, SessionLayout } from "@/components/session";
@@ -174,6 +174,17 @@ export function ProxySession({
   const [tentative, setTentative] = useState<Package | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  /**
+   * Emergency stop (Appendix C4). Not a pause button: the condition promises
+   * the participant a way out "if the system leaves an authorized boundary",
+   * and a promise made in the instructions that the interface does not keep is
+   * a broken manipulation, not a missing feature.
+   *
+   * A ref, because the negotiation loop reads it between turns and state
+   * captured in that closure would be stale.
+   */
+  const stopped = useRef(false);
+  const [showStopped, setShowStopped] = useState(false);
 
   const mockAi = useDevMockAi();
   const script = scriptedSession(task, role, policy);
@@ -265,12 +276,15 @@ export function ProxySession({
     setError(null);
     setTranscript([]);
     setProgress({ done: 0, total: TOTAL_TURNS });
+    stopped.current = false;
+    setShowStopped(false);
     logEvent("negotiation_started", { policy }, { sessionIndex });
 
     if (mockAi) {
       const scripted = script.messages;
       setProgress({ done: 0, total: scripted.length });
       for (let i = 0; i < scripted.length; i += 1) {
+        if (stopped.current) break;
         await new Promise((r) => setTimeout(r, 260));
         setTranscript(
           scripted.slice(0, i + 1).map((m) => ({
@@ -295,9 +309,13 @@ export function ProxySession({
     let lastParticipantPackage: Package | null = null;
     let lastCounterpartPackage: Package | null = null;
     let settled: Package | null = null;
+    // Which reason cards this side has voiced so far. The rationale budget is
+    // a whole-task limit, and the route is stateless, so the count lives here.
+    const reasonsUsed: string[] = [];
 
     try {
       for (let turn = 0; turn < TOTAL_TURNS; turn += 1) {
+        if (stopped.current) break;
         const res = await fetch("/api/proxy-negotiation", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -310,6 +328,7 @@ export function ProxySession({
             turn,
             lastParticipantPackage,
             lastCounterpartPackage,
+            reasonsUsed,
             history: collected.map((m) => ({
               speaker: m.speaker,
               text: m.text,
@@ -328,7 +347,10 @@ export function ProxySession({
           };
           done: boolean;
           totalTurns?: number;
+          reasonUsed?: string | null;
         };
+
+        if (data.reasonUsed) reasonsUsed.push(data.reasonUsed);
 
         if (data.message) {
           collected.push({
@@ -499,7 +521,7 @@ export function ProxySession({
             );
             void runNegotiation();
           }}
-          note="You cannot step in once it starts."
+          note="It negotiates without checking in, but you can stop it, and nothing is final until you review it."
           secondary={
             <button
               type="button"
@@ -561,6 +583,30 @@ export function ProxySession({
               </p>
             </div>
           ) : null}
+
+          {/* Appendix C4 promises this in the condition instructions, so it
+              has to exist. Deliberately quiet: it is for the case where
+              something has gone wrong, not a second way to negotiate. */}
+          <button
+            type="button"
+            onClick={() => {
+              stopped.current = true;
+              setShowStopped(true);
+              logEvent(
+                "negotiation_ended",
+                { emergencyStop: true, atTurn: progress.done },
+                { sessionIndex },
+              );
+            }}
+            disabled={showStopped}
+            className="mt-10 text-[0.8125rem] text-[var(--ink-3)] underline underline-offset-4 hover:text-[var(--ink-2)] disabled:no-underline"
+          >
+            {showStopped ? "Stopping…" : "Stop this now"}
+          </button>
+          <p className="mt-2 max-w-xs text-[0.75rem] text-[var(--ink-3)]">
+            Only if something looks wrong. You will still review whatever was
+            reached.
+          </p>
         </div>
       </Page>
     );

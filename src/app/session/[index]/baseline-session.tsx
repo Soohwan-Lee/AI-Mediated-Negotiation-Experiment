@@ -36,11 +36,31 @@ import { STAGES, STAGE_LABELS, STAGE_PROMPTS, counterpartStep } from "@/lib/nego
 import { scriptedSession } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
-import { NEGOTIATION, nextHref } from "@/lib/study-config";
+import { counterpartDelayMs, nextHref } from "@/lib/study-config";
 import { counterpartOpening, focalIssue, getTask } from "@/lib/tasks";
 import type { Package, Role, StageId, TaskId } from "@/lib/types";
 import { ReviewPhase } from "./review";
 import { PostTaskSurvey, PrivateTargetForm, SessionBrief } from "./shared";
+
+/**
+ * The counterpart's opening, in words.
+ *
+ * Used when no scripted line is available — outside mockup mode the real
+ * system would generate this through `/api/counterpart` at stage 1, but the
+ * participant must never arrive at an empty conversation, because the fixed
+ * opening is the anchor their reply is measured against.
+ */
+function openingLine(
+  task: ReturnType<typeof getTask>,
+  counterpartRole: Role,
+): string {
+  const opening = counterpartOpening(task, counterpartRole);
+  const terms = task.issues
+    .map((i) => i.options.find((o) => o.id === opening[i.id])?.label)
+    .filter(Boolean)
+    .join(", ");
+  return `hi — good to be working on this. my opening would be ${terms}. keen to hear what matters most on your side.`;
+}
 
 type Phase = "brief" | "target" | "negotiate" | "review" | "post";
 
@@ -169,11 +189,25 @@ export function BaselineSession({
     try {
       let reply: string;
       let counterProposal: Package | null = null;
+      // Set when the counterpart's closing test rejects the final package.
+      // Roughly a third of the package space falls below its stage-5
+      // threshold, so this is a reachable outcome and not a corner case.
+      let impasse = false;
 
       if (mockAi) {
-        const scripted = script.messages.find(
-          (m) => m.stage === stage && m.speaker === "counterpart",
-        );
+        // Appendix E1 runs each stage counterpart-then-participant, so the
+        // counterpart's stage-1 line is the opening the participant is already
+        // replying to. What follows their stage-N message is therefore the
+        // counterpart's stage-(N+1) line — and at stage 5 there is nothing
+        // after, because the tentative package closes the exchange. Without
+        // this the opening is said twice and the transcript runs to eleven.
+        const replyStage = (stage + 1) as StageId;
+        const scripted =
+          replyStage <= 5
+            ? script.messages.find(
+                (m) => m.stage === replyStage && m.speaker === "counterpart",
+              )
+            : undefined;
         const decision = counterpartStep(
           task,
           counterpartRole,
@@ -182,9 +216,10 @@ export function BaselineSession({
           lastCounterpartPackage,
         );
         counterProposal = decision.proposal;
-        reply =
-          scripted?.text ??
-          "Understood — let me come back to you on that.";
+        impasse = decision.impasse;
+        reply = decision.impasse
+          ? "i don't think we can make these terms work. i'd rather leave it than agree to something i can't deliver on."
+          : (scripted?.text ?? "");
         await new Promise((r) => setTimeout(r, 400));
       } else {
         const res = await fetch("/api/counterpart", {
@@ -206,40 +241,56 @@ export function BaselineSession({
         const data = (await res.json()) as {
           message?: string;
           proposal?: Package | null;
+          accepted?: boolean;
+          impasse?: boolean;
         };
         reply =
           data.message ??
           "Sorry, I lost my train of thought — could you say that again?";
         counterProposal = data.proposal ?? null;
+        impasse = data.impasse ?? false;
 
-        // Appendix E7: a reply is delayed in proportion to its length, so the
-        // exchange does not feel instantaneous the way a machine would.
-        await new Promise((r) => setTimeout(r, NEGOTIATION.counterpartDelayMs));
+        // Appendix E7: the reply is delayed in proportion to its own length
+        // and jittered, so the exchange does not answer a one-line question
+        // and a full counterpackage in the same beat — which is what a
+        // machine does and a person does not.
+        await new Promise((r) =>
+          setTimeout(r, counterpartDelayMs(reply.length)),
+        );
       }
 
       if (counterProposal) setLastCounterpartPackage(counterProposal);
 
-      const counter: DisplayMessage = {
-        id: `c${next.length}`,
-        speaker: "counterpart",
-        text: reply,
-      };
-      setMessages((m) => [...m, counter]);
-
-      if (participantKey) {
-        void getStore().appendMessage(participantKey, {
-          id: counter.id,
-          sessionIndex,
+      // Stage 5 has no counterpart turn after the participant's: the exchange
+      // closes on the tentative package.
+      if (reply) {
+        const counter: DisplayMessage = {
+          id: `c${next.length}`,
           speaker: "counterpart",
           text: reply,
-          createdAt: new Date().toISOString(),
-          stage,
-          proposal: counterProposal ?? undefined,
-        });
+        };
+        setMessages((m) => [...m, counter]);
+
+        if (participantKey) {
+          void getStore().appendMessage(participantKey, {
+            id: counter.id,
+            sessionIndex,
+            speaker: "counterpart",
+            text: reply,
+            createdAt: new Date().toISOString(),
+            stage,
+            proposal: counterProposal ?? undefined,
+          });
+        }
       }
 
       if (stage >= 5) {
-        setTentative(offer);
+        // An impasse is a real outcome, not a failure to handle: the review
+        // screen has a no-agreement branch and both sides take their fallback
+        // score. Recording the participant's last offer as a tentative
+        // agreement when the counterpart rejected it would invent an
+        // agreement that never happened.
+        setTentative(impasse ? null : offer);
         setPhase("review");
       } else {
         setStage((s) => (s + 1) as StageId);
@@ -271,10 +322,27 @@ export function BaselineSession({
         role={role}
         steps={STEP_LABELS}
         onContinue={() => {
-          // The counterpart's opening is fixed and goes first, so the
-          // participant is answering a position rather than inventing one.
+          // The counterpart opens, and its opening is FIXED (Appendix E2: its
+          // own best package on all three terms). Every participant therefore
+          // answers the same anchor, which is what makes their replies
+          // comparable — and it is the same order the Proxy sessions run, so
+          // Baseline and Proxy transcripts line up stage for stage.
+          //
+          // Seeding the message here rather than waiting for the first send is
+          // the point: otherwise the participant opens into nothing and the
+          // anchor never existed.
           const opening = counterpartOpening(task, counterpartRole);
           setLastCounterpartPackage(opening);
+          const scripted = script.messages.find(
+            (m) => m.stage === 1 && m.speaker === "counterpart",
+          );
+          setMessages([
+            {
+              id: "c-open",
+              speaker: "counterpart",
+              text: scripted?.text ?? openingLine(task, counterpartRole),
+            },
+          ]);
           logEvent("negotiation_started", undefined, { sessionIndex });
           setPhase("negotiate");
         }}

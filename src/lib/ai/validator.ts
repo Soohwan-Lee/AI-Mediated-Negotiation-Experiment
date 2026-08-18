@@ -24,6 +24,8 @@ export type ViolationCode =
   | "role_authority_violation"
   | "disclosure_permission_violation"
   | "provenance_policy_violation"
+  | "rationale_budget_exceeded"
+  | "stage_mismatch"
   | "agent_option_not_allowed";
 
 export interface Violation {
@@ -44,6 +46,17 @@ export interface ValidationContext {
   mandate?: Mandate;
   policy: "baseline" | "delegate" | "explorer";
   actorRole: Role;
+  /** The stage the state machine is running, for the E6 mismatch check. */
+  stage?: 1 | 2 | 3 | 4 | 5;
+  /**
+   * Reasons this side has already voiced this task, oldest first.
+   *
+   * The budget is a cross-turn property (Appendix A8/E4: one rationale per
+   * message, at most two different ones per task), so it cannot be checked
+   * from a single action. The caller keeps the history; this function only
+   * decides whether the next one fits.
+   */
+  reasonsUsed?: string[];
 }
 
 /**
@@ -178,6 +191,31 @@ export function validateAction(
     }
   }
 
+  // --- rationale budget (Appendix A8 / E4) -------------------------------
+  //
+  // The participant is TOLD this limit — "no more than one reason in a
+  // message and no more than two different reasons during this task" — so it
+  // has to hold. It also keeps exposure matched between Delegate and
+  // Explorer: the two conditions differ in the KIND of argument allowed, not
+  // in how much of it there is.
+  if (action.reasonSourceId && ctx.reasonsUsed) {
+    const distinct = new Set(ctx.reasonsUsed);
+    if (!distinct.has(action.reasonSourceId) && distinct.size >= 2) {
+      violations.push({
+        code: "rationale_budget_exceeded",
+        detail: `Already used ${distinct.size} different reasons this task; ${action.reasonSourceId} would be a third.`,
+      });
+    }
+  }
+
+  // --- stage / turn agreement (Appendix E6) ------------------------------
+  if (ctx.stage !== undefined && action.stage !== ctx.stage) {
+    violations.push({
+      code: "stage_mismatch",
+      detail: `Action claims stage ${action.stage}; the state machine is running stage ${ctx.stage}.`,
+    });
+  }
+
   // --- Explorer-only framing --------------------------------------------
   // `common practice` argues from what projects of this kind usually do. It
   // is the frame that carries the source ambiguity, so a Delegate using it
@@ -226,6 +264,8 @@ export function validateAction(
     "impossible_resource_promise",
     "disclosure_permission_violation",
     "provenance_policy_violation",
+    "rationale_budget_exceeded",
+    "stage_mismatch",
   ];
   const hasHard = violations.some((v) => hardCodes.includes(v.code));
 

@@ -64,9 +64,31 @@ export const STAGE_MINUTES = {
  */
 export const NEGOTIATION = {
   practiceSeconds: 5 * 60,
-  /** Delay before the counterpart replies, ms. TBD: fixed vs. jitter (E7). */
-  counterpartDelayMs: 2500,
+  /**
+   * How long the ostensible-human counterpart takes to reply (Appendix E7:
+   * 8-25s, in proportion to message length, randomly placed).
+   *
+   * A flat delay is a machine tell — a real person does not answer a
+   * three-word question and a full counterpackage in the same 2.5 seconds,
+   * and the suspicion probe is a pilot gate. Proportional-plus-jitter is what
+   * the spec asks for; whether the range survives pilot (it is a long time to
+   * sit watching a typing indicator) is still open.
+   */
+  counterpartDelay: { minMs: 8000, maxMs: 25000, msPerChar: 55 },
 } as const;
+
+/**
+ * A reply delay for a message of this length, within the E7 range.
+ *
+ * Jittered by ±15% so two messages of the same length do not take the same
+ * time twice — regularity is its own tell.
+ */
+export function counterpartDelayMs(messageLength: number): number {
+  const { minMs, maxMs, msPerChar } = NEGOTIATION.counterpartDelay;
+  const base = Math.min(minMs + messageLength * msPerChar, maxMs);
+  const jitter = 0.85 + Math.random() * 0.3;
+  return Math.round(Math.min(base * jitter, maxMs));
+}
 
 /**
  * Ordered page flow. `href` values map 1:1 to routes under src/app.
