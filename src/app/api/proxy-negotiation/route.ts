@@ -33,6 +33,29 @@ import type {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+/**
+ * TODO(yoked-stimuli) — REQUIRED BEFORE COLLECTION, not an optimization.
+ *
+ * A Leader participant is a RECEIVER: what they see is the stimulus, and
+ * Methods ver.1.8 §Yoked receiver stimuli calls it "receiver-side
+ * attribution·uptake의 핵심 causal control". It requires the packages, the
+ * focal message, the visible rationale and the tentative outcome to be
+ * pre-produced per sequence and task, reviewed, and then played back
+ * IDENTICALLY under Delegate and Explorer, with only the condition notice
+ * differing.
+ *
+ * This route generates each turn from the model instead. The state machine
+ * fixes the packages, so the substance is already condition-identical, and
+ * `lib/negotiation/script.ts#leaderScript` is the yoked content — deliberately
+ * not branching on policy. But wording still varies run to run, which means
+ * the `Explorer − Delegate` contrast on Attributional Leakage would carry
+ * whatever the model happened to say.
+ *
+ * The fix is to serve `leaderScript` from here when the participant is a
+ * Leader in a Proxy condition, once those transcripts have been written and
+ * reviewed rather than generated from a template.
+ */
+
 interface RequestBody {
   taskId: TaskId;
   participantRole: Role;

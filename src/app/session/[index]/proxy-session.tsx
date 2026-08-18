@@ -51,6 +51,7 @@ import type {
   ReasonCard,
   ReasonPermission,
   Role,
+  StageId,
   TaskId,
 } from "@/lib/types";
 import { ReviewPhase } from "./review";
@@ -409,6 +410,28 @@ export function ProxySession({
             text: data.message.text,
           });
           setTranscript([...collected]);
+
+          // Persist the message text, not only the trajectory.
+          //
+          // Two pilot gates need the actual words: the fabricated-personal-
+          // fact audit (target zero), and the check that Delegate and Explorer
+          // are matched on message length. Both are about what was said, and
+          // both were unrunnable while the proxy transcript lived only in
+          // React state and vanished on submit. Baseline was already storing
+          // its messages; this is the same store, for the other half.
+          if (participantKey) {
+            void getStore().appendMessage(participantKey, {
+              id: data.message.id,
+              sessionIndex,
+              speaker: data.message.speaker,
+              text: data.message.text,
+              createdAt: new Date().toISOString(),
+              ...(data.stage ? { stage: data.stage as StageId } : {}),
+              ...(data.message.proposal
+                ? { proposal: data.message.proposal }
+                : {}),
+            });
+          }
 
           if (data.message.proposal) {
             if (data.message.speaker === "participant_proxy") {

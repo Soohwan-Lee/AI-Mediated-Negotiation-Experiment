@@ -281,11 +281,16 @@ to decide:
   participants guessed the design. The preregistered fallback is a fourth
   (distributive) issue, which would mean recomputing every payoff property
   listed above.
-- **Yoked receiver stimuli.** A Leader currently sees the scripted exchange,
-  which is already condition-identical by construction — `leaderScript` does
-  not branch on policy, and it must not start. The real study still needs
-  those transcripts pre-produced and reviewed rather than generated from a
-  template.
+- **Yoked receiver stimuli — the largest remaining gap.** A Leader
+  participant is a receiver: what they see IS the stimulus, and ver.1.8 calls
+  it the core causal control for the receiver-side outcomes. It has to be
+  pre-produced, reviewed, and played back identically under Delegate and
+  Explorer. Live sessions generate each turn from the model instead. The
+  packages are already identical (the state machine fixes them) and
+  `leaderScript` is the yoked content, so the remaining work is to write and
+  review those transcripts and serve them from `/api/proxy-negotiation` for
+  Leader participants. Until then the `Explorer − Delegate` contrast on
+  Attributional Leakage carries whatever wording the model produced.
 - **Nothing exercises the failure branches automatically.** Impasse, the
   emergency stop, and the one revision all work when driven by hand, but
   mockup mode only carries the ideal trajectories, so a regression in any of
