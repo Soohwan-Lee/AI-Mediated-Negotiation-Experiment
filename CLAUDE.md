@@ -53,9 +53,11 @@ to randomize outcomes: identical behaviour already produces identical results.
 
 Both conditions run the same **five stages** — opening, priorities and
 reasons, the standardized challenge, a conditional trade, the tentative
-package — one message per side each, ten in total. That shared structure is
-what makes a Baseline transcript and a Proxy transcript comparable, so a
-session may not skip stages or end early.
+package — one message per side each, ten in total, **counterpart first at
+every stage**. That shared structure is what makes a Baseline transcript and a
+Proxy transcript comparable, so a session may not skip stages or end early,
+and the counterpart's fixed opening must be on screen before the participant
+writes anything: it is the anchor their reply is measured against.
 
 ## Things the participant must never learn mid-study
 
@@ -274,12 +276,15 @@ to decide:
   participants guessed the design. The preregistered fallback is a fourth
   (distributive) issue, which would mean recomputing every payoff property
   listed above.
-- **Impasse and revision paths.** The machine records an impasse at stage 5
-  and the review screen offers one revision, but neither branch has been
-  exercised end to end — mockup mode only carries the ideal trajectories.
-- **Yoked receiver stimuli.** A Leader currently sees the scripted exchange.
-  The real study needs the pre-produced, condition-identical transcripts of
-  §Yoked receiver stimuli, reviewed and fixed before collection.
+- **Yoked receiver stimuli.** A Leader currently sees the scripted exchange,
+  which is already condition-identical by construction — `leaderScript` does
+  not branch on policy, and it must not start. The real study still needs
+  those transcripts pre-produced and reviewed rather than generated from a
+  template.
+- **Nothing exercises the failure branches automatically.** Impasse, the
+  emergency stop, and the one revision all work when driven by hand, but
+  mockup mode only carries the ideal trajectories, so a regression in any of
+  them would be quiet. Worth a test before collection.
 - Fixed vs. jittered counterpart delay · final IRB language · whether the
   private reason may be switched to sayable at all (default: allowed, starts
   private).
