@@ -109,7 +109,10 @@ export function ReviewPhase({
   useDevAutofill(() => {
     setFocalResponse((c) => c ?? "accommodate");
     setChoice((c) => c ?? "ratify");
-  });
+    // The gate is "have they read to the end"; in mockup mode nobody has, and
+    // waiting for an intersection that will not happen would strand the walk.
+    setTranscriptSeen(true);
+  }, `review-s${sessionIndex}`);
 
   const canDecide = useDevGate(transcriptSeen);
   const canSubmit = useDevGate(

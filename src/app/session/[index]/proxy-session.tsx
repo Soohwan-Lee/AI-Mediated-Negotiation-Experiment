@@ -193,31 +193,38 @@ export function ProxySession({
   );
 
   // Mockup mode fills the mandate the way the worked example in Appendix E8
-  // does: open at the best focal level, allow the assistant down to the
-  // threshold, and make the threshold a hard boundary. The other two terms are
-  // left wide open, which is what makes the logroll available.
+  // does: open at your own best level on every term, allow the assistant all
+  // the way down on the terms you can spend, and put a hard boundary on the
+  // focal one at its threshold. That combination is what makes the logroll
+  // available — the assistant has scope and timing to give away, and a line it
+  // must hold on the term that matters.
+  //
+  // "Your own best level" is not `options[0]`: options are ordered best-first
+  // for whichever ROLE the term favours, so for a Member the scope list starts
+  // at the option worth nothing to them.
   useDevAutofill(() => {
     setMandate((m) => ({
       ...m,
       issues: m.issues.map((im) => {
         const issue = task.issues.find((i) => i.id === im.issueId)!;
         const isFocal = issue.id === focal.id;
+        const byValue = [...issue.options].sort(
+          (a, b) => b.points[role] - a.points[role],
+        );
         const threshold =
           issue.options[issue.focalThresholdIndex ?? 1] ?? issue.options[1];
         return {
           ...im,
-          preferredOptionId: im.preferredOptionId ?? issue.options[0].id,
+          preferredOptionId: im.preferredOptionId ?? byValue[0].id,
           acceptableFloorOptionId:
             im.acceptableFloorOptionId ??
-            (isFocal
-              ? threshold.id
-              : issue.options[issue.options.length - 1].id),
+            (isFocal ? threshold.id : byValue[byValue.length - 1].id),
           hardBoundaryOptionId:
             im.hardBoundaryOptionId ?? (isFocal ? threshold.id : null),
         };
       }),
     }));
-  });
+  }, `mandate-s${sessionIndex}`);
 
   function updateIssue(issueId: string, patch: Partial<IssueMandate>) {
     setMandate((m) => ({

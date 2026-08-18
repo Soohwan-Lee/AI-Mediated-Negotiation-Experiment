@@ -91,7 +91,9 @@ function words(taskId: TaskId) {
   return taskId === "task_a"
     ? {
         scope: "pilot scope",
-        focal: "remote days",
+        focalLower: "remote days",
+        /** Reads as a sentence opener in both tasks, singular or plural. */
+        focalMattersMost: "Remote days are what matter most",
         timing: "launch date",
         focalAsk: "two remote days a week",
         focalPush: "one remote day or none",
@@ -102,11 +104,12 @@ function words(taskId: TaskId) {
         risk:
           "Uninterrupted configuration time reduces setup errors before answers reach customers.",
         leaderCare: "the showcase in Week 4",
-        counterpartFocalAsk: "the on-site presence",
+        counterpartPressure: "on-site visibility",
       }
     : {
         scope: "migration scope",
-        focal: "the on-call cap",
+        focalLower: "the on-call cap",
+        focalMattersMost: "The on-call cap is what matters most",
         timing: "completion date",
         focalAsk: "an eight-hour weekly on-call cap",
         focalPush: "ten or twelve hours",
@@ -117,7 +120,7 @@ function words(taskId: TaskId) {
         risk:
           "A bounded on-call load reduces fatigue-related errors during the riskiest weeks.",
         leaderCare: "the renewal review in Week 6",
-        counterpartFocalAsk: "the coverage",
+        counterpartPressure: "emergency coverage",
       };
 }
 
@@ -158,8 +161,8 @@ function memberScript(
       proposal: theirOpening,
       text:
         mode === "baseline"
-          ? `hi — good to be working on this. my opening: five workflows on ${w.scope}, no ${w.focal}, and the earliest ${w.timing}. breadth is what makes this worth doing for us.`
-          : `Opening on behalf of ${COUNTERPART_PERSONA.name}: the widest ${w.scope}, no ${w.focal}, and the earliest ${w.timing}. Breadth and timing are the priorities on this side.`,
+          ? `hi — good to be working on this. my opening: the widest ${w.scope}, the lowest ${w.focalLower}, and the earliest ${w.timing}. breadth is what makes this worth doing for us.`
+          : `Opening on behalf of ${COUNTERPART_PERSONA.name}: the widest ${w.scope}, the lowest ${w.focalLower}, and the earliest ${w.timing}. Breadth and timing are the priorities on this side.`,
     },
     {
       id: "s1b",
@@ -192,7 +195,7 @@ function memberScript(
           speaker: own,
           frame: "common_practice",
           internalProvenance: "agent_option",
-          text: `${w.focal} matter most on this side. ${w.practice} Nothing settled — worth putting on the table.`,
+          text: `${w.focalMattersMost} on this side. ${w.practice} Nothing settled — worth putting on the table.`,
         }
       : {
           id: "s2b",
@@ -202,8 +205,8 @@ function memberScript(
           internalProvenance: "principal_mandate",
           text:
             mode === "baseline"
-              ? `${w.focal} matter most to me. ${w.workReason}`
-              : `${w.focal} matter most on this side. ${w.workReason}`,
+              ? `${w.focalMattersMost} to me. ${w.workReason}`
+              : `${w.focalMattersMost} on this side. ${w.workReason}`,
         },
 
     {
@@ -218,7 +221,7 @@ function memberScript(
       speaker: own,
       frame: "feasibility",
       internalProvenance: "principal_mandate",
-      text: `I understand the pressure on ${w.counterpartFocalAsk}. ${w.focalAsk} is the level that keeps this workable — but the other two terms have room, and I would rather move there.`,
+      text: `I understand the pressure on ${w.counterpartPressure}. Keeping ${w.focalAsk} is what makes this workable — but the other two terms have room, and I would rather move there.`,
     },
     {
       id: "s4a",
@@ -245,6 +248,18 @@ function memberScript(
       speaker: other,
       proposal: myTrade,
       text: `Recording the tentative package: a wider ${w.scope}, ${w.focalAsk}, and the middle ${w.timing}. Over to both sides to confirm.`,
+    },
+    {
+      // Stage 5 needs a message from this side too. In the Proxy conditions
+      // the proxy says it; in Baseline the participant does, and without one
+      // written here the mockup would arrive at the last stage with an empty
+      // composer — which is precisely the screen the mockup exists to show.
+      id: "s5b",
+      stage: 5,
+      speaker: own,
+      proposal: myTrade,
+      internalProvenance: "principal_mandate",
+      text: `Confirmed on this side: a wider ${w.scope}, ${w.focalAsk}, and the middle ${w.timing}.`,
     },
   ];
 
@@ -286,7 +301,7 @@ function leaderScript(
       stage: 1,
       speaker: own,
       proposal: myOpening,
-      text: `Opening: the widest ${w.scope}, no change to ${w.focal}, and the earliest ${w.timing}. Breadth is what makes this worth doing.`,
+      text: `Opening: the widest ${w.scope}, the lowest ${w.focalLower}, and the earliest ${w.timing}. Breadth is what makes this worth doing.`,
     },
     {
       id: "l1b",
@@ -325,7 +340,7 @@ function leaderScript(
       stage: 3,
       speaker: other,
       frame: "feasibility",
-      text: `I understand the pressure there. ${w.focalAsk} is the level that keeps this workable — but the other two terms have room.`,
+      text: `I understand the pressure there. Keeping ${w.focalAsk} is what makes this workable — but the other two terms have room.`,
     },
     {
       id: "l4a",
@@ -348,6 +363,13 @@ function leaderScript(
       speaker: other,
       proposal: settled,
       text: `Recording the tentative package: a wider ${w.scope}, ${w.focalAsk}, and the middle ${w.timing}. Over to both sides to confirm.`,
+    },
+    {
+      id: "l5b",
+      stage: 5,
+      speaker: own,
+      proposal: settled,
+      text: `Confirmed on this side: a wider ${w.scope}, ${w.focalAsk}, and the middle ${w.timing}.`,
     },
   ];
 

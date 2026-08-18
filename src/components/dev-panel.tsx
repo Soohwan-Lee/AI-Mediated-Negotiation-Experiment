@@ -148,6 +148,12 @@ export function DevPanel() {
           <>
             <Section title="Behavior">
               <Toggle
+                label="Mockup mode"
+                hint="Fill every screen on arrival — walk the flow with Continue"
+                checked={dev.autoFill}
+                onChange={(v) => dev.update({ autoFill: v })}
+              />
+              <Toggle
                 label="Skip required fields"
                 hint="Continue stays enabled with items unanswered"
                 checked={dev.skipValidation}
@@ -155,7 +161,7 @@ export function DevPanel() {
               />
               <Toggle
                 label="Mock AI turns"
-                hint="Instant canned replies instead of the model"
+                hint="Play the written exchange instead of calling the model"
                 checked={dev.mockAi}
                 onChange={(v) => dev.update({ mockAi: v })}
               />

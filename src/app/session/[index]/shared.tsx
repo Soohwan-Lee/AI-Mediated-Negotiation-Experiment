@@ -126,11 +126,15 @@ export function PrivateTargetForm({
   const [answers, setAnswers] = useState<Answers>({});
 
   useDevAutofill(() => {
-    // Option 2 — the threshold level. The ideal-scenario participant thinks
-    // this is what they need, which is what makes holding it meaningful.
-    setTarget(focal.options[1].id);
+    // The threshold level for a Member — what they judge just enough, which is
+    // what makes holding it through the challenge meaningful. A Leader is
+    // being asked about the other side's term, and the level they think would
+    // be enough is a lower one.
+    const index =
+      role === "member" ? (focal.focalThresholdIndex ?? 1) : focal.options.length - 2;
+    setTarget(focal.options[index].id);
     setAnswers(Object.fromEntries(items.map((i) => [i.id, dummyAnswer(i)])));
-  });
+  }, `target-s${sessionIndex}`);
 
   const missing = [
     ...(target === null ? [`target-${focal.id}`] : []),
@@ -242,8 +246,9 @@ export function PostTaskSurvey({
   const items: Item[] = withFocal(postTaskItems(role, isProxy), task);
   const [answers, setAnswers] = useState<Answers>({});
 
-  useDevAutofill(() =>
-    setAnswers(Object.fromEntries(items.map((i) => [i.id, dummyAnswer(i)]))),
+  useDevAutofill(
+    () => setAnswers(Object.fromEntries(items.map((i) => [i.id, dummyAnswer(i)]))),
+    `post-s${sessionIndex}`,
   );
 
   const missing = items

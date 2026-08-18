@@ -136,7 +136,7 @@ export function BaselineSession({
       setDraft(own.text);
       if (own.proposal) setOffer(own.proposal);
     }
-  });
+  }, `baseline-s${sessionIndex}-${phase}-${stage}`);
 
   async function send(text: string) {
     const own: DisplayMessage = {

@@ -82,6 +82,17 @@ interface DevSettings {
   skipValidation: boolean;
   /** Answer AI turns locally and instantly instead of calling the route. */
   mockAi: boolean;
+  /**
+   * Mockup mode: fill every screen on arrival with the ideal-scenario answers,
+   * so the whole flow can be walked with nothing but Continue.
+   *
+   * The difference from `skipValidation` is what you end up looking at.
+   * Skipping validation lets you past an empty screen; this fills it, so the
+   * review page shows a real package, the transcript shows a real exchange,
+   * and the questionnaire shows real answers. Reading the flow is the point,
+   * and empty screens do not read.
+   */
+  autoFill: boolean;
   /** Use `slot` instead of the claimed assignment. */
   slotOverride: boolean;
   slot: DevSlot;
@@ -96,6 +107,7 @@ const DEFAULTS: DevSettings = {
   hidden: false,
   skipValidation: true,
   mockAi: true,
+  autoFill: true,
   slotOverride: false,
   slot: { proxyPolicy: "delegate", role: "leader", sequenceId: "seq1" },
 };
@@ -297,13 +309,25 @@ export function useDevMockAi(): boolean {
   return enabled && mockAi;
 }
 
+/** True when screens should fill themselves on arrival. */
+export function useDevAutoFill(): boolean {
+  const { enabled, autoFill } = useDevMode();
+  return enabled && autoFill;
+}
+
 /**
  * Registers a "Fill this page" handler while the calling page is mounted.
  * The handler may change identity every render; only the latest is called.
+ *
+ * In mockup mode it also runs once on arrival, which is what turns the flow
+ * into something you can read by pressing Continue. `key` re-arms that: a
+ * session moves between phases without remounting, so without a key the
+ * mandate screen would fill and the review screen after it would not.
  */
-export function useDevAutofill(fill: () => void) {
-  const { registerAutofill, enabled } = useDevMode();
+export function useDevAutofill(fill: () => void, key?: string) {
+  const { registerAutofill, enabled, autoFill } = useDevMode();
   const latest = useRef(fill);
+  const filledFor = useRef<string | null>(null);
 
   useEffect(() => {
     latest.current = fill;
@@ -313,6 +337,20 @@ export function useDevAutofill(fill: () => void) {
     if (!enabled) return;
     return registerAutofill(() => latest.current());
   }, [enabled, registerAutofill]);
+
+  // Fires once per scope. Deliberately without a cleanup that cancels it:
+  // registering the handler above updates state in the provider, which
+  // re-renders this component, and in development React also runs effects
+  // twice — either would cancel a pending timeout before it fired, which is
+  // exactly the bug that made mockup mode do nothing.
+  useEffect(() => {
+    if (!enabled || !autoFill) return;
+    const scope = key ?? "default";
+    if (filledFor.current === scope) return;
+    filledFor.current = scope;
+    // After paint, so a screen that fills itself does not flash empty first.
+    window.setTimeout(() => latest.current(), 0);
+  }, [enabled, autoFill, key]);
 }
 
 /**
