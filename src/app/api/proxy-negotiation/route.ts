@@ -48,6 +48,12 @@ interface RequestBody {
   lastCounterpartPackage?: Package | null;
   /** Reason card ids this side has already voiced, for the budget check. */
   reasonsUsed?: string[];
+  /**
+   * The participant's instruction when they sent a package back for one
+   * revision. It narrows what the proxy does; it cannot widen the mandate,
+   * which is still the only thing that bounds it.
+   */
+  revisionNote?: string | null;
 }
 
 /**
@@ -269,7 +275,9 @@ export async function POST(request: Request) {
         stage,
         decidedAction,
         mandateSummary: isParticipantSide
-          ? mandateSummary(body.mandate, body.taskId)
+          ? body.revisionNote
+            ? `${mandateSummary(body.mandate, body.taskId)}\n\nYour principal reviewed the last result and asked for one change: "${body.revisionNote}". Honour it within the boundaries above — it narrows what you may do, it does not widen it.`
+            : mandateSummary(body.mandate, body.taskId)
           : undefined,
         reasons: isParticipantSide
           ? reasonsFor(body.taskId, body.participantRole, body.mandate)

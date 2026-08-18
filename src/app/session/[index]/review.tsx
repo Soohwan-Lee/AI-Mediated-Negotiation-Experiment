@@ -62,6 +62,8 @@ export function ReviewPhase({
   /** Proxy sessions show the exchange as something that already happened. */
   transcriptTitle,
   transcriptHint,
+  revisionsUsed,
+  onRevise,
   onDone,
 }: {
   sessionIndex: 1 | 2;
@@ -73,6 +75,19 @@ export function ReviewPhase({
   transcript: DisplayMessage[];
   transcriptTitle: string;
   transcriptHint: string;
+  /** How many revisions this session has already spent. Owned by the session. */
+  revisionsUsed: number;
+  /**
+   * Send the package back once with the participant's instruction.
+   *
+   * Required, not optional. "Ratify / one revision / reject" is what makes
+   * this bounded delegation rather than a rubber stamp — it is the commitment
+   * authority the spec keeps with the human and the condition instructions
+   * promise in as many words. A revision that recorded the request and moved
+   * on regardless would show the participant the control is cosmetic, which
+   * is worse than not offering it.
+   */
+  onRevise: (note: string) => Promise<void> | void;
   onDone: () => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
@@ -87,14 +102,13 @@ export function ReviewPhase({
   const [focalResponse, setFocalResponse] = useState<FocalResponse | null>(null);
   const [choice, setChoice] = useState<RatificationChoice | null>(null);
   const [revisionNote, setRevisionNote] = useState("");
-  /**
-   * "One revision" is a real limit, not a phrase in a hint.
-   *
-   * The spec gives the participant exactly one, and the option's own hint says
-   * so — so once it has been used the option has to stop being offered, or the
-   * interface is promising a constraint it does not apply.
-   */
-  const [revisionsUsed, setRevisionsUsed] = useState(0);
+  // "One revision" is a real limit, not a phrase in a hint — so once it has
+  // been used the option stops being offered.
+  //
+  // The count is owned by the SESSION, not by this screen. A revision sends
+  // the participant back into the negotiation and returns them here, which
+  // remounts this component; a local counter reset to zero on the way and the
+  // option came back, so the cap held only until someone used it.
 
   const isReceiver = role === "leader";
 
@@ -133,7 +147,6 @@ export function ReviewPhase({
   async function submit() {
     const decided = choice ?? (canSubmit ? "ratify" : null);
     if (!decided) return;
-    if (decided === "request_revision") setRevisionsUsed((n) => n + 1);
 
     if (participantKey) {
       await getStore().saveAgreement(participantKey, {
@@ -165,9 +178,18 @@ export function ReviewPhase({
 
     logEvent(
       "ratification_choice",
-      { choice: decided, focalResponse },
+      { choice: decided, focalResponse, revisionsUsed },
       { sessionIndex },
     );
+
+    if (decided === "request_revision") {
+      setChoice(null);
+      setRevisionNote("");
+      setTranscriptSeen(false);
+      await onRevise(revisionNote);
+      return;
+    }
+
     logEvent("negotiation_ended", undefined, { sessionIndex });
     onDone();
   }

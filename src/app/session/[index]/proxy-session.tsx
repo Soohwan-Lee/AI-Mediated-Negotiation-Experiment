@@ -173,6 +173,8 @@ export function ProxySession({
   const [transcript, setTranscript] = useState<DisplayMessage[]>([]);
   const [tentative, setTentative] = useState<Package | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The participant's instruction when they send a package back once. */
+  const [revisionNote, setRevisionNote] = useState("");
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   /**
    * Emergency stop (Appendix C4). Not a pause button: the condition promises
@@ -271,7 +273,7 @@ export function ProxySession({
    * sequence. Turns are appended as they arrive, which keeps each request
    * short and lets the waiting screen show real progress.
    */
-  async function runNegotiation() {
+  async function runNegotiation(revision?: string) {
     setPhase("negotiating");
     setError(null);
     setTranscript([]);
@@ -322,6 +324,13 @@ export function ProxySession({
     let lastParticipantPackage: Package | null = null;
     let lastCounterpartPackage: Package | null = null;
     let settled: Package | null = null;
+    // The counterpart's closing test can reject the final package. Reading it
+    // matters: without this the participant's own stage-5 proposal was the
+    // last one carrying a package, so a refusal was silently recorded as a
+    // tentative agreement — and a Proxy impasse would have been recoded as an
+    // agreement while Baseline recorded it correctly, leaving the two arms
+    // disagreeing about what an impasse is.
+    let proxyImpasse = false;
     /**
      * Where the focal requirement stood at each of the proxy's turns.
      *
@@ -354,6 +363,7 @@ export function ProxySession({
             lastParticipantPackage,
             lastCounterpartPackage,
             reasonsUsed,
+            revisionNote: revision ?? null,
             history: collected.map((m) => ({
               speaker: m.speaker,
               text: m.text,
@@ -375,7 +385,11 @@ export function ProxySession({
           reasonUsed?: string | null;
           stage?: number;
           focalOption?: string | null;
+          accepted?: boolean;
+          impasse?: boolean;
         };
+
+        if (data.impasse) proxyImpasse = true;
 
         if (data.reasonUsed) reasonsUsed.push(data.reasonUsed);
         if (
@@ -410,12 +424,13 @@ export function ProxySession({
         if (data.done) break;
       }
 
-      setTentative(stopped.current ? null : settled);
+      setTentative(stopped.current || proxyImpasse ? null : settled);
       logEvent(
         "negotiation_ended",
         {
           turns: collected.length,
           emergencyStop: stopped.current,
+          impasse: proxyImpasse,
           // The trajectory's middle: what the proxy opened on the focal term
           // (stage 1) and where it stood after the standardized challenge
           // (stage 4).
@@ -690,8 +705,22 @@ export function ProxySession({
       stepIndex={5}
       tentative={tentative}
       transcript={transcript}
+      revisionsUsed={mandate.revisionCount}
       transcriptTitle="The full conversation"
-      transcriptHint={`Every exchange between the two assistants, ${transcript.length} in all.`}
+      transcriptHint={
+        revisionNote
+          ? `Your assistant went back with your instruction — “${revisionNote}” — and this is what came of it. ${transcript.length} exchanges in all.`
+          : `Every exchange between the two assistants, ${transcript.length} in all.`
+      }
+      onRevise={async (note) => {
+        // The assistant goes back with the participant's instruction attached
+        // to its mandate. One revision only — the review screen stops offering
+        // it after the first — so this cannot loop.
+        setRevisionNote(note);
+        setMandate((m) => ({ ...m, revisionCount: m.revisionCount + 1 }));
+        logEvent("mandate_revised", { note, fromReview: true }, { sessionIndex });
+        await runNegotiation(note);
+      }}
       onDone={() => setPhase("post")}
     />
   );

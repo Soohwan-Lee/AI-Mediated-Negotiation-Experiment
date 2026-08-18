@@ -96,6 +96,13 @@ export function BaselineSession({
   const [pending, setPending] = useState(false);
   const [offer, setOffer] = useState<Package>({});
   const [tentative, setTentative] = useState<Package | null>(null);
+  /**
+   * Revisions spent. Held here rather than on the review screen because a
+   * revision sends the participant back into the conversation and returns
+   * them, remounting that screen — a counter living there reset on the way and
+   * the one-revision cap held only until someone used it.
+   */
+  const [revisionsUsed, setRevisionsUsed] = useState(0);
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(null);
 
@@ -367,8 +374,20 @@ export function BaselineSession({
         stepIndex={3}
         tentative={tentative}
         transcript={messages}
+        revisionsUsed={revisionsUsed}
         transcriptTitle="The conversation"
         transcriptHint="Everything the two of you said."
+        onRevise={(note) => {
+          // Sending it back means saying so yourself: the participant returns
+          // to the conversation with one more turn to put a different package
+          // on the table. One revision only — the review screen stops offering
+          // it after the first.
+          setRevisionsUsed((n) => n + 1);
+          setDraft(note);
+          setStage(5);
+          setPhase("negotiate");
+          logEvent("mandate_revised", { note, fromReview: true }, { sessionIndex });
+        }}
         onDone={() => setPhase("post")}
       />
     );
