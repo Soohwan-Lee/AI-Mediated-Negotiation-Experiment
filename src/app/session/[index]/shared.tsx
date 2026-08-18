@@ -383,7 +383,10 @@ export function OutcomeValue({
             : `Below your fallback of ${task.reservationPoints.toLocaleString()}.`
           : `No agreement — you receive your fallback of ${task.reservationPoints.toLocaleString()}.`}
       </p>
-      {role === "member" ? (
+      {/* On an impasse the requirement was not lost — there was simply no
+          package. Saying "below the level you judged workable" would report a
+          concession that never happened. */}
+      {role === "member" && terms ? (
         <p className="mt-3 border-t border-[var(--private-line)] pt-3 text-[0.8125rem]">
           {focal.label}:{" "}
           {held

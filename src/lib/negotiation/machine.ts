@@ -335,6 +335,10 @@ export function codeOutcome(
     participantRole === "member" ? "leader" : "member";
   const focal = focalIssue(task);
 
+  // No agreement: both sides take the fallback. `clearsReservation` is false
+  // rather than true — the participant did not clear their fallback, they
+  // *received* it, and reading "above your fallback" on an impasse screen
+  // would tell them the opposite of what happened.
   if (!finalPackage) {
     return {
       agreed: false,
@@ -343,7 +347,7 @@ export function codeOutcome(
       participantPoints: task.reservationPoints,
       counterpartPoints: task.reservationPoints,
       jointPoints: task.reservationPoints * 2,
-      clearsReservation: true,
+      clearsReservation: false,
     };
   }
 

@@ -9,12 +9,16 @@
  *   Member-priority focal        3000 / 2000 / 1000 / 0   (Leader: 0..1500)
  *   Distributive                 1800 / 1200 / 600 / 0    (constant sum 1800)
  *
- * Individual range 0-6,300. Joint range 4,800-7,800. Full logroll — the
- * Leader's scope at O1 and the Member's focal at O1 — is the only point on the
- * efficient frontier at 7,800, and beats compromising everything in the middle
- * (6,800) by 1,000. Reservation is 2,500 each, so 24 of the 64 packages clear
- * both sides and 17 of those also hold the focal threshold: protecting the
- * requirement and reaching agreement are compatible by construction.
+ * Individual range 0-6,300. Joint range 4,800-7,800. The full logroll — the
+ * Leader's scope at O1 and the Member's focal at O1 — is the only SCOPE/FOCAL
+ * combination reaching joint 7,800, and it beats compromising everything in
+ * the middle (6,800) by 1,000. Note that four packages share that maximum,
+ * one per timing option, because the timing issue is constant-sum and cannot
+ * change the joint total: "achieved the efficient frontier" is a property of
+ * the scope/focal pair, not of a single package. Reservation is 2,500 each,
+ * so 24 of the 64 packages clear both sides and 17 of those also hold the
+ * focal threshold: protecting the requirement and reaching agreement are
+ * compatible by construction.
  *
  * WHY THE FOCAL IS WORTH SO MUCH (3,000). If it were cheap, giving it up would
  * be explicable as a sensible low-priority concession, and that is exactly the
