@@ -192,7 +192,9 @@ export async function POST(request: Request) {
         break;
       case 3:
         decidedAction =
-          "Acknowledge the pushback and say the term still holds, without making a new offer yet.";
+          body.participantRole === "leader"
+            ? `Send exactly this challenge, in your own words: "${task.standardizedChallenge}"`
+            : "Acknowledge the pushback and say the term still holds, without making a new offer yet.";
         break;
       case 4:
         proposal = plan.counterpackage;
@@ -218,17 +220,31 @@ export async function POST(request: Request) {
     accepted = decision.accepts;
     impasse = decision.impasse;
 
+    // The challenge belongs to whichever side is the Leader. When the
+    // participant is one, their proxy issues it and the Member-counterpart
+    // holds its requirement — Appendix E3, the mirror of E2. Sending it from
+    // the counterpart regardless had a Member arguing against its own
+    // requirement.
+    const participantIsLeader = body.participantRole === "leader";
+    const focal = focalIssue(task);
+
     decidedAction =
       stage === 1
         ? "Open with your own best package on all three terms."
         : stage === 2
-          ? "Say which term matters most to you, and ask which matters most to them."
+          ? participantIsLeader
+            ? `Raise ${focal.label.toLowerCase()} as your principal's priority, with one authorized reason about reducing risk. Ask which term matters most to them.`
+            : "Say which term matters most to you, and ask which matters most to them."
           : stage === 3
-            ? `Send exactly this challenge, in your own words: "${task.standardizedChallenge}"`
+            ? participantIsLeader
+              ? `They have pushed back on ${focal.label.toLowerCase()}. Say it holds at the level your principal needs, and that the other terms have room. No new offer this turn.`
+              : `Send exactly this challenge, in your own words: "${task.standardizedChallenge}"`
             : stage === 4
               ? decision.accepts
                 ? "Say the package they proposed works for you."
-                : "Concede one step on the timing term and put that counteroffer forward."
+                : participantIsLeader
+                  ? `Offer a conditional trade: if ${focal.label.toLowerCase()} holds, you can give ground on the other two terms.`
+                  : "Concede one step on the timing term and put that counteroffer forward."
               : decision.accepts
                 ? "Record the tentative package and ask both sides to confirm."
                 : "Say you cannot reach agreement on these terms.";

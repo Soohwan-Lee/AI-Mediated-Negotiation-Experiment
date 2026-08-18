@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 import { generateAction } from "@/lib/ai/client";
 import { validateAction } from "@/lib/ai/validator";
 import { counterpartStep } from "@/lib/negotiation/machine";
-import { getTask } from "@/lib/tasks";
+import { focalIssue, getTask } from "@/lib/tasks";
 import type {
   NegotiationTask,
   Package,
@@ -92,17 +92,38 @@ export async function POST(request: Request) {
     body.lastCounterpartPackage ?? null,
   );
 
+  // WHO CHALLENGES WHOM depends on which side the participant is.
+  //
+  // The standardized challenge is written in the Leader's voice — it argues
+  // against the Member's focal requirement. Appendix E2 has the
+  // Leader-counterpart send it to a Member participant; E3 is the mirror, and
+  // there the LEADER PARTICIPANT does the challenging while the
+  // Member-counterpart raises its requirement and holds it.
+  //
+  // Sending it unconditionally had the Member-counterpart arguing against its
+  // own requirement, which left a Leader participant responding to a
+  // requirement nobody had advocated — and Requirement Uptake is precisely
+  // their response to one that was.
+  const participantIsLeader = body.participantRole === "leader";
+  const focal = focalIssue(task);
+
   const decidedAction =
     stage === 1
       ? "Open with your own best package on all three terms, and say which one matters most to you."
       : stage === 2
-        ? "Explain briefly why your priority term matters, and ask which term matters most to them."
+        ? participantIsLeader
+          ? `Raise ${focal.label.toLowerCase()} as the term that matters most to you, with one reason about the work — reduced risk of errors. Ask which term matters most to them.`
+          : "Explain briefly why your priority term matters, and ask which term matters most to them."
         : stage === 3
-          ? `Send exactly this challenge, in your own words: "${task.standardizedChallenge}"`
+          ? participantIsLeader
+            ? `They have pushed back on ${focal.label.toLowerCase()}. Hold it at the level you need and say the other two terms have room instead. Make no new offer this turn.`
+            : `Send exactly this challenge, in your own words: "${task.standardizedChallenge}"`
           : stage === 4
             ? decision.accepts
               ? "Say the package they just proposed works for you."
-              : "Concede one step on the timing term and put that counteroffer forward."
+              : participantIsLeader
+                ? `Offer a conditional trade: if ${focal.label.toLowerCase()} holds where you need it, you can give ground on the other two terms.`
+                : "Concede one step on the timing term and put that counteroffer forward."
             : decision.accepts
               ? "Confirm the tentative package and ask them to review it."
               : "Say you cannot reach agreement on these terms.";

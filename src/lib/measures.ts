@@ -320,7 +320,18 @@ const RECEIVER_ITEMS: Item[] = [
   {
     kind: "amount",
     id: "ATTR2",
-    text: `Even if the AI shaped the proposal, how strongly did the ${FOCAL_PLACEHOLDER} reveal what the Member personally wanted?`,
+    // Appendix D6's wording names the AI, which only makes sense to a Leader
+    // who was told an assistant was involved. Asking a BASELINE Leader "even
+    // if the AI shaped the proposal" would disclose mid-study that their
+    // counterpart was a system — the first thing CLAUDE.md says a participant
+    // must never learn — and would poison the suspicion probe meant to detect
+    // exactly that belief.
+    //
+    // The construct is the same either way: how strongly the proposal revealed
+    // what the Member personally wanted, over and above however it was
+    // produced. `receiverItems()` picks the wording that matches what this
+    // participant was told.
+    text: `Even if the wording was shaped by how it was sent, how strongly did the ${FOCAL_PLACEHOLDER} reveal what the Member personally wanted?`,
     unit: "0 = not at all · 100 = completely",
   },
   {
@@ -368,6 +379,24 @@ const PROXY_COMMON: Item[] = [
   },
 ];
 
+/**
+ * ATTR2 as Appendix D6 writes it, for a Leader who was told an assistant
+ * negotiated. Same construct, same id, same scale — only the clause naming
+ * the source changes, so the two arms stay comparable.
+ */
+const ATTR2_PROXY: Item = {
+  kind: "amount",
+  id: "ATTR2",
+  text: `Even if the AI shaped the proposal, how strongly did the ${FOCAL_PLACEHOLDER} reveal what the Member personally wanted?`,
+  unit: "0 = not at all · 100 = completely",
+};
+
+function receiverItems(isProxy: boolean): Item[] {
+  return isProxy
+    ? RECEIVER_ITEMS.map((i) => (i.id === "ATTR2" ? ATTR2_PROXY : i))
+    : RECEIVER_ITEMS;
+}
+
 /** Manipulation check, Leader in a Proxy session only. */
 const PROXY_LEADER_ONLY: Item[] = [
   {
@@ -389,7 +418,7 @@ export function postTaskItems(role: Role, isProxy: boolean): Item[] {
   const items: Item[] = [];
   if (role === "member") items.push(...EXPOSURE_ITEMS);
   items.push(...COMMON_POST_TASK);
-  if (role === "leader") items.push(...RECEIVER_ITEMS);
+  if (role === "leader") items.push(...receiverItems(isProxy));
   if (isProxy) {
     items.push(...PROXY_COMMON);
     if (role === "leader") items.push(...PROXY_LEADER_ONLY);

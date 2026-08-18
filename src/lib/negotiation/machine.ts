@@ -256,33 +256,48 @@ export function buildProxyPlan(
     task.issues.map((i) => [i.id, pick(i.id, "preferred")]),
   );
 
-  /** The most the proxy may give away on an issue without breaking a boundary. */
+  /**
+   * The furthest the proxy may go on an issue.
+   *
+   * The fall-through matters, and getting it wrong broke the Delegate arm.
+   * "No boundary and no floor" is a participant saying they do not mind about
+   * this term — the natural mandate for the issue they are willing to spend.
+   * Falling back to their OPENING turned that into "never move", so a
+   * Delegate conceded nothing on scope while an Explorer gave it away, and
+   * the same participant with the same mandate got an agreement in one arm
+   * and a rejection in the other. That is a mechanical difference between the
+   * conditions, which is precisely what §Delegate–Explorer matching exists to
+   * prevent.
+   *
+   * With nothing set, the limit is the worst option for the principal: they
+   * declined to constrain it, so all of it is available to trade.
+   */
   const limit = (issueId: string) => {
     const im = mandate.issues.find((i) => i.issueId === issueId);
-    return (
-      im?.hardBoundaryOptionId ??
-      im?.acceptableFloorOptionId ??
-      pick(issueId, "preferred")
-    );
+    if (im?.hardBoundaryOptionId) return im.hardBoundaryOptionId;
+    if (im?.acceptableFloorOptionId) return im.acceptableFloorOptionId;
+    return worstFor(task, issueId, participantRole);
   };
 
-  // The counterpackage: hold the focal at its limit, spend scope and timing.
-  // This is the logroll, and it is the same shape under both policies — what
-  // differs is that Delegate reaches it by following the participant's stated
-  // order and Explorer by trying the highest-joint-value combination first.
-  const counterpackage: Package = {
-    ...opening,
-    [focal.id]: limit(focal.id),
-    [scope.id]:
-      policy === "explorer"
-        ? // Explorer gives the counterpart its best scope outright, because
-          // that is what buys the focal. Within the authorized range: the
-          // participant left scope open, and giving more of it is never a
-          // boundary violation.
-          bestFor(task, scope.id, counterpartRole)
-        : limit(scope.id),
-    [timing.id]: limit(timing.id),
-  };
+  // The counterpackage: hold the focal at its limit and spend the other two
+  // terms, but not past the point where the package is worth less to the
+  // principal than walking away. Both policies compute it the same way,
+  // because both are bound by the same mandate — a Delegate that could not
+  // spend what the participant left open would be a broken control, not a
+  // stricter one.
+  //
+  // WHERE THE POLICIES ACTUALLY DIFFER, then, is not how far the proxy may go
+  // but what it puts on the table on the way: the Explorer floats an
+  // additional combination as an option (stage 2) and may support it with an
+  // argument anyone in the role could make. That difference is the
+  // manipulation. Concession reach is not, and must not become one.
+  const counterpackage = spendDownTo(
+    task,
+    participantRole,
+    { ...opening, [focal.id]: limit(focal.id) },
+    [scope.id, timing.id],
+    limit,
+  );
 
   const tentative = counterpackage;
 
@@ -298,6 +313,59 @@ export function buildProxyPlan(
   return { opening, counterpackage, tentative, probe };
 }
 
+/**
+ * Gives ground on `spendable` as far as the mandate allows, stopping before
+ * the package drops below the principal's own fallback.
+ *
+ * No mandate field says "and don't accept less than walking away" because it
+ * does not need to: refusing an agreement worth less than no agreement is not
+ * a preference, it is what the fallback means. Spending every open term
+ * without this produced packages the principal would rather have refused.
+ *
+ * Terms are spent in order of what they cost the principal per point the
+ * counterpart gains — cheapest first, which is the logroll.
+ */
+function spendDownTo(
+  task: NegotiationTask,
+  principal: Role,
+  from: Package,
+  spendable: string[],
+  limit: (issueId: string) => string,
+): Package {
+  const counterpart: Role = principal === "member" ? "leader" : "member";
+  const pkg: Package = { ...from };
+
+  const byCheapness = [...spendable].sort((a, b) => {
+    const cost = (id: string) => {
+      const issue = task.issues.find((i) => i.id === id)!;
+      const best = Math.max(...issue.options.map((o) => o.points[principal]));
+      const worst = Math.min(...issue.options.map((o) => o.points[principal]));
+      const gain = Math.max(...issue.options.map((o) => o.points[counterpart]));
+      return gain > 0 ? (best - worst) / gain : Number.POSITIVE_INFINITY;
+    };
+    return cost(a) - cost(b);
+  });
+
+  for (const issueId of byCheapness) {
+    const issue = task.issues.find((i) => i.id === issueId)!;
+    const target = limit(issueId);
+    const order = [...issue.options].sort(
+      (a, b) => b.points[principal] - a.points[principal],
+    );
+    const stop = order.findIndex((o) => o.id === target);
+    const start = order.findIndex((o) => o.id === pkg[issueId]);
+
+    // Step toward the limit while the package still beats the fallback.
+    for (let at = start + 1; at <= stop; at += 1) {
+      const next = { ...pkg, [issueId]: order[at].id };
+      if (scorePackage(task, next, principal) < task.reservationPoints) break;
+      pkg[issueId] = order[at].id;
+    }
+  }
+
+  return pkg;
+}
+
 function bestFor(
   task: NegotiationTask,
   issueId: string,
@@ -306,6 +374,19 @@ function bestFor(
   const issue = task.issues.find((i) => i.id === issueId)!;
   return [...issue.options].sort((a, b) => b.points[role] - a.points[role])[0]
     .id;
+}
+
+/** The option this role likes least — everything on the table to give away. */
+function worstFor(
+  task: NegotiationTask,
+  issueId: string,
+  role: Role,
+): string {
+  const issue = task.issues.find((i) => i.id === issueId)!;
+  const ranked = [...issue.options].sort(
+    (a, b) => b.points[role] - a.points[role],
+  );
+  return ranked[ranked.length - 1].id;
 }
 
 // ---------------------------------------------------------------------------
