@@ -121,8 +121,18 @@ tamper-resistant record.
 ### `responses`
 
 One row per block per participant. Blocks: `background`, `survey`,
-`manipulation_check`, `reward_decision`, `debriefing`,
-`initial_preference_s{1,2}`, `session_outcome_s{1,2}`.
+`manipulation_check`, `reward_decision`, `debriefing`, `instruction_check`,
+`private_target_s{1,2}`, `post_task_s{1,2}`, `session_outcome_s{1,2}`.
+
+`private_target_s{n}` holds the focal level the participant privately judged
+sufficient plus the two pre-task jeopardy items, and it is written before the
+session's condition is visible — the first point on the trajectory in Methods
+ver.1.8 §Primary outcome 1.
+
+`session_outcome_s{n}` carries the ratification choice, the Leader's
+structured focal response (Requirement Uptake), and the coded focal level of
+the final package. The last two are stored separately on purpose: a package
+that broke the threshold and was then rejected is still coded as preserved.
 
 ```sql
 create table responses (
@@ -138,15 +148,24 @@ create table responses (
 
 ```sql
 create table mandates (
-  participant_key text not null references participants,
-  session_index   smallint not null,
-  issues          jsonb not null,   -- IssueMandate[]
-  allowed_actions jsonb not null,
-  revision_count  integer not null default 0,
-  created_at      timestamptz not null default now(),
+  participant_key    text not null references participants,
+  session_index      smallint not null,
+  -- IssueMandate[]: per term, { preferred, acceptable_floor, hard_boundary }
+  issues             jsonb not null,
+  -- { reason_card_id: 'sayable' | 'private' } — the disclosure measure
+  reason_permissions jsonb not null,
+  conditional_trade  boolean not null default true,
+  revision_count     integer not null default 0,
+  created_at         timestamptz not null default now(),
   primary key (participant_key, session_index)
 );
 ```
+
+Two behavioural codes come straight out of this table. `MANDATE` is whether
+the hard boundary on the focal term preserves the participant's private
+target; the disclosure measure is which reason cards they marked sayable. Both
+are participant choices, not failures — a participant who entrusted no
+boundary has `MANDATE = 0`, which is data (Methods ver.1.8 §Missingness).
 
 Store each revision as a separate `events` row so mandate revision behavior is
 recoverable.
@@ -159,8 +178,12 @@ create table messages (
   participant_key     text not null references participants,
   session_index       smallint not null,
   turn_index          integer not null,
+  stage               smallint,       -- 1..5, the controlled interaction stage
   speaker             text not null,
   text                text not null,
+  proposal            jsonb,          -- the package on the table, if any
+  rationale_frame     text,           -- Appendix B4; 'common_practice' = Explorer only
+  reason_source_id    text,           -- which reason card the rationale used
   structured_action   jsonb,          -- NegotiationAction
   internal_provenance text,           -- 'principal_mandate' | 'agent_option'
   validator_result    jsonb,
@@ -170,8 +193,15 @@ create table messages (
 create index on messages (participant_key, session_index, turn_index);
 ```
 
-`internal_provenance` and `structured_action` are audit fields. Never select
-them into a participant-facing response.
+`internal_provenance`, `structured_action`, `rationale_frame` and
+`reason_source_id` are audit fields. Never select them into a
+participant-facing response — the Explorer condition is defined by the
+participant being unable to tell an explored option from an authorized one, so
+a leak here is not a privacy bug but a destroyed manipulation.
+
+`stage` and `proposal` are what make the trajectory recoverable: the focal
+level at stage 1 is opening advocacy, at stage 4 is retention after the
+standardized challenge, and at stage 5 is the final package.
 
 ### `guardrail_events`
 

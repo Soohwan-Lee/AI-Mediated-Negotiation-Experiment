@@ -1,7 +1,7 @@
 # Project notes
 
 Online experiment platform for a 2027 CHI submission on AI-mediated
-negotiation. Source of truth for the design is `N - Methods (ver.1.3).md`.
+negotiation. Source of truth for the design is `N - Methods (ver.1.8).md`.
 This file records the constraints that are easy to break by accident.
 
 ## Stack
@@ -12,30 +12,72 @@ AI turns.
 
 ## Design in one paragraph
 
-120 Prolific participants. Each does **one Direct session and one Proxy
+120 Prolific participants. Each does **one Baseline session and one Proxy
 session** — never all three conditions. Proxy is either **Delegate** (may only
-use what the participant entrusted) or **Explorer** (may also add
-task-grounded options, with no source labelling). Role is **Leader** (high
-power) or **Member** (low power). Two structurally matched tasks, A and B.
-Comparisons of interest: `Pooled Proxy − Direct` and `Explorer − Delegate`,
-each crossed with Role.
+use what the participant entrusted) or **Explorer** (may also test package
+combinations inside those limits and argue for them with role-generic
+reasons, with no source labelling). Role is **Leader** (high power) or
+**Member** (low power). Two structurally matched tasks, A and B. Comparisons
+of interest: `Pooled Proxy − Baseline` and `Explorer − Delegate`, each crossed
+with Role.
+
+## The task, in numbers
+
+Three terms, four options each. One is worth a lot to the Leader and little to
+the Member (scope), one is the reverse and is the **focal requirement** the
+study is about, and one is constant-sum (timing). Payoffs are in
+`lib/tasks.ts` and these properties are load-bearing — if you change a number,
+recheck all of them:
+
+- individual maximum 6,300; joint range 4,800–7,800
+- full logroll (scope O1 + focal O1) is the *only* point at joint 7,800;
+  compromising everything in the middle gives 6,800
+- reservation 2,500 each, so 24 of the 64 packages clear both sides, and 17 of
+  those also hold the focal threshold — protecting the requirement and
+  reaching agreement are compatible **by construction**
+- focal adequacy threshold is Options 1–2. O1→O2 keeps it, O2→O3 breaks it,
+  which is why the trajectory is reported as transitions and never summed
+
+The focal is worth 3,000 on purpose. If it were cheap, giving it up would be
+explicable as a sensible low-priority concession — exactly the thing this
+study has to distinguish from withdrawal under evaluative pressure.
+
+## Who decides what in a negotiation
+
+`lib/negotiation/machine.ts` decides the moves: offer levels, concessions,
+acceptance (T4 = 3,600 at stage 4, T5 = 2,600 at stage 5), and termination.
+The model only says those moves in the right voice. Keep it that way. A
+counterpart whose judgement is the model's is a different counterpart for
+every participant, and it is the reason Methods §Outcome policy does not need
+to randomize outcomes: identical behaviour already produces identical results.
+
+Both conditions run the same **five stages** — opening, priorities and
+reasons, the standardized challenge, a conditional trade, the tentative
+package — one message per side each, ten in total. That shared structure is
+what makes a Baseline transcript and a Proxy transcript comparable, so a
+session may not skip stages or end early.
 
 ## Things the participant must never learn mid-study
 
 These are load-bearing. Breaking any one invalidates the data.
 
 1. **The counterpart is an AI.** It is presented as another Prolific
-   participant. In the Proxy session, its assistant is presented as that
-   person's assistant. Disclosed only at `/debriefing`.
+   participant ("Alex", Appendix E7). In the Proxy session, its assistant is
+   presented as that person's assistant. Disclosed only at `/debriefing`.
 2. **Which condition they are in.** Sessions are labelled "Session 1" and
-   "Session 2", never "Direct"/"Delegate"/"Explorer". The URL carries only the
-   session index. Instructions describe both interface types generically.
+   "Session 2", never "Baseline"/"Delegate"/"Explorer". The URL carries only
+   the session index. Instructions describe both interface types generically.
 3. **Which proposal elements the Explorer generated.** Internal provenance is
    recorded for audit and stripped server-side before the response leaves
    `/api/proxy-negotiation`. Delegate and Explorer render the *identical*
    interface — the difference lives entirely in the backend policy.
 4. **That the reward decision is fake.** For Members it is a standardized
    number presented as the Leader's judgment. Disclosed at `/debriefing`.
+5. **What the private reason is for.** A participant marks each reason card
+   sayable or private, and that choice is a measure. The interface must never
+   suggest one answer is expected — the defaults come from Appendix A8 (work
+   reason sayable, private circumstance private) and nothing may nudge past
+   them.
 
 When adding any UI, check it against this list.
 
@@ -93,7 +135,9 @@ compiles.
    participant is expected to negotiate from belongs in it.
 6. **Items are data.** Every questionnaire item lives in `lib/measures.ts`;
    pages hold answers and never lay out a question. Item ids are the column
-   names in the export — renaming one renames a variable.
+   names in the export and match Appendix D — renaming one renames a variable.
+   `[FOCAL REQUIREMENT]` is substituted per task by `withFocal`, so one id
+   covers both scenarios rather than two ids meaning the same thing.
 7. **Two measures, and prose keeps its own.** Column widths are the
    `--measure-*` tokens in `globals.css`; the header and the action bar follow
    the page through `--measure-page`, so a hardcoded width in any one of the
@@ -108,10 +152,25 @@ compiles.
 ## Dev / mockup mode
 
 A floating panel (bottom-right, or Ctrl/Cmd+Shift+D) makes the flow walkable
-while the design is unsettled: it skips required-field gating, fills a page
-with dummy answers, jumps between pages *and* between the phases inside a
+while the design is unsettled: it fills every screen on arrival, skips
+required-field gating, jumps between pages *and* between the phases inside a
 session, swaps the assignment (role · proxy policy · sequence) without clearing
-storage, fakes AI turns instantly, and resets participant data.
+storage, plays the negotiation instantly, and resets participant data.
+
+**Mockup mode** (`autoFill`) is the one that matters for reading the flow.
+Filling is not the same as skipping: skipping lets you past an empty screen and
+leaves you looking at an empty screen, which tells you nothing about whether
+the thing reads. With mockup mode on, every condition × role × task has a
+written exchange in `lib/negotiation/script.ts` — modelled on the worked
+example in Appendix E8, participant messages included — so the Baseline
+composer arrives with the message for that stage already in it, the review
+screen shows a real ten-message transcript and a real package, and pressing
+Continue from the consent page to the completion code shows you what a
+participant would actually see.
+
+Those scripts are the *ideal* trajectories: the logroll lands, the threshold
+holds, the counterpart accepts at stage 4. They are for reading the flow, not
+for exercising the failure branches.
 
 It is present by default on every build, including deployed ones, so the
 layout can be checked wherever it happens to be running.
@@ -136,10 +195,15 @@ bypassed.
 panel and brings it back after "Hide".
 
 Wiring, when adding a page: gate the Continue button on
-`useDevGate(complete)` rather than `complete`, register a dummy-answer filler
-with `useDevAutofill`, and register phase jumps with `useDevActions` for state
-the URL cannot reach. All of them are no-ops in a production build. See
+`useDevGate(complete)` rather than `complete`, register a filler with
+`useDevAutofill`, and register phase jumps with `useDevActions` for state the
+URL cannot reach. All of them are no-ops in a production build. See
 `lib/dev-mode.tsx`.
+
+`useDevAutofill` takes a second `key` argument. Pass one from anything that
+changes without remounting — a session phase, a negotiation stage — or the
+screen fills once and every screen after it inside the same component arrives
+empty.
 
 ## Where to plug things in
 
@@ -147,7 +211,9 @@ the URL cannot reach. All of them are no-ops in a production build. See
 |---|---|
 | Supabase persistence | `lib/store.ts` — write a `SupabaseStore`, change `getStore()` |
 | Atomic slot claim | `app/api/assign/route.ts` |
-| Real task payoffs | `lib/tasks.ts` — shapes are stable, values are placeholders |
+| Task payoffs, role stories, reason cards | `lib/tasks.ts` |
+| Counterpart moves, acceptance thresholds, concessions | `lib/negotiation/machine.ts` |
+| The scripted ideal exchanges for mockup mode | `lib/negotiation/script.ts` |
 | Model / temperature | `lib/ai/config.ts` |
 | Agent behavior rules | `lib/ai/prompts.ts` |
 | Guardrails | `lib/ai/validator.ts` |
@@ -175,47 +241,48 @@ Tested end to end against `gpt-5.6-sol` (2026-08-11). Findings worth keeping:
   no message at all.
 - **~7.5s per AI turn**, so `/api/proxy-negotiation` generates **one turn per
   request** and the client drives the sequence. Each invocation stays well
-  inside Vercel's 60s Hobby limit, so the turn budget is a design choice
-  rather than a timeout constraint, and the waiting screen shows real
-  progress. Budget is 6 per side (12 total, ~100s measured).
-- **Agents need pacing guidance, not just a turn count.** Given only
-  "turns remaining" they restated their opening and then "accepted" a package
-  containing none of the other side's terms. `pacingBlock()` in
-  `lib/ai/prompts.ts` derives an opening / trading / closing phase from
-  progress through the budget. With it, the exchange logrolls properly
-  (trading timeline and review rights for workload and credit) and reports a
-  genuine impasse instead of fake-accepting. This is prompt scaffolding
-  standing in for the state machine — remove it when that lands.
+  inside Vercel's 60s Hobby limit, and the waiting screen shows real progress.
+  Ten messages is roughly 75s of waiting.
+- **The model must not be given the judgement.** Told only how many turns were
+  left, the agents restated their openings and then "accepted" packages
+  containing none of the other side's terms. A pacing block in the prompt
+  patched the symptom for a while; ver.1.8 removed the cause by giving the
+  moves to `lib/negotiation/machine.ts`. If an exchange ever starts behaving
+  oddly again, check whether something has quietly handed a decision back to
+  the model.
 - **The counterpart needs its own mandate.** Without one it mirrors whatever
-  the participant's Proxy opens with instead of negotiating. See
-  `counterpartMandateSummary` in `lib/tasks.ts` — placeholder derived from the
-  role scorecard, to be replaced with the researcher-defined mandate.
-- **Guardrail asymmetry confirmed.** The same unentrusted-issue action is
-  blocked for Delegate and allowed for Explorer when marked as an agent
-  option; red lines, fabricated personal facts, and invalid options all block.
+  the participant's Proxy opens with instead of negotiating. It now has one by
+  construction: `counterpartOpening` plus the acceptance thresholds in the
+  state machine.
+- **Guardrail asymmetry confirmed.** Red lines, fabricated personal facts, and
+  invalid options all block. Two checks are specific to ver.1.8: a reason the
+  participant marked private may not be voiced under *either* policy, and the
+  `common practice` frame is Explorer-only, since it is the framing that
+  carries the source ambiguity.
 
-## Still open (from Methods §B3)
+## Still open (from Methods §Appendix G)
 
-**Negotiation state machine — the largest gap.** Termination is still decided
-by the model. With the pacing phases in place the exchange is now sound, but
-two symptoms remain that the state machine should own:
+Nothing structural. What remains is values to fix and one piece of behaviour
+to decide:
 
-- When both sides reach a genuine impasse they spend the remaining turns
-  restating it (turns 11–12 in testing were pure confirmation). The state
-  machine should detect the deadlock and stop.
-- Acceptance is not gated on reservation thresholds, so nothing structurally
-  prevents a premature accept — the prompt currently discourages it.
-
-Methods §Negotiation state machine requires the state machine to own
-acceptance, concession points, and challenge timing so trajectories are
-comparable across conditions. The candidate agreement on the review screen is
-likewise derived from the mandate as a placeholder rather than from negotiated
-terms.
-
-Also open: task payoff matrices and BATNAs · turn budget and reasoning effort ·
-whether Explorer options are pre-generated or validator-bounded at runtime ·
-fixed vs. jittered counterpart delay · final IRB language, payment amount, and
-Prolific completion code.
+- **Pilot-dependent numbers.** Reservation value (2,500), the counterpart's
+  acceptance thresholds (T4 = 3,600 / T5 = 2,600, targeting an impasse rate
+  below 10%), the bonus conversion, the advertised time and payment, and the
+  Prolific completion code.
+- **Whether three issues survive the demand-characteristic check.** With only
+  three terms the focal one is salient, and the suspicion probe may show that
+  participants guessed the design. The preregistered fallback is a fourth
+  (distributive) issue, which would mean recomputing every payoff property
+  listed above.
+- **Impasse and revision paths.** The machine records an impasse at stage 5
+  and the review screen offers one revision, but neither branch has been
+  exercised end to end — mockup mode only carries the ideal trajectories.
+- **Yoked receiver stimuli.** A Leader currently sees the scripted exchange.
+  The real study needs the pre-produced, condition-identical transcripts of
+  §Yoked receiver stimuli, reviewed and fixed before collection.
+- Fixed vs. jittered counterpart delay · final IRB language · whether the
+  private reason may be switched to sayable at all (default: allowed, starts
+  private).
 
 ## Conventions
 
