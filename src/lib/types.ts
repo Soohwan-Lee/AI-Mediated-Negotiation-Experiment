@@ -18,8 +18,18 @@ export type Role = "leader" | "member";
 /** Session-level condition. Every participant sees `baseline` + one proxy. */
 export type Condition = "baseline" | "delegate" | "explorer";
 
-/** Which of the two structurally matched scenarios. */
+/** Which of the two structurally matched scenarios a session runs. */
 export type TaskId = "task_a" | "task_b";
+
+/**
+ * What a `NegotiationTask` may identify itself as.
+ *
+ * The practice round has the same shape as a real task but is not one, and
+ * saying so in the type keeps it out of `TaskId` — so it can never be
+ * assigned to a session, and a practice row can never be mistaken for Task A
+ * in the export.
+ */
+export type ScenarioId = TaskId | "practice";
 
 /** Counterbalancing: which session comes first. */
 export type SessionOrder = "baseline_first" | "proxy_first";
@@ -140,7 +150,7 @@ export interface ReasonCard {
 export type ReasonPermission = "sayable" | "private";
 
 export interface NegotiationTask {
-  id: TaskId;
+  id: ScenarioId;
   title: string;
   /** Shared context both sides can see (Appendix A2/A5). */
   publicBrief: string;

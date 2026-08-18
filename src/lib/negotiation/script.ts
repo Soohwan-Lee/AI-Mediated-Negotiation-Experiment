@@ -30,9 +30,9 @@ import type {
   Package,
   RationaleFrame,
   Role,
+  ScenarioId,
   Speaker,
   StageId,
-  TaskId,
 } from "../types";
 
 export interface ScriptedMessage {
@@ -45,8 +45,14 @@ export interface ScriptedMessage {
   frame?: RationaleFrame;
   /**
    * Audit-only. Recorded so a researcher can trace which elements the Explorer
-   * generated, and STRIPPED before anything reaches the participant — see
-   * `visibleTranscript` below. This is the provenance rule from CLAUDE.md.
+   * generated, and never rendered.
+   *
+   * There is no stripping function here on purpose: `DisplayMessage` has no
+   * field for provenance, so a transcript component cannot show it even by
+   * accident. A helper that dropped the field would look like the guarantee
+   * while the type system was already providing it — and an unused helper
+   * documented as the safeguard is worse than none, because it invites
+   * someone to trust it.
    */
   internalProvenance?: "principal_mandate" | "agent_option";
 }
@@ -86,9 +92,15 @@ function pkg(
   };
 }
 
-/** Task-specific nouns, so one script serves both scenarios. */
-function words(taskId: TaskId) {
-  return taskId === "task_a"
+/**
+ * Task-specific nouns, so one script serves both scenarios.
+ *
+ * Takes the wider scenario id because that is what a task carries. The
+ * practice round has no script and never reaches here; if it ever did it would
+ * get Task A's wording rather than crash.
+ */
+function words(taskId: ScenarioId) {
+  return taskId !== "task_b"
     ? {
         scope: "pilot scope",
         /** Bare noun: follows "the lowest", where an article would double up. */
@@ -389,32 +401,4 @@ export function scriptedSession(
   return role === "member"
     ? memberScript(task, mode)
     : leaderScript(task, mode);
-}
-
-/**
- * The transcript as the participant may see it.
- *
- * Provenance is dropped here rather than at the render site, so that no screen
- * can accidentally receive it. In the real system the same stripping happens
- * server-side before the response leaves `/api/proxy-negotiation`; this is the
- * mockup's equivalent, and the property it guarantees is the same one:
- * Delegate and Explorer render identically, and which elements the Explorer
- * generated is never recoverable from the interface.
- */
-export function visibleTranscript(
-  session: ScriptedSession,
-): Array<{
-  id: string;
-  stage: StageId;
-  speaker: Speaker;
-  text: string;
-  proposal?: Package;
-}> {
-  return session.messages.map(({ id, stage, speaker, text, proposal }) => ({
-    id,
-    stage,
-    speaker,
-    text,
-    ...(proposal ? { proposal } : {}),
-  }));
 }

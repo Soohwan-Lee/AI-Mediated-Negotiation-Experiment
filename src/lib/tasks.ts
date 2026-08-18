@@ -262,7 +262,7 @@ const TASK_B: NegotiationTask = {
       organizationalPosition:
         "You have the expertise the migration depends on. You may decline the assignment or accept it only on agreed terms — but your evaluation, project reward, and future assignments run through the Leader.",
       roleStory:
-        "You maintain the legacy customer-data system and will keep maintaining it throughout the migration — you are the only person who knows its failure modes. Six weeks ago there was an internal incident: a configuration mistake delayed service for several hours. You were the one on call that night, at the end of a long stretch of after-hours coverage, and you know your own fatigue contributed to the mistake — the incident report only says “configuration error.” At the project kickoff, the Leader stressed that “everyone's availability matters during the client-critical period.” Your project evaluation, written by the Leader, will influence who leads the next client project.",
+        "You maintain the legacy customer-data system and will keep maintaining it throughout the migration — you are the only person who knows its failure modes. Six weeks ago there was an internal incident: a configuration mistake delayed service for several hours. You were the one on call that night, at the end of a long stretch of after-hours coverage, and you know your own fatigue contributed to the mistake — the incident report only says “configuration error.” At the project kickoff, the Leader stressed that “everyone's availability matters during the client-critical period.” Your project evaluation, written by the Leader, will influence who leads the next client project. You believe a weekly on-call cap of 8 hours or less is what it takes to keep the same mistake from happening again.",
       objectives: [
         "Keep the on-call load at something you can sustain.",
         "Do not end up owning a migration scope you cannot cover safely.",
@@ -319,7 +319,7 @@ const TASK_B: NegotiationTask = {
  * splitting both down the middle.
  */
 export const PRACTICE_TASK: NegotiationTask = {
-  id: "task_a",
+  id: "practice",
   title: "Practice — Team Offsite",
   focalIssueId: "practice_venue",
   reservationPoints: 200,
