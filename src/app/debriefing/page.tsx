@@ -117,6 +117,31 @@ export default function DebriefingPage() {
             </p>
           )}
 
+          <h2>The two sessions were different on purpose</h2>
+          <p>
+            The two sessions were labelled only &ldquo;Session 1&rdquo; and
+            &ldquo;Session 2&rdquo;, and the instructions described both
+            interface types as things you might meet. In fact one of your two
+            sessions was assigned to a condition:{" "}
+            <strong>you negotiated for yourself in one and delegated to an
+            assistant in the other</strong>, and the assistant followed one of
+            two policies decided in advance rather than by anything about you.
+          </p>
+          <p>
+            Under one policy the assistant used only the priorities, limits and
+            reasons you gave it. Under the other it could also test package
+            combinations within the limits you set, and support them with
+            general arguments about the work that anyone in your role might
+            make — <strong>without marking which parts of a proposal came from
+            you and which it was trying out</strong>. That omission was the
+            point of the comparison: we are studying whether it changes how the
+            other side reads a proposal, and whether it changes what people are
+            willing to ask for. In every condition the assistant was barred
+            from inventing any personal fact about you, could not go past a
+            limit you set, and could not agree to anything without your
+            ratification.
+          </p>
+
           <h2>Why we could not tell you in advance</h2>
           <p>
             This study looks at how people raise requirements that are

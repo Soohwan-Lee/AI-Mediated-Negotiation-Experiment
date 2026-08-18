@@ -1,10 +1,19 @@
 "use client";
 
 /**
- * Simulated reward decision (Methods §8).
+ * Simulated reward decision (Methods ver.1.8 §Compensation and ethics).
  *
- * Leader: allocates a scenario bonus to the counterpart.
- * Member: is shown a standardized decision presented as the Leader's.
+ * Leader: sees the per-session bonus allocations they already made and gives
+ * one overall decision. Member: is shown a standardized decision presented as
+ * the Leader's.
+ *
+ * WHY THIS IS NOT BONUS1. The receiver-side bonus item (Appendix D6) is asked
+ * once per session, right after the negotiation it is a judgement about — that
+ * is the measure. This page is the scenario-level consequence of the power
+ * manipulation and, for the Member, the deception that /debriefing has to
+ * undo. Asking the same question twice would produce two columns that mean
+ * different things under one name, so the Leader's screen here says plainly
+ * that it is the overall decision.
  *
  * This is a scenario-level consequence of the power manipulation. It does NOT
  * affect anyone's actual Prolific payment — for the Member this is the
@@ -98,12 +107,12 @@ export default function RewardPage() {
             <PageHeader
               eyebrow="Your authority in this scenario"
               title="Your reward decision"
-              subtitle="As the Project Leader, you decide how the scenario bonus is split."
+              subtitle="As the Project Leader, you make the final call on the scenario bonus, taking both projects together."
             />
 
             <Card className="mb-5">
               <CardTitle
-                hint={`A discretionary pool of ${SCENARIO_BONUS_POOL} points is available for this project.`}
+                hint={`A discretionary pool of ${SCENARIO_BONUS_POOL} points, across both projects.`}
               >
                 Points awarded to the Team Member
               </CardTitle>
