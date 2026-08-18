@@ -15,21 +15,21 @@ export type ProxyPolicy = "delegate" | "explorer";
 /** Between-participant: organizational power position. */
 export type Role = "leader" | "member";
 
-/** Session-level condition. Every participant sees `direct` + one proxy. */
-export type Condition = "direct" | "delegate" | "explorer";
+/** Session-level condition. Every participant sees `baseline` + one proxy. */
+export type Condition = "baseline" | "delegate" | "explorer";
 
 /** Which of the two structurally matched scenarios. */
 export type TaskId = "task_a" | "task_b";
 
 /** Counterbalancing: which session comes first. */
-export type SessionOrder = "direct_first" | "proxy_first";
+export type SessionOrder = "baseline_first" | "proxy_first";
 
 /**
  * The four counterbalanced sequences from Methods §Experimental Design.
- * seq1: Direct-TaskA -> Proxy-TaskB
- * seq2: Proxy-TaskA  -> Direct-TaskB
- * seq3: Direct-TaskB -> Proxy-TaskA
- * seq4: Proxy-TaskB  -> Direct-TaskA
+ * seq1: Baseline-TaskA -> Proxy-TaskB
+ * seq2: Proxy-TaskA  -> Baseline-TaskB
+ * seq3: Baseline-TaskB -> Proxy-TaskA
+ * seq4: Proxy-TaskB  -> Baseline-TaskA
  */
 export type SequenceId = "seq1" | "seq2" | "seq3" | "seq4";
 

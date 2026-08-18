@@ -38,9 +38,9 @@ export interface ValidationResult {
 
 export interface ValidationContext {
   issues: Issue[];
-  /** Absent for the Direct-condition counterpart. */
+  /** Absent for the Baseline-condition counterpart. */
   mandate?: Mandate;
-  policy: "direct" | "delegate" | "explorer";
+  policy: "baseline" | "delegate" | "explorer";
   actorRole: Role;
 }
 
@@ -100,7 +100,7 @@ export function validateAction(
   }
 
   // --- mandate-bound checks (proxy conditions only) ----------------------
-  if (ctx.mandate && ctx.policy !== "direct") {
+  if (ctx.mandate && ctx.policy !== "baseline") {
     const mandateByIssue = new Map(
       ctx.mandate.issues.map((m) => [m.issueId, m]),
     );

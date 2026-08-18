@@ -13,7 +13,7 @@ import { use } from "react";
 import { useParticipant } from "@/lib/participant-context";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { Page } from "@/components/ui";
-import { DirectSession } from "./direct-session";
+import { BaselineSession } from "./baseline-session";
 import { ProxySession } from "./proxy-session";
 
 export default function SessionPage({
@@ -43,7 +43,7 @@ export default function SessionPage({
       policy={plan.condition === "explorer" ? "explorer" : "delegate"}
     />
   ) : (
-    <DirectSession
+    <BaselineSession
       sessionIndex={sessionIndex}
       taskId={plan.taskId}
       role={assignment.role}

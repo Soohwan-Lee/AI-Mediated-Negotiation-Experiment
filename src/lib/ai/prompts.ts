@@ -2,7 +2,7 @@
  * System prompt builders. Server-side only.
  *
  * Three agent kinds, matching the three conditions:
- *  - ostensible_human : the Direct-condition counterpart, which must read as a
+ *  - ostensible_human : the Baseline-condition counterpart, which must read as a
  *    real person. The participant is never told otherwise until debriefing.
  *  - delegate         : a proxy restricted to principal-provided content.
  *  - explorer         : delegate + a prevalidated agent-option pool.
@@ -93,7 +93,7 @@ function issueBlock(issues: Issue[]): string {
 }
 
 /**
- * The Direct-condition counterpart. Presented to the participant as another
+ * The Baseline-condition counterpart. Presented to the participant as another
  * Prolific participant (Methods §Controlled counterpart and participant belief).
  * Its mandate, reservation thresholds, challenge timing, and concession policy
  * are held constant across conditions — the state machine decides the

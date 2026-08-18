@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Direct condition session (Methods §Direct session).
+ * Baseline condition session (Methods §Baseline).
  *
  * The participant writes their own messages and makes their own offers. The
  * counterpart is presented as another participant; it is a controlled LLM
@@ -43,7 +43,7 @@ const MOCK_REPLIES = [
   "[mock] That works apart from the workload split. Here is a counter-proposal.",
 ];
 
-export function DirectSession({
+export function BaselineSession({
   sessionIndex,
   taskId,
   role,

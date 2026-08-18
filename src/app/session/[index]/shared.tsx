@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Phases shared by the Direct and Proxy sessions.
+ * Phases shared by the Baseline and Proxy sessions.
  *
  * The initial-preference form is the baseline for Preference Displacement and
  * AI Settlement Adoption, so it must be captured BEFORE the participant sees
@@ -247,7 +247,7 @@ export function InitialPreferenceForm({
 }
 
 // ---------------------------------------------------------------------------
-// Phase: final decision (Direct condition)
+// Phase: final decision (Baseline condition)
 // ---------------------------------------------------------------------------
 
 export function FinalDecision({

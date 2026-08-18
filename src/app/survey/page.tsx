@@ -11,7 +11,7 @@
  *
  * Two things this page must not do:
  *  - name a condition. Sessions are "Session 1" and "Session 2", reminded by
- *    scenario title, never by "Direct"/"Delegate"/"Explorer".
+ *    scenario title, never by "Baseline"/"Delegate"/"Explorer".
  *  - ask the suspicion probe anywhere but last, before any disclosure
  *    (Methods §A17).
  *
