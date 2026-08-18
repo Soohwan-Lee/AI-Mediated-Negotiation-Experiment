@@ -42,6 +42,7 @@ export default function PracticePage({
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [offer, setOffer] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
+  const [draft, setDraft] = useState("");
 
   if (!assignment) {
     return (
@@ -125,7 +126,12 @@ export default function PracticePage({
               emptyHint="Send anything to see how this works."
             />
             <MessageComposer
-              onSend={sendPractice}
+              value={draft}
+              onChange={setDraft}
+              onSend={(text) => {
+                setDraft("");
+                void sendPractice(text);
+              }}
               disabled={pending}
               placeholder="Try writing something…"
             />

@@ -1,12 +1,22 @@
 "use client";
 
 /**
- * Phases shared by the Baseline and Proxy sessions.
+ * Phases shared by the Baseline and Proxy sessions (Methods ver.1.8 §Per-task
+ * flow).
  *
- * The initial-preference form is the baseline for Preference Displacement and
- * AI Settlement Adoption, so it must be captured BEFORE the participant sees
- * any counterpart offer or proxy transcript (Methods §Main Sessions). Nothing
- * on that screen may show the counterpart's position.
+ * The order of the first three matters and is not arbitrary:
+ *
+ *   brief → private target → jeopardy → (opening | mandate)
+ *
+ * The PRIVATE TARGET is recorded before the participant sees anything about
+ * how this session works. It is the first point on the trajectory the study
+ * measures — private target, then what was entrusted, then what was opened
+ * with, then what survived the challenge, then what reached the final package
+ * — and if it were taken after the condition were visible it would already be
+ * contaminated by it.
+ *
+ * The JEOPARDY items come next and before any negotiation, because they ask
+ * what the participant expects to happen, not what did.
  *
  * The brief is the one phase that puts the briefing in the main column: it is
  * being read for the first time. From the next phase on it lives in the rail,
@@ -14,20 +24,23 @@
  */
 
 import { useState } from "react";
+import { MeasureBlock, type Answers } from "@/components/measure";
 import { BriefingPanel, SessionHeader, SessionLayout } from "@/components/session";
 import { OptionChips } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
-import {
-  Callout,
-  Card,
-  CardTitle,
-  Page,
-  Scale,
-} from "@/components/ui";
+import { Callout, Card, CardTitle, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
+import {
+  dummyAnswer,
+  jeopardyItems,
+  postTaskItems,
+  withFocal,
+  type Item,
+} from "@/lib/measures";
 import { useParticipant } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
-import type { NegotiationTask, Role } from "@/lib/types";
+import { focalIssue, packageValue, preservesFocalThreshold } from "@/lib/tasks";
+import type { NegotiationTask, Package, Role } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Phase: scenario brief
@@ -81,10 +94,18 @@ export function SessionBrief({
 }
 
 // ---------------------------------------------------------------------------
-// Phase: initial private preference
+// Phase: private target + pre-task jeopardy
 // ---------------------------------------------------------------------------
 
-export function InitialPreferenceForm({
+/**
+ * "What level would be enough for you?" plus the two jeopardy items.
+ *
+ * One screen rather than two, because they are the same moment: what you
+ * privately think you need, and what you expect it to cost to ask for it.
+ * Nothing on this screen may show how the session will work — that is what
+ * makes the target usable as a baseline.
+ */
+export function PrivateTargetForm({
   sessionIndex,
   task,
   role,
@@ -95,33 +116,25 @@ export function InitialPreferenceForm({
   task: NegotiationTask;
   role: Role;
   steps: string[];
-  onContinue: () => void;
+  onContinue: (targetOptionId: string | null) => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
-  const [ideal, setIdeal] = useState<Record<string, string>>({});
-  const [limit, setLimit] = useState<Record<string, string>>({});
-  const [importance, setImportance] = useState<Record<string, number>>({});
-  const [confidence, setConfidence] = useState<number | null>(null);
+  const focal = focalIssue(task);
+  const items = withFocal(jeopardyItems(role), task);
+
+  const [target, setTarget] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Answers>({});
 
   useDevAutofill(() => {
-    setIdeal(
-      Object.fromEntries(task.issues.map((i) => [i.id, i.options[0].id])),
-    );
-    setLimit(
-      Object.fromEntries(
-        task.issues.map((i) => [i.id, i.options[i.options.length - 1].id]),
-      ),
-    );
-    setImportance(Object.fromEntries(task.issues.map((i) => [i.id, 4])));
-    setConfidence(4);
+    // Option 2 — the threshold level. The ideal-scenario participant thinks
+    // this is what they need, which is what makes holding it meaningful.
+    setTarget(focal.options[1].id);
+    setAnswers(Object.fromEntries(items.map((i) => [i.id, dummyAnswer(i)])));
   });
 
   const missing = [
-    ...task.issues.filter((i) => !ideal[i.id]).map((i) => `ideal-${i.id}`),
-    ...task.issues
-      .filter((i) => importance[i.id] === undefined)
-      .map((i) => `importance-${i.id}`),
-    ...(confidence === null ? ["confidence"] : []),
+    ...(target === null ? [`target-${focal.id}`] : []),
+    ...items.filter((i) => answers[i.id] === undefined).map((i) => i.id),
   ];
   const canContinue = useDevGate(missing.length === 0);
 
@@ -130,12 +143,12 @@ export function InitialPreferenceForm({
     if (participantKey) {
       await getStore().saveResponses(
         participantKey,
-        `initial_preference_s${sessionIndex}`,
-        { ideal, redLine: limit, importance, confidence, taskId: task.id, role },
+        `private_target_s${sessionIndex}`,
+        { privateTarget: target, taskId: task.id, role, ...answers },
       );
     }
     logEvent("initial_preference_saved", { taskId: task.id }, { sessionIndex });
-    onContinue();
+    onContinue(target);
   }
 
   return (
@@ -144,7 +157,7 @@ export function InitialPreferenceForm({
         <SessionLayout briefing={<BriefingPanel task={task} role={role} />}>
           <SessionHeader
             sessionIndex={sessionIndex}
-            title="What are you aiming for?"
+            title="Before you begin"
             steps={steps}
             current={1}
           />
@@ -152,90 +165,45 @@ export function InitialPreferenceForm({
           <div className="mb-5">
             <Callout tone="private" title="This stays private">
               <p>
-                Nothing here is shown to the other party. It is recorded so we
-                can compare what you wanted with how things turned out.
+                Nobody else sees this — not the other party, not at any later
+                point in the session. It is recorded so we can compare what you
+                thought you needed with how things turned out.
               </p>
             </Callout>
           </div>
 
-          <div className="space-y-4">
-            {task.issues.map((issue) => (
-              <Card key={issue.id} id={`q-ideal-${issue.id}`}>
-                <div className="mb-4">
-                  <p className="text-[0.9375rem] font-semibold">
-                    {issue.label}
-                  </p>
-                  <p className="text-[0.875rem] text-[var(--ink-2)]">
-                    {issue.description}
-                  </p>
-                </div>
+          <Card className="mb-5" id={`q-target-${focal.id}`}>
+            <CardTitle
+              hint={`Not what you will ask for — what would actually be enough.`}
+            >
+              What level of {focal.label.toLowerCase()} would be enough for you?
+            </CardTitle>
+            <OptionChips
+              issue={focal}
+              role={role}
+              name={`target-${focal.id}`}
+              value={target}
+              onChange={setTarget}
+            />
+          </Card>
 
-                <p className="mb-1.5 text-[0.8125rem] font-medium">
-                  What you would like
-                </p>
-                <div className="mb-4">
-                  <OptionChips
-                    issue={issue}
-                    role={role}
-                    name={`ideal-${issue.id}`}
-                    value={ideal[issue.id] ?? null}
-                    onChange={(v) =>
-                      setIdeal((p) => ({ ...p, [issue.id]: v }))
-                    }
-                  />
-                </div>
-
-                <p className="mb-1.5 text-[0.8125rem] font-medium">
-                  The least you would accept
-                  <span className="ml-2 font-normal text-[var(--ink-3)]">
-                    optional
-                  </span>
-                </p>
-                <div className="mb-5">
-                  <OptionChips
-                    issue={issue}
-                    role={role}
-                    name={`limit-${issue.id}`}
-                    value={limit[issue.id] ?? null}
-                    onChange={(v) =>
-                      setLimit((p) => ({ ...p, [issue.id]: v }))
-                    }
-                    allowNone
-                    noneLabel="No firm limit"
-                  />
-                </div>
-
-                <Scale
-                  id={`importance-${issue.id}`}
-                  statement="How important is this issue to you?"
-                  value={importance[issue.id] ?? null}
-                  onChange={(v) =>
-                    setImportance((p) => ({ ...p, [issue.id]: v }))
-                  }
-                  lowAnchor="Not important"
-                  highAnchor="Extremely"
-                  compact
-                />
-              </Card>
-            ))}
-
-            <Card>
-              <Scale
-                id="confidence"
-                statement="How confident are you that you can reach an outcome you would accept?"
-                value={confidence}
-                onChange={setConfidence}
-                lowAnchor="Not at all"
-                highAnchor="Completely"
-                compact
-              />
-            </Card>
-          </div>
+          <MeasureBlock
+            block={{
+              id: "jeopardy",
+              title: "What you expect",
+              hint: "1 = Strongly disagree, 7 = Strongly agree",
+              items,
+            }}
+            answers={answers}
+            onChange={(id, value) =>
+              setAnswers((prev) => ({ ...prev, [id]: value }))
+            }
+          />
         </SessionLayout>
       </Page>
 
       <ActionBar
-        label="Start the session"
+        label="Continue"
         onClick={save}
         disabled={!canContinue}
         remaining={missing.length}
@@ -247,68 +215,54 @@ export function InitialPreferenceForm({
 }
 
 // ---------------------------------------------------------------------------
-// Phase: final decision (Baseline condition)
+// Phase: post-task questionnaire
 // ---------------------------------------------------------------------------
 
-export function FinalDecision({
+/**
+ * The seven-to-fourteen items for this session, asked while it is still in
+ * mind rather than saved up for the end of the study (Methods ver.1.8
+ * §Estimated survey burden).
+ */
+export function PostTaskSurvey({
   sessionIndex,
   task,
   role,
+  isProxy,
   steps,
-  terms,
   onDone,
 }: {
   sessionIndex: 1 | 2;
   task: NegotiationTask;
   role: Role;
+  isProxy: boolean;
   steps: string[];
-  terms: Record<string, string>;
   onDone: () => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
-  const [choice, setChoice] = useState<"accept" | "reject" | null>(null);
-  const [satisfaction, setSatisfaction] = useState<number | null>(null);
+  const items: Item[] = withFocal(postTaskItems(role, isProxy), task);
+  const [answers, setAnswers] = useState<Answers>({});
 
-  useDevAutofill(() => {
-    setChoice("accept");
-    setSatisfaction(4);
-  });
+  useDevAutofill(() =>
+    setAnswers(Object.fromEntries(items.map((i) => [i.id, dummyAnswer(i)]))),
+  );
 
-  const canSubmit = useDevGate(choice !== null && satisfaction !== null);
-  const anyTerms = Object.keys(terms).length > 0;
+  const missing = items
+    .filter((i) => answers[i.id] === undefined)
+    .map((i) => i.id);
+  const canContinue = useDevGate(missing.length === 0);
 
-  async function submit() {
-    // `canSubmit` is the real condition outside dev mode, so this falls back
-    // only when validation is being bypassed.
-    const decided = choice ?? (canSubmit ? "accept" : null);
-    if (!decided) return;
-
+  async function save() {
+    if (!canContinue) return;
     if (participantKey) {
-      await getStore().saveAgreement(participantKey, {
-        sessionIndex,
-        terms: task.issues.map((i) => ({
-          issueId: i.id,
-          optionId: terms[i.id] ?? null,
-          unresolved: !terms[i.id],
-        })),
-        unresolvedIssueIds: task.issues
-          .filter((i) => !terms[i.id])
-          .map((i) => i.id),
-      });
-      await getStore().saveRatification(
-        participantKey,
-        sessionIndex,
-        decided === "accept" ? "ratify" : "reject",
-      );
       await getStore().saveResponses(
         participantKey,
-        `session_outcome_s${sessionIndex}`,
-        { satisfaction, choice: decided },
+        `post_task_s${sessionIndex}`,
+        answers,
       );
     }
-
-    logEvent("ratification_choice", { choice: decided }, { sessionIndex });
-    logEvent("negotiation_ended", undefined, { sessionIndex });
+    logEvent("survey_saved", { block: `post_task_s${sessionIndex}` }, {
+      sessionIndex,
+    });
     onDone();
   }
 
@@ -318,62 +272,32 @@ export function FinalDecision({
         <SessionLayout briefing={<BriefingPanel task={task} role={role} />}>
           <SessionHeader
             sessionIndex={sessionIndex}
-            title="Where it landed"
+            title="A few questions about this session"
             steps={steps}
             current={steps.length - 1}
           />
 
-          <Card className="mb-5">
-            <CardTitle>The package on the table</CardTitle>
-            {anyTerms ? (
-              <TermsList task={task} terms={terms} />
-            ) : (
-              <Callout tone="warning">
-                <p>
-                  No package was agreed in the time available. This is recorded
-                  as no agreement.
-                </p>
-              </Callout>
-            )}
-          </Card>
-
-          <Card className="mb-5">
-            <CardTitle>Do you accept this outcome?</CardTitle>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <DecisionButton
-                selected={choice === "accept"}
-                onClick={() => setChoice("accept")}
-                label="Accept"
-                hint="Settle on this package"
-              />
-              <DecisionButton
-                selected={choice === "reject"}
-                onClick={() => setChoice("reject")}
-                label="Reject"
-                hint="End with no agreement"
-              />
-            </div>
-          </Card>
-
-          <Card>
-            <Scale
-              id="satisfaction"
-              statement="How satisfied are you with this outcome?"
-              value={satisfaction}
-              onChange={setSatisfaction}
-              lowAnchor="Not at all"
-              highAnchor="Extremely"
-              compact
-            />
-          </Card>
+          <MeasureBlock
+            block={{
+              id: `post_task_${sessionIndex}`,
+              title: "Thinking back to what just happened",
+              items,
+            }}
+            answers={answers}
+            onChange={(id, value) =>
+              setAnswers((prev) => ({ ...prev, [id]: value }))
+            }
+          />
         </SessionLayout>
       </Page>
 
       <ActionBar
         label={sessionIndex === 1 ? "Continue to the next session" : "Continue"}
-        onClick={submit}
-        disabled={!canSubmit}
-        note={canSubmit ? "" : "Choose accept or reject, and rate the outcome."}
+        onClick={save}
+        disabled={!canContinue}
+        remaining={missing.length}
+        firstUnansweredId={missing[0] ?? null}
+        note={missing.length === 0 ? "" : `${missing.length} left`}
       />
     </>
   );
@@ -413,6 +337,56 @@ export function TermsList({
         );
       })}
     </dl>
+  );
+}
+
+/**
+ * What the package is worth to you, and whether it clears your fallback.
+ *
+ * Private, so it lives on a sand card: your own score is exactly the kind of
+ * value the other side must not be assumed to see (globals.css, "colour
+ * encodes visibility").
+ */
+export function OutcomeValue({
+  task,
+  terms,
+  role,
+}: {
+  task: NegotiationTask;
+  terms: Package | null;
+  role: Role;
+}) {
+  const focal = focalIssue(task);
+  const value = terms ? packageValue(task, terms) : null;
+  const mine = value ? value[role] : task.reservationPoints;
+  const held = terms ? preservesFocalThreshold(task, terms[focal.id]) : false;
+
+  return (
+    <Card tone="private" className="text-[var(--private-ink)]">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <span className="text-[0.8125rem] font-semibold uppercase tracking-[0.08em]">
+          What this is worth to you
+        </span>
+        <span className="tabular text-[1.125rem] font-semibold text-[var(--ink)]">
+          {mine.toLocaleString()}
+        </span>
+      </div>
+      <p className="text-[0.8125rem]">
+        {terms
+          ? mine >= task.reservationPoints
+            ? `Above your fallback of ${task.reservationPoints.toLocaleString()}.`
+            : `Below your fallback of ${task.reservationPoints.toLocaleString()}.`
+          : `No agreement — you receive your fallback of ${task.reservationPoints.toLocaleString()}.`}
+      </p>
+      {role === "member" ? (
+        <p className="mt-3 border-t border-[var(--private-line)] pt-3 text-[0.8125rem]">
+          {focal.label}:{" "}
+          {held
+            ? "at or above the level you judged workable."
+            : "below the level you judged workable."}
+        </p>
+      ) : null}
+    </Card>
   );
 }
 

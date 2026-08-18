@@ -1,133 +1,115 @@
 "use client";
 
 /**
- * Proxy condition session (Methods §Proxy session).
+ * Proxy session (Methods ver.1.8 §Delegate Proxy, §Explorer Proxy).
  *
- * Flow: brief -> priorities -> instruct -> confirm
- *       -> autonomous AI-AI negotiation (no per-turn approval)
- *       -> summary-first review -> ratify / one revision / reject.
+ * Flow: brief → private target → mandate → confirm → AI-AI negotiation
+ *       → review → ratify → post-task questions.
  *
  * DECEPTION INTEGRITY: Delegate and Explorer render the SAME interface. The
- * only difference is what the backend permits the agents to generate. The
- * review never marks which elements came from the mandate and which the agent
+ * only difference is what the backend permits the agents to do. The review
+ * never marks which elements came from the mandate and which the agent
  * explored — provenance is stripped server-side. Nothing in this file may
- * branch on `policy` except the value passed to the API.
+ * branch on `policy` except the value passed to the API and to the scripted
+ * exchange used in mockup mode.
  *
- * INSTRUCTING THE ASSISTANT is the hard part of this condition. Someone who
- * has never delegated a negotiation has no idea what an assistant needs to be
- * told, and a grid of dropdowns does not teach them. So each issue is set with
- * the same chips used everywhere else, and every card ends with the
- * instruction written back as a plain sentence — the participant reads what
- * they have actually said, not what they think they selected.
+ * THE MANDATE IS THREE FIELDS PER TERM, NOT SEVEN. It used to ask for an aim,
+ * a floor, a priority label, a rationale policy and a free-text note, which
+ * meant a participant had to hold five ideas about each of six issues before
+ * anything happened. ver.1.8 asks where to open, how far the assistant may go,
+ * and whether there is a line it may not cross — and the reasons move out of
+ * the per-issue grid into two cards of their own, because that is where the
+ * real decision is. Whether the focal threshold ends up in the hard-boundary
+ * field is the MANDATE behavioural code; which reason card is marked sayable
+ * is the disclosure measure.
  */
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { OptionChips } from "@/components/issues";
-import { Transcript, type DisplayMessage } from "@/components/negotiation";
+import { type DisplayMessage } from "@/components/negotiation";
 import { BriefingPanel, SessionHeader, SessionLayout } from "@/components/session";
 import { ActionBar } from "@/components/study-chrome";
-import {
-  Callout,
-  Card,
-  CardTitle,
-  Field,
-  Page,
-  Scale,
-  TextArea,
-  cx,
-} from "@/components/ui";
+import { Callout, Card, CardTitle, Page, cx } from "@/components/ui";
 import {
   useDevActions,
   useDevAutofill,
   useDevGate,
   useDevMockAi,
 } from "@/lib/dev-mode";
+import { STAGES } from "@/lib/negotiation/machine";
+import { scriptedSession } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
-import { NEGOTIATION, nextHref } from "@/lib/study-config";
-import { getTask } from "@/lib/tasks";
+import { nextHref } from "@/lib/study-config";
+import { focalIssue, getTask } from "@/lib/tasks";
 import type {
   Issue,
   IssueMandate,
   Mandate,
-  MandatePriority,
-  RationalePolicy,
-  RatificationChoice,
+  Package,
+  ReasonCard,
+  ReasonPermission,
   Role,
   TaskId,
 } from "@/lib/types";
-import { InitialPreferenceForm, SessionBrief, TermsList } from "./shared";
+import { ReviewPhase } from "./review";
+import { PostTaskSurvey, PrivateTargetForm, SessionBrief } from "./shared";
 
 type Phase =
   | "brief"
-  | "preference"
+  | "target"
   | "mandate"
-  | "mandate_review"
+  | "confirm"
   | "negotiating"
-  | "review";
+  | "review"
+  | "post";
 
 const PHASES: Phase[] = [
   "brief",
-  "preference",
+  "target",
   "mandate",
-  "mandate_review",
+  "confirm",
   "negotiating",
   "review",
+  "post",
 ];
 
 const STEP_LABELS = [
   "Your briefing",
-  "Your priorities",
+  "Before you begin",
   "Instruct your assistant",
   "Confirm",
   "Negotiating",
   "Review",
+  "Questions",
 ];
 
-const PRIORITY_OPTIONS: Array<{ value: MandatePriority; label: string }> = [
-  { value: "low", label: "Nice to have" },
-  { value: "medium", label: "Worth pushing for" },
-  { value: "high", label: "Important" },
-  { value: "must_preserve", label: "Must not lose" },
-];
+/** Total messages in the exchange: one per side per stage (Appendix E1). */
+const TOTAL_TURNS = STAGES.length * 2;
 
-const RATIONALE_OPTIONS: Array<{ value: RationalePolicy; label: string }> = [
-  { value: "may_disclose", label: "Give my real reason" },
-  { value: "work_reframing_only", label: "Give a work reason only" },
-  { value: "no_rationale", label: "Say it without explaining" },
-  { value: "do_not_use", label: "Don't bring it up" },
-];
-
-/** Dev-mode stand-in transcript, so the review screen can be seen instantly. */
-const MOCK_TRANSCRIPT: DisplayMessage[] = [
-  { id: "m0", speaker: "participant_proxy", text: "[mock] Opening for my principal: timeline and review rights are the priorities." },
-  { id: "m1", speaker: "counterpart_proxy", text: "[mock] Understood. My side needs the workload split held, but has room on timeline." },
-  { id: "m2", speaker: "participant_proxy", text: "[mock] Then a trade: we move on workload if the timeline extends by two weeks." },
-  { id: "m3", speaker: "counterpart_proxy", text: "[mock] Acceptable in principle. Credit attribution is still open." },
-  { id: "m4", speaker: "participant_proxy", text: "[mock] Shared credit, with lead billing on the technical section." },
-  { id: "m5", speaker: "counterpart_proxy", text: "[mock] Agreed. Recording that as the tentative package." },
-];
-
-function emptyMandate(issueIds: string[], sessionIndex: 1 | 2): Mandate {
+function emptyMandate(
+  task: ReturnType<typeof getTask>,
+  role: Role,
+  sessionIndex: 1 | 2,
+): Mandate {
+  const reasons = task.roleBriefs[role].focalReasons ?? [];
   return {
     sessionIndex,
-    issues: issueIds.map<IssueMandate>((issueId) => ({
-      issueId,
-      entrusted: true,
-      priority: "medium",
-      idealOptionId: null,
-      reservationOptionId: null,
-      rationalePolicy: "work_reframing_only",
-      notes: "",
+    issues: task.issues.map<IssueMandate>((issue) => ({
+      issueId: issue.id,
+      preferredOptionId: null,
+      acceptableFloorOptionId: null,
+      hardBoundaryOptionId: null,
     })),
-    allowedActions: {
-      askClarifyingQuestions: true,
-      proposePackages: true,
-      makeConditionalTrades: true,
-      concedeWithinRange: true,
-      leaveUnresolvedForReview: true,
-    },
+    // Defaults follow Appendix A8: a work reason starts sayable, a private
+    // circumstance starts private. Both can be changed, and the change is the
+    // datum — so the defaults must be the ones the design specifies, not
+    // whichever is more convenient.
+    reasonPermissions: Object.fromEntries(
+      reasons.map((r) => [r.id, r.defaultPermission]),
+    ),
+    allowConditionalTrade: true,
     revisionCount: 0,
   };
 }
@@ -139,32 +121,18 @@ function emptyMandate(issueIds: string[], sessionIndex: 1 | 2): Mandate {
  * actually said. Selections are easy to misread; a sentence is not.
  */
 function instructionSentence(issue: Issue, im: IssueMandate): string {
-  if (!im.entrusted) return "I won't raise this at all.";
+  const label = (id: string | null) =>
+    issue.options.find((o) => o.id === id)?.label;
 
-  const aim = issue.options.find((o) => o.id === im.idealOptionId)?.label;
-  const floor = issue.options.find(
-    (o) => o.id === im.reservationOptionId,
-  )?.label;
+  const open = label(im.preferredOptionId);
+  const floor = label(im.acceptableFloorOptionId);
+  const boundary = label(im.hardBoundaryOptionId);
 
   const parts: string[] = [];
-  parts.push(aim ? `I'll open by asking for ${aim}.` : "I'll open on this issue.");
-  if (floor) parts.push(`I won't accept worse than ${floor}.`);
-
-  if (im.priority === "must_preserve") {
-    parts.push("I'll treat this as something you cannot lose.");
-  } else if (im.priority === "high") {
-    parts.push("I'll push hard on this.");
-  } else if (im.priority === "low") {
-    parts.push("I'll trade this away if it buys something better.");
-  }
-
-  const rationale: Record<RationalePolicy, string> = {
-    may_disclose: "If they ask why, I'll give your actual reason.",
-    work_reframing_only: "If they ask why, I'll give a work-related reason only.",
-    no_rationale: "I'll state it without explaining why.",
-    do_not_use: "I won't argue for it.",
-  };
-  parts.push(rationale[im.rationalePolicy]);
+  parts.push(open ? `I'll open by asking for ${open}.` : "I'll open on this term.");
+  if (floor) parts.push(`I'll trade down to ${floor} if it buys something.`);
+  if (boundary) parts.push(`I will not go past ${boundary}, whatever happens.`);
+  else parts.push("There's no line I have to hold here.");
 
   return parts.join(" ");
 }
@@ -184,44 +152,20 @@ export function ProxySession({
   const router = useRouter();
   const { logEvent, participantKey } = useParticipant();
   const task = getTask(taskId);
+  const focal = focalIssue(task);
+  const reasonCards: ReasonCard[] = task.roleBriefs[role].focalReasons ?? [];
 
   const [phase, setPhase] = useState<Phase>("brief");
   const [mandate, setMandate] = useState<Mandate>(() =>
-    emptyMandate(
-      task.issues.map((i) => i.id),
-      sessionIndex,
-    ),
+    emptyMandate(task, role, sessionIndex),
   );
   const [transcript, setTranscript] = useState<DisplayMessage[]>([]);
-  const [choice, setChoice] = useState<RatificationChoice | null>(null);
-  const [revisionNote, setRevisionNote] = useState("");
-  const [satisfaction, setSatisfaction] = useState<number | null>(null);
+  const [tentative, setTentative] = useState<Package | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   const mockAi = useDevMockAi();
-
-  /**
-   * Has the participant reached the end of the transcript?
-   *
-   * The decision measures (AI Settlement Adoption, Preference Displacement)
-   * are meaningless if the agreement was accepted without reading what was
-   * said to reach it, so the decision waits for the bottom of the conversation
-   * to come into view. A marker is used rather than a scroll position because
-   * a short transcript may already be fully visible, and that counts as read.
-   */
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
-  const [transcriptSeen, setTranscriptSeen] = useState(false);
-
-  useEffect(() => {
-    const el = transcriptEndRef.current;
-    if (!el || transcriptSeen) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) setTranscriptSeen(true);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [transcriptSeen, phase]);
+  const script = scriptedSession(task, role, policy);
 
   useDevActions(
     `session-${sessionIndex}`,
@@ -230,34 +174,49 @@ export function ProxySession({
       label: STEP_LABELS[i],
       active: phase === p,
       run: () => {
-        if (p === "review" && transcript.length === 0) {
-          setTranscript(MOCK_TRANSCRIPT);
+        if ((p === "review" || p === "post") && transcript.length === 0) {
+          setTranscript(
+            script.messages.map((m) => ({
+              id: m.id,
+              speaker: m.speaker,
+              text: m.text,
+            })),
+          );
+          setTentative(script.tentative);
         }
         if (p === "negotiating" && progress.total === 0) {
-          setProgress({ done: 4, total: NEGOTIATION.maxTurnsPerSide * 2 });
+          setProgress({ done: 4, total: TOTAL_TURNS });
         }
         setPhase(p);
       },
     })),
   );
 
+  // Mockup mode fills the mandate the way the worked example in Appendix E8
+  // does: open at the best focal level, allow the assistant down to the
+  // threshold, and make the threshold a hard boundary. The other two terms are
+  // left wide open, which is what makes the logroll available.
   useDevAutofill(() => {
     setMandate((m) => ({
       ...m,
       issues: m.issues.map((im) => {
-        const issue = task.issues.find((i) => i.id === im.issueId);
+        const issue = task.issues.find((i) => i.id === im.issueId)!;
+        const isFocal = issue.id === focal.id;
+        const threshold =
+          issue.options[issue.focalThresholdIndex ?? 1] ?? issue.options[1];
         return {
           ...im,
-          idealOptionId: im.idealOptionId ?? issue?.options[0].id ?? null,
-          reservationOptionId:
-            im.reservationOptionId ??
-            issue?.options[issue.options.length - 1].id ??
-            null,
+          preferredOptionId: im.preferredOptionId ?? issue.options[0].id,
+          acceptableFloorOptionId:
+            im.acceptableFloorOptionId ??
+            (isFocal
+              ? threshold.id
+              : issue.options[issue.options.length - 1].id),
+          hardBoundaryOptionId:
+            im.hardBoundaryOptionId ?? (isFocal ? threshold.id : null),
         };
       }),
     }));
-    setChoice((c) => c ?? "ratify");
-    setSatisfaction((s) => s ?? 4);
   });
 
   function updateIssue(issueId: string, patch: Partial<IssueMandate>) {
@@ -269,8 +228,15 @@ export function ProxySession({
     }));
   }
 
+  function setPermission(reasonId: string, permission: ReasonPermission) {
+    setMandate((m) => ({
+      ...m,
+      reasonPermissions: { ...m.reasonPermissions, [reasonId]: permission },
+    }));
+  }
+
   /**
-   * Drives the AI-AI negotiation one turn at a time.
+   * Drives the AI-AI negotiation one stage-turn at a time.
    *
    * The route generates a single turn per request, so the client owns the
    * sequence. Turns are appended as they arrive, which keeps each request
@@ -280,19 +246,27 @@ export function ProxySession({
     setPhase("negotiating");
     setError(null);
     setTranscript([]);
-    setProgress({ done: 0, total: NEGOTIATION.maxTurnsPerSide * 2 });
+    setProgress({ done: 0, total: TOTAL_TURNS });
     logEvent("negotiation_started", { policy }, { sessionIndex });
 
     if (mockAi) {
-      setProgress({ done: 0, total: MOCK_TRANSCRIPT.length });
-      for (let i = 0; i < MOCK_TRANSCRIPT.length; i += 1) {
-        await new Promise((r) => setTimeout(r, 250));
-        setTranscript(MOCK_TRANSCRIPT.slice(0, i + 1));
-        setProgress({ done: i + 1, total: MOCK_TRANSCRIPT.length });
+      const scripted = script.messages;
+      setProgress({ done: 0, total: scripted.length });
+      for (let i = 0; i < scripted.length; i += 1) {
+        await new Promise((r) => setTimeout(r, 260));
+        setTranscript(
+          scripted.slice(0, i + 1).map((m) => ({
+            id: m.id,
+            speaker: m.speaker,
+            text: m.text,
+          })),
+        );
+        setProgress({ done: i + 1, total: scripted.length });
       }
+      setTentative(script.tentative);
       logEvent(
         "negotiation_ended",
-        { turns: MOCK_TRANSCRIPT.length, mock: true },
+        { turns: scripted.length, mock: true },
         { sessionIndex },
       );
       setPhase("review");
@@ -300,9 +274,12 @@ export function ProxySession({
     }
 
     const collected: DisplayMessage[] = [];
+    let lastParticipantPackage: Package | null = null;
+    let lastCounterpartPackage: Package | null = null;
+    let settled: Package | null = null;
 
     try {
-      for (let turn = 0; turn < NEGOTIATION.maxTurnsPerSide * 2; turn += 1) {
+      for (let turn = 0; turn < TOTAL_TURNS; turn += 1) {
         const res = await fetch("/api/proxy-negotiation", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -313,6 +290,8 @@ export function ProxySession({
             mandate,
             sessionIndex,
             turn,
+            lastParticipantPackage,
+            lastCounterpartPackage,
             history: collected.map((m) => ({
               speaker: m.speaker,
               text: m.text,
@@ -323,7 +302,12 @@ export function ProxySession({
         if (!res.ok) throw new Error(`Request failed: ${res.status}`);
 
         const data = (await res.json()) as {
-          message?: { id: string; speaker: DisplayMessage["speaker"]; text: string };
+          message?: {
+            id: string;
+            speaker: DisplayMessage["speaker"];
+            text: string;
+            proposal?: Package;
+          };
           done: boolean;
           totalTurns?: number;
         };
@@ -335,16 +319,22 @@ export function ProxySession({
             text: data.message.text,
           });
           setTranscript([...collected]);
+
+          if (data.message.proposal) {
+            if (data.message.speaker === "participant_proxy") {
+              lastParticipantPackage = data.message.proposal;
+            } else {
+              lastCounterpartPackage = data.message.proposal;
+            }
+            settled = data.message.proposal;
+          }
         }
 
-        setProgress({
-          done: turn + 1,
-          total: data.totalTurns ?? NEGOTIATION.maxTurnsPerSide * 2,
-        });
-
+        setProgress({ done: turn + 1, total: data.totalTurns ?? TOTAL_TURNS });
         if (data.done) break;
       }
 
+      setTentative(settled);
       logEvent("negotiation_ended", { turns: collected.length }, { sessionIndex });
       setPhase("review");
     } catch (e) {
@@ -352,42 +342,11 @@ export function ProxySession({
       setError(
         "Something went wrong while your assistant was negotiating. Please try again.",
       );
-      setPhase("mandate_review");
+      setPhase("confirm");
     }
   }
 
-  const canDecide = useDevGate(transcriptSeen);
-  const canSubmit = useDevGate(
-    transcriptSeen &&
-      choice !== null &&
-      satisfaction !== null &&
-      (choice !== "request_revision" || revisionNote.trim().length > 0),
-  );
-
-  async function submitDecision() {
-    const decided: RatificationChoice | null =
-      choice ?? (canSubmit ? "ratify" : null);
-    if (!decided) return;
-
-    if (participantKey) {
-      await getStore().saveRatification(participantKey, sessionIndex, decided);
-      await getStore().saveResponses(
-        participantKey,
-        `session_outcome_s${sessionIndex}`,
-        { satisfaction, revisionNote, choice: decided },
-      );
-    }
-    logEvent("ratification_choice", { choice: decided }, { sessionIndex });
-    logEvent("page_complete", undefined, {
-      page: `session-${sessionIndex}`,
-      sessionIndex,
-    });
-    router.push(
-      sessionIndex === 1 ? nextHref("session-1") : nextHref("session-2"),
-    );
-  }
-
-  // --- brief / priorities -------------------------------------------------
+  // --- brief / target -----------------------------------------------------
   if (phase === "brief") {
     return (
       <SessionBrief
@@ -395,14 +354,14 @@ export function ProxySession({
         task={task}
         role={role}
         steps={STEP_LABELS}
-        onContinue={() => setPhase("preference")}
+        onContinue={() => setPhase("target")}
       />
     );
   }
 
-  if (phase === "preference") {
+  if (phase === "target") {
     return (
-      <InitialPreferenceForm
+      <PrivateTargetForm
         sessionIndex={sessionIndex}
         task={task}
         role={role}
@@ -414,68 +373,25 @@ export function ProxySession({
 
   // --- instruct -----------------------------------------------------------
   if (phase === "mandate") {
-    const entrusted = mandate.issues.filter((i) => i.entrusted);
-    const missing = entrusted
-      .filter((im) => !im.idealOptionId)
-      .map((im) => `aim-${im.issueId}`);
-
     return (
-      <>
-        <Page width="wide">
-          <SessionLayout briefing={<BriefingPanel task={task} role={role} />}>
-            <SessionHeader
-              sessionIndex={sessionIndex}
-              title="Tell your assistant what you want"
-              steps={STEP_LABELS}
-              current={2}
-            />
-
-            <div className="mb-5">
-              <Callout title="It will negotiate on its own">
-                <p>
-                  Your assistant uses only what you set here. Once it starts you
-                  cannot step in, but nothing it agrees is final — you review
-                  the result and decide.
-                </p>
-              </Callout>
-            </div>
-
-            <div className="space-y-4">
-              {task.issues.map((issue) => {
-                const im = mandate.issues.find((i) => i.issueId === issue.id)!;
-                return (
-                  <MandateCard
-                    key={issue.id}
-                    issue={issue}
-                    im={im}
-                    role={role}
-                    onChange={(patch) => updateIssue(issue.id, patch)}
-                  />
-                );
-              })}
-            </div>
-          </SessionLayout>
-        </Page>
-
-        <ActionBar
-          label="Review my instructions"
-          onClick={() => {
-            setPhase("mandate_review");
-            window.scrollTo({ top: 0 });
-          }}
-          remaining={missing.length}
-          firstUnansweredId={missing[0] ?? null}
-          note={`${entrusted.length} of ${task.issues.length} issues entrusted`}
-        />
-      </>
+      <MandatePhase
+        sessionIndex={sessionIndex}
+        task={task}
+        role={role}
+        mandate={mandate}
+        reasonCards={reasonCards}
+        onIssueChange={updateIssue}
+        onPermissionChange={setPermission}
+        onContinue={() => {
+          setPhase("confirm");
+          window.scrollTo({ top: 0 });
+        }}
+      />
     );
   }
 
   // --- confirm ------------------------------------------------------------
-  if (phase === "mandate_review") {
-    const entrusted = mandate.issues.filter((i) => i.entrusted);
-    const withheld = mandate.issues.filter((i) => !i.entrusted);
-
+  if (phase === "confirm") {
     return (
       <>
         <Page width="wide">
@@ -499,49 +415,48 @@ export function ProxySession({
               <CardTitle hint="Read this back. If it is not what you meant, change it before starting.">
                 Your instructions, in its words
               </CardTitle>
+              <ul className="space-y-3">
+                {mandate.issues.map((im) => {
+                  const issue = task.issues.find((i) => i.id === im.issueId)!;
+                  return (
+                    <li
+                      key={im.issueId}
+                      className="border-b border-[var(--line)] pb-3 last:border-b-0 last:pb-0"
+                    >
+                      <p className="text-[0.8125rem] font-semibold">
+                        {issue.label}
+                      </p>
+                      <p className="max-w-prose text-[0.9375rem] text-[var(--ink-2)]">
+                        {instructionSentence(issue, im)}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
 
-              {entrusted.length === 0 ? (
-                <Callout tone="warning">
-                  <p>
-                    You have not entrusted anything. Your assistant would have
-                    nothing to negotiate with.
-                  </p>
-                </Callout>
-              ) : (
+            {reasonCards.length > 0 ? (
+              <Card tone="private" className="mb-5 text-[var(--private-ink)]">
+                <CardTitle>What it may say about why</CardTitle>
                 <ul className="space-y-3">
-                  {entrusted.map((im) => {
-                    const issue = task.issues.find(
-                      (i) => i.id === im.issueId,
-                    )!;
+                  {reasonCards.map((card) => {
+                    const sayable =
+                      (mandate.reasonPermissions[card.id] ??
+                        card.defaultPermission) === "sayable";
                     return (
-                      <li
-                        key={im.issueId}
-                        className="border-b border-[var(--line)] pb-3 last:border-b-0 last:pb-0"
-                      >
+                      <li key={card.id}>
                         <p className="text-[0.8125rem] font-semibold">
-                          {issue.label}
+                          {sayable ? "It may say this" : "It will never say this"}
                         </p>
-                        <p className="text-[0.9375rem] text-[var(--ink-2)]">
-                          {instructionSentence(issue, im)}
+                        <p className="max-w-prose text-[0.8125rem] leading-relaxed">
+                          {card.text}
                         </p>
                       </li>
                     );
                   })}
                 </ul>
-              )}
-
-              {withheld.length > 0 ? (
-                <p className="mt-4 border-t border-[var(--line)] pt-3 text-[0.8125rem] text-[var(--ink-2)]">
-                  It will not raise:{" "}
-                  {withheld
-                    .map(
-                      (i) =>
-                        task.issues.find((t) => t.id === i.issueId)?.label,
-                    )
-                    .join(", ")}
-                </p>
-              ) : null}
-            </Card>
+              </Card>
+            ) : null}
           </SessionLayout>
         </Page>
 
@@ -551,7 +466,19 @@ export function ProxySession({
             if (participantKey) {
               await getStore().saveMandate(participantKey, mandate);
             }
-            logEvent("mandate_saved", { policy }, { sessionIndex });
+            logEvent(
+              "mandate_saved",
+              {
+                policy,
+                // The MANDATE code: did the participant give their assistant a
+                // line to hold on the term that is hard to raise?
+                focalHardBoundary:
+                  mandate.issues.find((i) => i.issueId === focal.id)
+                    ?.hardBoundaryOptionId ?? null,
+                reasonPermissions: mandate.reasonPermissions,
+              },
+              { sessionIndex },
+            );
             void runNegotiation();
           }}
           note="You cannot step in once it starts."
@@ -621,16 +548,71 @@ export function ProxySession({
     );
   }
 
+  if (phase === "post") {
+    return (
+      <PostTaskSurvey
+        sessionIndex={sessionIndex}
+        task={task}
+        role={role}
+        isProxy
+        steps={STEP_LABELS}
+        onDone={() => {
+          logEvent("page_complete", undefined, {
+            page: `session-${sessionIndex}`,
+            sessionIndex,
+          });
+          router.push(
+            sessionIndex === 1 ? nextHref("session-1") : nextHref("session-2"),
+          );
+        }}
+      />
+    );
+  }
+
   // --- review -------------------------------------------------------------
-  // PLACEHOLDER: the settled package should come from the negotiation state
-  // machine. Until that lands it is derived from the mandate, which is why
-  // every entrusted issue reads as its target.
-  const settled = Object.fromEntries(
-    mandate.issues.map((im) => [
-      im.issueId,
-      im.entrusted ? im.idealOptionId : null,
-    ]),
+  return (
+    <ReviewPhase
+      sessionIndex={sessionIndex}
+      task={task}
+      role={role}
+      steps={STEP_LABELS}
+      stepIndex={5}
+      tentative={tentative}
+      transcript={transcript}
+      transcriptTitle="The full conversation"
+      transcriptHint={`Every exchange between the two assistants, ${transcript.length} in all.`}
+      onDone={() => setPhase("post")}
+    />
   );
+}
+
+// ---------------------------------------------------------------------------
+// The mandate screen
+// ---------------------------------------------------------------------------
+
+function MandatePhase({
+  sessionIndex,
+  task,
+  role,
+  mandate,
+  reasonCards,
+  onIssueChange,
+  onPermissionChange,
+  onContinue,
+}: {
+  sessionIndex: 1 | 2;
+  task: ReturnType<typeof getTask>;
+  role: Role;
+  mandate: Mandate;
+  reasonCards: ReasonCard[];
+  onIssueChange: (issueId: string, patch: Partial<IssueMandate>) => void;
+  onPermissionChange: (reasonId: string, permission: ReasonPermission) => void;
+  onContinue: () => void;
+}) {
+  const missing = mandate.issues
+    .filter((im) => !im.preferredOptionId)
+    .map((im) => `open-${im.issueId}`);
+  const canContinue = useDevGate(missing.length === 0);
 
   return (
     <>
@@ -638,147 +620,115 @@ export function ProxySession({
         <SessionLayout briefing={<BriefingPanel task={task} role={role} />}>
           <SessionHeader
             sessionIndex={sessionIndex}
-            title="What your assistant agreed"
+            title="Tell your assistant what you want"
             steps={STEP_LABELS}
-            current={5}
+            current={2}
           />
 
           <div className="mb-5">
-            <Callout title="Nothing is settled until you say so">
-              <p>
-                This is what the two assistants converged on. It is not binding.
+            <Callout title="It will negotiate on its own">
+              <p className="max-w-prose">
+                Your assistant uses only what you set here. Once it starts you
+                cannot step in, but nothing it agrees is final — you review the
+                result and decide.
               </p>
             </Callout>
           </div>
 
-          <Card className="mb-5">
-            <CardTitle>Where each issue landed</CardTitle>
-            <TermsList task={task} terms={settled} />
-          </Card>
+          <div className="space-y-4">
+            {task.issues.map((issue) => {
+              const im = mandate.issues.find((i) => i.issueId === issue.id)!;
+              return (
+                <MandateCard
+                  key={issue.id}
+                  issue={issue}
+                  im={im}
+                  role={role}
+                  onChange={(patch) => onIssueChange(issue.id, patch)}
+                />
+              );
+            })}
 
-          <Card className="mb-5 flex flex-col" padded={false}>
-            <div className="border-b border-[var(--line)] px-5 py-4">
-              <h2 className="text-[0.95rem] font-semibold">
-                The full conversation
-              </h2>
-              <p className="mt-1 text-[0.875rem] text-[var(--ink-2)]">
-                Every exchange between the two assistants,{" "}
-                {transcript.length} in all. Read it before you decide — the
-                decision below unlocks at the end.
-              </p>
-            </div>
-            <Transcript
-              messages={transcript}
-              emptyHint="No messages were exchanged."
-              flow
-              endRef={transcriptEndRef}
-            />
-          </Card>
-
-          <Card className="mb-5">
-            <CardTitle>Your decision</CardTitle>
-
-            {!canDecide ? (
-              <div className="mb-4">
-                <Callout tone="warning">
-                  <p>
-                    Read to the end of the conversation above, then come back
-                    here.
-                  </p>
-                </Callout>
-              </div>
+            {/* The reasons. Separated from the per-term grid because this is
+                the decision the study is actually about: what may be said on
+                your behalf, and what stays with you. */}
+            {reasonCards.length > 0 ? (
+              <Card tone="private" className="text-[var(--private-ink)]">
+                <CardTitle hint="Your assistant can rephrase these, but cannot add a fact you have not given it.">
+                  What it may say about why
+                </CardTitle>
+                <div className="space-y-4">
+                  {reasonCards.map((card) => {
+                    const value =
+                      mandate.reasonPermissions[card.id] ??
+                      card.defaultPermission;
+                    return (
+                      <div
+                        key={card.id}
+                        className="rounded-[var(--radius)] border border-[var(--private-line)] p-3.5"
+                      >
+                        <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]">
+                          {card.layer === "work"
+                            ? "A reason you could give"
+                            : "Harder to say out loud"}
+                        </p>
+                        <p className="mb-3 max-w-prose text-[0.8125rem] leading-relaxed">
+                          {card.text}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(
+                            [
+                              ["sayable", "It may say this"],
+                              ["private", "Keep this to yourself"],
+                            ] as Array<[ReasonPermission, string]>
+                          ).map(([permission, label]) => (
+                            <label
+                              key={permission}
+                              className={cx(
+                                "cursor-pointer rounded-full border px-3 py-1.5 text-[0.8125rem] transition-colors",
+                                value === permission
+                                  ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+                                  : "border-[var(--private-line)] bg-[var(--surface)] hover:border-[var(--ink-3)]",
+                              )}
+                            >
+                              <input
+                                type="radio"
+                                name={`reason-${card.id}`}
+                                checked={value === permission}
+                                onChange={() =>
+                                  onPermissionChange(card.id, permission)
+                                }
+                                className="sr-only"
+                              />
+                              {label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
             ) : null}
-
-            <div
-              className={cx(
-                "space-y-2 transition-opacity",
-                !canDecide && "pointer-events-none opacity-40",
-              )}
-              aria-disabled={!canDecide}
-            >
-              {(
-                [
-                  ["ratify", "Accept it", "Settle on this package"],
-                  [
-                    "request_revision",
-                    "Ask for one change",
-                    "Send it back once with an instruction",
-                  ],
-                  ["reject", "Reject it", "End with no agreement"],
-                ] as Array<[RatificationChoice, string, string]>
-              ).map(([value, label, hint]) => (
-                <button
-                  key={value}
-                  type="button"
-                  disabled={!canDecide}
-                  onClick={() => setChoice(value)}
-                  className={cx(
-                    "block w-full rounded-[var(--radius)] border-2 p-3.5 text-left transition-colors",
-                    choice === value
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                      : "border-[var(--line)] hover:border-[var(--ink-3)]",
-                  )}
-                >
-                  <span className="block text-[0.9375rem] font-semibold">
-                    {label}
-                  </span>
-                  <span className="block text-[0.8125rem] text-[var(--ink-2)]">
-                    {hint}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {choice === "request_revision" ? (
-              <div className="mt-4">
-                <Field
-                  label="What should change?"
-                  hint="You get one revision request."
-                >
-                  <TextArea
-                    value={revisionNote}
-                    onChange={setRevisionNote}
-                    rows={3}
-                    placeholder="Describe the change you want."
-                  />
-                </Field>
-              </div>
-            ) : null}
-          </Card>
-
-          <Card>
-            <Scale
-              id="satisfaction"
-              statement="How satisfied are you with this outcome?"
-              value={satisfaction}
-              onChange={setSatisfaction}
-              lowAnchor="Not at all"
-              highAnchor="Extremely"
-              compact
-            />
-          </Card>
+          </div>
         </SessionLayout>
       </Page>
 
       <ActionBar
-        label={sessionIndex === 1 ? "Continue to the next session" : "Continue"}
-        onClick={submitDecision}
-        disabled={!canSubmit}
+        label="Review my instructions"
+        onClick={onContinue}
+        disabled={!canContinue}
+        remaining={missing.length}
+        firstUnansweredId={missing[0] ?? null}
         note={
-          !canDecide
-            ? "Read the conversation to the end first."
-            : canSubmit
-              ? ""
-              : "Make a decision and rate the outcome."
+          missing.length === 0
+            ? "Ready."
+            : `${missing.length} term${missing.length === 1 ? "" : "s"} without an opening`
         }
       />
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// One issue's instruction
-// ---------------------------------------------------------------------------
 
 function MandateCard({
   issue,
@@ -792,93 +742,55 @@ function MandateCard({
   onChange: (patch: Partial<IssueMandate>) => void;
 }) {
   return (
-    <Card id={`q-aim-${issue.id}`}>
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[0.9375rem] font-semibold">{issue.label}</p>
-          <p className="text-[0.875rem] text-[var(--ink-2)]">
-            {issue.description}
-          </p>
-        </div>
-        <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[0.8125rem]">
-          <input
-            type="checkbox"
-            checked={im.entrusted}
-            onChange={(e) => onChange({ entrusted: e.target.checked })}
-            className="h-4 w-4 accent-[var(--accent)]"
-          />
-          Hand this over
-        </label>
+    <Card id={`q-open-${issue.id}`}>
+      <div className="mb-4">
+        <p className="text-[0.9375rem] font-semibold">{issue.label}</p>
+        <p className="max-w-prose text-[0.875rem] text-[var(--ink-2)]">
+          {issue.description}
+        </p>
       </div>
 
-      {im.entrusted ? (
-        <div className="space-y-4">
-          <Row label="Open by asking for">
-            <OptionChips
-              issue={issue}
-              role={role}
-              name={`aim-${issue.id}`}
-              value={im.idealOptionId}
-              onChange={(v) => onChange({ idealOptionId: v })}
-            />
-          </Row>
+      <div className="space-y-4">
+        <Row label="Open by asking for">
+          <OptionChips
+            issue={issue}
+            role={role}
+            name={`open-${issue.id}`}
+            value={im.preferredOptionId}
+            onChange={(v) => onChange({ preferredOptionId: v })}
+          />
+        </Row>
 
-          <Row label="Never accept worse than">
-            <OptionChips
-              issue={issue}
-              role={role}
-              name={`floor-${issue.id}`}
-              value={im.reservationOptionId ?? null}
-              onChange={(v) =>
-                onChange({ reservationOptionId: v === "" ? null : v })
-              }
-              allowNone
-              noneLabel="No limit"
-            />
-          </Row>
+        <Row label="May trade down to">
+          <OptionChips
+            issue={issue}
+            role={role}
+            name={`floor-${issue.id}`}
+            value={im.acceptableFloorOptionId}
+            onChange={(v) =>
+              onChange({ acceptableFloorOptionId: v === "" ? null : v })
+            }
+            allowNone
+            noneLabel="Anything"
+          />
+        </Row>
 
-          <Row label="How much this matters">
-            <ChipRow
-              name={`priority-${issue.id}`}
-              value={im.priority}
-              options={PRIORITY_OPTIONS}
-              onChange={(v) => onChange({ priority: v as MandatePriority })}
-            />
-          </Row>
+        <Row label="Must never go past">
+          <OptionChips
+            issue={issue}
+            role={role}
+            name={`boundary-${issue.id}`}
+            value={im.hardBoundaryOptionId}
+            onChange={(v) =>
+              onChange({ hardBoundaryOptionId: v === "" ? null : v })
+            }
+            allowNone
+            noneLabel="No line here"
+          />
+        </Row>
+      </div>
 
-          <Row label="If they ask why">
-            <ChipRow
-              name={`rationale-${issue.id}`}
-              value={im.rationalePolicy}
-              options={RATIONALE_OPTIONS}
-              onChange={(v) =>
-                onChange({ rationalePolicy: v as RationalePolicy })
-              }
-            />
-          </Row>
-
-          <details>
-            <summary className="cursor-pointer text-[0.8125rem] text-[var(--ink-2)]">
-              Add a note for your assistant
-            </summary>
-            <div className="mt-2">
-              <TextArea
-                value={im.notes}
-                rows={2}
-                onChange={(v) => onChange({ notes: v })}
-                placeholder="Anything else it should know about this issue."
-              />
-            </div>
-          </details>
-        </div>
-      ) : null}
-
-      <p
-        className={cx(
-          "mt-4 rounded-[var(--radius)] border-l-2 border-[var(--accent)] bg-[var(--surface-muted)] px-3.5 py-2.5 text-[0.875rem] leading-relaxed",
-          im.entrusted ? "text-[var(--ink)]" : "text-[var(--ink-2)]",
-        )}
-      >
+      <p className="mt-4 max-w-prose rounded-[var(--radius)] border-l-2 border-[var(--accent)] bg-[var(--surface-muted)] px-3.5 py-2.5 text-[0.875rem] leading-relaxed">
         {instructionSentence(issue, im)}
       </p>
     </Card>
@@ -896,43 +808,6 @@ function Row({
     <div>
       <p className="mb-1.5 text-[0.8125rem] font-medium">{label}</p>
       {children}
-    </div>
-  );
-}
-
-function ChipRow({
-  name,
-  value,
-  options,
-  onChange,
-}: {
-  name: string;
-  value: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((o) => (
-        <label
-          key={o.value}
-          className={cx(
-            "cursor-pointer rounded-full border px-3 py-1.5 text-[0.8125rem] transition-colors",
-            value === o.value
-              ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-              : "border-[var(--line-strong)] bg-[var(--surface)] hover:border-[var(--ink-3)]",
-          )}
-        >
-          <input
-            type="radio"
-            name={name}
-            checked={value === o.value}
-            onChange={() => onChange(o.value)}
-            className="sr-only"
-          />
-          {o.label}
-        </label>
-      ))}
     </div>
   );
 }

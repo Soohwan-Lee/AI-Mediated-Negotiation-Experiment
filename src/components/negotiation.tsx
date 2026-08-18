@@ -183,43 +183,68 @@ export function Transcript({
   );
 }
 
+/**
+ * Message length cap, from Appendix E1.
+ *
+ * Both sides are held to it, because message length is one of the things
+ * matched across conditions — a Proxy that writes twice as much as a person
+ * would confound the comparison with sheer airtime.
+ */
+export const MAX_MESSAGE_CHARS = 280;
+
 export function MessageComposer({
+  value,
+  onChange,
   onSend,
   disabled,
   placeholder = "Write your message…",
+  sendLabel = "Send",
 }: {
+  /** Controlled, so mockup mode can put a written message in place. */
+  value: string;
+  onChange: (text: string) => void;
   onSend: (text: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  sendLabel?: string;
 }) {
-  const [text, setText] = useState("");
+  const trimmed = value.trim();
+  const over = value.length > MAX_MESSAGE_CHARS;
+  const left = MAX_MESSAGE_CHARS - value.length;
 
   function submit() {
-    const trimmed = text.trim();
-    if (!trimmed || disabled) return;
+    if (!trimmed || disabled || over) return;
     onSend(trimmed);
-    setText("");
   }
 
   return (
-    <div className="flex items-end gap-2 border-t border-[var(--line)] p-3">
-      <textarea
-        value={text}
-        rows={2}
-        disabled={disabled}
-        placeholder={placeholder}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            submit();
-          }
-        }}
-        className="flex-1 resize-none rounded-lg border border-[var(--line)] px-3 py-2 text-sm outline-none focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)]"
-      />
-      <Button onClick={submit} disabled={disabled || !text.trim()}>
-        Send
-      </Button>
+    <div className="border-t border-[var(--line)] p-3">
+      <div className="flex items-end gap-2">
+        <textarea
+          value={value}
+          rows={3}
+          disabled={disabled}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          className="flex-1 resize-none rounded-lg border border-[var(--line)] px-3 py-2 text-sm outline-none focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)]"
+        />
+        <Button onClick={submit} disabled={disabled || !trimmed || over}>
+          {sendLabel}
+        </Button>
+      </div>
+      <p
+        className={`mt-1.5 text-right text-xs tabular-nums ${
+          over ? "text-red-600" : "text-[var(--ink-3)]"
+        }`}
+      >
+        {left} characters left
+      </p>
     </div>
   );
 }
