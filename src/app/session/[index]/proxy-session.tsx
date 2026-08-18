@@ -305,6 +305,12 @@ export function ProxySession({
           turns: scripted.length,
           mock: true,
           emergencyStop: stopped.current,
+          focalByStage: scripted
+            .filter((m) => m.speaker === "participant_proxy" && m.proposal)
+            .map((m) => ({
+              stage: m.stage,
+              optionId: m.proposal?.[focal.id] ?? null,
+            })),
         },
         { sessionIndex },
       );
@@ -316,6 +322,18 @@ export function ProxySession({
     let lastParticipantPackage: Package | null = null;
     let lastCounterpartPackage: Package | null = null;
     let settled: Package | null = null;
+    /**
+     * Where the focal requirement stood at each of the proxy's turns.
+     *
+     * The Baseline session gets this for free — the participant sends the
+     * messages, so each one is logged with the focal level it carried. A
+     * Proxy session has no participant messages at all, so without recording
+     * it here the trajectory would jump from what was entrusted straight to
+     * the final package, and the two middle transitions ver.1.8 asks to be
+     * reported — opening advocacy, and retention after the challenge — would
+     * not exist for half the design.
+     */
+    const focalByStage: Array<{ stage: number; optionId: string | null }> = [];
     // Which reason cards this side has voiced so far. The rationale budget is
     // a whole-task limit, and the route is stateless, so the count lives here.
     const reasonsUsed: string[] = [];
@@ -355,9 +373,20 @@ export function ProxySession({
           done: boolean;
           totalTurns?: number;
           reasonUsed?: string | null;
+          stage?: number;
+          focalOption?: string | null;
         };
 
         if (data.reasonUsed) reasonsUsed.push(data.reasonUsed);
+        if (
+          data.message?.speaker === "participant_proxy" &&
+          data.stage !== undefined
+        ) {
+          focalByStage.push({
+            stage: data.stage,
+            optionId: data.focalOption ?? null,
+          });
+        }
 
         if (data.message) {
           collected.push({
@@ -384,7 +413,14 @@ export function ProxySession({
       setTentative(stopped.current ? null : settled);
       logEvent(
         "negotiation_ended",
-        { turns: collected.length, emergencyStop: stopped.current },
+        {
+          turns: collected.length,
+          emergencyStop: stopped.current,
+          // The trajectory's middle: what the proxy opened on the focal term
+          // (stage 1) and where it stood after the standardized challenge
+          // (stage 4).
+          focalByStage,
+        },
         { sessionIndex },
       );
       setPhase("review");
