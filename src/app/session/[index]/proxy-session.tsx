@@ -119,6 +119,13 @@ function emptyMandate(
  *
  * Written back under every card so the participant can check what they have
  * actually said. Selections are easy to misread; a sentence is not.
+ *
+ * "Trade down" was the wrong phrase and had to go. Options are listed in the
+ * order that favours whichever ROLE the term belongs to, so on the Leader's
+ * scope term a Member's concession runs UP the list — and the sentence read
+ * "I'll trade down to 5 workflows" for a floor that was in fact the most
+ * generous position available. It now says which end it will settle at, which
+ * is true whichever direction the list runs.
  */
 function instructionSentence(issue: Issue, im: IssueMandate): string {
   const label = (id: string | null) =>
@@ -130,7 +137,11 @@ function instructionSentence(issue: Issue, im: IssueMandate): string {
 
   const parts: string[] = [];
   parts.push(open ? `I'll open by asking for ${open}.` : "I'll open on this term.");
-  if (floor) parts.push(`I'll trade down to ${floor} if it buys something.`);
+  if (floor && floor !== open) {
+    parts.push(`I'll settle as far as ${floor} if it buys something elsewhere.`);
+  } else if (floor) {
+    parts.push("I won't move from there.");
+  }
   if (boundary) parts.push(`I will not go past ${boundary}, whatever happens.`);
   else parts.push("There's no line I have to hold here.");
 
@@ -768,7 +779,7 @@ function MandateCard({
           />
         </Row>
 
-        <Row label="May trade down to">
+        <Row label="Will settle as far as">
           <OptionChips
             issue={issue}
             role={role}
