@@ -79,6 +79,14 @@ const SPEAKER_LABEL: Record<Speaker, string> = {
   system: "System",
 };
 
+/**
+ * What a transcript is allowed to render.
+ *
+ * Deliberately narrower than `TranscriptMessage`: there is no field here for
+ * internal provenance, so a component physically cannot show which elements
+ * the Explorer generated. The route strips it too, but that is a rule someone
+ * could forget; this is a type error. Do not widen it to the stored shape.
+ */
 export interface DisplayMessage {
   id: string;
   speaker: Speaker;
