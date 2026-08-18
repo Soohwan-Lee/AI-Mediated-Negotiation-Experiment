@@ -295,10 +295,17 @@ export function ProxySession({
         );
         setProgress({ done: i + 1, total: scripted.length });
       }
-      setTentative(script.tentative);
+      // A stopped negotiation has no agreement — that is what stopping it
+      // means. Handing the participant the package the exchange was heading
+      // for would make the stop cosmetic.
+      setTentative(stopped.current ? null : script.tentative);
       logEvent(
         "negotiation_ended",
-        { turns: scripted.length, mock: true },
+        {
+          turns: scripted.length,
+          mock: true,
+          emergencyStop: stopped.current,
+        },
         { sessionIndex },
       );
       setPhase("review");
@@ -374,8 +381,12 @@ export function ProxySession({
         if (data.done) break;
       }
 
-      setTentative(settled);
-      logEvent("negotiation_ended", { turns: collected.length }, { sessionIndex });
+      setTentative(stopped.current ? null : settled);
+      logEvent(
+        "negotiation_ended",
+        { turns: collected.length, emergencyStop: stopped.current },
+        { sessionIndex },
+      );
       setPhase("review");
     } catch (e) {
       console.error(e);
