@@ -189,37 +189,59 @@ export function BaselineSession({
     try {
       let reply: string;
       let counterProposal: Package | null = null;
-      // Set when the counterpart's closing test rejects the final package.
-      // Roughly a third of the package space falls below its stage-5
-      // threshold, so this is a reachable outcome and not a corner case.
-      let impasse = false;
 
-      if (mockAi) {
-        // Appendix E1 runs each stage counterpart-then-participant, so the
-        // counterpart's stage-1 line is the opening the participant is already
-        // replying to. What follows their stage-N message is therefore the
-        // counterpart's stage-(N+1) line — and at stage 5 there is nothing
-        // after, because the tentative package closes the exchange. Without
-        // this the opening is said twice and the transcript runs to eleven.
-        const replyStage = (stage + 1) as StageId;
-        const scripted =
-          replyStage <= 5
-            ? script.messages.find(
-                (m) => m.stage === replyStage && m.speaker === "counterpart",
-              )
-            : undefined;
+      // Appendix E1 gives each stage one message per side, counterpart first.
+      // The counterpart's stage-1 line was the opening the participant replied
+      // to, so what follows their stage-N message is the counterpart's
+      // stage-(N+1) line — and after stage 5 there is none: the tentative
+      // package closes the exchange at ten messages.
+      //
+      // Returning here rather than generating and then declining to show the
+      // result is the point. Deciding this from whether a reply came back
+      // empty worked in mockup mode and not in the live path, where a missing
+      // message falls back to a non-empty string and the transcript ran to
+      // eleven.
+      if (stage >= 5) {
+        // The counterpart still runs its closing test, it just does not speak
+        // again. An impasse is a real outcome: recording the participant's
+        // last offer as a tentative agreement when the counterpart rejected it
+        // would invent an agreement that never happened.
         const decision = counterpartStep(
           task,
           counterpartRole,
-          stage,
+          5,
+          offer,
+          lastCounterpartPackage,
+        );
+        setTentative(decision.impasse ? null : offer);
+        setPhase("review");
+        return;
+      }
+
+      // Which of the counterpart's five turns comes next.
+      //
+      // Not the participant's current stage. Its stage-1 line was the opening
+      // they are replying to, so what follows their stage-N message is the
+      // counterpart's stage-(N+1) turn. Getting this wrong put the
+      // standardized challenge — a stage-3 move — one stage late, after the
+      // participant had already replied to a challenge nobody had made.
+      const counterpartStageNow = (stage + 1) as StageId;
+
+      if (mockAi) {
+        const scripted = script.messages.find(
+          (m) => m.stage === counterpartStageNow && m.speaker === "counterpart",
+        );
+        const decision = counterpartStep(
+          task,
+          counterpartRole,
+          counterpartStageNow,
           offer,
           lastCounterpartPackage,
         );
         counterProposal = decision.proposal;
-        impasse = decision.impasse;
-        reply = decision.impasse
-          ? "i don't think we can make these terms work. i'd rather leave it than agree to something i can't deliver on."
-          : (scripted?.text ?? "");
+        // Stages 1-4 never end the exchange, so there is no impasse branch to
+        // take here: the counterpart's closing test runs at stage 5, above.
+        reply = scripted?.text ?? "";
         await new Promise((r) => setTimeout(r, 400));
       } else {
         const res = await fetch("/api/counterpart", {
@@ -228,7 +250,7 @@ export function BaselineSession({
           body: JSON.stringify({
             taskId,
             participantRole: role,
-            stage,
+            stage: counterpartStageNow,
             incoming: offer,
             lastCounterpartPackage,
             history: next.map((m) => ({
@@ -241,14 +263,11 @@ export function BaselineSession({
         const data = (await res.json()) as {
           message?: string;
           proposal?: Package | null;
-          accepted?: boolean;
-          impasse?: boolean;
         };
         reply =
           data.message ??
           "Sorry, I lost my train of thought — could you say that again?";
         counterProposal = data.proposal ?? null;
-        impasse = data.impasse ?? false;
 
         // Appendix E7: the reply is delayed in proportion to its own length
         // and jittered, so the exchange does not answer a one-line question
@@ -261,8 +280,6 @@ export function BaselineSession({
 
       if (counterProposal) setLastCounterpartPackage(counterProposal);
 
-      // Stage 5 has no counterpart turn after the participant's: the exchange
-      // closes on the tentative package.
       if (reply) {
         const counter: DisplayMessage = {
           id: `c${next.length}`,
@@ -284,17 +301,7 @@ export function BaselineSession({
         }
       }
 
-      if (stage >= 5) {
-        // An impasse is a real outcome, not a failure to handle: the review
-        // screen has a no-agreement branch and both sides take their fallback
-        // score. Recording the participant's last offer as a tentative
-        // agreement when the counterpart rejected it would invent an
-        // agreement that never happened.
-        setTentative(impasse ? null : offer);
-        setPhase("review");
-      } else {
-        setStage((s) => (s + 1) as StageId);
-      }
+      setStage((s) => (s + 1) as StageId);
     } finally {
       setPending(false);
     }

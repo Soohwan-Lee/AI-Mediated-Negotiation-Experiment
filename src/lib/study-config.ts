@@ -87,7 +87,10 @@ export function counterpartDelayMs(messageLength: number): number {
   const { minMs, maxMs, msPerChar } = NEGOTIATION.counterpartDelay;
   const base = Math.min(minMs + messageLength * msPerChar, maxMs);
   const jitter = 0.85 + Math.random() * 0.3;
-  return Math.round(Math.min(base * jitter, maxMs));
+  // Clamped at BOTH ends after the jitter, not just the top. Applying the
+  // floor before a 0.85 multiplier let a short message come back in under
+  // seven seconds, outside the range E7 specifies.
+  return Math.round(Math.max(minMs, Math.min(base * jitter, maxMs)));
 }
 
 /**

@@ -13,7 +13,13 @@ import { generateAction } from "@/lib/ai/client";
 import { validateAction } from "@/lib/ai/validator";
 import { counterpartStep } from "@/lib/negotiation/machine";
 import { getTask } from "@/lib/tasks";
-import type { Package, Role, StageId, TaskId } from "@/lib/types";
+import type {
+  NegotiationTask,
+  Package,
+  Role,
+  StageId,
+  TaskId,
+} from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -28,6 +34,28 @@ interface RequestBody {
   incoming?: Package | null;
   /** The counterpart's own last package, so concessions accumulate. */
   lastCounterpartPackage?: Package | null;
+}
+
+/**
+ * What the counterpart says when the model's wording was blocked.
+ *
+ * In this condition the counterpart is presented as another participant, so
+ * the fallback has to sound like one — short, lowercase, and stating the
+ * position rather than reciting it. A message that reads like a system notice
+ * would be its own tell.
+ */
+function fallbackText(
+  task: NegotiationTask,
+  stage: StageId,
+  proposal: Package | null,
+): string {
+  if (stage === 3) return "i'd still rather not move on that one, if we can avoid it.";
+  if (!proposal) return "let me think about that and come back to you.";
+  const terms = task.issues
+    .map((i) => i.options.find((o) => o.id === proposal[i.id])?.label)
+    .filter(Boolean)
+    .join(", ");
+  return `where i am right now: ${terms}.`;
 }
 
 export async function POST(request: Request) {
@@ -98,14 +126,14 @@ export async function POST(request: Request) {
       actorRole: counterpartRole,
     });
 
-    // TODO(supabase): persist the action, the validation result, and any
-    // guardrail block to `messages` / `guardrail_events`.
-    if (!validation.valid && validation.disposition === "regenerate") {
-      return NextResponse.json(
-        { error: "Action failed validation", violations: validation.violations },
-        { status: 422 },
-      );
-    }
+    // A blocked action loses its WORDING, not the move behind it — the same
+    // rule the proxy route follows, and for the same reason. Returning a 422
+    // here left the client with no message and, worse, no package: the
+    // counterpart's move for that turn vanished, so the next stage evaluated a
+    // stale position. The state machine's decision stands; only the sentence
+    // is replaced.
+    const blocked =
+      !validation.valid && validation.disposition === "regenerate";
 
     // TODO(supabase): persist `action` and `validation` here. They must not
     // travel to the client — the sibling proxy route strips provenance for the
@@ -114,11 +142,12 @@ export async function POST(request: Request) {
     // who opens the network tab and finds structured negotiation state has
     // learned that the other party is machinery, which is deception rule 1.
     return NextResponse.json({
-      message: action.rationale,
+      message: blocked ? fallbackText(task, stage, decision.proposal) : action.rationale,
       stage,
       proposal: decision.proposal,
       accepted: decision.accepts,
       impasse: decision.impasse,
+      blocked,
       stubbed,
     });
   } catch (error) {
