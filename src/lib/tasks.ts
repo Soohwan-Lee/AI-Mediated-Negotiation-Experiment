@@ -293,7 +293,7 @@ const TASK_B: NegotiationTask = {
       organizationalPosition:
         "You hold formal authority over the migration and influence the Member's evaluation, project reward, and future assignments. You cannot settle the three terms alone — you need the Member's legacy-system expertise and their agreement.",
       roleStory:
-        "You manage the client relationship. The client's contract renewal review is in Week 6, and a migration that is broad and visibly on track by then is your strongest argument. A partial migration would force an expensive second transition next year. A lower on-call cap reduces emergency coverage during the riskiest weeks, but that costs you less than shrinking the migration itself.",
+        "You manage the relationship with this client, and their contract renewal review is in Week 6. You have told your own leadership that the migration will be substantially done by then, and a migration that is broad and visibly on track is the strongest argument you will have in that room. A partial move would leave the rest for next year at the cost of a second transition, which is the outcome you most want to avoid. The client's team has been asking for reassurance that someone will pick up during the cutover weeks, so a lower on-call cap costs you some of that — but far less than shrinking the migration itself would.",
       objectives: [
         "Move as much of the data as this phase can carry.",
         "Be visibly on track before the Week-6 renewal review.",
