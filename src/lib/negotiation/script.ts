@@ -320,14 +320,14 @@ function leaderScript(
       frame: "risk_reduction",
       text:
         mode === "baseline"
-          ? `${w.focalAsk} is the one i really need. ${w.risk} which of the three matters most on your side?`
-          : `${w.focalAsk} is the priority on this side. ${w.risk} Which term matters most to you?`,
+          ? `keeping ${w.focalAsk} is the one thing i really need. ${w.risk} which of the three matters most on your side?`
+          : `Keeping ${w.focalAsk} is the priority on this side. ${w.risk} Which term matters most to you?`,
     },
     {
       id: "l2b",
       stage: 2,
       speaker: own,
-      text: `${w.scope} is what matters most to me — it is what I can show at ${w.leaderCare}.`,
+      text: `The ${w.scope} is what matters most to me — it is what I can show at ${w.leaderCare}.`,
     },
     {
       id: "l3a",
