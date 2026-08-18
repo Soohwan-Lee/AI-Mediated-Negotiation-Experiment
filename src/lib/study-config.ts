@@ -1,16 +1,17 @@
 /**
  * Single source of truth for study-level constants.
  *
- * Values marked TBD are pending pilot + IRB per Methods §B3 "Decisions still
- * required". Change them here, not in page components.
+ * Values marked TBD are pending pilot + IRB per Methods ver.1.8 §Appendix G
+ * "Decisions required before preregistration". Change them here, not in page
+ * components.
  */
 
 export const STUDY = {
   title: "Workplace Negotiation and AI-Mediated Communication",
   /** Shown in the page chrome, where the full title does not fit. */
   shortTitle: "Workplace Negotiation Study",
-  /** Shown on the consent page. */
-  estimatedMinutes: 55,
+  /** Shown on the consent page. Methods ver.1.8 §Overall timeline. */
+  estimatedMinutes: 45,
   compensationUsd: "9.00", // TBD after pilot; must clear Prolific fair rate
   hourlyEquivalentUsd: "9.80",
   irb: {
@@ -27,35 +28,43 @@ export const STUDY = {
     "https://app.prolific.com/submissions/complete?cc=TBD-COMPLETION-CODE",
 } as const;
 
-/** Minutes per stage, from Methods §Overall timeline (total ≈ 54 min). */
+/**
+ * Minutes per stage, from Methods ver.1.8 §Overall timeline (total 40-45 min).
+ *
+ * Shorter than before because the task shrank from six issues to three and the
+ * eighty-item end-of-study battery became a short block inside each session.
+ * Confirm against the pilot median before fixing the advertised time.
+ */
 export const STAGE_MINUTES = {
   consent: 2,
   background: 3,
-  instruction: 5,
-  practice: 5,
-  session: 10,
-  survey: 10,
-  manipulationCheck: 2,
+  instruction: 4,
+  practice: 4,
+  /** Includes the mandate or opening, the exchange, review, and the questions. */
+  session: 12,
+  survey: 3,
+  manipulationCheck: 1,
   rewardDecision: 2,
 } as const;
 
 /**
- * Turn budget for a single main session. TBD pending pilot.
+ * Exchange budget for a single main session.
  *
- * LATENCY NOTE: measured ~7.5s per AI turn against gpt-5.6-sol at low
+ * FIXED BY THE STAGE STRUCTURE, not by a turn count. Five stages, one message
+ * from each side per stage, ten messages in total (Appendix E1). The old
+ * "six turns per side, stop when the model says so" budget is gone along with
+ * the model deciding termination — `lib/negotiation/machine` owns that now,
+ * which is also why an exchange can no longer spend its last turns restating
+ * an impasse.
+ *
+ * LATENCY NOTE: ~7.5s per AI turn measured against gpt-5.6-sol at low
  * reasoning effort. `/api/proxy-negotiation` generates ONE turn per request,
- * so each invocation stays well inside Vercel's 60s Hobby limit regardless of
- * this value — the budget is a design choice, not a timeout constraint.
- *
- * 6 per side (12 total, ~90s of waiting) is set to give the exchange room for
- * a real opening / trading / closing arc without producing a transcript too
- * long for participants to review. Confirm in pilot.
+ * so each invocation stays well inside Vercel's 60s Hobby limit, and the
+ * waiting screen shows real progress. Ten turns is roughly 75s of waiting.
  */
 export const NEGOTIATION = {
-  sessionSeconds: 10 * 60,
   practiceSeconds: 5 * 60,
-  maxTurnsPerSide: 6,
-  /** Delay before the counterpart replies, ms. TBD: fixed vs. jitter. */
+  /** Delay before the counterpart replies, ms. TBD: fixed vs. jitter (E7). */
   counterpartDelayMs: 2500,
 } as const;
 
@@ -123,8 +132,8 @@ export function flowLabel(key: FlowKey): string {
  *
  *  - a session holds its phase in component state, so returning restarts a
  *    negotiation that has already happened;
- *  - the initial-preference measures are baselines that must be taken before
- *    the counterpart is seen, and a second pass would not be one;
+ *  - the private target is recorded before the participant learns anything
+ *    about how the session works, and a second pass would not be;
  *  - the reward decision cannot be revisited after the debriefing explains
  *    that it was not real;
  *  - the consent page claims a slot.
