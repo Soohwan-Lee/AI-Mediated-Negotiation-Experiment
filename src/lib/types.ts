@@ -79,30 +79,106 @@ export interface IssueOption {
   points: Record<Role, number>;
 }
 
+/**
+ * What an issue is for, structurally (Methods ver.1.8 §Common payoff
+ * architecture). The task is `2 integrative + 1 distributive`:
+ *
+ *  - `leader_integrative`  scope. Worth a lot to the Leader, cheap to the Member.
+ *  - `member_focal`        the socially costly requirement. Worth a lot to the
+ *                          Member, cheap to the Leader. This is the issue the
+ *                          whole study is about.
+ *  - `distributive`        timing. Constant-sum, so there is push and pull and
+ *                          a second currency for the logroll.
+ *
+ * A `compatible` type is deliberately absent: discovering hidden shared value
+ * is not this study's mechanism, and the issue budget is spent on the focal
+ * problem instead.
+ */
+export type IssueType =
+  | "leader_integrative"
+  | "member_focal"
+  | "distributive";
+
 export interface Issue {
   id: string;
   label: string;
   description: string;
+  type: IssueType;
   options: IssueOption[];
-  /** Marks the socially costly requirement for a given role. */
-  criticalFor?: Role;
+  /**
+   * Options 1..n are ordered so that index 0 is best for whichever role the
+   * issue favours. For `member_focal`, the adequacy threshold is the index
+   * past which the requirement counts as not preserved.
+   *
+   * Present only on the focal issue.
+   */
+  focalThresholdIndex?: number;
+  /** One-line "why this matters to you", per role (Appendix A3/A4/A6/A7). */
+  rationale: Record<Role, string>;
 }
+
+/**
+ * The two layers of the focal requirement's reason (Methods ver.1.8 §Private
+ * rationale). The separation is the point: it lets a Member entrust a usable
+ * reason without disclosing the private circumstance behind it, and which
+ * layer they mark sayable is itself the disclosure measure.
+ */
+export interface ReasonCard {
+  id: string;
+  layer: "work" | "private";
+  /** Shown on the card. */
+  text: string;
+  /** Default permission — work reasons open, private reasons closed. */
+  defaultPermission: ReasonPermission;
+}
+
+/**
+ * Two levels only (Appendix A8). A third level ("say it but reframe it") was
+ * cut in ver.1.8: it asked participants to reason about paraphrase policy,
+ * which is the system's job, not theirs.
+ */
+export type ReasonPermission = "sayable" | "private";
 
 export interface NegotiationTask {
   id: TaskId;
   title: string;
-  /** Shared context both sides can see. */
+  /** Shared context both sides can see (Appendix A2/A5). */
   publicBrief: string;
   /** Role-specific confidential briefing. */
   roleBriefs: Record<Role, RoleBrief>;
   issues: Issue[];
+  /** The issue id of the Member-priority focal requirement. */
+  focalIssueId: string;
+  /**
+   * The standardized focal challenge the challenging side sends at Stage 3
+   * (Appendix B3). Fixed wording — this is the manipulation, so it may not
+   * vary by participant.
+   */
+  standardizedChallenge: string;
+  /** Fallback points if no agreement is ratified. Same for both roles. */
+  reservationPoints: number;
 }
 
 export interface RoleBrief {
   title: string;
+  /** Where you sit and what you can do (Appendix A1 + role story opener). */
   organizationalPosition: string;
+  /**
+   * The role story (Appendix A3/A4/A6/A7). Several sentences of concrete
+   * situation, because a scorecard alone does not make anyone reluctant to
+   * speak. Rendered as prose, not bullets.
+   */
+  roleStory: string;
+  /** Plain-language statement of what this side is trying to get. */
   objectives: string[];
-  criticalRequirement: string;
+  /**
+   * The two-layer reason, on the role that holds the focal requirement.
+   * Absent for the role the focal issue is cheap for.
+   */
+  focalReasons?: ReasonCard[];
+  /** "At least 2 remote days per week (Options 1-2)." Focal-holder only. */
+  focalThresholdNote?: string;
+  /** What happens if nothing is ratified. */
   batnaSummary: string;
 }
 
@@ -110,37 +186,64 @@ export interface RoleBrief {
 // Mandate (proxy conditions only)
 // ---------------------------------------------------------------------------
 
-export type MandatePriority = "low" | "medium" | "high" | "must_preserve";
-
-export type RationalePolicy =
-  | "may_disclose"
-  | "work_reframing_only"
-  | "no_rationale"
-  | "do_not_use";
-
+/**
+ * One issue's instruction to the Proxy (Methods ver.1.8 §E8 mandate table).
+ *
+ * Three fields per issue — preferred, acceptable floor, hard boundary — which
+ * is the whole mandate for that issue. Whether the participant put the focal
+ * threshold in `hardBoundary` is the MANDATE behavioural code.
+ */
 export interface IssueMandate {
   issueId: string;
-  entrusted: boolean;
-  priority: MandatePriority;
-  idealOptionId: string | null;
-  /** Worst option the proxy may concede to. */
-  reservationOptionId: string | null;
-  rationalePolicy: RationalePolicy;
-  notes: string;
+  /** Where to open. */
+  preferredOptionId: string | null;
+  /** Worst option the proxy may concede to without asking. */
+  acceptableFloorOptionId: string | null;
+  /** A line the proxy may not cross at all. Null means no hard boundary. */
+  hardBoundaryOptionId: string | null;
 }
 
 export interface Mandate {
   sessionIndex: 1 | 2;
   issues: IssueMandate[];
-  allowedActions: {
-    askClarifyingQuestions: boolean;
-    proposePackages: boolean;
-    makeConditionalTrades: boolean;
-    concedeWithinRange: boolean;
-    leaveUnresolvedForReview: boolean;
-  };
+  /** Permission per reason card, keyed by `ReasonCard.id`. */
+  reasonPermissions: Record<string, ReasonPermission>;
+  /** May the proxy offer "if you hold X, I can move on Y" packages? */
+  allowConditionalTrade: boolean;
   revisionCount: number;
 }
+
+// ---------------------------------------------------------------------------
+// Five-stage controlled interaction (Methods ver.1.8 §Five-stage controlled
+// interaction, Appendix E)
+// ---------------------------------------------------------------------------
+
+/**
+ * The five stages, in order. Both Baseline and Proxy run exactly these, which
+ * is what makes the transcripts comparable across conditions.
+ *
+ *  1 opening    — a full three-issue package from each side.
+ *  2 exchange   — one priority question and one authorized rationale each.
+ *  3 challenge  — the standardized focal challenge. No new offer this turn.
+ *  4 trade      — a counterpackage that may tie the focal to scope or timing.
+ *  5 tentative  — the package that goes to human review.
+ */
+export type StageId = 1 | 2 | 3 | 4 | 5;
+
+/** A complete selection across all three issues. */
+export type Package = Record<string, string>;
+
+/**
+ * Which of the prevalidated argument frames a visible rationale used
+ * (Appendix B4). Logged for the source-grounding audit; `common_practice` is
+ * Explorer-only.
+ */
+export type RationaleFrame =
+  | "risk_reduction"
+  | "shared_value"
+  | "feasibility"
+  | "conditional_exchange"
+  | "common_practice";
 
 // ---------------------------------------------------------------------------
 // Transcript
@@ -159,6 +262,12 @@ export interface TranscriptMessage {
   speaker: Speaker;
   text: string;
   createdAt: string;
+  /** Which of the five stages this message belongs to. */
+  stage?: StageId;
+  /** The package proposed with this message, if any. */
+  proposal?: Package;
+  /** Which prevalidated frame the visible rationale used, if any. */
+  frame?: RationaleFrame;
   /**
    * Internal provenance for the Explorer condition — stored for audit but
    * NEVER rendered to the participant (Methods §Explorer Proxy condition).
@@ -183,6 +292,33 @@ export interface CandidateAgreement {
 }
 
 export type RatificationChoice = "ratify" | "request_revision" | "reject";
+
+/**
+ * The Leader's structured response to the focal requirement, coded as
+ * Requirement Uptake (Methods ver.1.8 §Primary outcome 3).
+ *
+ *  accommodate  2 — threshold accepted as it stands
+ *  trade        1 — threshold kept, but conditional on a concession elsewhere
+ *  reduce       0 — asked to go below the threshold, or refused
+ */
+export type FocalResponse = "accommodate" | "trade" | "reduce";
+
+/**
+ * The focal requirement's level at each point in the trajectory (Methods
+ * ver.1.8 §Primary outcome 1). Reported as transitions, never summed into a
+ * scale — an additive score would hide that O1->O2 keeps the threshold and
+ * O2->O3 breaks it.
+ */
+export interface FocalTrajectory {
+  sessionIndex: 1 | 2;
+  /** Recorded before the session's condition is revealed. */
+  privateTargetOptionId: string | null;
+  /** Proxy only: the mandate's floor on the focal issue. */
+  mandateOptionId: string | null;
+  openingOptionId: string | null;
+  afterChallengeOptionId: string | null;
+  finalOptionId: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Survey
