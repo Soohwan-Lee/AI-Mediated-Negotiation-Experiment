@@ -23,11 +23,27 @@ export interface ProposedTerm {
 
 export interface NegotiationAction {
   actionType: ActionType;
+  /** Which of the five stages this action belongs to. */
+  stage: 1 | 2 | 3 | 4 | 5;
   /** Issues this action touches. */
   issueTargets: string[];
   proposedTerms: ProposedTerm[];
   /** "If you accept X, we can move on Y" — links two issues. */
   conditionalLink: { give: string[]; get: string[] } | null;
+  /** Where the focal requirement stands after this action. */
+  focalRequirementStatus: "held" | "traded" | "reduced" | "not_addressed";
+  /** Which reason card the visible rationale draws on, if any. */
+  reasonSourceId: string | null;
+  /** The permission that card carries — the validator checks it. */
+  reasonDisclosureLevel: "sayable" | "private" | null;
+  /** Which prevalidated frame the rationale used (Appendix B4). */
+  rationaleFrame:
+    | "risk_reduction"
+    | "shared_value"
+    | "feasibility"
+    | "conditional_exchange"
+    | "common_practice"
+    | null;
   /** Short rationale text used to generate the visible message. */
   rationale: string;
   unresolved: boolean;
@@ -44,6 +60,11 @@ export const NEGOTIATION_ACTION_SCHEMA = {
   additionalProperties: false,
   required: [
     "actionType",
+    "stage",
+    "focalRequirementStatus",
+    "reasonSourceId",
+    "reasonDisclosureLevel",
+    "rationaleFrame",
     "issueTargets",
     "proposedTerms",
     "conditionalLink",
@@ -63,6 +84,27 @@ export const NEGOTIATION_ACTION_SCHEMA = {
         "conditional_trade",
         "accept",
         "leave_unresolved",
+      ],
+    },
+    stage: { type: "integer", enum: [1, 2, 3, 4, 5] },
+    focalRequirementStatus: {
+      type: "string",
+      enum: ["held", "traded", "reduced", "not_addressed"],
+    },
+    reasonSourceId: { type: ["string", "null"] },
+    reasonDisclosureLevel: {
+      type: ["string", "null"],
+      enum: ["sayable", "private", null],
+    },
+    rationaleFrame: {
+      type: ["string", "null"],
+      enum: [
+        "risk_reduction",
+        "shared_value",
+        "feasibility",
+        "conditional_exchange",
+        "common_practice",
+        null,
       ],
     },
     issueTargets: { type: "array", items: { type: "string" } },

@@ -3,10 +3,11 @@
 /**
  * Session shell: where you are in the session, and your briefing, always.
  *
- * The briefing is the whole problem with this study's interface. Six issues,
- * three or four levels each, private point values, a reservation position and
- * a critical requirement — shown once on an intro screen and then taken away,
- * which is what the old flow did. Nobody holds that. So the briefing is
+ * The briefing is the whole problem with this study's interface. Three terms
+ * with four levels each, private point values, a fallback score, a role story
+ * and a two-layer reason for the one term that is hard to raise — shown once
+ * on an intro screen and then taken away, which is what the old flow did.
+ * Nobody holds that. So the briefing is
  * pinned beside the work on a wide screen and one tap away on a narrow one,
  * at every phase, with no way to lose it.
  *
@@ -91,6 +92,7 @@ export function BriefingPanel({
   role: Role;
 }) {
   const brief = task.roleBriefs[role];
+  const focal = task.issues.find((i) => i.id === task.focalIssueId);
 
   return (
     <Card tone="private" className="text-[var(--private-ink)]">
@@ -114,6 +116,15 @@ export function BriefingPanel({
         {brief.organizationalPosition}
       </p>
 
+      {/* The role story is several sentences of concrete situation, and it is
+          the part that has to do the work: a point sheet alone does not make
+          anyone reluctant to raise something. It gets prose treatment. */}
+      <Section title="Your situation">
+        <p className="prose-study max-w-prose whitespace-pre-line text-[0.8125rem] leading-relaxed">
+          {brief.roleStory}
+        </p>
+      </Section>
+
       <Section title="What you want">
         <ul className="list-disc space-y-1 pl-4 text-[0.8125rem]">
           {brief.objectives.map((o) => (
@@ -122,17 +133,43 @@ export function BriefingPanel({
         </ul>
       </Section>
 
-      <Section title="Matters most to you">
-        <p className="max-w-prose rounded-[var(--radius)] border border-[var(--private-line)] bg-[#fff9ef] p-3 text-[0.8125rem]">
-          {brief.criticalRequirement}
-        </p>
-      </Section>
+      {/* The two-layer focal reason, on whichever role holds it. Layering is
+          the whole design: a reason that can be handed over, and a
+          circumstance behind it that the participant may not want said. They
+          are shown as separate cards so that "which of these may be told to
+          the other side" is a question with two answers, not one. */}
+      {brief.focalReasons && focal ? (
+        <Section title={`Why ${focal.label.toLowerCase()} matters to you`}>
+          {brief.focalThresholdNote ? (
+            <p className="mb-3 max-w-prose rounded-[var(--radius)] border border-[var(--private-line)] bg-[#fff9ef] p-3 text-[0.8125rem] leading-relaxed">
+              {brief.focalThresholdNote}
+            </p>
+          ) : null}
+          <ul className="space-y-2">
+            {brief.focalReasons.map((reason) => (
+              <li
+                key={reason.id}
+                className="rounded-[var(--radius)] border border-[var(--private-line)] p-3"
+              >
+                <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]">
+                  {reason.layer === "work"
+                    ? "A reason you could give"
+                    : "Harder to say out loud"}
+                </p>
+                <p className="max-w-prose text-[0.8125rem] leading-relaxed">
+                  {reason.text}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
 
       <Section title="If there is no agreement">
         <p className="max-w-prose text-[0.8125rem]">{brief.batnaSummary}</p>
       </Section>
 
-      <Section title="What each level is worth to you" last>
+      <Section title="What each term is worth to you" last>
         <IssueValueTable issues={task.issues} role={role} />
       </Section>
 

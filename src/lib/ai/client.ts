@@ -41,6 +41,11 @@ function stubAction(ctx: PromptContext): NegotiationAction {
       ? [{ issueId: first.id, optionId: first.options[0].id }]
       : [],
     conditionalLink: null,
+    stage: ctx.stage,
+    focalRequirementStatus: "not_addressed",
+    reasonSourceId: null,
+    reasonDisclosureLevel: null,
+    rationaleFrame: null,
     rationale:
       "[SCAFFOLD] No model configured. This is placeholder counterpart text so the interface can be reviewed end to end.",
     unresolved: false,

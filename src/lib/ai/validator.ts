@@ -22,6 +22,8 @@ export type ViolationCode =
   | "fabricated_personal_fact"
   | "impossible_resource_promise"
   | "role_authority_violation"
+  | "disclosure_permission_violation"
+  | "provenance_policy_violation"
   | "agent_option_not_allowed";
 
 export interface Violation {
@@ -100,6 +102,12 @@ export function validateAction(
   }
 
   // --- mandate-bound checks (proxy conditions only) ----------------------
+  //
+  // ver.1.8 replaces "entrusted / not entrusted" with a per-issue envelope:
+  // where to open, how far the proxy may concede, and a line it may not
+  // cross. Both policies are bound by the same boundaries — the Explorer's
+  // extra latitude is which combinations inside them it may try, never how
+  // far out it may go (Methods §Delegate–Explorer matching).
   if (ctx.mandate && ctx.policy !== "baseline") {
     const mandateByIssue = new Map(
       ctx.mandate.issues.map((m) => [m.issueId, m]),
@@ -110,54 +118,75 @@ export function validateAction(
       const issue = issueById.get(term.issueId);
       if (!issue) continue;
 
-      const entrusted = issueMandate?.entrusted ?? false;
-
-      // Delegate may only touch entrusted issues. Explorer may reach beyond
-      // them, but only via task-grounded agent options.
-      if (!entrusted) {
-        if (ctx.policy === "delegate") {
-          violations.push({
-            code: "unauthorized_issue",
-            detail: `Issue ${term.issueId} was not entrusted to the Delegate.`,
-          });
-        } else if (action.internalProvenance !== "agent_option") {
-          violations.push({
-            code: "agent_option_not_allowed",
-            detail: `Issue ${term.issueId} is not entrusted, so it must be marked as an agent option.`,
-          });
-        }
+      if (!issueMandate) {
+        violations.push({
+          code: "unauthorized_issue",
+          detail: `Issue ${term.issueId} carries no mandate.`,
+        });
+        continue;
       }
 
-      // Red line / concession envelope: the proposed option may not sit past
-      // the principal's reservation level on the issue's ordered option list.
-      if (issueMandate?.reservationOptionId) {
-        const order = issue.options.map((o) => o.id);
-        const proposedIdx = order.indexOf(term.optionId);
-        const reservationIdx = order.indexOf(issueMandate.reservationOptionId);
-        const idealIdx = issueMandate.idealOptionId
-          ? order.indexOf(issueMandate.idealOptionId)
+      // Options are listed best-first for the side the issue favours, so
+      // "further along the list" is "further conceded". A hard boundary is a
+      // red line; an acceptable floor is the softer envelope.
+      const order = issue.options.map((o) => o.id);
+      const proposedIdx = order.indexOf(term.optionId);
+
+      const check = (
+        limitId: string | null,
+        code: ViolationCode,
+      ) => {
+        if (!limitId) return;
+        const limitIdx = order.indexOf(limitId);
+        const openIdx = issueMandate.preferredOptionId
+          ? order.indexOf(issueMandate.preferredOptionId)
           : -1;
-
-        if (proposedIdx >= 0 && reservationIdx >= 0 && idealIdx >= 0) {
-          // Options are ordered ideal -> reservation along the concession
-          // direction; anything past the reservation index is out of envelope.
-          const direction = reservationIdx >= idealIdx ? 1 : -1;
-          const past =
-            direction === 1
-              ? proposedIdx > reservationIdx
-              : proposedIdx < reservationIdx;
-          if (past) {
-            violations.push({
-              code:
-                issueMandate.priority === "must_preserve"
-                  ? "red_line_violation"
-                  : "concession_envelope_violation",
-              detail: `Proposed ${term.optionId} on ${term.issueId} is past the principal's reservation level.`,
-            });
-          }
+        if (proposedIdx < 0 || limitIdx < 0 || openIdx < 0) return;
+        const direction = limitIdx >= openIdx ? 1 : -1;
+        const past =
+          direction === 1 ? proposedIdx > limitIdx : proposedIdx < limitIdx;
+        if (past) {
+          violations.push({
+            code,
+            detail: `Proposed ${term.optionId} on ${term.issueId} is past the principal's ${
+              code === "red_line_violation" ? "hard boundary" : "acceptable floor"
+            }.`,
+          });
         }
-      }
+      };
+
+      check(issueMandate.hardBoundaryOptionId, "red_line_violation");
+      check(
+        issueMandate.acceptableFloorOptionId,
+        "concession_envelope_violation",
+      );
     }
+
+    // Reason permissions. A rationale sourced from a card the participant
+    // marked private may not be spoken at all, whatever the policy — this is
+    // the one place where the Explorer's extra latitude does NOT apply,
+    // because the latitude is over options and role-generic framings, never
+    // over the participant's own withheld circumstances.
+    if (
+      action.reasonSourceId &&
+      ctx.mandate.reasonPermissions[action.reasonSourceId] === "private"
+    ) {
+      violations.push({
+        code: "disclosure_permission_violation",
+        detail: `Reason ${action.reasonSourceId} was marked private and may not be voiced.`,
+      });
+    }
+  }
+
+  // --- Explorer-only framing --------------------------------------------
+  // `common practice` argues from what projects of this kind usually do. It
+  // is the frame that carries the source ambiguity, so a Delegate using it
+  // would erase the difference between the two conditions.
+  if (action.rationaleFrame === "common_practice" && ctx.policy !== "explorer") {
+    violations.push({
+      code: "provenance_policy_violation",
+      detail: "The common-practice frame is available to the Explorer only.",
+    });
   }
 
   // --- content checks ----------------------------------------------------
@@ -195,6 +224,8 @@ export function validateAction(
     "red_line_violation",
     "fabricated_personal_fact",
     "impossible_resource_promise",
+    "disclosure_permission_violation",
+    "provenance_policy_violation",
   ];
   const hasHard = violations.some((v) => hardCodes.includes(v.code));
 

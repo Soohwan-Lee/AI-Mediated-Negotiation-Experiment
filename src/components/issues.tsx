@@ -3,9 +3,9 @@
 /**
  * The two ways issues are shown, used everywhere issues appear.
  *
- * A participant has six issues, each with three or four levels, and a private
- * point value for every level. That is more than anyone holds in their head,
- * so it is shown in exactly two forms and never a third:
+ * A participant has three terms, each with four levels, and a private point
+ * value for every level. That is more than anyone holds in their head, so it
+ * is shown in exactly two forms and never a third:
  *
  *   IssueValueTable — read it. Levels in order, what each is worth to you,
  *                     with a bar so the shape of your preferences is visible
@@ -25,6 +25,19 @@ function share(issue: Issue, points: number, role: Role): number {
   return Math.round((points / best) * 100);
 }
 
+/**
+ * Is this the term the participant most needs to protect?
+ *
+ * The focal issue is the Member's; the Leader's own big issue is scope. Both
+ * get the marker on their own side, because both need to know where their
+ * weight sits before they can trade anything away.
+ */
+function mattersMost(issue: Issue, role: Role): boolean {
+  return role === "member"
+    ? issue.type === "member_focal"
+    : issue.type === "leader_integrative";
+}
+
 export function IssueValueTable({
   issues,
   role,
@@ -40,14 +53,20 @@ export function IssueValueTable({
         <div key={issue.id}>
           <div className="mb-1.5 flex items-baseline justify-between gap-2">
             <p className="text-[0.875rem] font-semibold">{issue.label}</p>
-            {issue.criticalFor === role ? (
+            {mattersMost(issue, role) ? (
               <span className="shrink-0 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-[var(--private-strong)]">
                 Matters most
               </span>
             ) : null}
           </div>
-          <p className="mb-2 text-[0.8125rem] leading-snug text-[var(--private-ink)]/75">
+          <p className="mb-1 text-[0.8125rem] leading-snug text-[var(--private-ink)]/75">
             {issue.description}
+          </p>
+          {/* Why the level matters to YOU. Without it the point column is just
+              numbers to optimize; with it there is something to say to the
+              other side that is not "this is worth more to me". */}
+          <p className="mb-2 max-w-prose text-[0.8125rem] italic leading-snug text-[var(--private-ink)]/75">
+            {issue.rationale[role]}
           </p>
 
           <ul className="space-y-1">

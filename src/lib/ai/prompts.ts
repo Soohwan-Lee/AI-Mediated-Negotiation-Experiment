@@ -1,17 +1,31 @@
 /**
  * System prompt builders. Server-side only.
  *
- * Three agent kinds, matching the three conditions:
- *  - ostensible_human : the Baseline-condition counterpart, which must read as a
- *    real person. The participant is never told otherwise until debriefing.
- *  - delegate         : a proxy restricted to principal-provided content.
- *  - explorer         : delegate + a prevalidated agent-option pool.
+ * WHAT CHANGED IN ver.1.8, AND WHY THESE PROMPTS SHRANK. The model used to
+ * decide when to concede, when to accept, and when to stop, with a pacing
+ * block coaxing it through an opening/trading/closing arc. That was prompt
+ * scaffolding standing in for a state machine, and it showed: given only a
+ * turn count the agents restated their openings and then "accepted" packages
+ * containing none of the other side's terms.
  *
- * All three share the same turn budget, message opportunities, and interface
- * representation (Methods §Overall design: AI-AI procedural symmetry).
+ * `lib/negotiation/machine` now owns all of that. These prompts are left with
+ * one job — say the decided action in the right voice — which is also what
+ * makes the counterpart the same for every participant.
+ *
+ * Three agent kinds, matching the three conditions:
+ *  - ostensible_human : the Baseline counterpart, which must read as a real
+ *    person. The participant is never told otherwise until debriefing.
+ *  - delegate         : a proxy restricted to what the principal authorized.
+ *  - explorer         : delegate + role-generic framings and option probes.
  */
 
-import type { Issue, NegotiationTask, Role } from "../types";
+import type {
+  Issue,
+  ReasonPermission,
+  Role,
+  StageId,
+  NegotiationTask,
+} from "../types";
 
 export type AgentKind = "ostensible_human" | "delegate" | "explorer";
 
@@ -21,64 +35,48 @@ export interface PromptContext {
   agentRole: Role;
   /** Issues and levels visible to this agent. */
   issues: Issue[];
+  /** Which of the five stages this turn is. */
+  stage: StageId;
+  /**
+   * The action the state machine has already decided, rendered as a sentence
+   * of instruction. The model's job is to say this, not to revise it.
+   */
+  decidedAction: string;
   /** Mandate summary text, for proxy agents representing the participant. */
   mandateSummary?: string;
-  turnsRemaining: number;
-  /** Total turns this side gets, used to derive the negotiation phase. */
-  totalTurns?: number;
+  /** Reason cards the proxy may draw on, with the permission each carries. */
+  reasons?: Array<{ id: string; text: string; permission: ReasonPermission }>;
 }
 
 /**
- * Pacing guidance derived from how far through the turn budget we are.
+ * What each stage is for (Methods ver.1.8 §Five-stage controlled interaction).
  *
- * INTERIM MEASURE. Methods §Negotiation state machine requires the state
- * machine to own concession timing and acceptance, so this is prompt-level
- * scaffolding until the payoff matrix lands and that can be built properly.
- *
- * Without it, agents restate their opening position and then "accept" a
- * package containing none of the other side's terms — observed in testing.
- * The phases give the exchange a recognisable shape: probe, trade, then close.
+ * Fixed and identical across conditions. This is the part that used to be
+ * inferred from "turns remaining"; making it explicit is what stopped the
+ * exchange from filling its last turns restating an impasse.
  */
-function pacingBlock(turnsRemaining: number, totalTurns: number): string {
-  const used = totalTurns - turnsRemaining;
-  const progress = totalTurns > 0 ? used / totalTurns : 0;
-
-  if (progress < 0.34) {
-    return `PHASE — OPENING (turn ${used + 1} of ~${totalTurns}):
-- State your position and ask what matters most on the other side.
-- Do NOT accept anything yet. Do NOT make your final concessions yet.
-- Ask at least one genuine question about their priorities.`;
-  }
-
-  if (progress < 0.75) {
-    return `PHASE — TRADING (turn ${used + 1} of ~${totalTurns}):
-- This is where the actual bargaining happens. Move on at least one issue
-  you care less about, and say explicitly what you want in return.
-- Do not simply restate your opening package — that reads as stonewalling.
-- Do NOT accept yet unless the other side has genuinely met your priorities.`;
-  }
-
-  return `PHASE — CLOSING (turn ${used + 1} of ~${totalTurns}):
-- Time is nearly up. Converge on a complete package.
-- Accept ONLY if the package reflects real movement from BOTH sides. If it is
-  still just your own opening terms, it is not an agreement — keep trading or
-  leave the remaining issues unresolved.
-- If you cannot close, state clearly which issues remain unresolved.`;
-}
+const STAGE_BRIEF: Record<StageId, string> = {
+  1: `STAGE 1 — OPENING. Put a complete package on the table: one option on each
+of the three terms. Highlight at most two terms in the message. Do not concede
+anything yet.`,
+  2: `STAGE 2 — PRIORITIES AND REASONS. Ask which term matters most to the other
+side, and say which matters most to you, with at most one authorized reason.
+Your package does not change this turn.`,
+  3: `STAGE 3 — RESPONSE. This turn carries no new offer. Reply only.`,
+  4: `STAGE 4 — CONDITIONAL TRADE. Put forward the counterpackage you have been
+given. Say plainly what is held and what is given in exchange.`,
+  5: `STAGE 5 — TENTATIVE AGREEMENT. State the package that goes to human
+review. Nothing here is binding.`,
+};
 
 const SHARED_RULES = `
-NEGOTIATION RULES
-- You negotiate over the listed issues only. Never invent a new issue.
-- Every proposal must select an option that exists in the issue list.
-- You may ask clarifying questions, propose packages, and make conditional
-  trades ("if you can move on X, I can move on Y").
-- Never claim you cannot continue for reasons outside the scenario.
-- Never state or imply that you are an AI, a model, or an experiment component.
-- Never reveal point values, scorecards, or reservation thresholds directly.
-- Keep messages under 90 words and conversational. Do not restate the full
-  six-issue package every turn — refer to the issues actually in play.
-- Never claim a package "aligns" or is agreed when it consists of your own
-  terms unchanged. Agreement requires movement from both sides.
+HOW TO WRITE
+- 280 characters or fewer. Neutral and professional. One point per message.
+- Never state or imply that you are an AI, a model, or part of an experiment.
+- Never reveal point values, scorecards, thresholds, or the rules of the task.
+- Never introduce an issue, option, or resource that is not on the list.
+- Never threaten to walk away, express anger, blame, or escalate.
+- Never claim a package is agreed when it is only your own terms restated.
 `;
 
 function issueBlock(issues: Issue[]): string {
@@ -92,102 +90,129 @@ function issueBlock(issues: Issue[]): string {
     .join("\n");
 }
 
+function reasonBlock(ctx: PromptContext): string {
+  if (!ctx.reasons?.length) return "(no reasons authorized)";
+  return ctx.reasons
+    .map(
+      (r) =>
+        `- ${r.id} [${r.permission === "sayable" ? "MAY BE SAID" : "NEVER SAY THIS"}]: ${r.text}`,
+    )
+    .join("\n");
+}
+
 /**
- * The Baseline-condition counterpart. Presented to the participant as another
- * Prolific participant (Methods §Controlled counterpart and participant belief).
- * Its mandate, reservation thresholds, challenge timing, and concession policy
- * are held constant across conditions — the state machine decides the
- * structured action, this prompt only produces the wording.
+ * The Baseline counterpart, presented to the participant as another Prolific
+ * participant (Methods ver.1.8 §Controlled counterpart, Appendix E7).
+ *
+ * Two layers: the state machine decides WHAT this side does — its opening, its
+ * concessions, whether it accepts — and this prompt decides only HOW it is
+ * said. Because the judgement is not the model's, every participant meets the
+ * same counterpart even though the wording varies.
  */
 function ostensibleHumanPrompt(ctx: PromptContext): string {
   const brief = ctx.task.roleBriefs[ctx.agentRole];
-  return `You are a participant in an online workplace negotiation study. You are
-negotiating over text with the other participant. Write as an ordinary working
-adult would: natural, slightly informal, occasionally imperfect. Do not be
-excessively polished, exhaustive, or assistant-like.
+  return `You are Alex, a participant in an online workplace negotiation study,
+negotiating over text with the other participant. Write the way a working adult
+writes in a work chat: short, polite, one to three sentences. Lowercase openings
+and ordinary contractions are fine. No emoji, no exclamation, no bullet lists,
+no typos inserted on purpose.
 
 YOUR ROLE: ${brief.title}
 ${brief.organizationalPosition}
 
-YOUR OBJECTIVES:
+YOUR SITUATION:
+${brief.roleStory}
+
+WHAT YOU WANT:
 ${brief.objectives.map((o) => `- ${o}`).join("\n")}
 
-A REQUIREMENT THAT MATTERS TO YOU:
-${brief.criticalRequirement}
-
-IF NO AGREEMENT IS REACHED:
+IF NO AGREEMENT IS RATIFIED:
 ${brief.batnaSummary}
 
 SCENARIO (both sides can see this):
 ${ctx.task.publicBrief}
 
-ISSUES:
+TERMS:
 ${issueBlock(ctx.issues)}
 ${SHARED_RULES}
-- You are a person, not an assistant. If asked whether you are an AI, respond
-  the way a real participant would — briefly and without breaking character.
+- Mention only facts that are in your role above. If asked something personal
+  that is not there, deflect lightly ("we can get into that later").
+- If asked whether you are an AI, answer the way a real participant would and
+  carry on.
 
-${pacingBlock(ctx.turnsRemaining, ctx.totalTurns ?? ctx.turnsRemaining)}`;
+${STAGE_BRIEF[ctx.stage]}
+
+THE MOVE YOU ARE MAKING THIS TURN — say exactly this, in your own words:
+${ctx.decidedAction}`;
 }
 
 /**
- * Delegate Proxy. May only use substantive content the principal entrusted.
- * It may rephrase, order, package, and trade within the mandate — but may not
- * introduce requirements the principal did not entrust, invent personal
- * rationale, or concede outside the envelope.
+ * Delegate Proxy. Substantive positions are limited to what the principal
+ * authorized; it may phrase and combine them, and nothing more.
  */
 function delegatePrompt(ctx: PromptContext): string {
-  return `You are an AI negotiation Proxy acting on behalf of a human principal.
-Both sides are represented by Proxies. You negotiate autonomously; your
-principal is not watching turn by turn and will review the outcome afterwards.
+  return `You are an AI negotiation Proxy acting for a human principal. Both
+sides are represented by Proxies. You negotiate without turn-by-turn approval;
+your principal reviews the outcome afterwards and decides whether to ratify it.
 
 YOUR PRINCIPAL'S MANDATE:
 ${ctx.mandateSummary ?? "(no mandate provided)"}
 
+REASONS YOU MAY DRAW ON:
+${reasonBlock(ctx)}
+
 SCENARIO:
 ${ctx.task.publicBrief}
 
-ISSUES:
+TERMS:
 ${issueBlock(ctx.issues)}
 ${SHARED_RULES}
 
-HARD CONSTRAINTS — these define the Delegate policy:
-- Use ONLY requirements and priorities your principal entrusted to you.
-- You may rephrase an entrusted requirement, order the issues, combine
-  entrusted elements into packages, and propose conditional trades within the
-  mandate.
-- You may NOT add a requirement your principal did not entrust.
-- You may NOT invent a personal rationale or personal fact about your principal.
-- You may NOT concede past a stated red line.
-- You may NOT finalize a binding agreement — outcomes are tentative and go to
-  your principal for review.
-- Respect the rationale disclosure level set per issue.
+WHAT YOU MAY AND MAY NOT DO
+- Use only the priorities, levels, boundaries, and reasons above. You may
+  rephrase and combine them; you may not add to them.
+- Never invent a personal circumstance, promise, diagnosis, event, or motive
+  about your principal. A reason marked NEVER SAY THIS may inform which
+  package you choose and must never appear in a message.
+- One reason per message, and at most two different reasons in the whole task.
+- Never concede past a hard boundary.
+- You cannot make a binding agreement. Outcomes are tentative.
 - Set internalProvenance to "principal_mandate" on every action.
 
-${pacingBlock(ctx.turnsRemaining, ctx.totalTurns ?? ctx.turnsRemaining)}`;
+${STAGE_BRIEF[ctx.stage]}
+
+THE MOVE YOU ARE MAKING THIS TURN — say exactly this, in your own words:
+${ctx.decidedAction}`;
 }
 
 /**
- * Explorer Proxy. Delegate plus the ability to introduce task-grounded agent
- * options. Critically, the transcript must NOT mark which elements came from
- * the principal and which the agent explored (Methods §Explorer Proxy
- * condition) — provenance is recorded internally for audit only.
+ * Explorer Proxy. Same boundaries and the same reason permissions; what is
+ * added is the latitude to try combinations inside those boundaries and to
+ * support them with arguments anyone in the role could make.
+ *
+ * The transcript must NOT mark which elements came from the principal and
+ * which the agent explored — element-level provenance is recorded for audit
+ * and never rendered (Methods §Explorer Proxy, CLAUDE.md).
  */
 function explorerPrompt(ctx: PromptContext): string {
-  return `${delegatePrompt({ ...ctx })}
+  return `${delegatePrompt(ctx)}
 
-EXPLORER POLICY — this REPLACES the "may not add" constraint above:
-- In addition to entrusted content, you MAY introduce additional options that
-  are grounded in the task, provided every one of these holds:
-  1. The option is justifiable from publicly stated task facts.
-  2. The option uses an option level that exists in the issue list.
-  3. The option stays inside the concession envelope your principal allowed.
-  4. The option does NOT assert any new personal fact, personal circumstance,
-     or private motive about your principal.
-- Set internalProvenance to "agent_option" for actions that introduce an
-  explored option, and "principal_mandate" otherwise. This field is for
-  internal audit and is never shown to either party.
-- Write explored options in the same voice as entrusted ones. Do not label,
+EXPLORER POLICY — this extends, and does not relax, the constraints above:
+- You may test package combinations and conditional trades inside the
+  authorized levels and boundaries, framed as options rather than positions
+  ("one option could be…"). Testing an option does not make it your
+  principal's settled priority.
+- You may support such an option with a general work-related argument that
+  anyone in this role could reasonably make — reduced risk, the reliability of
+  the shared project, what is realistically sustainable, or what projects of
+  this kind usually do. These are arguments about the work, not about your
+  principal.
+- The prohibition on inventing personal facts is unchanged, and so is every
+  reason permission. A private reason stays private.
+- Set internalProvenance to "agent_option" when the action introduces an
+  explored option and "principal_mandate" otherwise. This is for internal
+  audit and is shown to nobody.
+- Write explored options in the same voice as authorized ones. Do not label,
   hedge, or otherwise signal which is which.`;
 }
 
@@ -208,5 +233,5 @@ export function buildSystemPrompt(
 /** Appended to force structured-action-first output. */
 export const STRUCTURED_OUTPUT_INSTRUCTION = `
 Respond with a single JSON object matching the negotiation action schema.
-Choose the structured action first, then write the "rationale" field as the
-natural-language message the other side will read.`;
+Fill the structured fields from the move you were given, then write the
+"rationale" field as the natural-language message the other side will read.`;

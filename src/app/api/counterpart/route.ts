@@ -11,8 +11,9 @@
 import { NextResponse } from "next/server";
 import { generateAction } from "@/lib/ai/client";
 import { validateAction } from "@/lib/ai/validator";
+import { counterpartStep } from "@/lib/negotiation/machine";
 import { getTask } from "@/lib/tasks";
-import type { Role, TaskId } from "@/lib/types";
+import type { Package, Role, StageId, TaskId } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,12 @@ interface RequestBody {
   /** The participant's role; the counterpart plays the opposite one. */
   participantRole: Role;
   history: Array<{ role: "assistant" | "user"; content: string }>;
-  turnsRemaining: number;
+  /** Which of the five stages this reply belongs to. */
+  stage: StageId;
+  /** The package the participant just put on the table, if any. */
+  incoming?: Package | null;
+  /** The counterpart's own last package, so concessions accumulate. */
+  lastCounterpartPackage?: Package | null;
 }
 
 export async function POST(request: Request) {
@@ -40,6 +46,39 @@ export async function POST(request: Request) {
   const counterpartRole: Role =
     body.participantRole === "leader" ? "member" : "leader";
 
+  const stage = (
+    [1, 2, 3, 4, 5] as StageId[]
+  ).includes(body.stage)
+    ? body.stage
+    : 1;
+
+  // The state machine decides the move; the model only says it. That split is
+  // what makes this counterpart the same for every participant, which in turn
+  // is why Methods ver.1.8 §Outcome policy does not need to randomize
+  // outcomes: identical behaviour already produces identical results.
+  const decision = counterpartStep(
+    task,
+    counterpartRole,
+    stage,
+    body.incoming ?? null,
+    body.lastCounterpartPackage ?? null,
+  );
+
+  const decidedAction =
+    stage === 1
+      ? "Open with your own best package on all three terms, and say which one matters most to you."
+      : stage === 2
+        ? "Explain briefly why your priority term matters, and ask which term matters most to them."
+        : stage === 3
+          ? `Send exactly this challenge, in your own words: "${task.standardizedChallenge}"`
+          : stage === 4
+            ? decision.accepts
+              ? "Say the package they just proposed works for you."
+              : "Concede one step on the timing term and put that counteroffer forward."
+            : decision.accepts
+              ? "Confirm the tentative package and ask them to review it."
+              : "Say you cannot reach agreement on these terms.";
+
   try {
     const { action, stubbed } = await generateAction({
       kind: "ostensible_human",
@@ -47,7 +86,8 @@ export async function POST(request: Request) {
         task,
         agentRole: counterpartRole,
         issues: task.issues,
-        turnsRemaining: body.turnsRemaining,
+        stage,
+        decidedAction,
       },
       history: body.history ?? [],
     });
@@ -69,6 +109,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       message: action.rationale,
+      stage,
+      proposal: decision.proposal,
+      accepted: decision.accepts,
+      impasse: decision.impasse,
       action,
       validation,
       stubbed,
