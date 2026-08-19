@@ -27,7 +27,16 @@ import { useEffect, useRef, useState } from "react";
 import { Transcript, type DisplayMessage } from "@/components/negotiation";
 import { BriefingPanel, SessionHeader, SessionLayout } from "@/components/session";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Field, Page, TextArea, cx } from "@/components/ui";
+import {
+  Callout,
+  Card,
+  CardTitle,
+  Cue,
+  Field,
+  Page,
+  TextArea,
+  cx,
+} from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
@@ -277,8 +286,17 @@ export function ReviewPhase({
             </Card>
           ) : null}
 
-          <Card>
-            <CardTitle>Your decision</CardTitle>
+          {/* The cue arrives when the decision does. Before the transcript has
+              been read the card is inert and says so; after it, this is the
+              one thing left on the screen to do. */}
+          <Card cue={canDecide && choice === null}>
+            <CardTitle
+              aside={
+                canDecide && choice === null ? <Cue>Choose one</Cue> : null
+              }
+            >
+              Your decision
+            </CardTitle>
 
             {!canDecide ? (
               <div className="mb-4">

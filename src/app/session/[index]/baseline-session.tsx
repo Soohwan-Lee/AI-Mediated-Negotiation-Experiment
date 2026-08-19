@@ -30,7 +30,7 @@ import {
 } from "@/components/negotiation";
 import { BriefingPanel, SessionHeader, SessionLayout } from "@/components/session";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Page } from "@/components/ui";
+import { Callout, Card, CardTitle, Cue, Page } from "@/components/ui";
 import { useDevActions, useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { STAGES, STAGE_LABELS, STAGE_PROMPTS, counterpartStep } from "@/lib/negotiation/machine";
 import { scriptedSession } from "@/lib/negotiation/script";
@@ -136,6 +136,11 @@ export function BaselineSession({
   // the phase branches below return early, and a hook cannot sit behind that.
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const canSend = useDevGate(chosen === task.issues.length || stage !== 1);
+
+  // The three states of the conversation, named once so the composer, the
+  // terms card and the pill above them cannot disagree about which one it is.
+  const yourTurn = !pending && canSend;
+  const needsTerms = !pending && !canSend;
 
   /**
    * The written exchange for this cell, used in mockup mode.
@@ -479,14 +484,30 @@ export function BaselineSession({
             </Callout>
           </div>
 
-          <Card className="mb-5 flex flex-col" padded={false}>
-            <div className="border-b border-[var(--line)] px-4 py-3">
-              <p className="text-[0.875rem] font-medium">
-                Messages with the other party
-              </p>
-              <p className="text-[0.8125rem] text-[var(--ink-2)]">
-                They can see everything you write here.
-              </p>
+          {/* Whose move it is, said in one place.
+              The exchange answers itself several seconds later and the reply
+              arrives at the bottom of a box the participant may have scrolled
+              away from, so "am I waiting or are they" is a real question. The
+              cue sits on whichever card is actually blocking: the composer
+              when they can write, the terms when a first package has to be
+              chosen before they can. */}
+          <Card className="mb-5 flex flex-col" padded={false} cue={yourTurn}>
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
+              <div>
+                <p className="text-[0.875rem] font-medium">
+                  Messages with the other party
+                </p>
+                <p className="text-[0.8125rem] text-[var(--ink-2)]">
+                  They can see everything you write here.
+                </p>
+              </div>
+              {pending ? (
+                <Cue tone="quiet">Waiting for their reply</Cue>
+              ) : yourTurn ? (
+                <Cue>Your turn</Cue>
+              ) : (
+                <Cue tone="quiet">Choose your terms first</Cue>
+              )}
             </div>
             <Transcript
               messages={messages}
@@ -498,6 +519,7 @@ export function BaselineSession({
               onChange={setDraft}
               onSend={send}
               disabled={pending || !canSend}
+              cue={yourTurn}
               sendLabel={stage >= 5 ? "Send and finish" : "Send"}
               placeholder={
                 canSend
@@ -507,8 +529,13 @@ export function BaselineSession({
             />
           </Card>
 
-          <Card>
-            <CardTitle hint="This is the package you are proposing. Update it as the conversation moves.">
+          <Card cue={needsTerms}>
+            <CardTitle
+              hint="This is the package you are proposing. Update it as the conversation moves."
+              aside={
+                needsTerms ? <Cue>{task.issues.length - chosen} to choose</Cue> : null
+              }
+            >
               Your current offer
             </CardTitle>
             <div className="space-y-4">

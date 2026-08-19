@@ -26,7 +26,14 @@ import {
   SessionLayout,
 } from "@/components/session";
 import { ActionBar, BackButton } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Page, PageHeader } from "@/components/ui";
+import {
+  Callout,
+  Card,
+  CardTitle,
+  Cue,
+  Page,
+  PageHeader,
+} from "@/components/ui";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { useDevActions } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
@@ -193,9 +200,14 @@ export default function PracticePage({
             </p>
           </Card>
 
-          <Card className="mb-5 flex flex-col" padded={false}>
-            <div className="border-b border-[var(--line)] px-4 py-3">
+          <Card className="mb-5 flex flex-col" padded={false} cue={!pending}>
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
               <p className="text-[0.875rem] font-medium">Practice messages</p>
+              {pending ? (
+                <Cue tone="quiet">Waiting for their reply</Cue>
+              ) : (
+                <Cue>Your turn</Cue>
+              )}
             </div>
             <Transcript
               messages={messages}
@@ -210,6 +222,7 @@ export default function PracticePage({
                 void sendPractice(text);
               }}
               disabled={pending}
+              cue={!pending}
               placeholder="Try writing something…"
             />
           </Card>

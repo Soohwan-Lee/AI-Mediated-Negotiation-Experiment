@@ -96,6 +96,7 @@ export function Card({
   tone = "surface",
   padded = true,
   id,
+  cue,
 }: {
   children: ReactNode;
   className?: string;
@@ -103,14 +104,22 @@ export function Card({
   padded?: boolean;
   /** Anchor target, for the action bar's "go to the first unanswered". */
   id?: string;
+  /**
+   * Marks this card as the one waiting on the participant right now — the
+   * composer when it is their turn, the terms when a message cannot be sent
+   * until they are chosen. An outline only; the surface colour still says who
+   * can see what is on the card. One per screen.
+   */
+  cue?: boolean;
 }) {
   return (
     <section
       id={id}
       className={cx(
         id && "scroll-mt-24",
-        "rounded-[var(--radius-lg)] border",
+        "rounded-[var(--radius-lg)] border transition-shadow",
         padded && "p-5 sm:p-6",
+        cue && (tone === "private" ? "cue-ring-private" : "cue-ring"),
         tone === "private"
           ? "border-[var(--private-line)] bg-[var(--private)]"
           : tone === "muted"
@@ -173,6 +182,49 @@ export function Callout({
           still spans the card. */}
       <div className="max-w-prose [&>p+p]:mt-2">{children}</div>
     </div>
+  );
+}
+
+/**
+ * A pill that says what the screen is waiting for: "Your turn", "3 to answer",
+ * "Waiting for their reply".
+ *
+ * `accent` is for something to do now and is the only one that moves; `quiet`
+ * is for a state the participant is waiting out; `positive` is for a part that
+ * is finished. It says what is expected, never what to say — nothing here may
+ * hint at an answer.
+ */
+export function Cue({
+  children,
+  tone = "accent",
+}: {
+  children: ReactNode;
+  tone?: "accent" | "quiet" | "positive";
+}) {
+  return (
+    <span
+      className={cx(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]",
+        tone === "accent"
+          ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+          : tone === "positive"
+            ? "bg-[var(--positive-soft)] text-[var(--positive)]"
+            : "bg-[var(--surface-muted)] text-[var(--ink-2)]",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cx(
+          "h-1.5 w-1.5 rounded-full",
+          tone === "accent"
+            ? "animate-pulse bg-[var(--accent)]"
+            : tone === "positive"
+              ? "bg-[var(--positive)]"
+              : "bg-[var(--ink-3)]",
+        )}
+      />
+      {children}
+    </span>
   );
 }
 

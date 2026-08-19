@@ -18,6 +18,7 @@ import {
   Card,
   CardTitle,
   ChoiceList,
+  Cue,
   Field,
   Scale,
   Select,
@@ -41,9 +42,28 @@ export function MeasureBlock({
 }) {
   const optional = new Set(block.optional ?? []);
 
+  // How much of this block is still open. The action bar counts the whole
+  // page; this says where the remainder is, which on a page with more than one
+  // block is the part that is actually hard to see.
+  const required = requiredIds(block);
+  const left = required.filter(
+    (id) => answers[id] === undefined || answers[id] === "",
+  ).length;
+
   return (
     <Card className="mb-5">
-      <CardTitle hint={block.hint}>{block.title}</CardTitle>
+      <CardTitle
+        hint={block.hint}
+        aside={
+          required.length === 0 ? null : left > 0 ? (
+            <Cue>{left} to answer</Cue>
+          ) : (
+            <Cue tone="positive">All answered</Cue>
+          )
+        }
+      >
+        {block.title}
+      </CardTitle>
       {pairShortItems(block.items).map((row) =>
         row.length === 1 ? (
           <MeasureItem

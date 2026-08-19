@@ -207,6 +207,7 @@ export function MessageComposer({
   disabled,
   placeholder = "Write your message…",
   sendLabel = "Send",
+  cue,
 }: {
   /** Controlled, so mockup mode can put a written message in place. */
   value: string;
@@ -215,6 +216,12 @@ export function MessageComposer({
   disabled?: boolean;
   placeholder?: string;
   sendLabel?: string;
+  /**
+   * It is the participant's turn and they can act on it. Gives the box a
+   * visible edge, because "is it my move?" is a real question in a
+   * conversation that answers itself several seconds later.
+   */
+  cue?: boolean;
 }) {
   const trimmed = value.trim();
   const over = value.length > MAX_MESSAGE_CHARS;
@@ -240,7 +247,11 @@ export function MessageComposer({
               submit();
             }
           }}
-          className="flex-1 resize-none rounded-lg border border-[var(--line)] px-3 py-2 text-sm outline-none focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)]"
+          className={`flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)] ${
+            cue && !value
+              ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+              : "border-[var(--line)]"
+          }`}
         />
         <Button onClick={submit} disabled={disabled || !trimmed || over}>
           {sendLabel}

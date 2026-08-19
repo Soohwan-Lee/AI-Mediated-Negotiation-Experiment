@@ -173,6 +173,25 @@ body {
   margin-top: 0;
 }
 
+/* "This is the thing to do next."
+ *
+ * A halo, never a fill. The surface colour of a card is what says who can see
+ * what is on it (see the note at the top of this file), so a cue may not touch
+ * it — it adds an outline and nothing else. Sand cards get the sand outline
+ * for the same reason.
+ *
+ * Used sparingly: at most one cue on a screen, on the control the participant
+ * is waiting to be told to use. */
+.cue-ring {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.cue-ring-private {
+  border-color: var(--private-strong);
+  box-shadow: 0 0 0 3px #f6ecd8;
+}
+
 /* Visible, consistent focus for keyboard participants. */
 :focus-visible {
   outline: 2px solid var(--focus);

@@ -33,7 +33,7 @@ import {
 } from "@/components/session";
 import { OptionChips } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Page } from "@/components/ui";
+import { Callout, Card, CardTitle, Cue, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import {
   dummyAnswer,
@@ -256,8 +256,17 @@ export function PrivateTargetForm({
           </div>
 
           <Card className="mb-5" id={`q-target-${focal.id}`}>
+            {/* Same counter language as the questionnaire blocks below it, so
+                one glance down the page says what is left anywhere on it. */}
             <CardTitle
               hint={`Not what you will ask for — what would actually be enough.`}
+              aside={
+                target === null ? (
+                  <Cue>1 to choose</Cue>
+                ) : (
+                  <Cue tone="positive">Answered</Cue>
+                )
+              }
             >
               What level of {focal.label.toLowerCase()} would be enough for you?
             </CardTitle>
