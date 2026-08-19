@@ -40,7 +40,12 @@ import { counterpartDelayMs, nextHref } from "@/lib/study-config";
 import { counterpartOpening, focalIssue, getTask } from "@/lib/tasks";
 import type { Package, Role, StageId, TaskId } from "@/lib/types";
 import { ReviewPhase } from "./review";
-import { PostTaskSurvey, PrivateTargetForm, SessionBrief } from "./shared";
+import {
+  PostTaskSurvey,
+  PrivateTargetForm,
+  SessionBrief,
+  SessionIntro,
+} from "./shared";
 
 /**
  * The counterpart's opening, in words.
@@ -62,16 +67,34 @@ function openingLine(
   return `hi — good to be working on this. my opening would be ${terms}. keen to hear what matters most on your side.`;
 }
 
-type Phase = "brief" | "target" | "negotiate" | "review" | "post";
+type Phase = "intro" | "brief" | "target" | "negotiate" | "review" | "post";
 
-const PHASES: Phase[] = ["brief", "target", "negotiate", "review", "post"];
-const STEP_LABELS = [
-  "Your briefing",
-  "Before you begin",
-  "Negotiate",
-  "Review",
-  "Questions",
+const PHASES: Phase[] = [
+  "intro",
+  "brief",
+  "target",
+  "negotiate",
+  "review",
+  "post",
 ];
+
+const PHASE_LABELS: Record<Phase, string> = {
+  intro: "Start screen",
+  brief: "Your briefing",
+  target: "Before you begin",
+  negotiate: "Negotiate",
+  review: "Review",
+  post: "Questions",
+};
+
+/**
+ * The phases the progress bar counts.
+ *
+ * The cover is not one of them: it is the screen you are on before the session
+ * starts, and having it fill the first segment would make the bar read as
+ * one-fifth done before anything had happened.
+ */
+const STEP_LABELS = PHASES.slice(1).map((p) => PHASE_LABELS[p]);
 
 export function BaselineSession({
   sessionIndex,
@@ -89,7 +112,7 @@ export function BaselineSession({
   const focal = focalIssue(task);
   const counterpartRole: Role = role === "leader" ? "member" : "leader";
 
-  const [phase, setPhase] = useState<Phase>("brief");
+  const [phase, setPhase] = useState<Phase>("intro");
   const [stage, setStage] = useState<StageId>(1);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -133,9 +156,9 @@ export function BaselineSession({
 
   useDevActions(
     `session-${sessionIndex}`,
-    PHASES.map((p, i) => ({
+    PHASES.map((p) => ({
       id: p,
-      label: STEP_LABELS[i],
+      label: PHASE_LABELS[p],
       active: phase === p,
       run: () => {
         // Jumping straight to the review needs something to review, so the
@@ -315,6 +338,16 @@ export function BaselineSession({
   }
 
   // --- phases -------------------------------------------------------------
+
+  if (phase === "intro") {
+    return (
+      <SessionIntro
+        sessionIndex={sessionIndex}
+        steps={STEP_LABELS}
+        onStart={() => setPhase("brief")}
+      />
+    );
+  }
 
   if (phase === "brief") {
     return (

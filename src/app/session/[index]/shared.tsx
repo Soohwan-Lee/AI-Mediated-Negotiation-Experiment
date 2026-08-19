@@ -25,7 +25,12 @@
 
 import { useState } from "react";
 import { MeasureBlock, type Answers } from "@/components/measure";
-import { BriefingPanel, SessionHeader, SessionLayout } from "@/components/session";
+import {
+  BriefingPanel,
+  SessionCover,
+  SessionHeader,
+  SessionLayout,
+} from "@/components/session";
 import { OptionChips } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Page } from "@/components/ui";
@@ -39,8 +44,82 @@ import {
 } from "@/lib/measures";
 import { useParticipant } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
+import { STAGE_MINUTES } from "@/lib/study-config";
 import { focalIssue, packageValue, preservesFocalThreshold } from "@/lib/tasks";
 import type { NegotiationTask, Package, Role } from "@/lib/types";
+
+// ---------------------------------------------------------------------------
+// Phase: the cover
+// ---------------------------------------------------------------------------
+
+/**
+ * "Session 1 of 2 starts now."
+ *
+ * The practice round used to end on a button that dropped the participant
+ * straight into a briefing for the session that counts, with nothing marking
+ * the change. This is the marker: which of the two sessions this is, what it
+ * asks of them, and roughly how long it takes.
+ *
+ * Shared by both conditions so the wording is identical where it can be. The
+ * step list is the only part that differs, and it comes from the session's own
+ * phases — interface phases, never a condition name.
+ */
+export function SessionIntro({
+  sessionIndex,
+  steps,
+  onStart,
+}: {
+  sessionIndex: 1 | 2;
+  steps: string[];
+  onStart: () => void;
+}) {
+  const first = sessionIndex === 1;
+
+  return (
+    <SessionCover
+      eyebrow={`Session ${sessionIndex} of 2`}
+      title={first ? "Session 1 starts here" : "Session 2, the last one"}
+      lead={
+        first ? (
+          <>
+            <p>
+              The practice round is over — this one is the real thing. You will
+              be working through a project with{" "}
+              {/* The counterpart is presented as another participant
+                  throughout the study and is disclosed only at the debriefing.
+                  Saying it plainly here is the same claim the rest of the
+                  interface makes, in the place the participant is most likely
+                  to form an expectation about who they are talking to. */}
+              another participant who has the other side of it, and neither of
+              you can settle anything alone.
+            </p>
+            <p>
+              Your own briefing is private. It stays on screen for the whole
+              session, so there is nothing to memorise now.
+            </p>
+          </>
+        ) : (
+          <>
+            <p>
+              This is the second and last session. It is a different project,
+              with a different briefing, and the way you work through it is the
+              one you have just practised — not necessarily the way the first
+              session worked.
+            </p>
+            <p>
+              The other side is a different participant, and nothing carries
+              over from the first session.
+            </p>
+          </>
+        )
+      }
+      steps={steps}
+      minutes={STAGE_MINUTES.session}
+      actionLabel={`Start Session ${sessionIndex}`}
+      onStart={onStart}
+    />
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Phase: scenario brief

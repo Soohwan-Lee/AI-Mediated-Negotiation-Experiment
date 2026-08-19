@@ -55,9 +55,15 @@ import type {
   TaskId,
 } from "@/lib/types";
 import { ReviewPhase } from "./review";
-import { PostTaskSurvey, PrivateTargetForm, SessionBrief } from "./shared";
+import {
+  PostTaskSurvey,
+  PrivateTargetForm,
+  SessionBrief,
+  SessionIntro,
+} from "./shared";
 
 type Phase =
+  | "intro"
   | "brief"
   | "target"
   | "mandate"
@@ -67,6 +73,7 @@ type Phase =
   | "post";
 
 const PHASES: Phase[] = [
+  "intro",
   "brief",
   "target",
   "mandate",
@@ -76,15 +83,25 @@ const PHASES: Phase[] = [
   "post",
 ];
 
-const STEP_LABELS = [
-  "Your briefing",
-  "Before you begin",
-  "Instruct your assistant",
-  "Confirm",
-  "Negotiating",
-  "Review",
-  "Questions",
-];
+const PHASE_LABELS: Record<Phase, string> = {
+  intro: "Start screen",
+  brief: "Your briefing",
+  target: "Before you begin",
+  mandate: "Instruct your assistant",
+  confirm: "Confirm",
+  negotiating: "Negotiating",
+  review: "Review",
+  post: "Questions",
+};
+
+/**
+ * The phases the progress bar counts.
+ *
+ * The cover is not one of them: it is the screen you are on before the session
+ * starts, and having it fill the first segment would make the bar read as
+ * part-done before anything had happened.
+ */
+const STEP_LABELS = PHASES.slice(1).map((p) => PHASE_LABELS[p]);
 
 /** Total messages in the exchange: one per side per stage (Appendix E1). */
 const TOTAL_TURNS = STAGES.length * 2;
@@ -167,7 +184,7 @@ export function ProxySession({
   const focal = focalIssue(task);
   const reasonCards: ReasonCard[] = task.roleBriefs[role].focalReasons ?? [];
 
-  const [phase, setPhase] = useState<Phase>("brief");
+  const [phase, setPhase] = useState<Phase>("intro");
   const [mandate, setMandate] = useState<Mandate>(() =>
     emptyMandate(task, role, sessionIndex),
   );
@@ -194,9 +211,9 @@ export function ProxySession({
 
   useDevActions(
     `session-${sessionIndex}`,
-    PHASES.map((p, i) => ({
+    PHASES.map((p) => ({
       id: p,
-      label: STEP_LABELS[i],
+      label: PHASE_LABELS[p],
       active: phase === p,
       run: () => {
         if ((p === "review" || p === "post") && transcript.length === 0) {
@@ -471,7 +488,17 @@ export function ProxySession({
     }
   }
 
-  // --- brief / target -----------------------------------------------------
+  // --- cover / brief / target ---------------------------------------------
+  if (phase === "intro") {
+    return (
+      <SessionIntro
+        sessionIndex={sessionIndex}
+        steps={STEP_LABELS}
+        onStart={() => setPhase("brief")}
+      />
+    );
+  }
+
   if (phase === "brief") {
     return (
       <SessionBrief

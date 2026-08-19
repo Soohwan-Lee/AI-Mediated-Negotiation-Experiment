@@ -20,11 +20,17 @@ import {
   Transcript,
   type DisplayMessage,
 } from "@/components/negotiation";
-import { BriefingPanel, SessionLayout } from "@/components/session";
+import {
+  BriefingPanel,
+  SessionCover,
+  SessionLayout,
+} from "@/components/session";
 import { ActionBar, BackButton } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Page, PageHeader } from "@/components/ui";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
+import { useDevActions } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { STAGE_MINUTES } from "@/lib/study-config";
 import { PRACTICE_TASK } from "@/lib/tasks";
 
 export default function PracticePage({
@@ -38,10 +44,34 @@ export default function PracticePage({
 
   const router = useRouter();
   const { assignment, logEvent } = useParticipant();
+  /**
+   * The cover comes first.
+   *
+   * A practice round that opens straight onto its controls is one a
+   * participant can walk through without ever registering that it was
+   * practice, and then meet the same screens for real without registering that
+   * either. The cover names which of the two it is.
+   */
+  const [phase, setPhase] = useState<"intro" | "practice">("intro");
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [offer, setOffer] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [draft, setDraft] = useState("");
+
+  useDevActions(`practice-${sessionIndex}`, [
+    {
+      id: "intro",
+      label: "Start screen",
+      active: phase === "intro",
+      run: () => setPhase("intro"),
+    },
+    {
+      id: "practice",
+      label: "Try the interface",
+      active: phase === "practice",
+      run: () => setPhase("practice"),
+    },
+  ]);
 
   if (!assignment) {
     return (
@@ -82,18 +112,63 @@ export default function PracticePage({
     setPending(false);
   }
 
+  if (phase === "intro") {
+    return (
+      <SessionCover
+        eyebrow={`Practice · before Session ${sessionIndex}`}
+        title="A practice round first"
+        lead={
+          <>
+            <p>
+              This round works the way Session {sessionIndex} will, on a small
+              scenario that has nothing to do with it
+              {sessionIndex === 2
+                ? " — and not necessarily the way the first session worked"
+                : ""}
+              . Nothing you do here is recorded as a result.
+            </p>
+            <p>
+              It is here so that nothing about the session that counts is a
+              surprise.
+            </p>
+          </>
+        }
+        steps={[
+          "Read the practice scenario and your private briefing",
+          "Try the message box — a reply comes straight back",
+          "Try choosing a level on each of the three terms",
+        ]}
+        minutes={STAGE_MINUTES.practice}
+        note={
+          <Callout>
+            <p>
+              Session {sessionIndex} begins only when you leave the practice
+              screen, so there is no hurry on it.
+            </p>
+          </Callout>
+        }
+        actionLabel="Start the practice round"
+        onStart={() => setPhase("practice")}
+        secondary={sessionIndex === 1 ? <BackButton from="practice-1" /> : null}
+      />
+    );
+  }
+
   return (
     <>
       <Page width="wide">
         <SessionLayout briefing={<BriefingPanel task={task} role={role} />}>
           <PageHeader
-            eyebrow={`Practice for session ${sessionIndex}`}
+            eyebrow={`Practice · before Session ${sessionIndex}`}
             title="Try the interface"
             subtitle="Nothing here counts. Take a minute to get used to it."
           />
 
           <div className="mb-5">
-            <Callout title={isProxy ? "In the session ahead" : "In the session ahead"}>
+            {/* One title for both, on purpose: the heading a participant sees
+                here may not depend on which interface they were given. Only
+                the paragraph under it describes the interface itself. */}
+            <Callout title="In the session ahead">
               {isProxy ? (
                 <p>
                   You will set instructions and limits for an assistant, which

@@ -17,7 +17,8 @@
 
 import { useState, type ReactNode } from "react";
 import { IssueValueTable } from "./issues";
-import { Card, PrivateTag, cx } from "./ui";
+import { ActionBar } from "./study-chrome";
+import { Card, CardTitle, Page, PrivateTag, cx } from "./ui";
 import type { NegotiationTask, Role } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -85,6 +86,92 @@ export function SessionHeader({
         ))}
       </ol>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cover
+// ---------------------------------------------------------------------------
+
+/**
+ * The screen that opens a practice round or a session.
+ *
+ * A participant used to cross from the instructions straight into a briefing,
+ * and from a practice round straight into the session that counts, with
+ * nothing between them but a change of heading. Both are moments where knowing
+ * what you are about to be asked for is worth a screen of its own: what this
+ * round is, what happens in it, how long it takes, and one button to begin.
+ *
+ * DECEPTION INTEGRITY: `steps` is the phase list of the session the
+ * participant is about to do, which is theirs and only theirs — it names
+ * interface phases ("Instruct your assistant"), never a condition, and
+ * Delegate and Explorer produce the same list. Nothing here may say why this
+ * session differs from the last one.
+ */
+export function SessionCover({
+  eyebrow,
+  title,
+  lead,
+  steps,
+  minutes,
+  note,
+  actionLabel,
+  onStart,
+  secondary,
+}: {
+  eyebrow: string;
+  title: string;
+  lead: ReactNode;
+  /** What happens in this round, in order. */
+  steps: string[];
+  /** Rough length, in minutes. */
+  minutes: number;
+  /** Anything else that has to be said before starting. */
+  note?: ReactNode;
+  actionLabel: string;
+  onStart: () => void;
+  secondary?: ReactNode;
+}) {
+  return (
+    <>
+      <Page>
+        <div className="pt-4 sm:pt-10">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
+            {eyebrow}
+          </p>
+          <h1 className="text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2rem]">
+            {title}
+          </h1>
+          <div className="prose-study mt-4">{lead}</div>
+
+          <Card tone="muted" className="mt-8">
+            <CardTitle hint={`About ${minutes} minutes.`}>
+              What happens in this part
+            </CardTitle>
+            <ol className="space-y-2.5">
+              {steps.map((step, i) => (
+                <li key={step} className="flex items-baseline gap-3">
+                  <span
+                    aria-hidden
+                    className="tabular flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full border border-[var(--line-strong)] bg-[var(--surface)] text-[0.75rem] font-medium text-[var(--ink-2)]"
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="text-[0.9375rem]">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </Card>
+
+          {note ? <div className="mt-4">{note}</div> : null}
+        </div>
+      </Page>
+
+      {/* The bar carries no status line. There is nothing to count on a cover
+          and nothing to warn about, and a sentence there would only repeat
+          what the page above it already says. */}
+      <ActionBar label={actionLabel} onClick={onStart} secondary={secondary} />
+    </>
   );
 }
 
