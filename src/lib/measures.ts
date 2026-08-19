@@ -174,7 +174,6 @@ export const BACKGROUND_BLOCKS: Block[] = [
   {
     id: "experience",
     title: "Your experience",
-    hint: "Rate each item on the scale shown.",
     items: [
       {
         kind: "scale",
@@ -511,7 +510,6 @@ export const COMPREHENSION_REMEDIATION: Record<string, string> = {
 export const POWER_BLOCK: Block = {
   id: "power",
   title: "About the roles",
-  hint: "1 = Strongly disagree, 7 = Strongly agree",
   items: [
     {
       kind: "scale",

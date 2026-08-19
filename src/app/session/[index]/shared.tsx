@@ -195,7 +195,6 @@ export function PrivateTargetForm({
             block={{
               id: "jeopardy",
               title: "What you expect",
-              hint: "1 = Strongly disagree, 7 = Strongly agree",
               items,
             }}
             answers={answers}
