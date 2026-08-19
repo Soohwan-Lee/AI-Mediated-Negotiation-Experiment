@@ -109,7 +109,7 @@ a real row would silently unbalance the design.
 
 ## Interface rules
 
-Seven decisions the screens depend on. Breaking one is a regression even if it
+Nine decisions the screens depend on. Breaking one is a regression even if it
 compiles.
 
 1. **Colour encodes visibility.** Cool white and navy are the shared table;
@@ -149,7 +149,22 @@ compiles.
    why two short answers (`half` in `lib/measures.ts`) share a row. Prose does
    not follow the column: `.prose-study` and `max-w-prose` hold it near 70
    characters. Widening something without capping the prose inside it is the
-   easy way to regress this.
+   easy way to regress this. The other easy way is a control with a minimum
+   width its container cannot give it: a rating row of fixed statement column
+   plus fixed anchors plus fixed buttons needed 54rem and the session column
+   is about 50rem, so "Strongly agree" hung outside the card. Rows flex, and
+   the parts that cannot shrink are grids that fit their container.
+8. **A cue points, it does not colour.** The one thing a screen is waiting for
+   gets `.cue-ring` (an outline) and a `Cue` pill — "Your turn", "3 to
+   answer", "Waiting for their reply". It may never change a card's surface,
+   because the surface is what says who can see what is on it (rule 1), and it
+   may never suggest an answer, only that one is expected. At most one ring on
+   a screen; pills that count what is left may repeat.
+9. **A session announces itself.** Every practice round and every session
+   opens on a `SessionCover`: which of the two it is, whether it counts, what
+   happens in it, how long it takes. It is a phase, not a route — the flow
+   step still comes from the URL alone (rule 3) — and it is deliberately not
+   counted as one of the session's own steps.
 
 ## Dev / mockup mode
 
