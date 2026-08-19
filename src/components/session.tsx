@@ -24,6 +24,15 @@ import type { NegotiationTask, Role } from "@/lib/types";
 // Header
 // ---------------------------------------------------------------------------
 
+/**
+ * Where you are in this session.
+ *
+ * A bar of segments rather than a written trail of phase names. Seven names
+ * with separators between them wrapped to three lines inside the session
+ * column, which is a lot of chrome to say "third of seven" — and the phase the
+ * participant is on is already the heading right above it. The names stay for
+ * screen readers, where a trail costs nothing.
+ */
 export function SessionHeader({
   sessionIndex,
   title,
@@ -42,9 +51,13 @@ export function SessionHeader({
   return (
     <div className="mb-6">
       <div className="mb-3 flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
             Session {sessionIndex} of 2
+            <span aria-hidden className="mx-2 text-[var(--line-strong)]">
+              /
+            </span>
+            Step {current + 1} of {steps.length}
           </p>
           <h1 className="text-[1.5rem] font-semibold leading-tight tracking-[-0.02em]">
             {title}
@@ -53,25 +66,20 @@ export function SessionHeader({
         {aside}
       </div>
 
-      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem]">
+      <ol className="flex items-center gap-1">
         {steps.map((label, i) => (
-          <li key={label} className="flex items-center gap-2">
-            {i > 0 ? (
-              <span aria-hidden className="text-[var(--ink-3)]">
-                ›
-              </span>
-            ) : null}
-            <span
-              className={cx(
-                i === current
-                  ? "font-semibold text-[var(--ink)]"
-                  : i < current
-                    ? "text-[var(--ink-3)] line-through decoration-[var(--line-strong)]"
-                    : "text-[var(--ink-3)]",
-              )}
-              aria-current={i === current ? "step" : undefined}
-            >
+          <li
+            key={label}
+            className={cx(
+              "flex-1 rounded-full transition-colors",
+              i === current ? "h-1.5" : "h-1",
+              i <= current ? "bg-[var(--accent)]" : "bg-[var(--line)]",
+            )}
+            aria-current={i === current ? "step" : undefined}
+          >
+            <span className="sr-only">
               {label}
+              {i === current ? " — you are here" : ""}
             </span>
           </li>
         ))}

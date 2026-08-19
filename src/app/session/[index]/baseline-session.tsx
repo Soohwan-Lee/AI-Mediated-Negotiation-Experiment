@@ -425,9 +425,13 @@ export function BaselineSession({
             title={task.title}
             steps={STEP_LABELS}
             current={2}
+            // "Round", not "Step": the header above counts the phases of the
+            // session, and two counters both called step, both currently
+            // reading 3, are a way to make a participant think they have lost
+            // their place. A round here is one message each way.
             aside={
               <span className="shrink-0 text-[0.8125rem] text-[var(--ink-2)]">
-                Step{" "}
+                Round{" "}
                 <span className="tabular font-medium text-[var(--ink)]">
                   {stage}
                 </span>{" "}
@@ -508,7 +512,7 @@ export function BaselineSession({
           participants least engaged with the negotiation. The session ends
           when the last message is sent. */}
       <ActionBar
-        note={`${chosen} of ${task.issues.length} terms chosen · step ${stage} of ${STAGES.length}`}
+        note={`${chosen} of ${task.issues.length} terms chosen · round ${stage} of ${STAGES.length}`}
       />
     </>
   );
