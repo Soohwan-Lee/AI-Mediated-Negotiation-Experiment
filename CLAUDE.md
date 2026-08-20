@@ -60,7 +60,9 @@ for every participant, and it is why the design does not need to randomize
 outcomes: identical behaviour already produces identical results.
 
 **The participant's conversation is free-form, bounded only by a ten-minute
-timer.** They write as many messages as they like and may finish early. The
+timer.** They write as many messages as they like and may finish early. Running
+the clock to zero is an outcome — `onExpire` closes the exchange as an impasse
+— not a screen with no button on it. The
 five stages still exist, but as the COUNTERPART'S script, not a lockstep the
 participant is marched through: it advances one move per reply, so every
 participant meets the same fixed opening, the same standardized challenge and
@@ -72,6 +74,15 @@ accept before it reaches its trade stage, which is after it has opened, stated
 its priority and challenged. So a participant who opens with a perfect package
 still has to answer the challenge — the manipulation cannot be skipped by
 negotiating well. Check this after any change to `counterpartStep`.
+
+**"Late" is decided by the clock, not by the turn count.** T_FINAL is the
+relaxed closing threshold, and it applies when `secondsRemaining` is low. Tying
+it to the counterpart's script position instead made the Proxy arm relax after
+one direct message and Baseline after four, because the Proxy counterpart
+resumes mid-script — so identical packages were acceptable at different points
+depending on condition. Once both arms are at the trade stage the counterpart's
+decision depends only on the package and the clock; verify that after touching
+either.
 
 **The counterpart's fixed opening must be on screen before the participant
 writes anything**: it is the anchor their reply is measured against.
@@ -233,6 +244,21 @@ navigation.
 stated its priority and challenged. Replaying those would make the participant
 answer a challenge they watched being answered, and would give the Proxy arm
 two challenges where Baseline has one.
+
+**The review screen must show the participant's OWN conversation.** It once
+showed the AI-AI transcript captioned as theirs, so every item asking them to
+judge "what was said" was answered against the wrong stimulus and their own
+words were never shown back. Both transcripts belong there — theirs as the
+subject of the decision, the proxies' collapsed above it, because several §9.4
+items ask about each.
+
+**The reason rule reads what the proxy actually said, not what it should have
+said.** `DirectNegotiation` takes `reasonAlreadyVoiced` rather than assuming
+one was voiced: an emergency stop can end the exchange before the proxy speaks
+and a guardrail block can strip the reason out of the message meant to carry
+it. Assuming it made the rule inert for every Proxy participant while it kept
+biting in Baseline — a mechanical asymmetry in the primary outcome, along the
+primary contrast.
 
 **There is no "ask for one change".** It existed when the proxies produced the
 final package alone. Talking to the other side directly is a better version of
