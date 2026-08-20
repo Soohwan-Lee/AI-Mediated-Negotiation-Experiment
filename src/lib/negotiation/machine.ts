@@ -1,83 +1,125 @@
 /**
- * The negotiation state machine (Methods ver.1.8 §5, Appendix E2–E5).
+ * The negotiation state machine (Experimental Design Ver.2.4 §4).
  *
- * WHAT THIS OWNS, AND WHY IT MATTERS. Until ver.1.8 the model decided when to
- * concede, when to accept, and when to stop, which meant two participants who
- * behaved identically could get different outcomes — and the primary outcomes
- * are all functions of behaviour. So the split is: this file decides WHAT
- * happens (offer levels, concessions, acceptance, termination) and the model
- * only decides HOW it is said. Every participant meets the same counterpart.
+ * WHAT THIS OWNS, AND WHY IT MATTERS. The model decides nothing here. This
+ * file decides WHAT happens — offer levels, concessions, acceptance,
+ * termination — and the model only decides HOW it is said. Two participants
+ * who behave identically get identical outcomes, which is what makes a
+ * condition contrast interpretable when every primary outcome is a function
+ * of behaviour.
  *
- * That split is also what makes randomizing outcomes unnecessary. Methods
- * §Outcome policy declines to assign success and failure precisely because a
- * deterministic counterpart already gives the stronger guarantee: same
- * behaviour, same result.
+ * Design §4 states the split as a table ("LLM이 정하지 않는 것 / LLM이 하는
+ * 것") and requires every turn to log the decided action beside the rendered
+ * sentence, so pilot gate 9 can show the model never stepped outside it.
  *
- * The five stages run once each, in order. There is no free-running turn loop
- * to deadlock, so the "both sides restate the impasse for the remaining turns"
- * failure mode that the prompt-level pacing was patching over cannot occur.
+ * The five stages run once each, in order. There is no free-running turn loop,
+ * so an exchange cannot deadlock or spend its last turns restating an impasse.
  */
 
 import {
   counterpartOpening,
-  focalIssue,
+  requirementIssue,
+  counterRequirementIssue,
   optionIndex,
-  scopeIssue,
   distributiveIssue,
+  preservesRequirement,
   scorePackage,
 } from "../tasks";
-import type {
-  NegotiationTask,
-  Package,
-  Role,
-  StageId,
-} from "../types";
+import type { NegotiationTask, Package, Role, StageId } from "../types";
 
 /**
- * Counterpart acceptance thresholds (Appendix E2).
+ * Counterpart acceptance thresholds (Design §4 "이유 연동 수락 규칙").
  *
  * Working values, to be fixed after the pilot against a target impasse rate
- * below 10% (Methods §Appendix G). T4 is deliberately set so that a full
- * logroll — the other side's scope at Option 1 while holding your own focal at
- * Option 1 — scores 3,600 and is accepted: protecting the requirement while
- * giving away what the counterpart actually wants is structurally rewarded.
+ * below 10% (Design §10 gate 7). T_MID is deliberately set so that a full
+ * logroll — giving the counterpart its own priority issue at Option 1 while
+ * holding your requirement at Option 1 — scores 3,600 and is accepted:
+ * protecting your requirement while giving away what they actually want is
+ * structurally rewarded.
+ *
+ * T_FINAL sits below T_MID so a late concession can still close, which is the
+ * lever on the impasse rate.
  */
 export const ACCEPTANCE = {
-  /** Stage 4: accept a counterpackage worth at least this much. */
-  T4: 3600,
-  /** Stage 5: the relaxed closing threshold. */
-  T5: 2600,
+  /** Stage 4, the conditional trade. */
+  T_MID: 3600,
+  /** Stage 5, the closing threshold. */
+  T_FINAL: 2600,
 } as const;
+
+/**
+ * How long a negotiation runs before the soft close (Design §8: "10분 타이머").
+ *
+ * The timer is a real constraint on the participant's pace, not a device to
+ * force agreement: when it runs low the counterpart offers to settle on what
+ * is already on the table (Design §4 "Soft close"), and an impasse remains a
+ * legitimate ending.
+ */
+export const NEGOTIATION_SECONDS = 10 * 60;
+
+/** Below this, the counterpart starts steering toward a close. */
+export const SOFT_CLOSE_SECONDS = 90;
 
 export const STAGES: readonly StageId[] = [1, 2, 3, 4, 5];
 
 export const STAGE_LABELS: Record<StageId, string> = {
-  1: "Opening package",
+  1: "Opening offer",
   2: "Priorities and reasons",
-  3: "Their response",
+  3: "Pushback",
   4: "Conditional trade",
   5: "Tentative agreement",
 };
 
 /**
  * What the participant (or their proxy) is being asked to do at each stage.
- * Identical wording across conditions — the stage structure is held constant
- * so transcripts are comparable, and nothing here may hint at the condition.
+ *
+ * Identical wording across conditions and across roles — the stage structure
+ * is held constant so transcripts are comparable, and nothing here may hint at
+ * the condition or at which term the study is about.
  */
 export const STAGE_PROMPTS: Record<StageId, string> = {
-  1: "Put a complete package on the table — one option on each of the three terms. You can highlight at most two of them in your message.",
-  2: "They have asked what matters most to you. Answer, and ask what you want to know.",
-  3: "They have pushed back on one of your terms. This turn is for your reply — you make your next offer at the following step.",
-  4: "Now make your counterpackage. Tying one term to another is allowed: “if X holds, I can move on Y.”",
-  5: "This is the package that goes to review.",
+  1: "Put a complete offer on the table — one option on each of the three terms. Say which ones matter most to you.",
+  2: "Answer what they asked, and ask what you want to know about their side.",
+  3: "They have asked you to lower one of your terms. This turn is for your reply — your next offer comes at the following step.",
+  4: "Make your counter-offer. You can tie one term to another: “if X holds, I can move on Y.”",
+  5: "This is the package that goes to review. Nothing is final until you approve it.",
+};
+
+/**
+ * What each stage is for, in three or four words. Shown in the stage rail so
+ * nobody has to infer where they are in a five-step exchange.
+ */
+export const STAGE_GOALS: Record<StageId, string> = {
+  1: "Open with a full package",
+  2: "Trade priorities and reasons",
+  3: "Answer their pushback",
+  4: "Offer a trade",
+  5: "Settle on a package",
 };
 
 // ---------------------------------------------------------------------------
 // Counterpart behaviour
 // ---------------------------------------------------------------------------
 
+/**
+ * Every move the counterpart is allowed to make, named. The name goes into
+ * the transcript beside the rendered sentence (Design §4), so an audit can
+ * check the wording against the decision without re-reading the rules.
+ */
+export type DecidedAction =
+  | "open"
+  | "state_priority"
+  | "challenge"
+  | "request_reason"
+  | "concede_distributive"
+  | "accept"
+  | "hold"
+  | "soft_close"
+  | "impasse";
+
 export interface CounterpartDecision {
   stage: StageId;
+  action: DecidedAction;
   /** The package the counterpart puts forward, if it makes an offer. */
   proposal: Package | null;
   /** Does it accept what is on the table? */
@@ -86,10 +128,33 @@ export interface CounterpartDecision {
   scoreOfIncoming: number;
   /** Set when the exchange ends without agreement. */
   impasse: boolean;
+  /**
+   * True when the counterpart is withholding a concession because no reason
+   * has been given for the requirement being asked for (Design §4 이유 요건).
+   * Judgement is deferred once, not refused.
+   */
+  awaitingReason: boolean;
 }
 
 /**
- * One step down on an issue, from the counterpart's point of view.
+ * State the acceptance rule reads, beyond the package itself.
+ *
+ * `reasonGivenForRequirement` is decided by the system from the structured
+ * action log — was a reason card voiced, or (in Baseline) did the participant
+ * attach one to a message — never by asking the model to judge whether an
+ * argument was any good. Design §4 is explicit that quality judgement is not
+ * introduced, so the rule stays deterministic; the effect of a reason's
+ * content lives in the perception measures instead.
+ */
+export interface ExchangeState {
+  reasonGivenForRequirement: boolean;
+  /** Whether the one-turn grace period has already been spent. */
+  reasonAlreadyRequested: boolean;
+  secondsRemaining?: number;
+}
+
+/**
+ * One step down on an issue, from the conceding role's point of view.
  * Options are always ordered best-first for the role the issue favours, so a
  * concession is a move toward the far end of that role's preference.
  */
@@ -108,11 +173,48 @@ function concede(
 }
 
 /**
- * The counterpart's move at one stage (Appendix E2, mirrored by E3).
+ * Is the incoming package asking the counterpart to give ground on the
+ * participant's requirement issue, relative to where the counterpart stands?
+ *
+ * This is what the reason requirement attaches to. Asking for something the
+ * counterpart has already conceded is not a request, and should not trigger a
+ * demand for justification.
+ */
+function asksForRequirementConcession(
+  task: NegotiationTask,
+  participantRole: Role,
+  incoming: Package | null,
+  held: Package,
+): boolean {
+  if (!incoming) return false;
+  const counterpartRole: Role =
+    participantRole === "leader" ? "member" : "leader";
+  const issue = requirementIssue(task, participantRole);
+  const asked = incoming[issue.id];
+  const standing = held[issue.id];
+  if (!asked || !standing) return false;
+  const rank = (id: string) =>
+    [...issue.options]
+      .sort((a, b) => b.points[counterpartRole] - a.points[counterpartRole])
+      .findIndex((o) => o.id === id);
+  // A higher rank number is worse for the counterpart, so asking for a worse
+  // position than it currently holds is asking it to concede.
+  return rank(asked) > rank(standing);
+}
+
+/**
+ * The counterpart's move at one stage (Design §4).
  *
  * Stage 3 makes no offer at all — the standardized challenge occupies that
- * turn on its own, so that the challenge is a fixed stimulus rather than
- * something bundled with a concession that would vary its strength.
+ * turn on its own, so the challenge is a fixed stimulus rather than something
+ * bundled with a concession that would vary its strength.
+ *
+ * THE REASON REQUIREMENT is applied at stage 4. If the participant is asking
+ * the counterpart to move on their requirement and has never given a reason
+ * for it, the counterpart asks for one and defers judgement by one turn. This
+ * is what keeps reasons mechanically consequential rather than decorative —
+ * Design §4 introduces it precisely because a task settled by option-swapping
+ * alone would disconnect the outcome from the thing the study manipulates.
  */
 export function counterpartStep(
   task: NegotiationTask,
@@ -120,81 +222,133 @@ export function counterpartStep(
   stage: StageId,
   incoming: Package | null,
   lastCounterpartPackage: Package | null,
+  state: ExchangeState = {
+    reasonGivenForRequirement: true,
+    reasonAlreadyRequested: false,
+  },
 ): CounterpartDecision {
+  const participantRole: Role =
+    counterpartRole === "leader" ? "member" : "leader";
   const opening = counterpartOpening(task, counterpartRole);
   const held = lastCounterpartPackage ?? opening;
   const score = incoming ? scorePackage(task, incoming, counterpartRole) : 0;
 
+  const base = {
+    stage,
+    scoreOfIncoming: score,
+    impasse: false,
+    awaitingReason: false,
+  };
+
   switch (stage) {
     case 1:
-      return {
-        stage,
-        proposal: opening,
-        accepts: false,
-        scoreOfIncoming: score,
-        impasse: false,
-      };
+      return { ...base, action: "open" as const, proposal: opening, accepts: false };
 
     case 2:
       // Explains its own priority and asks about yours. Position unchanged.
       return {
-        stage,
+        ...base,
+        action: "state_priority" as const,
         proposal: null,
         accepts: false,
-        scoreOfIncoming: score,
-        impasse: false,
       };
 
     case 3:
-      // The standardized focal challenge, and nothing else.
+      // The standardized challenge, and nothing else.
       return {
-        stage,
+        ...base,
+        action: "challenge" as const,
         proposal: null,
         accepts: false,
-        scoreOfIncoming: score,
-        impasse: false,
       };
 
     case 4: {
-      if (score >= ACCEPTANCE.T4) {
+      const needsReason =
+        !state.reasonGivenForRequirement &&
+        !state.reasonAlreadyRequested &&
+        asksForRequirementConcession(task, participantRole, incoming, held);
+
+      if (needsReason) {
+        // Defer judgement by exactly one turn and ask why. The package is not
+        // rejected — it has not been evaluated yet.
         return {
-          stage,
-          proposal: incoming,
-          accepts: true,
-          scoreOfIncoming: score,
-          impasse: false,
+          ...base,
+          action: "request_reason" as const,
+          proposal: null,
+          accepts: false,
+          awaitingReason: true,
         };
       }
-      // Otherwise concede one step on the distributive issue — the cheapest
-      // currency it has, and the one that keeps the logroll path open.
+
+      if (score >= ACCEPTANCE.T_MID && state.reasonGivenForRequirement) {
+        return {
+          ...base,
+          action: "accept" as const,
+          proposal: incoming,
+          accepts: true,
+        };
+      }
+
+      if (score >= ACCEPTANCE.T_MID) {
+        // Generous package, unexplained requirement: the counterpart takes the
+        // terms it was offered but holds the requirement where it stands. The
+        // rule is "no concession without a reason", not "no agreement without
+        // a reason" — refusing a package that clears the threshold outright
+        // would make the reason rule a second acceptance test, which is not
+        // what Design §4 specifies.
+        const issue = requirementIssue(task, participantRole);
+        const withHeldRequirement = {
+          ...(incoming as Package),
+          [issue.id]: held[issue.id],
+        };
+        return {
+          ...base,
+          action: "hold" as const,
+          proposal: withHeldRequirement,
+          accepts: false,
+        };
+      }
+
+      // Otherwise trade: concede a step on the distributive issue — the
+      // cheapest currency it has, and the one that keeps the logroll open.
       const timing = distributiveIssue(task);
       return {
-        stage,
+        ...base,
+        action: "concede_distributive" as const,
         proposal: {
           ...held,
           [timing.id]: concede(task, timing.id, held[timing.id], counterpartRole),
         },
         accepts: false,
-        scoreOfIncoming: score,
-        impasse: false,
       };
     }
 
     case 5: {
-      const accepts = score >= ACCEPTANCE.T5;
+      const softClose =
+        state.secondsRemaining !== undefined &&
+        state.secondsRemaining <= SOFT_CLOSE_SECONDS;
+
+      if (score >= ACCEPTANCE.T_FINAL) {
+        return {
+          ...base,
+          action: (softClose ? "soft_close" : "accept") as DecidedAction,
+          proposal: incoming,
+          accepts: true,
+        };
+      }
       return {
-        stage,
-        proposal: accepts ? incoming : null,
-        accepts,
-        scoreOfIncoming: score,
-        impasse: !accepts,
+        ...base,
+        action: "impasse" as const,
+        proposal: null,
+        accepts: false,
+        impasse: true,
       };
     }
   }
 }
 
 // ---------------------------------------------------------------------------
-// Proxy behaviour (Appendix E4 / E5)
+// Proxy behaviour (Design §4, §7)
 // ---------------------------------------------------------------------------
 
 export interface ProxyPlan {
@@ -202,24 +356,22 @@ export interface ProxyPlan {
   opening: Package;
   counterpackage: Package;
   tentative: Package;
-  /** Explorer only: the package it floats as "one option could be…". */
-  probe: Package | null;
 }
 
 /**
- * Turns a mandate into the three packages the proxy will actually put forward.
+ * Turns a mandate into the packages the proxy will put forward.
  *
- * DELEGATE executes the participant's own concession path: it opens at their
- * preferred package and, when challenged, spends the issues they marked as
- * having room, never crossing a hard boundary.
+ * BOTH POLICIES COMPUTE THIS IDENTICALLY. That is deliberate and it is the
+ * heart of the design: Design §7 defines Delegate and Explorer as differing in
+ * REASON USE POLICY, not in what they are willing to trade. If an Explorer
+ * could reach further than a Delegate, the `Explorer − Delegate` contrast
+ * would be confounded by concession reach, and no perception measure could
+ * separate the two.
  *
- * EXPLORER has the same boundaries but picks its trial order by joint value
- * instead — which is why it converges on the logroll (give scope, hold focal)
- * rather than on whatever order the participant happened to write down.
- *
- * Both produce the same NUMBER of visible offers. The difference is which
- * packages get tried and how they are framed, never how much airtime they get
- * (Methods §Delegate–Explorer matching).
+ * The Explorer difference lives entirely in which reasons it may voice — see
+ * `plausibleReasons` in lib/tasks — and Design §7's exposure control requires
+ * the extra reason to fit INSIDE the scheduled stage message, never as an
+ * extra turn.
  */
 export function buildProxyPlan(
   task: NegotiationTask,
@@ -228,89 +380,49 @@ export function buildProxyPlan(
     issues: Array<{
       issueId: string;
       preferredOptionId: string | null;
-      acceptableFloorOptionId: string | null;
-      hardBoundaryOptionId: string | null;
+      minimumOptionId: string | null;
     }>;
   },
-  policy: "delegate" | "explorer",
 ): ProxyPlan {
-  const counterpartRole: Role =
-    participantRole === "member" ? "leader" : "member";
-  const focal = focalIssue(task);
-  const scope = scopeIssue(task);
+  const requirement = requirementIssue(task, participantRole);
+  const theirs = counterRequirementIssue(task, participantRole);
   const timing = distributiveIssue(task);
 
-  const pick = (issueId: string, which: "preferred" | "floor" | "boundary") => {
+  const preferred = (issueId: string) => {
     const im = mandate.issues.find((i) => i.issueId === issueId);
-    const issue = task.issues.find((i) => i.id === issueId)!;
-    const chosen =
-      which === "preferred"
-        ? im?.preferredOptionId
-        : which === "floor"
-          ? im?.acceptableFloorOptionId
-          : im?.hardBoundaryOptionId;
-    return chosen ?? issue.options[0].id;
+    return im?.preferredOptionId ?? bestFor(task, issueId, participantRole);
   };
-
-  const opening: Package = Object.fromEntries(
-    task.issues.map((i) => [i.id, pick(i.id, "preferred")]),
-  );
 
   /**
    * The furthest the proxy may go on an issue.
    *
-   * The fall-through matters, and getting it wrong broke the Delegate arm.
-   * "No boundary and no floor" is a participant saying they do not mind about
-   * this term — the natural mandate for the issue they are willing to spend.
-   * Falling back to their OPENING turned that into "never move", so a
-   * Delegate conceded nothing on scope while an Explorer gave it away, and
-   * the same participant with the same mandate got an agreement in one arm
-   * and a rejection in the other. That is a mechanical difference between the
-   * conditions, which is precisely what §Delegate–Explorer matching exists to
-   * prevent.
-   *
-   * With nothing set, the limit is the worst option for the principal: they
-   * declined to constrain it, so all of it is available to trade.
+   * The fall-through matters. A participant who set no minimum on a term is
+   * saying they do not mind about it — the natural mandate for the term they
+   * are willing to spend. Falling back to their OPENING would turn that into
+   * "never move", which is a broken proxy rather than a cautious one, and it
+   * once produced an agreement in one arm and a rejection in the other for
+   * the same mandate.
    */
   const limit = (issueId: string) => {
     const im = mandate.issues.find((i) => i.issueId === issueId);
-    if (im?.hardBoundaryOptionId) return im.hardBoundaryOptionId;
-    if (im?.acceptableFloorOptionId) return im.acceptableFloorOptionId;
-    return worstFor(task, issueId, participantRole);
+    return im?.minimumOptionId ?? worstFor(task, issueId, participantRole);
   };
 
-  // The counterpackage: hold the focal at its limit and spend the other two
-  // terms, but not past the point where the package is worth less to the
-  // principal than walking away. Both policies compute it the same way,
-  // because both are bound by the same mandate — a Delegate that could not
-  // spend what the participant left open would be a broken control, not a
-  // stricter one.
-  //
-  // WHERE THE POLICIES ACTUALLY DIFFER, then, is not how far the proxy may go
-  // but what it puts on the table on the way: the Explorer floats an
-  // additional combination as an option (stage 2) and may support it with an
-  // argument anyone in the role could make. That difference is the
-  // manipulation. Concession reach is not, and must not become one.
+  const opening: Package = Object.fromEntries(
+    task.issues.map((i) => [i.id, preferred(i.id)]),
+  );
+
+  // Hold the requirement at its stated floor and spend the other two terms,
+  // stopping before the package is worth less than walking away.
   const counterpackage = spendDownTo(
     task,
     participantRole,
-    { ...opening, [focal.id]: limit(focal.id) },
-    [scope.id, timing.id],
+    { ...opening, [requirement.id]: limit(requirement.id) },
+    [theirs.id, timing.id],
     limit,
   );
 
-  const tentative = counterpackage;
-
-  const probe: Package | null =
-    policy === "explorer"
-      ? {
-          ...opening,
-          [focal.id]: limit(focal.id),
-          [scope.id]: bestFor(task, scope.id, counterpartRole),
-        }
-      : null;
-
-  return { opening, counterpackage, tentative, probe };
+  return { opening, counterpackage, tentative: counterpackage };
 }
 
 /**
@@ -319,8 +431,7 @@ export function buildProxyPlan(
  *
  * No mandate field says "and don't accept less than walking away" because it
  * does not need to: refusing an agreement worth less than no agreement is not
- * a preference, it is what the fallback means. Spending every open term
- * without this produced packages the principal would rather have refused.
+ * a preference, it is what the fallback means.
  *
  * Terms are spent in order of what they cost the principal per point the
  * counterpart gains — cheapest first, which is the logroll.
@@ -355,7 +466,6 @@ function spendDownTo(
     const stop = order.findIndex((o) => o.id === target);
     const start = order.findIndex((o) => o.id === pkg[issueId]);
 
-    // Step toward the limit while the package still beats the fallback.
     for (let at = start + 1; at <= stop; at += 1) {
       const next = { ...pkg, [issueId]: order[at].id };
       if (scorePackage(task, next, principal) < task.reservationPoints) break;
@@ -366,22 +476,14 @@ function spendDownTo(
   return pkg;
 }
 
-function bestFor(
-  task: NegotiationTask,
-  issueId: string,
-  role: Role,
-): string {
+function bestFor(task: NegotiationTask, issueId: string, role: Role): string {
   const issue = task.issues.find((i) => i.id === issueId)!;
   return [...issue.options].sort((a, b) => b.points[role] - a.points[role])[0]
     .id;
 }
 
 /** The option this role likes least — everything on the table to give away. */
-function worstFor(
-  task: NegotiationTask,
-  issueId: string,
-  role: Role,
-): string {
+function worstFor(task: NegotiationTask, issueId: string, role: Role): string {
   const issue = task.issues.find((i) => i.id === issueId)!;
   const ranked = [...issue.options].sort(
     (a, b) => b.points[role] - a.points[role],
@@ -395,10 +497,12 @@ function worstFor(
 
 export interface OutcomeCoding {
   agreed: boolean;
-  /** Behavioural code SURV-FINAL — is the focal threshold in the final package? */
-  focalPreserved: boolean;
-  /** Where the focal landed, as an option index (0-based). */
-  focalOptionIndex: number;
+  /** Is the participant's own requirement threshold in the final package? */
+  requirementPreserved: boolean;
+  /** Is the counterpart's requirement threshold in it? */
+  counterRequirementPreserved: boolean;
+  /** Where the participant's requirement landed, as an option index (0-based). */
+  requirementOptionIndex: number;
   participantPoints: number;
   counterpartPoints: number;
   jointPoints: number;
@@ -414,7 +518,8 @@ export function codeOutcome(
 ): OutcomeCoding {
   const counterpartRole: Role =
     participantRole === "member" ? "leader" : "member";
-  const focal = focalIssue(task);
+  const requirement = requirementIssue(task, participantRole);
+  const theirs = counterRequirementIssue(task, participantRole);
 
   // No agreement: both sides take the fallback. `clearsReservation` is false
   // rather than true — the participant did not clear their fallback, they
@@ -423,8 +528,9 @@ export function codeOutcome(
   if (!finalPackage) {
     return {
       agreed: false,
-      focalPreserved: false,
-      focalOptionIndex: -1,
+      requirementPreserved: false,
+      counterRequirementPreserved: false,
+      requirementOptionIndex: -1,
       participantPoints: task.reservationPoints,
       counterpartPoints: task.reservationPoints,
       jointPoints: task.reservationPoints * 2,
@@ -434,12 +540,25 @@ export function codeOutcome(
 
   const participantPoints = scorePackage(task, finalPackage, participantRole);
   const counterpartPoints = scorePackage(task, finalPackage, counterpartRole);
-  const index = optionIndex(task, focal.id, finalPackage[focal.id] ?? null);
+  const index = optionIndex(
+    task,
+    requirement.id,
+    finalPackage[requirement.id] ?? null,
+  );
 
   return {
     agreed,
-    focalPreserved: index >= 0 && index <= (focal.focalThresholdIndex ?? 1),
-    focalOptionIndex: index,
+    requirementPreserved: preservesRequirement(
+      task,
+      participantRole,
+      finalPackage[requirement.id] ?? null,
+    ),
+    counterRequirementPreserved: preservesRequirement(
+      task,
+      counterpartRole,
+      finalPackage[theirs.id] ?? null,
+    ),
+    requirementOptionIndex: index,
     participantPoints,
     counterpartPoints,
     jointPoints: participantPoints + counterpartPoints,

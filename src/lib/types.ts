@@ -3,6 +3,14 @@
  *
  * These mirror the intended Supabase schema (see docs/DATA_MODEL.md).
  * Nothing here talks to a database — persistence is behind `lib/store`.
+ *
+ * WHAT CHANGED IN ver.2.4 (Experimental Design Ver.2.4). The design became
+ * role-symmetric: a Leader and a Member now each hold their own socially
+ * costly requirement, on their own priority issue, backed by their own six
+ * reason cards. Everything that used to be Member-only — the requirement, the
+ * private circumstance, the trajectory — is now indexed by role. The yoked
+ * receiver stimulus is gone with it (§13): when both sides are senders, there
+ * is no receiver-only arm left to hold constant.
  */
 
 // ---------------------------------------------------------------------------
@@ -35,7 +43,8 @@ export type ScenarioId = TaskId | "practice";
 export type SessionOrder = "baseline_first" | "proxy_first";
 
 /**
- * The four counterbalanced sequences from Methods §Experimental Design.
+ * The four counterbalanced sequences (Design §2 "block-randomized
+ * counterbalance").
  * seq1: Baseline-TaskA -> Proxy-TaskB
  * seq2: Proxy-TaskA  -> Baseline-TaskB
  * seq3: Baseline-TaskB -> Proxy-TaskA
@@ -47,8 +56,8 @@ export type SequenceId = "seq1" | "seq2" | "seq3" | "seq4";
  * A fully resolved assignment for one participant.
  *
  * IMPORTANT: participants never see these values as labels. The UI must never
- * render "you are in the Explorer condition" — sessions are shown as
- * "Session 1 / Session 2" and the interface differs only structurally.
+ * render "you are in the Explorer condition" — tasks are shown as "Task 1 /
+ * Task 2" and the interface differs only structurally.
  */
 export interface Assignment {
   participantKey: string;
@@ -56,7 +65,7 @@ export interface Assignment {
   role: Role;
   sequenceId: SequenceId;
   sessionOrder: SessionOrder;
-  /** Ordered plan for the two main sessions. */
+  /** Ordered plan for the two negotiation tasks. */
   sessions: [SessionPlan, SessionPlan];
   assignedAt: string;
 }
@@ -90,104 +99,127 @@ export interface IssueOption {
 }
 
 /**
- * What an issue is for, structurally (Methods ver.1.8 §Common payoff
- * architecture). The task is `2 integrative + 1 distributive`:
+ * What an issue is for, structurally (Design §5 "Issue 구성 rationale").
+ * The task is `2 integrative + 1 distributive`:
  *
- *  - `leader_integrative`  scope. Worth a lot to the Leader, cheap to the Member.
- *  - `member_focal`        the socially costly requirement. Worth a lot to the
- *                          Member, cheap to the Leader. This is the issue the
- *                          whole study is about.
- *  - `distributive`        timing. Constant-sum, so there is push and pull and
- *                          a second currency for the logroll.
+ *  - `leader_priority`  The Leader's requirement lives here. Worth a lot to
+ *                       the Leader, cheap to the Member.
+ *  - `member_priority`  The Member's requirement lives here. The mirror image.
+ *  - `distributive`     Timing. Constant-sum, so there is push and pull and a
+ *                       second currency for the logroll.
  *
- * A `compatible` type is deliberately absent: discovering hidden shared value
- * is not this study's mechanism, and the issue budget is spent on the focal
- * problem instead.
+ * Two integrative issues, one per role, is the MINIMUM for a role-symmetric
+ * design: with only one, a single role would hold the only requirement and the
+ * symmetry collapses. Two distributive issues would turn the task into
+ * haggling, which is not what this study measures. A `compatible` type is
+ * deliberately absent — both sides preferring the same option needs no
+ * conversation, so it carries no information.
  */
 export type IssueType =
-  | "leader_integrative"
-  | "member_focal"
+  | "leader_priority"
+  | "member_priority"
   | "distributive";
 
 export interface Issue {
   id: string;
   label: string;
+  /** One sentence, in the participant's own words (Design §5 exposure column). */
   description: string;
   type: IssueType;
   options: IssueOption[];
   /**
-   * Options 1..n are ordered so that index 0 is best for whichever role the
-   * issue favours. For `member_focal`, the adequacy threshold is the index
-   * past which the requirement counts as not preserved.
+   * Index past which the requirement on this issue counts as not preserved.
+   * Options are ordered best-first for whichever role the issue favours, so
+   * index 1 means "Options 1-2 hold the requirement".
    *
-   * Present only on the focal issue.
+   * Present on both integrative issues — each role has a requirement now.
    */
-  focalThresholdIndex?: number;
-  /** One-line "why this matters to you", per role (Appendix A3/A4/A6/A7). */
+  requirementThresholdIndex?: number;
+  /**
+   * One line of "why this is scored the way it is", per role. Design §5
+   * requires this to sit NEXT TO the score at all times, so nobody optimizes
+   * a number without reading the situation behind it.
+   */
   rationale: Record<Role, string>;
 }
 
 /**
- * The two layers of the focal requirement's reason (Methods ver.1.8 §Private
- * rationale). The separation is the point: it lets a Member entrust a usable
- * reason without disclosing the private circumstance behind it, and which
- * layer they mark sayable is itself the disclosure measure.
+ * One checkbox on the mandate screen (Design §5 이유 카드, §7 UI 규칙).
+ *
+ * The two layers are the measure. `work` cards cost nothing to say; `sensitive`
+ * cards are the participant's own reputational exposure, and how many of them
+ * they are willing to hand over is `REASON-SCOPE`.
+ *
+ * ver.2.4 replaced the old two-level Sayable/Private permission with plain
+ * multi-select checkboxes: a checked card may be spoken, an unchecked card may
+ * not. That is one decision per card instead of two, and the count is directly
+ * interpretable as delegation breadth.
  */
 export interface ReasonCard {
   id: string;
-  layer: "work" | "private";
-  /** Shown on the card. */
+  layer: "work" | "sensitive";
+  /** Shown on the card, verbatim from Design §5. */
   text: string;
-  /** Default permission — work reasons open, private reasons closed. */
-  defaultPermission: ReasonPermission;
+  /**
+   * Which phase of the one situation this card carries — `incident`,
+   * `undisclosed`, `worry`. Sensitive cards only.
+   *
+   * The three sensitive cards are deliberately three faces of ONE event, not
+   * three separate secrets: that is what makes them memorable, and it lets
+   * `REASON-SCOPE` record how deep a participant was willing to go rather than
+   * just how many boxes they ticked.
+   */
+  phase?: "incident" | "undisclosed" | "worry";
 }
-
-/**
- * Two levels only (Appendix A8). A third level ("say it but reframe it") was
- * cut in ver.1.8: it asked participants to reason about paraphrase policy,
- * which is the system's job, not theirs.
- */
-export type ReasonPermission = "sayable" | "private";
 
 export interface NegotiationTask {
   id: ScenarioId;
   title: string;
-  /** Shared context both sides can see (Appendix A2/A5). */
+  /** Shared context both sides can see (Design §6 공통 안내). */
   publicBrief: string;
   /** Role-specific confidential briefing. */
   roleBriefs: Record<Role, RoleBrief>;
   issues: Issue[];
-  /** The issue id of the Member-priority focal requirement. */
-  focalIssueId: string;
   /**
-   * The standardized focal challenge the challenging side sends at Stage 3
-   * (Appendix B3). Fixed wording — this is the manipulation, so it may not
-   * vary by participant.
+   * Which issue carries each role's requirement. Both roles have one now, so
+   * this is a map rather than a single `focalIssueId`.
    */
-  standardizedChallenge: string;
+  requirementIssueId: Record<Role, string>;
+  /**
+   * The standardized challenge each side sends at Stage 3 (Design §4 단계 3:
+   * "양측이 상대의 핵심 요구를 한 번씩 낮춰 달라고 요청함 (고정 문구)").
+   *
+   * Keyed by the role being challenged, because the challenge names that
+   * role's requirement. Fixed wording — this is the manipulation, so it may
+   * not vary by participant.
+   */
+  standardizedChallenge: Record<Role, string>;
   /** Fallback points if no agreement is ratified. Same for both roles. */
   reservationPoints: number;
 }
 
 export interface RoleBrief {
   title: string;
-  /** Where you sit and what you can do (Appendix A1 + role story opener). */
+  /** Where you sit and what you can do. */
   organizationalPosition: string;
   /**
-   * The role story (Appendix A3/A4/A6/A7). Several sentences of concrete
+   * The role story (Design §6 안내문). Several sentences of concrete
    * situation, because a scorecard alone does not make anyone reluctant to
-   * speak. Rendered as prose, not bullets.
+   * speak. The sensitive cards must already be present in this narrative or
+   * they arrive out of nowhere on the mandate screen.
    */
   roleStory: string;
   /** Plain-language statement of what this side is trying to get. */
   objectives: string[];
   /**
-   * The two-layer reason, on the role that holds the focal requirement.
-   * Absent for the role the focal issue is cheap for.
+   * Six cards: 3 work reasons + 3 phases of the one sensitive situation.
+   * Both roles have these now.
    */
-  focalReasons?: ReasonCard[];
-  /** "At least 2 remote days per week (Options 1-2)." Focal-holder only. */
-  focalThresholdNote?: string;
+  reasonCards: ReasonCard[];
+  /** "At least 3 review checkpoints (Options 1-2)." */
+  requirementNote: string;
+  /** Why saying the sensitive reason out loud would cost something. */
+  disclosureRisk: string;
   /** What happens if nothing is ratified. */
   batnaSummary: string;
 }
@@ -197,35 +229,50 @@ export interface RoleBrief {
 // ---------------------------------------------------------------------------
 
 /**
- * One issue's instruction to the Proxy (Methods ver.1.8 §E8 mandate table).
+ * One issue's instruction to the Proxy (Design §8 Proxy task 흐름 step 2).
  *
- * Three fields per issue — preferred, acceptable floor, hard boundary — which
- * is the whole mandate for that issue. Whether the participant put the focal
- * threshold in `hardBoundary` is the MANDATE behavioural code.
+ * Two fields per issue — what you want, and the least you will take. Design
+ * §5 principle 4 is explicit that all three issues are entered the same way,
+ * so the UI may not single out the requirement issue with an extra control.
  */
 export interface IssueMandate {
   issueId: string;
   /** Where to open. */
   preferredOptionId: string | null;
-  /** Worst option the proxy may concede to without asking. */
-  acceptableFloorOptionId: string | null;
-  /** A line the proxy may not cross at all. Null means no hard boundary. */
-  hardBoundaryOptionId: string | null;
+  /** The least the proxy may settle for. Doubles as the hard boundary. */
+  minimumOptionId: string | null;
 }
 
 export interface Mandate {
   sessionIndex: 1 | 2;
   issues: IssueMandate[];
-  /** Permission per reason card, keyed by `ReasonCard.id`. */
-  reasonPermissions: Record<string, ReasonPermission>;
-  /** May the proxy offer "if you hold X, I can move on Y" packages? */
-  allowConditionalTrade: boolean;
+  /**
+   * Ids of the reason cards the AI Proxy is allowed to say. Unchecked cards
+   * may inform the proxy's package choice but must never appear in its text
+   * (Design §7).
+   */
+  authorizedReasonIds: string[];
   revisionCount: number;
 }
 
+/**
+ * The delegation-breadth measure derived from a mandate (Design §9.3.1
+ * `REASON-SCOPE`).
+ *
+ * Reported as its parts, never as one number: "checked four cards" means
+ * something entirely different depending on whether any of them were
+ * sensitive, and how far into the situation they went.
+ */
+export interface ReasonScope {
+  totalChecked: number;
+  workChecked: number;
+  sensitiveChecked: number;
+  /** How deep into the situation they went, or null if no sensitive card. */
+  deepestPhase: "incident" | "undisclosed" | "worry" | null;
+}
+
 // ---------------------------------------------------------------------------
-// Five-stage controlled interaction (Methods ver.1.8 §Five-stage controlled
-// interaction, Appendix E)
+// Five-stage fixed progression (Design §4)
 // ---------------------------------------------------------------------------
 
 /**
@@ -233,27 +280,17 @@ export interface Mandate {
  * is what makes the transcripts comparable across conditions.
  *
  *  1 opening    — a full three-issue package from each side.
- *  2 exchange   — one priority question and one authorized rationale each.
- *  3 challenge  — the standardized focal challenge. No new offer this turn.
- *  4 trade      — a counterpackage that may tie the focal to scope or timing.
+ *  2 exchange   — one priority question and one authorized reason each.
+ *  3 challenge  — each side asks the other to lower its requirement. No new
+ *                 offer this turn.
+ *  4 trade      — a counterpackage holding the requirement and paying for it
+ *                 elsewhere.
  *  5 tentative  — the package that goes to human review.
  */
 export type StageId = 1 | 2 | 3 | 4 | 5;
 
 /** A complete selection across all three issues. */
 export type Package = Record<string, string>;
-
-/**
- * Which of the prevalidated argument frames a visible rationale used
- * (Appendix B4). Logged for the source-grounding audit; `common_practice` is
- * Explorer-only.
- */
-export type RationaleFrame =
-  | "risk_reduction"
-  | "shared_value"
-  | "feasibility"
-  | "conditional_exchange"
-  | "common_practice";
 
 // ---------------------------------------------------------------------------
 // Transcript
@@ -264,6 +301,8 @@ export type Speaker =
   | "counterpart"
   | "participant_proxy"
   | "counterpart_proxy"
+  /** The counterpart principal, who speaks only at ratification (Design §4). */
+  | "counterpart_principal"
   | "system";
 
 export interface TranscriptMessage {
@@ -276,13 +315,24 @@ export interface TranscriptMessage {
   stage?: StageId;
   /** The package proposed with this message, if any. */
   proposal?: Package;
-  /** Which prevalidated frame the visible rationale used, if any. */
-  frame?: RationaleFrame;
+  /**
+   * Which reason card this message voiced, if any. Design §4 makes reason
+   * delivery mechanically consequential — the counterpart will not concede on
+   * a requirement no reason was ever given for — so this is read by the state
+   * machine, not just logged.
+   */
+  reasonCardId?: string;
   /**
    * Internal provenance for the Explorer condition — stored for audit but
-   * NEVER rendered to the participant (Methods §Explorer Proxy condition).
+   * NEVER rendered to the participant (Design §7 "이유 출처 표시").
    */
-  internalProvenance?: "principal_mandate" | "agent_option";
+  internalProvenance?: "principal_reason" | "pool_reason";
+  /**
+   * The move the state machine chose for this turn, stored beside the rendered
+   * sentence. Design §4 requires the pair so an audit can show the model never
+   * stepped outside the rules (pilot gate 9).
+   */
+  decidedAction?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -304,30 +354,22 @@ export interface CandidateAgreement {
 export type RatificationChoice = "ratify" | "request_revision" | "reject";
 
 /**
- * The Leader's structured response to the focal requirement, coded as
- * Requirement Uptake (Methods ver.1.8 §Primary outcome 3).
+ * The requirement's level at each point in the trajectory (Design §9.3.1).
  *
- *  accommodate  2 — threshold accepted as it stands
- *  trade        1 — threshold kept, but conditional on a concession elsewhere
- *  reduce       0 — asked to go below the threshold, or refused
+ * Reported as transitions, never summed into a scale — an additive score
+ * would hide that O1->O2 keeps the requirement and O2->O3 breaks it.
  */
-export type FocalResponse = "accommodate" | "trade" | "reduce";
-
-/**
- * The focal requirement's level at each point in the trajectory (Methods
- * ver.1.8 §Primary outcome 1). Reported as transitions, never summed into a
- * scale — an additive score would hide that O1->O2 keeps the threshold and
- * O2->O3 breaks it.
- */
-export interface FocalTrajectory {
+export interface RequirementTrajectory {
   sessionIndex: 1 | 2;
-  /** Recorded before the session's condition is revealed. */
-  privateTargetOptionId: string | null;
-  /** Proxy only: the mandate's floor on the focal issue. */
-  mandateOptionId: string | null;
+  /** From the pre-negotiation preference screen. */
+  preferredOptionId: string | null;
+  /** The floor entered on the same screen. */
+  minimumOptionId: string | null;
   openingOptionId: string | null;
   afterChallengeOptionId: string | null;
   finalOptionId: string | null;
+  /** Whether a reason was ever voiced for this requirement, and which. */
+  reasonsVoicedCardIds: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +388,7 @@ export type ResponseValue =
   | string[]
   | Record<string, string | number | null>;
 
-/** Keyed by item id (e.g. "FNE1", "SAFE2_R"). */
+/** Keyed by item id (e.g. "PERC1", "OWN-AI5"). */
 export type SurveyResponses = Record<string, ResponseValue>;
 
 // ---------------------------------------------------------------------------
