@@ -163,6 +163,21 @@ function fallbackText(
   return `${side}: ${terms}.`;
 }
 
+/**
+ * A stable opaque token for a reason id.
+ *
+ * Not a security measure — the client is not an adversary — but the difference
+ * between "the same reason as last turn" (which the budget needs) and "this
+ * sentence came from the pool" (which the participant must not learn).
+ */
+function hashReason(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    h = (h * 31 + id.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h) % 9973;
+}
+
 export async function POST(request: Request) {
   let body: RequestBody;
   try {
@@ -337,7 +352,15 @@ export async function POST(request: Request) {
       stage,
       // The budget spans the whole task, so the client carries the history —
       // this route is stateless and one action cannot know what came before.
+      //
+      // The history arrives as opaque tokens (they went out that way, so the
+      // Explorer's additions are not named in the network tab), so the current
+      // action is tokenised to match. The budget only needs "is this the same
+      // reason as one already used", which survives the mapping.
       reasonsUsed: isParticipantSide ? (body.reasonsUsed ?? []) : undefined,
+      reasonKey: action.reasonSourceId
+        ? `r${hashReason(action.reasonSourceId)}`
+        : null,
     });
 
     // A blocked action loses its WORDING, not the move behind it.
@@ -384,9 +407,23 @@ export async function POST(request: Request) {
       accepted,
       impasse,
       blocked,
-      // So the client can carry the budget forward to the next turn.
-      reasonUsed: action.reasonSourceId,
-      guardrailViolations: validation.valid ? [] : validation.violations,
+      // The budget is a COUNT, and the client only needs the count.
+      //
+      // Returning the card id itself was a provenance leak: under Explorer a
+      // `pool:` prefix in the network tab names exactly which messages the AI
+      // added, which is the judgement OTHER-AI4 asks the participant to make
+      // unaided. An opaque token keeps distinct reasons distinguishable from
+      // each other without saying what any of them is.
+      reasonToken: action.reasonSourceId
+        ? `r${hashReason(action.reasonSourceId)}`
+        : null,
+      // Violation CODES only. The details name red lines, withheld reason
+      // cards and the validator's reasoning — a participant who opened the
+      // network tab and found "disclosure_permission_violation: reason a_m_s2
+      // was not checked" would have been shown the card they withheld.
+      guardrailViolations: validation.valid
+        ? []
+        : validation.violations.map((v) => v.code),
       done: turn + 1 >= TOTAL_TURNS,
       totalTurns: TOTAL_TURNS,
       stubbed,

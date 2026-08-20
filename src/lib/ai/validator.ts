@@ -57,6 +57,15 @@ export interface ValidationContext {
    * one fits.
    */
   reasonsUsed?: string[];
+  /**
+   * The current action's reason, in the same form as `reasonsUsed`.
+   *
+   * The caller passes opaque tokens rather than card ids, because those tokens
+   * travel to the client for the running budget and a card id there would name
+   * the Explorer's additions. The budget question — "is this the same reason as
+   * one already used" — is answerable either way.
+   */
+  reasonKey?: string | null;
 }
 
 /**
@@ -196,12 +205,13 @@ export function validateAction(
   // differ in the KIND of argument allowed, not in how much of it there is.
   // Pilot gate 10 checks the same property from the other end, on the stored
   // transcripts.
-  if (action.reasonSourceId && ctx.reasonsUsed) {
+  const budgetKey = ctx.reasonKey ?? action.reasonSourceId;
+  if (budgetKey && ctx.reasonsUsed) {
     const distinct = new Set(ctx.reasonsUsed);
-    if (!distinct.has(action.reasonSourceId) && distinct.size >= 2) {
+    if (!distinct.has(budgetKey) && distinct.size >= 2) {
       violations.push({
         code: "rationale_budget_exceeded",
-        detail: `Already used ${distinct.size} different reasons this task; ${action.reasonSourceId} would be a third.`,
+        detail: `Already used ${distinct.size} different reasons this task; this would be a third.`,
       });
     }
   }

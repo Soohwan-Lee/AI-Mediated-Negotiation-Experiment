@@ -376,8 +376,10 @@ export function ProxyTask({
       stage: number;
       optionId: string | null;
     }> = [];
-    // Which reason cards this side has voiced so far. The reason budget is a
-    // whole-task limit and the route is stateless, so the count lives here.
+    // Opaque tokens for the reasons this side has voiced. The budget is a
+    // whole-task limit and the route is stateless, so the count lives here —
+    // but the client is deliberately not told WHICH reasons they were, since
+    // that would name the Explorer's additions.
     const reasonsUsed: string[] = [];
 
     try {
@@ -415,7 +417,7 @@ export function ProxyTask({
           };
           done: boolean;
           totalTurns?: number;
-          reasonUsed?: string | null;
+          reasonToken?: string | null;
           decidedAction?: string;
           stage?: number;
           requirementOption?: string | null;
@@ -424,7 +426,7 @@ export function ProxyTask({
         };
 
         if (data.impasse) proxyImpasse = true;
-        if (data.reasonUsed) reasonsUsed.push(data.reasonUsed);
+        if (data.reasonToken) reasonsUsed.push(data.reasonToken);
         if (
           data.message?.speaker === "participant_proxy" &&
           data.stage !== undefined
