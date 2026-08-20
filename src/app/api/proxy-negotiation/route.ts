@@ -451,8 +451,15 @@ export async function POST(request: Request) {
       stage,
       message: visible,
       requirementOption: proposal?.[yourRequirement.id] ?? null,
-      // The decided move, returned so the client can store it beside the
-      // rendered sentence. Design §4 requires the pair for the gate-9 audit.
+      // The decided move, in machine vocabulary, so the client can store it
+      // beside the rendered sentence — Design §4 requires the pair for the
+      // gate-9 audit, and there is nowhere else to record it until Supabase is
+      // wired.
+      //
+      // Unlike the Baseline route this is defensible: in a Proxy task the
+      // participant already knows both sides are AI Proxies, so "the system
+      // decided to concede on timing" reveals nothing they were not told. It
+      // must still never carry provenance — see `reasonToken`.
       decidedAction: counterpartAction,
       accepted,
       impasse,

@@ -149,7 +149,7 @@ export async function POST(request: Request) {
   })();
 
   try {
-    const { action, stubbed } = await generateAction({
+    const { action } = await generateAction({
       kind: "ostensible_human",
       ctx: {
         task,
@@ -176,23 +176,28 @@ export async function POST(request: Request) {
     const blocked =
       !validation.valid && validation.disposition === "regenerate";
 
-    // TODO(supabase): persist `action` and `validation` here. They must not
-    // travel to the client — the sibling proxy route strips provenance for the
-    // same reason, and this one carries `reasonSourceId` and the validator's
-    // reasoning besides. A participant who opens the network tab and finds
-    // structured negotiation state has learned that the other party is
-    // machinery, which is deception rule 1.
+    // TODO(supabase): persist `action`, `decision` and `validation` here.
+    //
+    // WHAT THE CLIENT GETS IS THE MINIMUM IT USES, and that is the rule rather
+    // than an optimization. In this condition the counterpart is presented as
+    // another Prolific participant, so a participant who opens the network tab
+    // and finds `awaitingReason: true` or `action: "concede_distributive"` has
+    // learned the other party is machinery — deception rule 1, and the
+    // suspicion probe is pilot gate 11.
+    //
+    // `message` and `proposal` are what the conversation is made of and cannot
+    // be withheld. Everything else the state machine decided — whether it
+    // accepted, whether this is an impasse, whether it is waiting for a
+    // reason, whether the wording was regenerated — stays on the server. The
+    // client does not need any of it: it re-runs `counterpartStep` itself for
+    // the stage-5 closing test, from the same inputs, and gets the same answer
+    // because the machine is deterministic. That is the whole point of the
+    // machine owning the decisions.
     return NextResponse.json({
       message: blocked
         ? fallbackText(task, decision.action, decision.proposal)
         : action.rationale,
-      stage,
       proposal: decision.proposal,
-      accepted: decision.accepts,
-      impasse: decision.impasse,
-      awaitingReason: decision.awaitingReason,
-      blocked,
-      stubbed,
     });
   } catch (error) {
     console.error("[counterpart]", error);
