@@ -371,9 +371,15 @@ Tested end to end against `gpt-5.6-sol` (2026-08-11). Findings worth keeping:
 Nothing structural. What remains is values to fix and behaviour to exercise:
 
 - **Pilot-dependent numbers.** Reservation (2,500), acceptance thresholds
-  (T_MID = 3,600 / T_FINAL = 2,600, targeting impasse below 10%), the Member's
-  fixed bonus (70/100), the advertised time and payment, and the Prolific
-  completion code.
+  (T_MID = 3,600 / T_FINAL = 2,600), the Member's fixed bonus (70/100), the
+  advertised time and payment, and the Prolific completion code.
+
+  On the impasse target: across the whole 256-mandate space the proxy's
+  counterpackage falls below T_FINAL in 36% of mandates, against the design's
+  sub-10% goal. That number is not the expected impasse rate — most of those
+  mandates are hardline ones no participant is likely to set, and the standard
+  mandate settles comfortably — but it is the lever if the pilot runs hot, and
+  it moves with T_FINAL rather than with any code change.
 - **Timing.** `STAGE_MINUTES` sums to about 55 minutes, which is what the
   consent page advertises. Design §10 gate 8 asks for a task median under 12
   minutes; the 10-minute negotiation cap plus briefing, mandate and review sits
@@ -385,10 +391,16 @@ Nothing structural. What remains is values to fix and behaviour to exercise:
   that participants guessed the design. The preregistered fallback is a fourth
   (distributive) issue, which would mean recomputing every payoff property
   listed above.
-- **Nothing exercises the failure branches automatically.** Impasse, the
-  emergency stop, the reason-request branch and the one revision all work when
-  driven by hand, but mockup mode carries only the ideal trajectories, so a
-  regression in any of them would be quiet. Worth a test before collection.
+- **The failure branches work but nothing exercises them automatically.**
+  Impasse, the emergency stop, the reason-request branch, the reason-withheld
+  close and the one revision were all verified by hand — driving the state
+  machine directly and walking the interface — and the scratch scripts that did
+  it are not in the repo. Mockup mode carries only the ideal trajectories, so a
+  regression in any of them would be quiet. The checks worth keeping as tests:
+  a greedy package impasses at stage 5; giving a reason preserves the
+  requirement while withholding one loses it, in all four cells; the revision
+  option disappears after one use; the emergency stop discards the package the
+  exchange was heading for.
 - **The counterpart principal's three templates are inlined** in `review.tsx`
   rather than rendered through P2. The *decision* between them is the state
   machine's and is correct — ratify above T_FINAL, reject below, fallback on no
