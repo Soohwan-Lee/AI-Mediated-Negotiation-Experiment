@@ -294,6 +294,13 @@ export function RiskForm({
   role,
   steps,
   stepIndex,
+  /**
+   * What the button says. Baseline goes straight into the negotiation from
+   * here; Proxy still has the mandate screens to come, and a button promising
+   * a negotiation that does not start is a small lie the participant catches
+   * immediately.
+   */
+  continueLabel = "Continue",
   onContinue,
 }: {
   taskIndex: 1 | 2;
@@ -301,6 +308,7 @@ export function RiskForm({
   role: Role;
   steps: string[];
   stepIndex: number;
+  continueLabel?: string;
   onContinue: () => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
@@ -357,7 +365,7 @@ export function RiskForm({
       </Page>
 
       <ActionBar
-        label="Start the negotiation"
+        label={continueLabel}
         onClick={save}
         disabled={!canContinue}
         remaining={missing.length}

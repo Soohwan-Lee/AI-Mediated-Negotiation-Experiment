@@ -444,6 +444,7 @@ export function BaselineTask({
         role={role}
         steps={STEP_LABELS}
         stepIndex={STEP_OF.risk}
+        continueLabel="Start the negotiation"
         onContinue={() => setPhase("matchmaking")}
       />
     );
