@@ -31,6 +31,7 @@ import {
   Callout,
   Card,
   CardTitle,
+  Cue,
   Field,
   Page,
   TextArea,
@@ -353,8 +354,17 @@ export function ReviewPhase({
             </Card>
           ) : null}
 
-          <Card>
-            <CardTitle>✅ Your decision</CardTitle>
+          {/* The cue arrives when the decision does. Before the transcript has
+              been read the card is inert and says so; after it, this is the
+              one thing left on the screen to do. */}
+          <Card cue={canDecide && choice === null}>
+            <CardTitle
+              aside={
+                canDecide && choice === null ? <Cue>Choose one</Cue> : null
+              }
+            >
+              ✅ Your decision
+            </CardTitle>
 
             {!canDecide ? (
               <div className="mb-4">

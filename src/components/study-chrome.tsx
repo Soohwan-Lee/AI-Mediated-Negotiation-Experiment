@@ -41,22 +41,22 @@ export function StudyChrome({ children }: { children: ReactNode }) {
           className="mx-auto flex h-[var(--header-h)] w-full items-center justify-between gap-4 px-5 sm:px-6 lg:px-8"
           style={{ maxWidth: "var(--measure-page, var(--measure-reading))" }}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
             <span
               aria-hidden
-              className="h-4 w-1.5 rounded-full bg-[var(--accent)]"
+              className="h-4 w-1.5 shrink-0 rounded-full bg-[var(--accent)]"
             />
-            <span className="truncate text-[0.8125rem] font-medium text-[var(--ink-2)]">
+            {/* The study's name is the first thing to give up on a narrow
+                screen. Where you are is the thing worth the room. */}
+            <span className="hidden truncate text-[0.8125rem] font-medium text-[var(--ink-2)] sm:block">
               {STUDY.shortTitle}
             </span>
           </div>
 
           {key ? (
-            <div className="flex shrink-0 items-center gap-3 text-[0.8125rem]">
-              <span className="hidden font-medium sm:inline">
-                {flowLabel(key)}
-              </span>
-              <span className="tabular text-[var(--ink-3)]">
+            <div className="flex min-w-0 items-center gap-3 text-[0.8125rem]">
+              <span className="truncate font-medium">{flowLabel(key)}</span>
+              <span className="tabular shrink-0 text-[var(--ink-3)]">
                 {step} / {total}
               </span>
             </div>

@@ -199,7 +199,6 @@ export const BACKGROUND_BLOCKS: Block[] = [
   {
     id: "experience",
     title: "Your experience",
-    hint: "Rate each on the scale shown.",
     items: [
       {
         kind: "scale",

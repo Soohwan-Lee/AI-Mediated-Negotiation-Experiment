@@ -96,6 +96,7 @@ export function Card({
   tone = "surface",
   padded = true,
   id,
+  cue,
 }: {
   children: ReactNode;
   className?: string;
@@ -103,14 +104,22 @@ export function Card({
   padded?: boolean;
   /** Anchor target, for the action bar's "go to the first unanswered". */
   id?: string;
+  /**
+   * Marks this card as the one waiting on the participant right now — the
+   * composer when it is their turn, the terms when a message cannot be sent
+   * until they are chosen. An outline only; the surface colour still says who
+   * can see what is on the card. One per screen.
+   */
+  cue?: boolean;
 }) {
   return (
     <section
       id={id}
       className={cx(
         id && "scroll-mt-24",
-        "rounded-[var(--radius-lg)] border",
+        "rounded-[var(--radius-lg)] border transition-shadow",
         padded && "p-5 sm:p-6",
+        cue && (tone === "private" ? "cue-ring-private" : "cue-ring"),
         tone === "private"
           ? "border-[var(--private-line)] bg-[var(--private)]"
           : tone === "muted"
@@ -173,6 +182,49 @@ export function Callout({
           still spans the card. */}
       <div className="max-w-prose [&>p+p]:mt-2">{children}</div>
     </div>
+  );
+}
+
+/**
+ * A pill that says what the screen is waiting for: "Your turn", "3 to answer",
+ * "Waiting for their reply".
+ *
+ * `accent` is for something to do now and is the only one that moves; `quiet`
+ * is for a state the participant is waiting out; `positive` is for a part that
+ * is finished. It says what is expected, never what to say — nothing here may
+ * hint at an answer.
+ */
+export function Cue({
+  children,
+  tone = "accent",
+}: {
+  children: ReactNode;
+  tone?: "accent" | "quiet" | "positive";
+}) {
+  return (
+    <span
+      className={cx(
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]",
+        tone === "accent"
+          ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+          : tone === "positive"
+            ? "bg-[var(--positive-soft)] text-[var(--positive)]"
+            : "bg-[var(--surface-muted)] text-[var(--ink-2)]",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cx(
+          "h-1.5 w-1.5 rounded-full",
+          tone === "accent"
+            ? "animate-pulse bg-[var(--accent)]"
+            : tone === "positive"
+              ? "bg-[var(--positive)]"
+              : "bg-[var(--ink-3)]",
+        )}
+      />
+      {children}
+    </span>
   );
 }
 
@@ -502,30 +554,43 @@ export function Scale({
       {/* The statement sits beside its buttons once there is room for both.
           Stacked, every item costs two rows, and a battery of eighty of them
           becomes a long scroll; side by side each item is one row and a block
-          can be taken in at once. Below `lg` it stacks as it did before. */}
+          can be taken in at once. Below `lg` it stacks.
+
+          The statement is the part that flexes and the buttons are the part
+          that does not: a fixed statement column plus fixed anchor columns
+          plus fixed buttons added up to more than the session column is wide,
+          and "Strongly agree" ended up outside the card. Nothing here has a
+          minimum width the row cannot give it. */}
       <div className={cx(statement && "lg:flex lg:items-center lg:gap-6")}>
         {statement ? (
           <p
             aria-hidden
-            className="mb-3 text-[0.9375rem] leading-snug lg:mb-0 lg:w-[21rem] lg:shrink-0"
+            className="mb-2.5 text-[0.9375rem] leading-snug lg:mb-0 lg:min-w-0 lg:flex-1"
           >
             {statement}
           </p>
         ) : null}
 
-        <div className="flex items-center gap-3 lg:min-w-0 lg:flex-1">
-          <span className="hidden w-24 shrink-0 text-right text-xs leading-tight text-[var(--ink-2)] sm:block">
-            {lowAnchor}
-          </span>
-
-          <div className="flex flex-1 justify-between gap-1.5">
+        {/* ONE anchor placement, not two. The anchors used to flank the row on
+            a wide screen and sit under it on a narrow one, which is two
+            layouts to keep working and the reason the wide one could overflow.
+            Under the row they are the same thing at every width, and they sit
+            directly beneath the end they name. */}
+        <div
+          className="w-full lg:shrink-0"
+          // Caps the row at a comfortable button size instead of stretching
+          // seven circles across a wide column. Below the cap the buttons
+          // shrink with the container, so the row cannot overflow it.
+          style={{ maxWidth: `calc(${points} * 2.875rem)` }}
+        >
+          <div
+            className="grid gap-1.5"
+            style={{ gridTemplateColumns: `repeat(${points}, minmax(0, 1fr))` }}
+          >
             {steps.map((n) => {
               const selected = value === n;
               return (
-                <label
-                  key={n}
-                  className="group flex flex-1 cursor-pointer flex-col items-center gap-1"
-                >
+                <label key={n} className="group cursor-pointer">
                   <input
                     type="radio"
                     name={id}
@@ -535,7 +600,7 @@ export function Scale({
                   />
                   <span
                     className={cx(
-                      "flex h-9 w-9 items-center justify-center rounded-full border-2 text-[0.8125rem] font-medium transition-all",
+                      "flex aspect-square w-full items-center justify-center rounded-full border-2 text-[0.8125rem] font-medium transition-colors",
                       selected
                         ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
                         : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-3)] group-hover:border-[var(--accent)] group-hover:text-[var(--ink)]",
@@ -548,17 +613,11 @@ export function Scale({
             })}
           </div>
 
-          <span className="hidden w-24 shrink-0 text-xs leading-tight text-[var(--ink-2)] sm:block">
-            {highAnchor}
-          </span>
+          <div className="mt-1.5 flex items-start justify-between gap-3 text-[0.75rem] leading-tight text-[var(--ink-2)]">
+            <span className="max-w-[48%]">{lowAnchor}</span>
+            <span className="max-w-[48%] text-right">{highAnchor}</span>
+          </div>
         </div>
-      </div>
-
-      {/* Anchors for narrow screens, where the pair above is hidden. Never
-          visible at the same time as the side-by-side layout. */}
-      <div className="mt-2 flex justify-between text-xs text-[var(--ink-2)] sm:hidden">
-        <span>{lowAnchor}</span>
-        <span>{highAnchor}</span>
       </div>
     </fieldset>
   );
@@ -587,15 +646,18 @@ export function AmountScale({
 
   return (
     <fieldset id={`q-${id}`} className="scroll-mt-24">
-      <div className="flex flex-wrap gap-1.5">
+      {/* A grid rather than a wrapping flex row: with `flex-1` a leftover chip
+          on the last line stretched to the full width and stopped looking like
+          the same control as the ones above it. Columns fit themselves to the
+          container, so this cannot overflow either. */}
+      <div
+        className="grid gap-1.5"
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(3rem, 1fr))" }}
+      >
         {steps.map((n) => {
           const selected = value === n;
           return (
-            <label
-              key={n}
-              className="group flex-1 cursor-pointer"
-              style={{ minWidth: "3rem" }}
-            >
+            <label key={n} className="group cursor-pointer">
               <input
                 type="radio"
                 name={id}
@@ -605,7 +667,7 @@ export function AmountScale({
               />
               <span
                 className={cx(
-                  "tabular flex h-11 items-center justify-center rounded-[var(--radius)] border-2 text-[0.875rem] transition-all",
+                  "tabular flex h-11 items-center justify-center rounded-[var(--radius)] border-2 text-[0.875rem] transition-colors",
                   selected
                     ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
                     : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-2)] group-hover:border-[var(--accent)] group-hover:text-[var(--ink)]",

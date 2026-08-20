@@ -27,6 +27,7 @@ import { MeasureBlock, type Answers } from "@/components/measure";
 import {
   BriefingPanel,
   ReasonBox,
+  TaskCover,
   TaskHeader,
   TaskLayout,
 } from "@/components/session";
@@ -36,7 +37,7 @@ import { Callout, Card, CardTitle, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { dummyAnswer, riskBlock } from "@/lib/measures";
 import { useParticipant } from "@/lib/participant-context";
-import { NEGOTIATION, pauseMs } from "@/lib/study-config";
+import { NEGOTIATION, STAGE_MINUTES, pauseMs } from "@/lib/study-config";
 import { getStore } from "@/lib/store";
 import {
   packageValue,
@@ -44,6 +45,78 @@ import {
   requirementIssue,
 } from "@/lib/tasks";
 import type { NegotiationTask, Package, Role } from "@/lib/types";
+
+// ---------------------------------------------------------------------------
+// Phase: the cover
+// ---------------------------------------------------------------------------
+
+/**
+ * "Task 1 of 2 starts now."
+ *
+ * The practice round used to end on a button that dropped the participant
+ * straight into a briefing for the task that counts, with nothing marking the
+ * change. This is the marker: which of the two tasks this is, what it asks of
+ * them, and roughly how long it takes.
+ *
+ * Shared by both conditions so the wording is identical where it can be. The
+ * step list is the only part that differs, and it comes from the task's own
+ * phases — interface phases, never a condition name.
+ */
+export function TaskIntro({
+  taskIndex,
+  steps,
+  onStart,
+}: {
+  taskIndex: 1 | 2;
+  steps: string[];
+  onStart: () => void;
+}) {
+  const first = taskIndex === 1;
+
+  return (
+    <TaskCover
+      eyebrow={`Task ${taskIndex} of 2`}
+      title={first ? "Task 1 starts here" : "Task 2, the last one"}
+      lead={
+        first ? (
+          <>
+            <p>
+              The practice round is over — this one is the real thing. You will
+              be working through a project with{" "}
+              {/* The counterpart is presented as another participant
+                  throughout the study and is disclosed only at the debriefing.
+                  Saying it plainly here is the same claim the rest of the
+                  interface makes, in the place the participant is most likely
+                  to form an expectation about who they are talking to. */}
+              another participant who has the other side of it, and neither of
+              you can settle anything alone.
+            </p>
+            <p>
+              Your own briefing is private. It stays on screen for the whole
+              task, so there is nothing to memorise now.
+            </p>
+          </>
+        ) : (
+          <>
+            <p>
+              This is the second and last task. It is a different project, with
+              a different briefing, and the way you work through it may not be
+              the way the first task worked.
+            </p>
+            <p>
+              The other side is a different participant, and nothing carries
+              over from the first task.
+            </p>
+          </>
+        )
+      }
+      steps={steps}
+      minutes={STAGE_MINUTES.task}
+      actionLabel={`Start Task ${taskIndex}`}
+      onStart={onStart}
+    />
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Phase: scenario brief

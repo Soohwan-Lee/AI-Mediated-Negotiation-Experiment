@@ -27,7 +27,7 @@ import {
   Transcript,
   type DisplayMessage,
 } from "@/components/negotiation";
-import { BriefingPanel, TaskLayout } from "@/components/session";
+import { BriefingPanel, TaskCover, TaskLayout } from "@/components/session";
 import { ActionBar, BackButton } from "@/components/study-chrome";
 import {
   Callout,
@@ -41,13 +41,16 @@ import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { useDevBypass } from "@/lib/dev-mode";
 import { PRACTICE_REASON_ANSWER, practiceReasonItem } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { nextHref } from "@/lib/study-config";
+import { STAGE_MINUTES, nextHref } from "@/lib/study-config";
 import { PRACTICE_TASK } from "@/lib/tasks";
 
 export default function PracticePage() {
   usePageEnter("practice");
 
   const router = useRouter();
+  // The cover is a PHASE, not a route: the flow step still comes from the URL
+  // alone, so adding a screen here cannot desynchronise the progress bar.
+  const [phase, setPhase] = useState<"intro" | "practice">("intro");
   const { assignment, logEvent, saveResponses } = useParticipant();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [offer, setOffer] = useState<Record<string, string>>({});
@@ -106,6 +109,46 @@ export default function PracticePage() {
   }
 
   const canContinue = bypass || (reasonSubmitted && reasonCorrect);
+
+  if (phase === "intro") {
+    return (
+      <TaskCover
+        eyebrow="Practice · before Task 1"
+        title="A practice round first"
+        lead={
+          <>
+            <p>
+              This round works the way the real tasks will, on a small scenario
+              that has nothing to do with either of them. Nothing you do here is
+              recorded as a result.
+            </p>
+            <p>
+              It is here so that nothing about the tasks that count is a
+              surprise.
+            </p>
+          </>
+        }
+        steps={[
+          "Read the practice scenario and your private briefing",
+          "Try the message box — a reply comes straight back",
+          "Try choosing a level on each of the terms",
+          "One question about how the point sheet works",
+        ]}
+        minutes={STAGE_MINUTES.practice}
+        note={
+          <Callout>
+            <p>
+              Task 1 begins only when you leave the practice screen, so there is
+              no hurry on it.
+            </p>
+          </Callout>
+        }
+        actionLabel="Start the practice round"
+        onStart={() => setPhase("practice")}
+        secondary={<BackButton from="practice" />}
+      />
+    );
+  }
 
   return (
     <>

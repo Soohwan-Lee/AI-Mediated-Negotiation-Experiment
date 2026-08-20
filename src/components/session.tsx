@@ -17,7 +17,8 @@
 
 import { useState, type ReactNode } from "react";
 import { IssueValueTable } from "./issues";
-import { Card, PrivateTag, cx } from "./ui";
+import { ActionBar } from "./study-chrome";
+import { Card, CardTitle, Page, PrivateTag, cx } from "./ui";
 import { requirementIssue } from "@/lib/tasks";
 import type { NegotiationTask, Role } from "@/lib/types";
 
@@ -25,6 +26,15 @@ import type { NegotiationTask, Role } from "@/lib/types";
 // Header
 // ---------------------------------------------------------------------------
 
+/**
+ * Where you are in this task.
+ *
+ * A bar of segments rather than a written trail of phase names. Seven names
+ * with separators between them wrapped to three lines inside the task column,
+ * which is a lot of chrome to say "third of seven" — and the phase the
+ * participant is on is already the heading right above it. The names stay for
+ * screen readers, where a trail costs nothing.
+ */
 export function TaskHeader({
   taskIndex,
   title,
@@ -43,9 +53,13 @@ export function TaskHeader({
   return (
     <div className="mb-6">
       <div className="mb-3 flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
             Task {taskIndex} of 2
+            <span aria-hidden className="mx-2 text-[var(--line-strong)]">
+              /
+            </span>
+            Step {current + 1} of {steps.length}
           </p>
           <h1 className="text-[1.5rem] font-semibold leading-tight tracking-[-0.02em]">
             {title}
@@ -54,30 +68,110 @@ export function TaskHeader({
         {aside}
       </div>
 
-      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem]">
+      <ol className="flex items-center gap-1">
         {steps.map((label, i) => (
-          <li key={label} className="flex items-center gap-2">
-            {i > 0 ? (
-              <span aria-hidden className="text-[var(--ink-3)]">
-                ›
-              </span>
-            ) : null}
-            <span
-              className={cx(
-                i === current
-                  ? "font-semibold text-[var(--ink)]"
-                  : i < current
-                    ? "text-[var(--ink-3)] line-through decoration-[var(--line-strong)]"
-                    : "text-[var(--ink-3)]",
-              )}
-              aria-current={i === current ? "step" : undefined}
-            >
+          <li
+            key={label}
+            className={cx(
+              "flex-1 rounded-full transition-colors",
+              i === current ? "h-1.5" : "h-1",
+              i <= current ? "bg-[var(--accent)]" : "bg-[var(--line)]",
+            )}
+            aria-current={i === current ? "step" : undefined}
+          >
+            <span className="sr-only">
               {label}
+              {i === current ? " — you are here" : ""}
             </span>
           </li>
         ))}
       </ol>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cover
+// ---------------------------------------------------------------------------
+
+/**
+ * The screen that opens a practice round or a session.
+ *
+ * A participant used to cross from the instructions straight into a briefing,
+ * and from the practice round straight into the task that counts, with nothing
+ * between them but a change of heading. Both are moments where knowing what
+ * you are about to be asked for is worth a screen of its own: what this round
+ * is, what happens in it, how long it takes, and one button to begin.
+ *
+ * DECEPTION INTEGRITY: `steps` is the phase list of the task the participant
+ * is about to do, which is theirs and only theirs — it names interface phases
+ * ("What it may say"), never a condition, and Delegate and Explorer produce
+ * the same list. Nothing here may say why this task differs from the last one.
+ */
+export function TaskCover({
+  eyebrow,
+  title,
+  lead,
+  steps,
+  minutes,
+  note,
+  actionLabel,
+  onStart,
+  secondary,
+}: {
+  eyebrow: string;
+  title: string;
+  lead: ReactNode;
+  /** What happens in this round, in order. */
+  steps: string[];
+  /** Rough length, in minutes. */
+  minutes: number;
+  /** Anything else that has to be said before starting. */
+  note?: ReactNode;
+  actionLabel: string;
+  onStart: () => void;
+  secondary?: ReactNode;
+}) {
+  return (
+    <>
+      <Page>
+        <div className="pt-4 sm:pt-10">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
+            {eyebrow}
+          </p>
+          <h1 className="text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2rem]">
+            {title}
+          </h1>
+          <div className="prose-study mt-4">{lead}</div>
+
+          <Card tone="muted" className="mt-8">
+            <CardTitle hint={`About ${minutes} minutes.`}>
+              What happens in this part
+            </CardTitle>
+            <ol className="space-y-2.5">
+              {steps.map((step, i) => (
+                <li key={step} className="flex items-baseline gap-3">
+                  <span
+                    aria-hidden
+                    className="tabular flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full border border-[var(--line-strong)] bg-[var(--surface)] text-[0.75rem] font-medium text-[var(--ink-2)]"
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="text-[0.9375rem]">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </Card>
+
+          {note ? <div className="mt-4">{note}</div> : null}
+        </div>
+      </Page>
+
+      {/* The bar carries no status line. There is nothing to count on a cover
+          and nothing to warn about, and a sentence there would only repeat
+          what the page above it already says. */}
+      <ActionBar label={actionLabel} onClick={onStart} secondary={secondary} />
+    </>
   );
 }
 

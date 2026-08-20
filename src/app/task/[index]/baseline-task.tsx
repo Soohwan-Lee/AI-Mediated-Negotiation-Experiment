@@ -29,7 +29,7 @@ import {
 } from "@/components/negotiation";
 import { BriefingPanel, TaskHeader, TaskLayout } from "@/components/session";
 import { ActionBar } from "@/components/study-chrome";
-import { Card, CardTitle, Page } from "@/components/ui";
+import { Card, CardTitle, Cue, Page } from "@/components/ui";
 import {
   useDevActions,
   useDevAutofill,
@@ -56,6 +56,7 @@ import {
   ReasonPicker,
   RiskForm,
   TaskBrief,
+  TaskIntro,
   type Preferences,
 } from "./shared";
 
@@ -80,6 +81,7 @@ function openingLine(
 }
 
 type Phase =
+  | "intro"
   | "brief"
   | "prefs"
   | "risk"
@@ -88,6 +90,7 @@ type Phase =
   | "review";
 
 const PHASES: Phase[] = [
+  "intro",
   "brief",
   "prefs",
   "risk",
@@ -96,7 +99,14 @@ const PHASES: Phase[] = [
   "review",
 ];
 
-/** Phase labels shown in the task header. Matchmaking has no step of its own. */
+/**
+ * The phases the progress bar counts.
+ *
+ * The cover is not one of them: it is the screen you are on before the task
+ * starts, and having it fill the first segment would make the bar read as
+ * one-fifth done before anything had happened. Matchmaking has no step of its
+ * own either — it is the same step as the negotiation it opens.
+ */
 const STEP_LABELS = [
   "Your briefing",
   "What you want",
@@ -105,7 +115,18 @@ const STEP_LABELS = [
   "Review",
 ];
 
+const PHASE_LABELS: Record<Phase, string> = {
+  intro: "Start screen",
+  brief: "Your briefing",
+  prefs: "What you want",
+  risk: "Before you start",
+  matchmaking: "Connecting",
+  negotiate: "Negotiate",
+  review: "Review",
+};
+
 const STEP_OF: Record<Phase, number> = {
+  intro: 0,
   brief: 0,
   prefs: 1,
   risk: 2,
@@ -130,7 +151,7 @@ export function BaselineTask({
   const requirement = requirementIssue(task, role);
   const counterpartRole: Role = role === "leader" ? "member" : "leader";
 
-  const [phase, setPhase] = useState<Phase>("brief");
+  const [phase, setPhase] = useState<Phase>("intro");
   const [stage, setStage] = useState<StageId>(1);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -173,6 +194,11 @@ export function BaselineTask({
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const canSend = useDevGate(chosen === task.issues.length || stage !== 1);
 
+  // The three states of the conversation, named once so the composer, the
+  // terms card and the pill above them cannot disagree about which one it is.
+  const yourTurn = !pending && canSend;
+  const needsTerms = !pending && !canSend;
+
   /**
    * The written exchange for this cell, used in mockup mode.
    *
@@ -187,7 +213,7 @@ export function BaselineTask({
     `task-${taskIndex}`,
     PHASES.map((p) => ({
       id: p,
-      label: p,
+      label: PHASE_LABELS[p],
       active: phase === p,
       run: () => {
         // Jumping straight to the review needs something to review, so the
@@ -397,6 +423,16 @@ export function BaselineTask({
 
   // --- phases -------------------------------------------------------------
 
+  if (phase === "intro") {
+    return (
+      <TaskIntro
+        taskIndex={taskIndex}
+        steps={STEP_LABELS}
+        onStart={() => setPhase("brief")}
+      />
+    );
+  }
+
   if (phase === "brief") {
     return (
       <TaskBrief
@@ -545,15 +581,31 @@ export function BaselineTask({
             }
           />
 
-          <Card className="mb-5 flex flex-col" padded={false}>
+          {/* Whose move it is, said in one place.
+              The exchange answers itself several seconds later and the reply
+              arrives at the bottom of a box the participant may have scrolled
+              away from, so "am I waiting or are they" is a real question. The
+              cue sits on whichever card is actually blocking: the composer
+              when they can write, the terms when a first package has to be
+              chosen before they can. */}
+          <Card className="mb-5 flex flex-col" padded={false} cue={yourTurn}>
             <StageRail
               stage={stage}
               goals={STAGE_GOALS}
               note={outOfTime ? "Time is up — send your last message." : undefined}
             />
-            <p className="border-b border-[var(--line)] px-4 py-2.5 text-[0.8125rem] text-[var(--ink-2)]">
-              {STAGE_PROMPTS[stage]}
-            </p>
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-2.5">
+              <p className="text-[0.8125rem] text-[var(--ink-2)]">
+                {STAGE_PROMPTS[stage]}
+              </p>
+              {pending ? (
+                <Cue tone="quiet">Waiting for their reply</Cue>
+              ) : yourTurn ? (
+                <Cue>Your turn</Cue>
+              ) : (
+                <Cue tone="quiet">Choose your terms first</Cue>
+              )}
+            </div>
             <Transcript
               messages={messages}
               pending={pending}
@@ -573,6 +625,7 @@ export function BaselineTask({
               onChange={setDraft}
               onSend={send}
               disabled={pending || !canSend}
+              cue={yourTurn}
               sendLabel={stage >= 5 ? "Send and finish" : "Send"}
               placeholder={
                 canSend
@@ -582,8 +635,15 @@ export function BaselineTask({
             />
           </Card>
 
-          <Card>
-            <CardTitle hint="This is the package you are proposing. Update it as the conversation moves.">
+          <Card cue={needsTerms}>
+            <CardTitle
+              hint="This is the package you are proposing. Update it as the conversation moves."
+              aside={
+                needsTerms ? (
+                  <Cue>{task.issues.length - chosen} to choose</Cue>
+                ) : null
+              }
+            >
               📦 Your current offer
             </CardTitle>
             <div className="space-y-4">
@@ -630,7 +690,7 @@ export function BaselineTask({
           engaged with the negotiation. The task ends when the last message is
           sent. */}
       <ActionBar
-        note={`${chosen} of ${task.issues.length} terms chosen · step ${stage} of ${STAGES.length}`}
+        note={`${chosen} of ${task.issues.length} terms chosen · round ${stage} of ${STAGES.length}`}
       />
     </>
   );

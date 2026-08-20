@@ -71,6 +71,7 @@ import {
   PreferenceForm,
   RiskForm,
   TaskBrief,
+  TaskIntro,
   type Preferences,
 } from "./shared";
 
@@ -88,6 +89,7 @@ import {
  * negotiate.
  */
 type Phase =
+  | "intro"
   | "brief"
   | "prefs"
   | "risk"
@@ -98,6 +100,7 @@ type Phase =
   | "review";
 
 const PHASES: Phase[] = [
+  "intro",
   "brief",
   "prefs",
   "risk",
@@ -108,6 +111,11 @@ const PHASES: Phase[] = [
   "review",
 ];
 
+/**
+ * The phases the progress bar counts. The cover is not one of them: it is the
+ * screen you are on before the task starts, and filling the first segment
+ * would make the bar read as part-done before anything had happened.
+ */
 const STEP_LABELS = [
   "Your briefing",
   "What you want",
@@ -118,7 +126,22 @@ const STEP_LABELS = [
   "Review",
 ];
 
+/** Readable names for the dev panel's phase jumps. */
+const PHASE_LABELS: Record<Phase, string> = {
+  intro: "Start screen",
+  brief: "Your briefing",
+  prefs: "What you want",
+  risk: "Before you start",
+  reasons: "What it may say",
+  confirm: "Check and start",
+  matchmaking: "Connecting",
+  watching: "Watch",
+  review: "Review",
+};
+
 const STEP_OF: Record<Phase, number> = {
+  /* The cover is not a counted step — see the note on STEP_LABELS. */
+  intro: 0,
   brief: 0,
   prefs: 1,
   risk: 2,
@@ -246,7 +269,7 @@ export function ProxyTask({
     `task-${taskIndex}`,
     PHASES.map((p) => ({
       id: p,
-      label: p,
+      label: PHASE_LABELS[p],
       active: phase === p,
       run: () => {
         if (p === "review" && transcript.length === 0) {
@@ -540,7 +563,17 @@ export function ProxyTask({
     }
   }
 
-  // --- brief / preferences ------------------------------------------------
+  // --- cover / brief / preferences ----------------------------------------
+  if (phase === "intro") {
+    return (
+      <TaskIntro
+        taskIndex={taskIndex}
+        steps={STEP_LABELS}
+        onStart={() => setPhase("brief")}
+      />
+    );
+  }
+
   if (phase === "brief") {
     return (
       <TaskBrief
