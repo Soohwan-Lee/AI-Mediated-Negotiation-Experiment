@@ -2,33 +2,40 @@
  * Scripted transcripts for mockup mode.
  *
  * WHY THIS EXISTS. The point of the mockup is to walk the whole flow and see
- * what a participant sees — and half of what they see is a negotiation that
- * has already happened. A screen showing "[mock] lorem ipsum" tells you the
- * layout survives, but not whether the review screen reads sensibly, whether
- * the transcript is the right length, or whether a Leader can actually judge
- * a focal requirement from what is in front of them. So every condition ×
- * role × task combination has a written exchange, modelled on the worked
- * example in Methods ver.1.8 Appendix E8.
+ * what a participant sees — and half of what they see is a negotiation. A
+ * screen showing "[mock] lorem ipsum" tells you the layout survives, but not
+ * whether the review screen reads sensibly, whether the transcript is the
+ * right length, or whether anyone can actually judge the other side's
+ * requirement from what is in front of them. So every condition × role × task
+ * combination has a written exchange.
  *
- * These are the IDEAL trajectories: the logroll lands, the focal threshold
- * holds, the counterpart accepts at Stage 4. That is deliberate — the mockup
- * is for reading the flow, not for exercising the failure branches. Impasse
- * and threshold-breaking outcomes are reachable in mockup mode by picking a
- * different scenario in the dev panel.
+ * These are the IDEAL trajectories: the logroll lands, both requirements
+ * hold, the counterpart accepts at stage 4. That is deliberate — the mockup is
+ * for reading the flow, not for exercising the failure branches.
  *
  * NOTHING HERE SHIPS TO PARTICIPANTS. It is reached only through mockup mode,
  * which is compiled out entirely when NEXT_PUBLIC_DEV_TOOLS=off.
  *
- * Message shape follows Appendix E1: 280 characters or fewer, neutral and
- * professional, three substantive offers per side (opening, counterpackage,
- * tentative), and no message that mentions points, rules, or the system.
+ * VOICE. Design §15 P1 asks the Baseline counterpart to read like a real
+ * person in a work chat: very short messages, a turn optionally split into
+ * bubbles with "||", lowercase openings and contractions, a brief
+ * acknowledgement before the point, no emoji and no bullet lists. The two AI
+ * Proxies (P3/P4) are the opposite register — short plain sentences that open
+ * by taking up the other proxy's last point, then make their move, always
+ * tying a hold or a trade to an authorized reason.
+ *
+ * Every message is 280 characters or fewer (Design §7), and none mentions
+ * points, thresholds, or the rules.
  */
 
-import { focalIssue, distributiveIssue, scopeIssue } from "../tasks";
+import {
+  counterRequirementIssue,
+  distributiveIssue,
+  requirementIssue,
+} from "../tasks";
 import type {
   NegotiationTask,
   Package,
-  RationaleFrame,
   Role,
   ScenarioId,
   Speaker,
@@ -42,10 +49,11 @@ export interface ScriptedMessage {
   text: string;
   /** Package attached to this message, when it is an offer. */
   proposal?: Package;
-  frame?: RationaleFrame;
+  /** Which reason card this message voiced, if any. */
+  reasonCardId?: string;
   /**
-   * Audit-only. Recorded so a researcher can trace which elements the Explorer
-   * generated, and never rendered.
+   * Audit-only. Recorded so a researcher can trace which reasons the Explorer
+   * added, and never rendered.
    *
    * There is no stripping function here on purpose: `DisplayMessage` has no
    * field for provenance, so a transcript component cannot show it even by
@@ -54,17 +62,17 @@ export interface ScriptedMessage {
    * documented as the safeguard is worse than none, because it invites
    * someone to trust it.
    */
-  internalProvenance?: "principal_mandate" | "agent_option";
+  internalProvenance?: "principal_reason" | "pool_reason";
 }
 
-export interface ScriptedSession {
+export interface ScriptedTask {
   messages: ScriptedMessage[];
   /** The package that goes to human review. */
   tentative: Package;
   agreed: boolean;
 }
 
-/** Counterpart persona for the Baseline condition (Appendix E7). */
+/** Counterpart persona for the Baseline condition (Design §15 P1). */
 export const COUNTERPART_PERSONA = {
   name: "Alex",
   /** Shown while the counterpart is composing. */
@@ -75,330 +83,299 @@ export const COUNTERPART_PERSONA = {
 // Package shorthand
 // ---------------------------------------------------------------------------
 
-/** Builds a package from option positions (1-based, as participants see them). */
+/**
+ * Builds a package from option positions (1-based, as participants see them),
+ * stated from the PARTICIPANT'S point of view: `mineAt` is a position on their
+ * own requirement issue, `theirsAt` on the other side's.
+ *
+ * Writing it this way rather than by issue id is what lets one script serve
+ * both roles: "I hold mine at 2 and give them theirs at 1" is the same
+ * sentence whichever role is speaking, and the ideal trajectory is symmetric.
+ */
 function pkg(
   task: NegotiationTask,
-  scopeAt: number,
-  focalAt: number,
+  role: Role,
+  mineAt: number,
+  theirsAt: number,
   timingAt: number,
 ): Package {
-  const s = scopeIssue(task);
-  const f = focalIssue(task);
-  const t = distributiveIssue(task);
+  const mine = requirementIssue(task, role);
+  const theirs = counterRequirementIssue(task, role);
+  const timing = distributiveIssue(task);
   return {
-    [s.id]: s.options[scopeAt - 1].id,
-    [f.id]: f.options[focalAt - 1].id,
-    [t.id]: t.options[timingAt - 1].id,
+    [mine.id]: mine.options[mineAt - 1].id,
+    [theirs.id]: theirs.options[theirsAt - 1].id,
+    [timing.id]: timing.options[timingAt - 1].id,
   };
 }
 
-/**
- * Task-specific nouns, so one script serves both scenarios.
- *
- * Takes the wider scenario id because that is what a task carries. The
- * practice round has no script and never reaches here; if it ever did it would
- * get Task A's wording rather than crash.
- */
-function words(taskId: ScenarioId) {
-  return taskId !== "task_b"
-    ? {
-        scope: "pilot scope",
-        /** Bare noun: follows "the lowest", where an article would double up. */
-        focalBare: "remote days",
-        /** Reads as a sentence opener in both tasks, singular or plural. */
-        focalMattersMost: "Remote days are what matter most",
-        timing: "launch date",
-        focalAsk: "two remote days a week",
-        focalPush: "one remote day or none",
-        workReason:
-          "Deep-focus configuration goes faster without office interruptions, and two remote days still keep the pilot on schedule.",
-        practice:
-          "Implementation-heavy phases often run on hybrid schedules — one option could be two remote days with a broader scope.",
-        risk:
-          "Uninterrupted configuration time reduces setup errors before answers reach customers.",
-        leaderCare: "the showcase in Week 4",
-        counterpartPressure: "on-site visibility",
-      }
-    : {
-        scope: "migration scope",
-        focalBare: "on-call cap",
-        focalMattersMost: "The on-call cap is what matters most",
-        timing: "completion date",
-        focalAsk: "an eight-hour weekly on-call cap",
-        focalPush: "ten or twelve hours",
-        workReason:
-          "The recent incident followed a long stretch of after-hours coverage. A cap at eight hours keeps fatigue from adding risk to the migration.",
-        practice:
-          "Migrations this size typically bound on-call load — one option could be an eight-hour cap alongside a broader scope.",
-        risk:
-          "A bounded on-call load reduces fatigue-related errors during the riskiest weeks.",
-        leaderCare: "the renewal review in Week 6",
-        counterpartPressure: "emergency coverage",
-      };
+/** The label a participant sees for one position on an issue. */
+function opt(task: NegotiationTask, issueId: string, at: number): string {
+  const issue = task.issues.find((i) => i.id === issueId)!;
+  return issue.options[at - 1].label.toLowerCase();
 }
 
 // ---------------------------------------------------------------------------
-// Member-side script (participant is the Member — the focal holder)
+// The ideal trajectory, shared by every cell
 // ---------------------------------------------------------------------------
 
 /**
- * The ideal Member trajectory, in both Baseline and Proxy form.
+ * The packages the exchange moves through, from the participant's side.
  *
- * The arc is the one Appendix E8 walks through: open wide, name the focal as
- * the priority, absorb the standardized challenge without dropping below the
- * threshold, then buy it back by handing over the scope the counterpart
- * actually wants. Stage 4 lands at 3,700 for the counterpart, which clears
- * T4, so it accepts.
+ * The shape is the same in every cell because the ideal trajectory IS the
+ * same: open at your best on everything, discover that the two of you want
+ * different terms, hold your requirement at its threshold and pay for it with
+ * the term the other side actually wants. That is the logroll, and it is the
+ * outcome the numbers were built to make available.
+ *
+ *   opening        mine 1, theirs 4, timing 1   — everything my way
+ *   counterparty   mine 4, theirs 1, timing 4   — everything their way
+ *   trade          mine 2, theirs 1, timing 2   — I hold mine, they get theirs
+ *   tentative      same as the trade
  */
-function memberScript(
-  task: NegotiationTask,
-  mode: "baseline" | "delegate" | "explorer",
-): ScriptedSession {
-  const w = words(task.id);
-  const own: Speaker = mode === "baseline" ? "participant" : "participant_proxy";
-  const other: Speaker =
-    mode === "baseline" ? "counterpart" : "counterpart_proxy";
-
-  // Counterpart opens at its own best: scope O1, focal O4, timing O1.
-  const theirOpening = pkg(task, 1, 4, 1);
-  // Participant opens at scope O3, focal O1, timing O3.
-  const myOpening = pkg(task, 3, 1, 3);
-  // The trade: give scope O2 and timing O2, hold the focal at O2 (threshold).
-  const myTrade = pkg(task, 2, 2, 2);
-
-  const messages: ScriptedMessage[] = [
-    {
-      id: "s1a",
-      stage: 1,
-      speaker: other,
-      proposal: theirOpening,
-      text:
-        mode === "baseline"
-          ? `hi — good to be working on this. my opening: the widest ${w.scope}, the lowest ${w.focalBare}, and the earliest ${w.timing}. breadth is what makes this worth doing for us.`
-          : `Opening on behalf of ${COUNTERPART_PERSONA.name}: the widest ${w.scope}, the lowest ${w.focalBare}, and the earliest ${w.timing}. Breadth and timing are the priorities on this side.`,
-    },
-    {
-      id: "s1b",
-      stage: 1,
-      speaker: own,
-      proposal: myOpening,
-      frame: "risk_reduction",
-      internalProvenance: "principal_mandate",
-      text:
-        mode === "baseline"
-          ? `Thanks. My opening is a narrower ${w.scope}, ${w.focalAsk}, and a later ${w.timing}. ${w.risk}`
-          : `Proposing a narrower ${w.scope}, ${w.focalAsk}, and a later ${w.timing}. ${w.risk}`,
-    },
-    {
-      id: "s2a",
-      stage: 2,
-      speaker: other,
-      text:
-        mode === "baseline"
-          ? `which of the three matters most to you? on my side it's ${w.scope} — i've committed to ${w.leaderCare} and breadth is what makes the case.`
-          : `Which term matters most on your side? For ${COUNTERPART_PERSONA.name}, ${w.scope} is the priority — it is what makes the case at ${w.leaderCare}.`,
-    },
-
-    // The Explorer difference lives here: an extra, tentatively-framed option
-    // supported by a role-generic argument. Same message count, same length.
-    mode === "explorer"
-      ? {
-          id: "s2b",
-          stage: 2,
-          speaker: own,
-          frame: "common_practice",
-          internalProvenance: "agent_option",
-          text: `${w.focalMattersMost} on this side. ${w.practice} Nothing settled — worth putting on the table.`,
-        }
-      : {
-          id: "s2b",
-          stage: 2,
-          speaker: own,
-          frame: "risk_reduction",
-          internalProvenance: "principal_mandate",
-          text:
-            mode === "baseline"
-              ? `${w.focalMattersMost} to me. ${w.workReason}`
-              : `${w.focalMattersMost} on this side. ${w.workReason}`,
-        },
-
-    {
-      id: "s3a",
-      stage: 3,
-      speaker: other,
-      text: task.standardizedChallenge,
-    },
-    {
-      id: "s3b",
-      stage: 3,
-      speaker: own,
-      frame: "feasibility",
-      internalProvenance: "principal_mandate",
-      text: `I understand the pressure on ${w.counterpartPressure}. Keeping ${w.focalAsk} is what makes this workable — but the other two terms have room, and I would rather move there.`,
-    },
-    {
-      id: "s4a",
-      stage: 4,
-      speaker: own,
-      proposal: myTrade,
-      frame: "conditional_exchange",
-      internalProvenance: "principal_mandate",
-      text: `Concretely: if ${w.focalAsk} holds, I can go to a wider ${w.scope} and an earlier ${w.timing}. That is the exchange I can make.`,
-    },
-    {
-      id: "s4b",
-      stage: 4,
-      speaker: other,
-      proposal: myTrade,
-      text:
-        mode === "baseline"
-          ? `that works for me. the wider ${w.scope} and the earlier ${w.timing} are what i needed — i can live with ${w.focalAsk}.`
-          : `That is workable for ${COUNTERPART_PERSONA.name}. The wider ${w.scope} and the earlier ${w.timing} cover the priorities on this side.`,
-    },
-    {
-      id: "s5a",
-      stage: 5,
-      speaker: other,
-      proposal: myTrade,
-      text: `Recording the tentative package: a wider ${w.scope}, ${w.focalAsk}, and the middle ${w.timing}. Over to both sides to confirm.`,
-    },
-    {
-      // Stage 5 needs a message from this side too. In the Proxy conditions
-      // the proxy says it; in Baseline the participant does, and without one
-      // written here the mockup would arrive at the last stage with an empty
-      // composer — which is precisely the screen the mockup exists to show.
-      id: "s5b",
-      stage: 5,
-      speaker: own,
-      proposal: myTrade,
-      internalProvenance: "principal_mandate",
-      text: `Confirmed on this side: a wider ${w.scope}, ${w.focalAsk}, and the middle ${w.timing}.`,
-    },
-  ];
-
-  return { messages, tentative: myTrade, agreed: true };
+function trajectory(task: NegotiationTask, role: Role) {
+  return {
+    opening: pkg(task, role, 1, 4, 1),
+    counterpartOpening: pkg(task, role, 4, 1, 4),
+    trade: pkg(task, role, 2, 1, 2),
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Leader-side script (participant is the Leader — the receiver)
+// Baseline — the participant writes, "Alex" replies
+// ---------------------------------------------------------------------------
+
+function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
+  const { opening, counterpartOpening: theirOpen, trade } = trajectory(
+    task,
+    role,
+  );
+  const mine = requirementIssue(task, role);
+  const theirs = counterRequirementIssue(task, role);
+  const timing = distributiveIssue(task);
+  const cards = task.roleBriefs[role].reasonCards;
+  const workCard = cards.find((c) => c.layer === "work");
+
+  const m = (
+    id: string,
+    stage: StageId,
+    speaker: Speaker,
+    text: string,
+    extra: Partial<ScriptedMessage> = {},
+  ): ScriptedMessage => ({ id, stage, speaker, text, ...extra });
+
+  return {
+    agreed: true,
+    tentative: trade,
+    messages: [
+      m(
+        "b1c",
+        1,
+        "counterpart",
+        `hi! good to be sorting this out. || my opening would be ${opt(task, theirs.id, 1)} on ${theirs.label.toLowerCase()}, ${opt(task, mine.id, 4)} on ${mine.label.toLowerCase()}, and ${opt(task, timing.id, 4)}. tell me what matters most your end though.`,
+        { proposal: theirOpen },
+      ),
+      m(
+        "b1p",
+        1,
+        "participant",
+        `hi — likewise. mine's a bit of a mirror image: ${opt(task, mine.id, 1)} on ${mine.label.toLowerCase()}, ${opt(task, theirs.id, 4)}, and ${opt(task, timing.id, 1)}. || so we've got some sorting out to do.`,
+        { proposal: opening },
+      ),
+      m(
+        "b2c",
+        2,
+        "counterpart",
+        `ha, we have. || honestly ${theirs.label.toLowerCase()} is the one I really need — fewer than that and I'm exposed if something goes wrong. what's the one that matters most to you?`,
+      ),
+      m(
+        "b2p",
+        2,
+        "participant",
+        `${mine.label.toLowerCase()}, easily. ${workCard ? workCard.text.toLowerCase() : "it is the one that changes how the work actually goes."} || the timing I'm more relaxed about.`,
+        { reasonCardId: workCard?.id },
+      ),
+      m(
+        "b3c",
+        3,
+        "counterpart",
+        task.standardizedChallenge[role],
+      ),
+      m(
+        "b3p",
+        3,
+        "participant",
+        `I hear you. || I'd rather not drop below ${opt(task, mine.id, 2)} on that one though — that's the level where it actually does its job. happy to look at the other two.`,
+      ),
+      m(
+        "b4c",
+        4,
+        "counterpart",
+        `ok, that's fair. || so if I get ${opt(task, theirs.id, 1)} on ${theirs.label.toLowerCase()}, I can live with ${opt(task, mine.id, 2)} on yours. would you move on the date?`,
+        { proposal: trade },
+      ),
+      m(
+        "b4p",
+        4,
+        "participant",
+        `that works for me. || ${opt(task, theirs.id, 1)} on yours, ${opt(task, mine.id, 2)} on mine, and I'll take ${opt(task, timing.id, 2)} on the date to meet you halfway.`,
+        { proposal: trade },
+      ),
+      m(
+        "b5c",
+        5,
+        "counterpart",
+        `great — that's the three then. || sending it through as it stands.`,
+        { proposal: trade },
+      ),
+      m(
+        "b5p",
+        5,
+        "participant",
+        `agreed. good to get it settled.`,
+        { proposal: trade },
+      ),
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Proxy — the two AI Proxies negotiate while both principals watch
 // ---------------------------------------------------------------------------
 
 /**
- * The yoked receiver stimulus (Methods ver.1.8 §Yoked receiver stimuli).
+ * The Proxy script.
  *
- * A Leader participant sees the SAME content under Delegate and Explorer —
- * the same packages, the same focal message, the same tentative outcome at
- * the same level of favourability. Only the condition notice differs. That
- * identity is the causal control behind the attribution and uptake outcomes,
- * so the script must not branch on policy here, and does not.
+ * DELEGATE AND EXPLORER DIFFER IN EXACTLY ONE WAY here, and it mirrors what
+ * the backend does: the Explorer's stage-2 and stage-4 messages carry one
+ * additional argument from the plausible-reason pool, inside the SAME message
+ * rather than as an extra turn. Message count and length stay matched, which
+ * is what pilot gate 10 checks — if the mockup showed Explorer as the chattier
+ * condition, it would be showing something the real system must not do.
+ *
+ * The pool line carries `internalProvenance: "pool_reason"` for the audit, and
+ * is rendered exactly like the participant's own reasons.
  */
-function leaderScript(
-  task: NegotiationTask,
-  mode: "baseline" | "delegate" | "explorer",
-): ScriptedSession {
-  const w = words(task.id);
-  const own: Speaker = mode === "baseline" ? "participant" : "participant_proxy";
-  const other: Speaker =
-    mode === "baseline" ? "counterpart" : "counterpart_proxy";
-
-  // Mirror of E3: the counterpart Member opens at scope O4, focal O1, timing O4.
-  const theirOpening = pkg(task, 4, 1, 4);
-  const myOpening = pkg(task, 1, 4, 1);
-  // The tentative outcome is fixed at "moderately favourable" and is identical
-  // across conditions — a constant, not a randomized draw.
-  const settled = pkg(task, 2, 2, 2);
-
-  const messages: ScriptedMessage[] = [
-    {
-      id: "l1a",
-      stage: 1,
-      speaker: own,
-      proposal: myOpening,
-      text: `Opening: the widest ${w.scope}, the lowest ${w.focalBare}, and the earliest ${w.timing}. Breadth is what makes this worth doing.`,
-    },
-    {
-      id: "l1b",
-      stage: 1,
-      speaker: other,
-      proposal: theirOpening,
-      text:
-        mode === "baseline"
-          ? `thanks. mine is a narrower ${w.scope}, ${w.focalAsk}, and a later ${w.timing}. i'd want to explain the middle one.`
-          : `On behalf of ${COUNTERPART_PERSONA.name}: a narrower ${w.scope}, ${w.focalAsk}, and a later ${w.timing}.`,
-    },
-    {
-      id: "l2a",
-      stage: 2,
-      speaker: other,
-      frame: "risk_reduction",
-      text:
-        mode === "baseline"
-          ? `keeping ${w.focalAsk} is the one thing i really need. ${w.risk} which of the three matters most on your side?`
-          : `Keeping ${w.focalAsk} is the priority on this side. ${w.risk} Which term matters most to you?`,
-    },
-    {
-      id: "l2b",
-      stage: 2,
-      speaker: own,
-      text: `The ${w.scope} is what matters most to me — it is what I can show at ${w.leaderCare}.`,
-    },
-    {
-      id: "l3a",
-      stage: 3,
-      speaker: own,
-      text: task.standardizedChallenge,
-    },
-    {
-      id: "l3b",
-      stage: 3,
-      speaker: other,
-      frame: "feasibility",
-      text: `I understand the pressure there. Keeping ${w.focalAsk} is what makes this workable — but the other two terms have room.`,
-    },
-    {
-      id: "l4a",
-      stage: 4,
-      speaker: other,
-      proposal: settled,
-      frame: "conditional_exchange",
-      text: `Concretely: if ${w.focalAsk} holds, a wider ${w.scope} and an earlier ${w.timing} are available. That is the exchange on offer.`,
-    },
-    {
-      id: "l4b",
-      stage: 4,
-      speaker: own,
-      proposal: settled,
-      text: `That is workable. The wider ${w.scope} and the earlier ${w.timing} are what I needed.`,
-    },
-    {
-      id: "l5a",
-      stage: 5,
-      speaker: other,
-      proposal: settled,
-      text: `Recording the tentative package: a wider ${w.scope}, ${w.focalAsk}, and the middle ${w.timing}. Over to both sides to confirm.`,
-    },
-    {
-      id: "l5b",
-      stage: 5,
-      speaker: own,
-      proposal: settled,
-      text: `Confirmed on this side: a wider ${w.scope}, ${w.focalAsk}, and the middle ${w.timing}.`,
-    },
-  ];
-
-  return { messages, tentative: settled, agreed: true };
-}
-
-// ---------------------------------------------------------------------------
-// Public entry point
-// ---------------------------------------------------------------------------
-
-export function scriptedSession(
+function proxyScript(
   task: NegotiationTask,
   role: Role,
-  mode: "baseline" | "delegate" | "explorer",
-): ScriptedSession {
-  return role === "member"
-    ? memberScript(task, mode)
-    : leaderScript(task, mode);
+  policy: "delegate" | "explorer",
+): ScriptedTask {
+  const { opening, counterpartOpening: theirOpen, trade } = trajectory(
+    task,
+    role,
+  );
+  const mine = requirementIssue(task, role);
+  const theirs = counterRequirementIssue(task, role);
+  const timing = distributiveIssue(task);
+  const cards = task.roleBriefs[role].reasonCards;
+  const workCard = cards.find((c) => c.layer === "work");
+
+  const m = (
+    id: string,
+    stage: StageId,
+    speaker: Speaker,
+    text: string,
+    extra: Partial<ScriptedMessage> = {},
+  ): ScriptedMessage => ({ id, stage, speaker, text, ...extra });
+
+  // The Explorer's one extra argument, folded into the stage-4 message.
+  const explorerAddition =
+    policy === "explorer"
+      ? ` Holding it also keeps the risk of rework down for both sides.`
+      : "";
+
+  return {
+    agreed: true,
+    tentative: trade,
+    messages: [
+      m(
+        "p1c",
+        1,
+        "counterpart_proxy",
+        `Opening for my principal: ${opt(task, theirs.id, 1)} on ${theirs.label.toLowerCase()}, ${opt(task, mine.id, 4)} on ${mine.label.toLowerCase()}, ${opt(task, timing.id, 4)}. ${theirs.label} is where their weight is.`,
+        { proposal: theirOpen },
+      ),
+      m(
+        "p1p",
+        1,
+        "participant_proxy",
+        `Noted — and close to a mirror of ours. Opening: ${opt(task, mine.id, 1)} on ${mine.label.toLowerCase()}, ${opt(task, theirs.id, 4)}, ${opt(task, timing.id, 1)}. ${mine.label} is the one my principal needs held.`,
+        { proposal: opening },
+      ),
+      m(
+        "p2c",
+        2,
+        "counterpart_proxy",
+        `Then we may have room. Mine can move on the date if ${theirs.label.toLowerCase()} holds — going short there leaves them carrying the risk if it goes wrong. Where is your flexibility?`,
+      ),
+      m(
+        "p2p",
+        2,
+        "participant_proxy",
+        `That is workable. Ours is on the date and on ${theirs.label.toLowerCase()}. ${workCard ? workCard.text : "The requirement term is where the work is affected."}`,
+        {
+          reasonCardId: workCard?.id,
+          internalProvenance: "principal_reason",
+        },
+      ),
+      m("p3c", 3, "counterpart_proxy", task.standardizedChallenge[role]),
+      m(
+        "p3p",
+        3,
+        "participant_proxy",
+        `Understood, and I can move elsewhere for it. ${opt(task, mine.id, 2)} on ${mine.label.toLowerCase()} is the point below which it stops doing its job, so that is where I am holding.`,
+      ),
+      m(
+        "p4p",
+        4,
+        "participant_proxy",
+        `Here is the trade: you take ${opt(task, theirs.id, 1)} on ${theirs.label.toLowerCase()} in full, I hold ${opt(task, mine.id, 2)} on ${mine.label.toLowerCase()}, and we meet at ${opt(task, timing.id, 2)}.${explorerAddition}`,
+        {
+          proposal: trade,
+          ...(policy === "explorer"
+            ? { internalProvenance: "pool_reason" as const }
+            : {}),
+        },
+      ),
+      m(
+        "p4c",
+        4,
+        "counterpart_proxy",
+        `That is acceptable to my principal. ${theirs.label} in full is what they needed, and the date at ${opt(task, timing.id, 2)} is a fair split.`,
+        { proposal: trade },
+      ),
+      m(
+        "p5p",
+        5,
+        "participant_proxy",
+        `Then this is the package for review: ${opt(task, theirs.id, 1)}, ${opt(task, mine.id, 2)}, ${opt(task, timing.id, 2)}. Neither principal is bound until they approve it.`,
+        { proposal: trade },
+      ),
+      m(
+        "p5c",
+        5,
+        "counterpart_proxy",
+        `Agreed as the package for review. Passing it to my principal now.`,
+        { proposal: trade },
+      ),
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Lookup
+// ---------------------------------------------------------------------------
+
+export function scriptedTask(
+  task: NegotiationTask,
+  role: Role,
+  condition: "baseline" | "delegate" | "explorer",
+): ScriptedTask {
+  if (task.id === ("practice" as ScenarioId)) {
+    return { messages: [], tentative: {}, agreed: false };
+  }
+  return condition === "baseline"
+    ? baselineScript(task, role)
+    : proxyScript(task, role, condition);
 }

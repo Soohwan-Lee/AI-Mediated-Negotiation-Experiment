@@ -13,7 +13,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { Speaker } from "@/lib/types";
+import { NEGOTIATION } from "@/lib/study-config";
+import type { StageId, Speaker } from "@/lib/types";
 import { Button } from "./ui";
 
 // ---------------------------------------------------------------------------
@@ -71,11 +72,20 @@ export function CountdownTimer({
 // Transcript
 // ---------------------------------------------------------------------------
 
+/**
+ * How each speaker is named on screen.
+ *
+ * DECEPTION INTEGRITY: the counterpart is a person with a name, and their
+ * proxy belongs to that person. Nothing here may read as a system component.
+ * `counterpart_principal` is the other participant speaking in their own
+ * voice, which in a Proxy task happens exactly once — at ratification.
+ */
 const SPEAKER_LABEL: Record<Speaker, string> = {
   participant: "You",
-  counterpart: "Counterpart",
-  participant_proxy: "Your Proxy",
-  counterpart_proxy: "Counterpart's Proxy",
+  counterpart: "Alex",
+  participant_proxy: "Your AI Proxy",
+  counterpart_proxy: "Alex's AI Proxy",
+  counterpart_principal: "Alex",
   system: "System",
 };
 
@@ -137,7 +147,8 @@ export function Transcript({
       ) : null}
 
       {messages.map((m) => {
-        const own = m.speaker === "participant" || m.speaker === "participant_proxy";
+        const own =
+          m.speaker === "participant" || m.speaker === "participant_proxy";
         if (m.speaker === "system") {
           return (
             <p
@@ -192,13 +203,14 @@ export function Transcript({
 }
 
 /**
- * Message length cap, from Appendix E1.
+ * Message length cap (Design §7 노출량 통제), read from one place.
  *
  * Both sides are held to it, because message length is one of the things
- * matched across conditions — a Proxy that writes twice as much as a person
- * would confound the comparison with sheer airtime.
+ * matched across conditions — an Explorer that writes twice as much as a
+ * Delegate to fit an extra reason would confound the contrast with sheer
+ * airtime, which is what pilot gate 10 checks.
  */
-export const MAX_MESSAGE_CHARS = 280;
+export const MAX_MESSAGE_CHARS = NEGOTIATION.maxMessageChars;
 
 export function MessageComposer({
   value,
@@ -254,5 +266,77 @@ export function MessageComposer({
         {left} characters left
       </p>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stage rail
+// ---------------------------------------------------------------------------
+
+/**
+ * Where you are in the five stages, and what this one is for.
+ *
+ * A five-step exchange with a fixed structure is only legible if the structure
+ * is on screen. Without this, a participant three messages in has no way to
+ * know whether two more turns are coming or twenty, and the pacing of what
+ * they concede depends on that guess — which would put a nuisance variable
+ * straight into the primary outcome.
+ *
+ * Identical in both conditions and for both roles.
+ */
+export function StageRail({
+  stage,
+  goals,
+  note,
+}: {
+  stage: StageId;
+  goals: Record<StageId, string>;
+  /** One line on what to do right now. */
+  note?: string;
+}) {
+  const stages: StageId[] = [1, 2, 3, 4, 5];
+  return (
+    <div className="border-b border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3">
+      <ol className="mb-2 flex items-center gap-1.5">
+        {stages.map((s) => (
+          <li key={s} className="flex flex-1 items-center gap-1.5">
+            <span
+              className={
+                s < stage
+                  ? "h-1.5 flex-1 rounded-full bg-[var(--accent)]/40"
+                  : s === stage
+                    ? "h-1.5 flex-1 rounded-full bg-[var(--accent)]"
+                    : "h-1.5 flex-1 rounded-full bg-[var(--line-strong)]"
+              }
+            />
+          </li>
+        ))}
+      </ol>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="text-[0.8125rem] font-semibold">
+          Step {stage} of 5 · {goals[stage]}
+        </p>
+        {note ? (
+          <p className="text-[0.8125rem] text-[var(--ink-2)]">{note}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "The other participant is watching this too" (Design §4 관전 중).
+ *
+ * Shown throughout a Proxy negotiation. It is the thing that makes the
+ * exchange feel observed rather than private, which is the condition the
+ * social-cost measures are asked about — a participant who believed nobody
+ * else saw the exchange would be answering about a different situation.
+ */
+export function SpectatorBanner({ name = "Alex" }: { name?: string }) {
+  return (
+    <p className="flex items-center gap-2 border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-2 text-[0.8125rem] text-[var(--ink-2)]">
+      <span aria-hidden>👀</span>
+      {name} is watching this negotiation too. Neither of you can step in.
+    </p>
   );
 }

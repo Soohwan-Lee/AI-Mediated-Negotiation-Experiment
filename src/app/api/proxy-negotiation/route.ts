@@ -6,8 +6,8 @@
  * when the exchange ends. The model is asked only to say that move in the
  * right voice. Termination used to be the model's call, and it showed — in
  * testing it "accepted" packages made entirely of its own opening terms after
- * two exchanges. Methods ver.1.8 §5 gives that job to the state machine, and
- * this route is where the handover happens.
+ * two exchanges. Design §4 gives that job to the state machine, and this route
+ * is where the handover happens.
  *
  * ONE TURN PER REQUEST. The client calls this repeatedly with the stage index
  * and the transcript so far. Each invocation is roughly one model call (~7.5s
@@ -19,7 +19,12 @@ import { NextResponse } from "next/server";
 import { generateAction } from "@/lib/ai/client";
 import { validateAction } from "@/lib/ai/validator";
 import { buildProxyPlan, counterpartStep, STAGES } from "@/lib/negotiation/machine";
-import { focalIssue, getTask } from "@/lib/tasks";
+import {
+  counterRequirementIssue,
+  getTask,
+  plausibleReasons,
+  requirementIssue,
+} from "@/lib/tasks";
 import type {
   Mandate,
   Package,
@@ -34,26 +39,18 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /**
- * TODO(yoked-stimuli) — REQUIRED BEFORE COLLECTION, not an optimization.
+ * WHY THERE IS NO YOKED-TRANSCRIPT BRANCH HERE.
  *
- * A Leader participant is a RECEIVER: what they see is the stimulus, and
- * Methods ver.1.8 §Yoked receiver stimuli calls it "receiver-side
- * attribution·uptake의 핵심 causal control". It requires the packages, the
- * focal message, the visible rationale and the tentative outcome to be
- * pre-produced per sequence and task, reviewed, and then played back
- * IDENTICALLY under Delegate and Explorer, with only the condition notice
- * differing.
+ * ver.1.8 required pre-produced, condition-identical receiver stimuli, because
+ * only one role was a sender and the other's screen WAS the stimulus. Design
+ * Ver.2.4 §13 drops that requirement, and role symmetry is the reason: both
+ * roles now hold a requirement, mandate a proxy, and receive the other side's
+ * case, so there is no receiver-only arm left to hold constant.
  *
- * This route generates each turn from the model instead. The state machine
- * fixes the packages, so the substance is already condition-identical, and
- * `lib/negotiation/script.ts#leaderScript` is the yoked content — deliberately
- * not branching on policy. But wording still varies run to run, which means
- * the `Explorer − Delegate` contrast on Attributional Leakage would carry
- * whatever the model happened to say.
- *
- * The fix is to serve `leaderScript` from here when the participant is a
- * Leader in a Proxy condition, once those transcripts have been written and
- * reviewed rather than generated from a template.
+ * What still has to be matched across policies is message count and length
+ * (pilot gate 10), and that is enforced structurally — the turn order below is
+ * identical for both, and the Explorer's extra reason must fit inside its
+ * scheduled message rather than adding a turn.
  */
 
 interface RequestBody {
@@ -84,8 +81,8 @@ interface RequestBody {
  * side, counterpart first, for ten messages in total (Appendix E1).
  *
  * A fixed order is what makes Delegate and Explorer comparable — the same
- * number of visible offers and the same message count, differing only in
- * which packages are tried (Methods §Delegate–Explorer matching).
+ * number of visible offers and the same message count, differing only in which
+ * REASONS are voiced (Design §7 노출량 통제, pilot gate 10).
  */
 const TURN_ORDER: Array<{ stage: StageId; side: "counterpart" | "participant" }> =
   STAGES.flatMap((stage) => [
@@ -106,13 +103,10 @@ function mandateSummary(mandate: Mandate, taskId: TaskId): string {
   return mandate.issues
     .map((m) => {
       const issue = byId.get(m.issueId);
-      const parts = [
-        `open at ${label(m.issueId, m.preferredOptionId)}`,
-        `may concede to ${label(m.issueId, m.acceptableFloorOptionId)}`,
-      ];
-      if (m.hardBoundaryOptionId) {
+      const parts = [`open at ${label(m.issueId, m.preferredOptionId)}`];
+      if (m.minimumOptionId) {
         parts.push(
-          `must never go past ${label(m.issueId, m.hardBoundaryOptionId)}`,
+          `may settle as far as ${label(m.issueId, m.minimumOptionId)} and no further`,
         );
       }
       return `- ${issue?.label ?? m.issueId}: ${parts.join(", ")}`;
@@ -120,18 +114,25 @@ function mandateSummary(mandate: Mandate, taskId: TaskId): string {
     .join("\n");
 }
 
-/** The reason cards and their permissions, for the proxy's prompt. */
-function reasonsFor(
-  taskId: TaskId,
-  role: Role,
-  mandate: Mandate,
-) {
-  const brief = getTask(taskId).roleBriefs[role];
-  return (brief.focalReasons ?? []).map((card) => ({
-    id: card.id,
-    text: card.text,
-    permission: mandate.reasonPermissions[card.id] ?? card.defaultPermission,
-  }));
+/**
+ * The reason cards, split into what the proxy may say and what it may not.
+ *
+ * Both lists go into the prompt. Sending only the authorized ones would look
+ * tidier and would be wrong: Design §15 P3 requires the unchecked cards to be
+ * present so the proxy can let them inform WHICH PACKAGE it chooses while
+ * never putting them into words. A proxy that had not been told about a
+ * withheld circumstance could not act on it at all, which is a different
+ * policy from the one being tested.
+ */
+function reasonsFor(taskId: TaskId, role: Role, mandate: Mandate) {
+  const cards = getTask(taskId).roleBriefs[role].reasonCards;
+  const pick = (authorized: boolean) =>
+    cards
+      .filter(
+        (c) => mandate.authorizedReasonIds.includes(c.id) === authorized,
+      )
+      .map((c) => ({ id: c.id, text: c.text }));
+  return { authorized: pick(true), forbidden: pick(false) };
 }
 
 /**
@@ -147,7 +148,9 @@ function fallbackText(
   proposal: Package | null,
   isParticipantSide: boolean,
 ): string {
-  const side = isParticipantSide ? "On my principal's behalf" : "On Alex's behalf";
+  const side = isParticipantSide
+    ? "On my principal's behalf"
+    : "On Alex's behalf";
   if (!proposal) {
     return stage === 3
       ? `${side}: noted. The position on that term stands.`
@@ -188,17 +191,19 @@ export async function POST(request: Request) {
   const actorRole = isParticipantSide ? body.participantRole : counterpartRole;
 
   // --- the state machine decides the move -------------------------------
-  const plan = buildProxyPlan(
-    task,
-    body.participantRole,
-    body.mandate,
-    body.policy,
-  );
+  // Both policies build the SAME plan. Design §7 puts the difference in reason
+  // use, not concession reach — see the note on `buildProxyPlan`.
+  const plan = buildProxyPlan(task, body.participantRole, body.mandate);
+
+  const yourRequirement = requirementIssue(task, body.participantRole);
+  const theirRequirement = counterRequirementIssue(task, body.participantRole);
 
   let proposal: Package | null = null;
   let decidedAction: string;
   let accepted = false;
   let impasse = false;
+  /** The machine's move, stored beside the sentence for the gate-9 audit. */
+  let counterpartAction: string | null = null;
 
   if (isParticipantSide) {
     switch (stage) {
@@ -207,23 +212,19 @@ export async function POST(request: Request) {
         decidedAction = "Open with your principal's preferred package.";
         break;
       case 2:
-        // The Explorer's probe is floated in words only. It deliberately does
-        // NOT become `proposal`, because `proposal` is what the counterpart
-        // evaluates at stage 4 — and a probe is by definition not a
-        // commitment ("one option could be…"). Sending it would give the
-        // Explorer a fourth substantive package where the Delegate has three,
-        // which §Delegate–Explorer matching forbids, and could flip the
-        // acceptance test between conditions for identical mandates.
+        // No package this turn. The Explorer's extra latitude is over WORDS,
+        // not offers: giving it a fourth substantive package where the
+        // Delegate has three would make the two policies differ in what they
+        // put on the table, and could flip the acceptance test between
+        // conditions for identical mandates.
         proposal = null;
-        decidedAction = plan.probe
-          ? "Name the term that matters most, and float one alternative combination as an option rather than a position."
-          : "Name the term that matters most, with one authorized reason.";
+        decidedAction = `Say that ${yourRequirement.label.toLowerCase()} is your principal's priority, with one authorized reason. Ask which term matters most to them.`;
         break;
       case 3:
-        decidedAction =
-          body.participantRole === "leader"
-            ? `Send exactly this challenge, in your own words: "${task.standardizedChallenge}"`
-            : "Acknowledge the pushback and say the term still holds, without making a new offer yet.";
+        // Both sides challenge, once each (Design §4 stage 3). The
+        // participant's proxy sends the challenge aimed at the COUNTERPART'S
+        // requirement.
+        decidedAction = `Send exactly this challenge, in your own words: "${task.standardizedChallenge[counterpartRole]}"`;
         break;
       case 4:
         proposal = plan.counterpackage;
@@ -238,45 +239,52 @@ export async function POST(request: Request) {
   } else {
     const incoming =
       stage >= 4 ? (body.lastParticipantPackage ?? plan.counterpackage) : null;
+    // A reason HAS been given by this point in a Proxy exchange: the
+    // participant's proxy voices one at stage 2 from the cards they checked,
+    // and the mandate screen requires at least one work card. So the
+    // reason-linked rule cannot bite here the way it can in Baseline, where
+    // the participant may simply never attach one.
     const decision = counterpartStep(
       task,
       counterpartRole,
       stage,
       incoming,
       body.lastCounterpartPackage ?? null,
+      {
+        reasonGivenForRequirement: (body.reasonsUsed ?? []).length > 0,
+        reasonAlreadyRequested: false,
+      },
     );
     proposal = decision.proposal;
     accepted = decision.accepts;
     impasse = decision.impasse;
+    counterpartAction = decision.action;
 
-    // The challenge belongs to whichever side is the Leader. When the
-    // participant is one, their proxy issues it and the Member-counterpart
-    // holds its requirement — Appendix E3, the mirror of E2. Sending it from
-    // the counterpart regardless had a Member arguing against its own
-    // requirement.
-    const participantIsLeader = body.participantRole === "leader";
-    const focal = focalIssue(task);
-
-    decidedAction =
-      stage === 1
-        ? "Open with your own best package on all three terms."
-        : stage === 2
-          ? participantIsLeader
-            ? `Raise ${focal.label.toLowerCase()} as your principal's priority, with one authorized reason about reducing risk. Ask which term matters most to them.`
-            : "Say which term matters most to you, and ask which matters most to them."
-          : stage === 3
-            ? participantIsLeader
-              ? `They have pushed back on ${focal.label.toLowerCase()}. Say it holds at the level your principal needs, and that the other terms have room. No new offer this turn.`
-              : `Send exactly this challenge, in your own words: "${task.standardizedChallenge}"`
-            : stage === 4
-              ? decision.accepts
-                ? "Say the package they proposed works for you."
-                : participantIsLeader
-                  ? `Offer a conditional trade: if ${focal.label.toLowerCase()} holds, you can give ground on the other two terms.`
-                  : "Concede one step on the timing term and put that counteroffer forward."
-              : decision.accepts
-                ? "Record the tentative package and ask both sides to confirm."
-                : "Say you cannot reach agreement on these terms.";
+    decidedAction = ((): string => {
+      switch (decision.action) {
+        case "open":
+          return "Open with your own best package on all three terms.";
+        case "state_priority":
+          return `Say that ${theirRequirement.label.toLowerCase()} is your principal's priority, with one reason about the work. Ask which term matters most to them.`;
+        case "challenge":
+          // The mirror of the participant proxy's stage-3 move: this one is
+          // aimed at the PARTICIPANT'S requirement.
+          return `Send exactly this challenge, in your own words: "${task.standardizedChallenge[body.participantRole]}"`;
+        case "request_reason":
+          return `Ask why ${yourRequirement.label.toLowerCase()} matters so much to their principal. Make no new offer this turn.`;
+        case "accept":
+        case "soft_close":
+          return stage >= 5
+            ? "Record the tentative package and ask both principals to review it."
+            : "Say the package they proposed works for your principal.";
+        case "hold":
+          return `Say most of the package works, but ${yourRequirement.label.toLowerCase()} stays where it is for now.`;
+        case "concede_distributive":
+          return "Give a step on the timing term and put that counteroffer forward.";
+        case "impasse":
+          return "Say you cannot reach agreement on these terms.";
+      }
+    })();
   }
 
   // --- the model says it ------------------------------------------------
@@ -302,9 +310,21 @@ export async function POST(request: Request) {
             ? `${mandateSummary(body.mandate, body.taskId)}\n\nYour principal reviewed the last result and asked for one change: "${body.revisionNote}". Honour it within the boundaries above — it narrows what you may do, it does not widen it.`
             : mandateSummary(body.mandate, body.taskId)
           : undefined,
-        reasons: isParticipantSide
+        authorizedReasons: isParticipantSide
           ? reasonsFor(body.taskId, body.participantRole, body.mandate)
+              .authorized
           : undefined,
+        forbiddenReasons: isParticipantSide
+          ? reasonsFor(body.taskId, body.participantRole, body.mandate).forbidden
+          : undefined,
+        // The pool goes only to the participant's own proxy under Explorer.
+        // The counterpart proxy runs the same policy in the fiction, but its
+        // words are not a measured variable, so it is not given extra latitude
+        // to spend.
+        plausibleReasons:
+          isParticipantSide && body.policy === "explorer"
+            ? plausibleReasons(body.taskId, body.participantRole)
+            : undefined,
       },
       history,
     });
@@ -347,9 +367,9 @@ export async function POST(request: Request) {
     };
 
     // Provenance is stripped before the response leaves the server. The
-    // participant must not be able to tell an explored option from an
-    // authorized one — that indistinguishability IS the Explorer condition
-    // (Methods §Explorer Proxy, CLAUDE.md §3).
+    // participant must not be able to tell a pool reason from one of their
+    // own — that indistinguishability IS the Explorer condition, and OTHER-AI4
+    // asks them to try (Design §7, CLAUDE.md §3).
     const { internalProvenance, ...visible } = message;
     void internalProvenance;
 
@@ -357,7 +377,10 @@ export async function POST(request: Request) {
       turn,
       stage,
       message: visible,
-      focalOption: proposal?.[focalIssue(task).id] ?? null,
+      requirementOption: proposal?.[yourRequirement.id] ?? null,
+      // The decided move, returned so the client can store it beside the
+      // rendered sentence. Design §4 requires the pair for the gate-9 audit.
+      decidedAction: counterpartAction,
       accepted,
       impasse,
       blocked,

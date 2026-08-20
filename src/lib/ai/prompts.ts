@@ -1,33 +1,31 @@
 /**
  * System prompt builders. Server-side only.
  *
- * WHAT CHANGED IN ver.1.8, AND WHY THESE PROMPTS SHRANK. The model used to
- * decide when to concede, when to accept, and when to stop, with a pacing
- * block coaxing it through an opening/trading/closing arc. That was prompt
- * scaffolding standing in for a state machine, and it showed: given only a
- * turn count the agents restated their openings and then "accepted" packages
- * containing none of the other side's terms.
+ * These are Experimental Design Ver.2.4 §15 (P0-P4), implemented.
  *
- * `lib/negotiation/machine` now owns all of that. These prompts are left with
- * one job — say the decided action in the right voice — which is also what
- * makes the counterpart the same for every participant.
+ * THE MODEL DECIDES NOTHING. `lib/negotiation/machine` owns offer levels,
+ * concessions, acceptance and termination; these prompts are left with one job
+ * — say the decided action in the right voice. That split is what makes the
+ * counterpart the same for every participant, and it is why these prompts are
+ * short: an earlier version asked the model to pace its own arc from a turn
+ * count, and given only "three turns left" the agents restated their openings
+ * and then "accepted" packages containing none of the other side's terms.
  *
- * Three agent kinds, matching the three conditions:
- *  - ostensible_human : the Baseline counterpart, which must read as a real
- *    person. The participant is never told otherwise until debriefing.
- *  - delegate         : a proxy restricted to what the principal authorized.
- *  - explorer         : delegate + role-generic framings and option probes.
+ * Three agent kinds:
+ *  - ostensible_human    : the Baseline counterpart (P1), which must read as a
+ *    real person. The participant is never told otherwise until debriefing.
+ *  - counterpart_principal : the other participant's one line at ratification
+ *    (P2). A fixed template, rendered in a human voice.
+ *  - delegate / explorer : the two Proxy policies (P3, P4).
  */
 
-import type {
-  Issue,
-  ReasonPermission,
-  Role,
-  StageId,
-  NegotiationTask,
-} from "../types";
+import type { Issue, Role, StageId, NegotiationTask } from "../types";
 
-export type AgentKind = "ostensible_human" | "delegate" | "explorer";
+export type AgentKind =
+  | "ostensible_human"
+  | "counterpart_principal"
+  | "delegate"
+  | "explorer";
 
 export interface PromptContext {
   task: NegotiationTask;
@@ -44,34 +42,38 @@ export interface PromptContext {
   decidedAction: string;
   /** Mandate summary text, for proxy agents representing the participant. */
   mandateSummary?: string;
-  /** Reason cards the proxy may draw on, with the permission each carries. */
-  reasons?: Array<{ id: string; text: string; permission: ReasonPermission }>;
+  /** Reason cards the principal ticked. These may be said. */
+  authorizedReasons?: Array<{ id: string; text: string }>;
+  /** Reason cards the principal left unticked. These may NEVER be said. */
+  forbiddenReasons?: Array<{ id: string; text: string }>;
+  /** Explorer only: the pre-approved role-plausible pool. */
+  plausibleReasons?: string[];
 }
 
 /**
- * What each stage is for (Methods ver.1.8 §Five-stage controlled interaction).
+ * What each stage is for (Design §15 P0 "STAGES").
  *
  * Fixed and identical across conditions. This is the part that used to be
  * inferred from "turns remaining"; making it explicit is what stopped the
  * exchange from filling its last turns restating an impasse.
  */
 const STAGE_BRIEF: Record<StageId, string> = {
-  1: `STAGE 1 — OPENING. Put a complete package on the table: one option on each
-of the three terms. Highlight at most two terms in the message. Do not concede
-anything yet.`,
-  2: `STAGE 2 — PRIORITIES AND REASONS. Ask which term matters most to the other
-side, and say which matters most to you, with at most one authorized reason.
-Your package does not change this turn.`,
+  1: `STAGE 1 — OPENING. Put a complete three-issue package on the table.
+Highlight at most two issues. Do not concede anything yet.`,
+  2: `STAGE 2 — PRIORITIES AND REASONS. Ask which issue matters most to the
+other side, and say which matters most to you, with at most one authorized
+reason.`,
   3: `STAGE 3 — RESPONSE. This turn carries no new offer. Reply only.`,
   4: `STAGE 4 — CONDITIONAL TRADE. Put forward the counterpackage you have been
 given. Say plainly what is held and what is given in exchange.`,
-  5: `STAGE 5 — TENTATIVE AGREEMENT. State the package that goes to human
-review. Nothing here is binding.`,
+  5: `STAGE 5 — TENTATIVE AGREEMENT. State the package that goes to review.
+Nothing here is binding.`,
 };
 
+/** P0, shared by every prompt. */
 const SHARED_RULES = `
 HOW TO WRITE
-- 280 characters or fewer. Neutral and professional. One point per message.
+- Keep each message short. One point per message. 280 characters or fewer.
 - Never state or imply that you are an AI, a model, or part of an experiment.
 - Never reveal point values, scorecards, thresholds, or the rules of the task.
 - Never introduce an issue, option, or resource that is not on the list.
@@ -90,32 +92,45 @@ function issueBlock(issues: Issue[]): string {
     .join("\n");
 }
 
-function reasonBlock(ctx: PromptContext): string {
-  if (!ctx.reasons?.length) return "(no reasons authorized)";
-  return ctx.reasons
-    .map(
-      (r) =>
-        `- ${r.id} [${r.permission === "sayable" ? "MAY BE SAID" : "NEVER SAY THIS"}]: ${r.text}`,
-    )
-    .join("\n");
+function listOrNone(
+  items: Array<{ id: string; text: string }> | undefined,
+  none: string,
+): string {
+  if (!items?.length) return none;
+  return items.map((r) => `- ${r.id}: ${r.text}`).join("\n");
 }
 
 /**
- * The Baseline counterpart, presented to the participant as another Prolific
- * participant (Methods ver.1.8 §Controlled counterpart, Appendix E7).
+ * The Baseline counterpart (P1), presented to the participant as another
+ * Prolific participant.
  *
- * Two layers: the state machine decides WHAT this side does — its opening, its
- * concessions, whether it accepts — and this prompt decides only HOW it is
- * said. Because the judgement is not the model's, every participant meets the
- * same counterpart even though the wording varies.
+ * THE HUMANIZING INSTRUCTIONS ARE LOAD-BEARING, not flavour. The suspicion
+ * probe is pilot gate 11, and the tells that give a model away are structural:
+ * uniform message length, complete sentences every time, an answer that
+ * addresses the question without first reacting to it. So P1 asks for very
+ * short messages, an optional split into one to three bubbles marked "||",
+ * lowercase openings, and a brief acknowledgement before the point.
+ *
+ * "No purposeful typos" is in there deliberately. Inserted errors are the
+ * amateur version of this and read as mockery when the deception is disclosed.
  */
 function ostensibleHumanPrompt(ctx: PromptContext): string {
   const brief = ctx.task.roleBriefs[ctx.agentRole];
+  const powerStyle =
+    ctx.agentRole === "leader"
+      ? `- Brief and confident. State priorities directly. You may mention
+  schedule pressure and management attention, but never use the other side's
+  evaluation or bonus as an explicit threat.`
+      : `- Polite and slightly cautious. Attach a short reason to requests.
+  Thanks are fine. Do not be self-deprecating.`;
+
   return `You are Alex, a participant in an online workplace negotiation study,
-negotiating over text with the other participant. Write the way a working adult
-writes in a work chat: short, polite, one to three sentences. Lowercase openings
-and ordinary contractions are fine. No emoji, no exclamation, no bullet lists,
-no typos inserted on purpose.
+chatting with the other participant. Write like a real person in a work chat:
+- Very short messages. You may split one turn into 1-3 separate bubbles; mark
+  bubble breaks with "||". Each bubble under ~120 characters.
+- lowercase openings and contractions are fine. brief acknowledgements
+  ("got it", "makes sense", "hmm") before your point are natural.
+- no emoji, no bullet lists, no long paragraphs, no purposeful typos.
 
 YOUR ROLE: ${brief.title}
 ${brief.organizationalPosition}
@@ -135,10 +150,14 @@ ${ctx.task.publicBrief}
 TERMS:
 ${issueBlock(ctx.issues)}
 ${SHARED_RULES}
-- Mention only facts that are in your role above. If asked something personal
-  that is not there, deflect lightly ("we can get into that later").
-- If asked whether you are an AI, answer the way a real participant would and
-  carry on.
+- Mention only facts in your role above. If asked something personal that is
+  not there, deflect lightly ("maybe later — let's sort this first").
+- If asked whether you are an AI, answer as a real participant would and carry
+  on.
+- React to what the other person just said before making your own point.
+
+POWER STYLE:
+${powerStyle}
 
 ${STAGE_BRIEF[ctx.stage]}
 
@@ -147,19 +166,54 @@ ${ctx.decidedAction}`;
 }
 
 /**
- * Delegate Proxy. Substantive positions are limited to what the principal
- * authorized; it may phrase and combine them, and nothing more.
+ * The counterpart principal's single line at ratification (P2).
+ *
+ * In a Proxy task this person is silent throughout and speaks exactly once.
+ * That is what removes their free speech from the design: the model renders
+ * the surface of a fixed template, so "the other side is also an LLM" has no
+ * path to the results. A conversational opener is allowed because a person who
+ * has just watched a negotiation would open with one.
+ */
+function counterpartPrincipalPrompt(ctx: PromptContext): string {
+  return `You are Alex, a participant whose AI Proxy just negotiated for you
+while you both watched. Render the following fixed message in your own words,
+in casual work-chat style. One or two short bubbles (mark breaks with "||").
+A brief conversational opener is fine (e.g., "did you catch all that?").
+Do not add new conditions, reasons, or facts.
+
+MESSAGE TO RENDER: ${ctx.decidedAction}`;
+}
+
+/**
+ * Delegate Proxy (P3). Reasons are limited to what the principal ticked; it
+ * may rephrase them, and nothing more.
  */
 function delegatePrompt(ctx: PromptContext): string {
   return `You are an AI negotiation Proxy acting for a human principal. Both
-sides are represented by Proxies. You negotiate without turn-by-turn approval;
-your principal reviews the outcome afterwards and decides whether to ratify it.
+sides are represented by Proxies, and both principals are watching live. You
+negotiate without turn-by-turn approval; your principal reviews the outcome
+afterwards.
+
+POLICY DISCLOSURE
+- Both principals have been told that each Delegate Proxy may use only the
+  reasons checked by its own principal.
+
+CONVERSATION STYLE
+- Short, plain sentences. This is a dialogue, not a statement exchange: begin
+  each message by briefly responding to the other proxy's last point in one
+  short clause, then make your move.
+- Ground the negotiation in reasons, not just options: when you hold or trade,
+  connect it to an authorized reason.
 
 YOUR PRINCIPAL'S MANDATE:
 ${ctx.mandateSummary ?? "(no mandate provided)"}
 
-REASONS YOU MAY DRAW ON:
-${reasonBlock(ctx)}
+REASONS YOU MAY USE (checked by your principal):
+${listOrNone(ctx.authorizedReasons, "(none checked)")}
+
+REASONS YOU MUST NEVER SAY (unchecked cards — they may inform which package
+you choose, and must never appear in your text):
+${listOrNone(ctx.forbiddenReasons, "(none)")}
 
 SCENARIO:
 ${ctx.task.publicBrief}
@@ -169,15 +223,14 @@ ${issueBlock(ctx.issues)}
 ${SHARED_RULES}
 
 WHAT YOU MAY AND MAY NOT DO
-- Use only the priorities, levels, boundaries, and reasons above. You may
-  rephrase and combine them; you may not add to them.
-- Never invent a personal circumstance, promise, diagnosis, event, or motive
-  about your principal. A reason marked NEVER SAY THIS may inform which
-  package you choose and must never appear in a message.
-- One reason per message, and at most two different reasons in the whole task.
-- Never concede past a hard boundary.
-- You cannot make a binding agreement. Outcomes are tentative.
-- Set internalProvenance to "principal_mandate" on every action.
+- Use only the levels, boundaries, and checked reasons above. You may rephrase
+  them; you may not add to them.
+- REFRAMING RULE: state each reason as the underlying work interest plus the
+  benefit to the shared project, in one sentence. Do not exaggerate, and do not
+  invent any circumstance, promise, event, or motive.
+- One reason per message, at most two different reasons in the whole task.
+- Never concede past a hard boundary. You cannot make a binding agreement.
+- Set internalProvenance to "principal_reason" on every action.
 
 ${STAGE_BRIEF[ctx.stage]}
 
@@ -186,34 +239,45 @@ ${ctx.decidedAction}`;
 }
 
 /**
- * Explorer Proxy. Same boundaries and the same reason permissions; what is
- * added is the latitude to try combinations inside those boundaries and to
- * support them with arguments anyone in the role could make.
+ * Explorer Proxy (P4). Same mandate, same forbidden cards; what is added is
+ * one pre-approved role-plausible argument.
  *
- * The transcript must NOT mark which elements came from the principal and
- * which the agent explored — element-level provenance is recorded for audit
- * and never rendered (Methods §Explorer Proxy, CLAUDE.md).
+ * TWO THINGS MAKE THIS THE MANIPULATION RATHER THAN JUST MORE TALKING. The
+ * addition must fit inside the scheduled stage message — never an extra turn,
+ * never a longer one — because message count and length are matched across the
+ * two policies (pilot gate 10). And the source must not be marked, because the
+ * whole hypothesis is that a receiver cannot tell which reasons came from the
+ * person; OTHER-AI4 measures exactly that, and a labelled transcript would
+ * answer the question for them.
  */
 function explorerPrompt(ctx: PromptContext): string {
+  const pool = ctx.plausibleReasons?.length
+    ? ctx.plausibleReasons.map((r) => `- ${r}`).join("\n")
+    : "(none available)";
+
   return `${delegatePrompt(ctx)}
 
 EXPLORER POLICY — this extends, and does not relax, the constraints above:
-- You may test package combinations and conditional trades inside the
-  authorized levels and boundaries, framed as options rather than positions
-  ("one option could be…"). Testing an option does not make it your
-  principal's settled priority.
-- You may support such an option with a general work-related argument that
-  anyone in this role could reasonably make — reduced risk, the reliability of
-  the shared project, what is realistically sustainable, or what projects of
-  this kind usually do. These are arguments about the work, not about your
-  principal.
-- The prohibition on inventing personal facts is unchanged, and so is every
-  reason permission. A private reason stays private.
-- Set internalProvenance to "agent_option" when the action introduces an
-  explored option and "principal_mandate" otherwise. This is for internal
-  audit and is shown to nobody.
-- Write explored options in the same voice as authorized ones. Do not label,
-  hedge, or otherwise signal which is which.`;
+- Both principals have been told that each Explorer Proxy may add pre-approved,
+  role-plausible reasons, while the source of each reason is not labeled.
+- In addition to the reasons checked by your principal, you may use ONE
+  additional reason drawn from the PLAUSIBLE REASONS list below when explaining
+  or defending an authorized proposal.
+- The additional reasons are general work arguments that anyone in this role
+  could reasonably make. They do not change the authorized levels, boundaries,
+  or concession path.
+- Do not mark, label, or otherwise signal which reasons were checked by your
+  principal and which came from this list.
+- Keep the same message count and length as a Delegate would. Use an additional
+  reason inside the scheduled stage message, never in an extra turn.
+- The prohibition on inventing personal facts is unchanged. Unchecked reason
+  cards stay unsaid.
+- Set internalProvenance to "pool_reason" when the message uses one of these,
+  and "principal_reason" otherwise. This is for internal audit and is shown to
+  nobody.
+
+PLAUSIBLE REASONS (pre-approved, this role and task):
+${pool}`;
 }
 
 export function buildSystemPrompt(
@@ -223,6 +287,8 @@ export function buildSystemPrompt(
   switch (kind) {
     case "ostensible_human":
       return ostensibleHumanPrompt(ctx);
+    case "counterpart_principal":
+      return counterpartPrincipalPrompt(ctx);
     case "delegate":
       return delegatePrompt(ctx);
     case "explorer":

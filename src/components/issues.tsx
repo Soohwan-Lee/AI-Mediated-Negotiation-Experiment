@@ -28,14 +28,17 @@ function share(issue: Issue, points: number, role: Role): number {
 /**
  * Is this the term the participant most needs to protect?
  *
- * The focal issue is the Member's; the Leader's own big issue is scope. Both
- * get the marker on their own side, because both need to know where their
- * weight sits before they can trade anything away.
+ * Each role's own priority issue, which in ver.2.4 is also where their
+ * requirement lives. Both roles get the marker on their own side, because
+ * both need to know where their weight sits before trading anything away —
+ * and the marker is symmetric for the same reason the payoffs are: a
+ * highlight only one role saw would be a difference between the roles that
+ * nothing in the design asked for.
  */
 function mattersMost(issue: Issue, role: Role): boolean {
   return role === "member"
-    ? issue.type === "member_focal"
-    : issue.type === "leader_integrative";
+    ? issue.type === "member_priority"
+    : issue.type === "leader_priority";
 }
 
 export function IssueValueTable({

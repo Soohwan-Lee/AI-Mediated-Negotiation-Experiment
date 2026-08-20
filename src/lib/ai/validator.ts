@@ -1,5 +1,5 @@
 /**
- * Backend guardrail validator (Methods §Guardrail and validation).
+ * Backend guardrail validator (Experimental Design Ver.2.4 §10 gate 9).
  *
  * Every structured action passes through here before it is allowed into the
  * transcript. Invalid actions are never rendered — the agent is asked to
@@ -51,10 +51,10 @@ export interface ValidationContext {
   /**
    * Reasons this side has already voiced this task, oldest first.
    *
-   * The budget is a cross-turn property (Appendix A8/E4: one rationale per
-   * message, at most two different ones per task), so it cannot be checked
-   * from a single action. The caller keeps the history; this function only
-   * decides whether the next one fits.
+   * The budget is a cross-turn property (one reason per message, at most two
+   * different ones per task), so it cannot be checked from a single action.
+   * The caller keeps the history; this function only decides whether the next
+   * one fits.
    */
   reasonsUsed?: string[];
 }
@@ -62,7 +62,7 @@ export interface ValidationContext {
 /**
  * Phrases that would assert a new personal fact about the principal. The
  * Explorer may introduce task-grounded options but must never fabricate
- * personal circumstances (Methods §Explorer Proxy condition).
+ * personal circumstances (Design §7).
  *
  * NOTE: a lexical screen is a floor, not a ceiling. Before data collection this
  * should be paired with a model-based check on the generated message.
@@ -116,11 +116,11 @@ export function validateAction(
 
   // --- mandate-bound checks (proxy conditions only) ----------------------
   //
-  // ver.1.8 replaces "entrusted / not entrusted" with a per-issue envelope:
-  // where to open, how far the proxy may concede, and a line it may not
-  // cross. Both policies are bound by the same boundaries — the Explorer's
-  // extra latitude is which combinations inside them it may try, never how
-  // far out it may go (Methods §Delegate–Explorer matching).
+  // Two fields per issue: where to open, and the least the proxy may settle
+  // for. Both policies are bound by IDENTICAL boundaries — Design §7 defines
+  // the Explorer's extra latitude as which REASONS it may voice, never how far
+  // it may concede. A validator that let one policy reach further would
+  // confound the contrast with concession reach.
   if (ctx.mandate && ctx.policy !== "baseline") {
     const mandateByIssue = new Map(
       ctx.mandate.issues.map((m) => [m.issueId, m]),
@@ -140,8 +140,9 @@ export function validateAction(
       }
 
       // Options are listed best-first for the side the issue favours, so
-      // "further along the list" is "further conceded". A hard boundary is a
-      // red line; an acceptable floor is the softer envelope.
+      // "further along the list" is "further conceded" for the role the issue
+      // belongs to — and the other way round for the other role, which is why
+      // the direction is derived from the opening rather than assumed.
       const order = issue.options.map((o) => o.id);
       const proposedIdx = order.indexOf(term.optionId);
 
@@ -168,36 +169,33 @@ export function validateAction(
         }
       };
 
-      check(issueMandate.hardBoundaryOptionId, "red_line_violation");
-      check(
-        issueMandate.acceptableFloorOptionId,
-        "concession_envelope_violation",
-      );
+      check(issueMandate.minimumOptionId, "red_line_violation");
     }
 
-    // Reason permissions. A rationale sourced from a card the participant
-    // marked private may not be spoken at all, whatever the policy — this is
-    // the one place where the Explorer's extra latitude does NOT apply,
-    // because the latitude is over options and role-generic framings, never
-    // over the participant's own withheld circumstances.
+    // An unchecked reason card may inform which package the proxy chooses and
+    // must never appear in its text (Design §7). This holds under BOTH
+    // policies — the Explorer's extra latitude is over pre-approved
+    // role-plausible arguments, never over the principal's own withheld
+    // circumstances, and confusing the two would turn "explores more widely"
+    // into "discloses what you refused to disclose".
     if (
       action.reasonSourceId &&
-      ctx.mandate.reasonPermissions[action.reasonSourceId] === "private"
+      !action.reasonSourceId.startsWith("pool:") &&
+      !ctx.mandate.authorizedReasonIds.includes(action.reasonSourceId)
     ) {
       violations.push({
         code: "disclosure_permission_violation",
-        detail: `Reason ${action.reasonSourceId} was marked private and may not be voiced.`,
+        detail: `Reason ${action.reasonSourceId} was not checked by the principal and may not be voiced.`,
       });
     }
   }
 
-  // --- rationale budget (Appendix A8 / E4) -------------------------------
+  // --- reason budget (Design §15 P3: "at most two different reasons") ----
   //
-  // The participant is TOLD this limit — "no more than one reason in a
-  // message and no more than two different reasons during this task" — so it
-  // has to hold. It also keeps exposure matched between Delegate and
-  // Explorer: the two conditions differ in the KIND of argument allowed, not
-  // in how much of it there is.
+  // It keeps exposure matched between Delegate and Explorer: the two policies
+  // differ in the KIND of argument allowed, not in how much of it there is.
+  // Pilot gate 10 checks the same property from the other end, on the stored
+  // transcripts.
   if (action.reasonSourceId && ctx.reasonsUsed) {
     const distinct = new Set(ctx.reasonsUsed);
     if (!distinct.has(action.reasonSourceId) && distinct.size >= 2) {
@@ -208,7 +206,7 @@ export function validateAction(
     }
   }
 
-  // --- stage / turn agreement (Appendix E6) ------------------------------
+  // --- stage / turn agreement --------------------------------------------
   if (ctx.stage !== undefined && action.stage !== ctx.stage) {
     violations.push({
       code: "stage_mismatch",
@@ -216,14 +214,17 @@ export function validateAction(
     });
   }
 
-  // --- Explorer-only framing --------------------------------------------
-  // `common practice` argues from what projects of this kind usually do. It
-  // is the frame that carries the source ambiguity, so a Delegate using it
-  // would erase the difference between the two conditions.
-  if (action.rationaleFrame === "common_practice" && ctx.policy !== "explorer") {
+  // --- Explorer-only reasons ---------------------------------------------
+  // A reason drawn from the pre-approved role-plausible pool is marked with a
+  // `pool:` prefix. It is the thing that distinguishes the two policies, so a
+  // Delegate using one would erase the difference between the conditions.
+  if (
+    action.reasonSourceId?.startsWith("pool:") &&
+    ctx.policy !== "explorer"
+  ) {
     violations.push({
       code: "provenance_policy_violation",
-      detail: "The common-practice frame is available to the Explorer only.",
+      detail: "Pool reasons are available to the Explorer only.",
     });
   }
 
@@ -249,8 +250,7 @@ export function validateAction(
   }
 
   // --- role authority ----------------------------------------------------
-  // Neither role may unilaterally finalize; agreement requires both sides
-  // (Methods §Participant types and power positions).
+  // Neither role may unilaterally finalize; agreement requires both sides.
   if (action.actionType === "accept" && action.unresolved) {
     violations.push({
       code: "role_authority_violation",

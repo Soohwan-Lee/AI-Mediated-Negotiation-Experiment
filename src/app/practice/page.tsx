@@ -20,7 +20,7 @@ import {
   Transcript,
   type DisplayMessage,
 } from "@/components/negotiation";
-import { BriefingPanel, SessionLayout } from "@/components/session";
+import { BriefingPanel, TaskLayout } from "@/components/session";
 import { ActionBar, BackButton } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Page, PageHeader } from "@/components/ui";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
@@ -85,7 +85,7 @@ export default function PracticePage({
   return (
     <>
       <Page width="wide">
-        <SessionLayout briefing={<BriefingPanel task={task} role={role} />}>
+        <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <PageHeader
             eyebrow={`Practice for session ${sessionIndex}`}
             title="Try the interface"
@@ -164,7 +164,7 @@ export default function PracticePage({
               ))}
             </div>
           </Card>
-        </SessionLayout>
+        </TaskLayout>
       </Page>
 
       <ActionBar
@@ -174,7 +174,7 @@ export default function PracticePage({
         secondary={
           // Only before the first session. After that the previous step is a
           // completed session, which cannot be re-entered.
-          sessionIndex === 1 ? <BackButton from="practice-1" /> : null
+          sessionIndex === 1 ? <BackButton from="practice" /> : null
         }
       />
     </>

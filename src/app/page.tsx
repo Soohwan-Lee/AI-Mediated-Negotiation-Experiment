@@ -44,15 +44,15 @@ const STEPS = [
   {
     title: "Two negotiations",
     detail: "Each with a practice round first, using a different interface.",
-    minutes: 2 * (STAGE_MINUTES.practice + STAGE_MINUTES.session),
+    minutes: 2 * (STAGE_MINUTES.practice + STAGE_MINUTES.task),
   },
   {
     title: "Questionnaire",
     detail: "What the two sessions were like, and a short final decision.",
     minutes:
-      STAGE_MINUTES.survey +
-      STAGE_MINUTES.manipulationCheck +
-      STAGE_MINUTES.rewardDecision,
+      STAGE_MINUTES.taskSurvey +
+      STAGE_MINUTES.wrapUp +
+      STAGE_MINUTES.reward,
   },
 ];
 

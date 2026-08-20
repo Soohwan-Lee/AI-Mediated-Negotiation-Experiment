@@ -42,14 +42,12 @@ function stubAction(ctx: PromptContext): NegotiationAction {
       : [],
     conditionalLink: null,
     stage: ctx.stage,
-    focalRequirementStatus: "not_addressed",
+    requirementStatus: "not_addressed",
     reasonSourceId: null,
-    reasonDisclosureLevel: null,
-    rationaleFrame: null,
     rationale:
       "[SCAFFOLD] No model configured. This is placeholder counterpart text so the interface can be reviewed end to end.",
     unresolved: false,
-    internalProvenance: "principal_mandate",
+    internalProvenance: "principal_reason",
   };
 }
 

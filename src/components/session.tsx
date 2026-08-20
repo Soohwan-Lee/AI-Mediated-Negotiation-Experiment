@@ -1,37 +1,38 @@
 "use client";
 
 /**
- * Session shell: where you are in the session, and your briefing, always.
+ * Task shell: where you are in the task, and your briefing, always.
  *
  * The briefing is the whole problem with this study's interface. Three terms
  * with four levels each, private point values, a fallback score, a role story
- * and a two-layer reason for the one term that is hard to raise — shown once
- * on an intro screen and then taken away, which is what the old flow did.
- * Nobody holds that. So the briefing is
- * pinned beside the work on a wide screen and one tap away on a narrow one,
- * at every phase, with no way to lose it.
+ * and six reason cards for the one term that is hard to raise — shown once on
+ * an intro screen and then taken away, which is what an ordinary flow does.
+ * Nobody holds that. So the briefing is pinned beside the work on a wide
+ * screen and one tap away on a narrow one, at every phase, with no way to lose
+ * it.
  *
  * DECEPTION INTEGRITY: phase names are generic and identical in wording
- * wherever they can be. Nothing here may hint at which condition a session is.
+ * wherever they can be. Nothing here may hint at which condition a task is.
  */
 
 import { useState, type ReactNode } from "react";
 import { IssueValueTable } from "./issues";
 import { Card, PrivateTag, cx } from "./ui";
+import { requirementIssue } from "@/lib/tasks";
 import type { NegotiationTask, Role } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Header
 // ---------------------------------------------------------------------------
 
-export function SessionHeader({
-  sessionIndex,
+export function TaskHeader({
+  taskIndex,
   title,
   steps,
   current,
   aside,
 }: {
-  sessionIndex: 1 | 2;
+  taskIndex: 1 | 2;
   title: string;
   /** Phase labels, in order. */
   steps: string[];
@@ -44,7 +45,7 @@ export function SessionHeader({
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
-            Session {sessionIndex} of 2
+            Task {taskIndex} of 2
           </p>
           <h1 className="text-[1.5rem] font-semibold leading-tight tracking-[-0.02em]">
             {title}
@@ -92,7 +93,11 @@ export function BriefingPanel({
   role: Role;
 }) {
   const brief = task.roleBriefs[role];
-  const focal = task.issues.find((i) => i.id === task.focalIssueId);
+  const requirement = requirementIssue(task, role);
+  const workCards = brief.reasonCards.filter((c) => c.layer === "work");
+  const sensitiveCards = brief.reasonCards.filter(
+    (c) => c.layer === "sensitive",
+  );
 
   return (
     <Card tone="private" className="text-[var(--private-ink)]">
@@ -119,13 +124,13 @@ export function BriefingPanel({
       {/* The role story is several sentences of concrete situation, and it is
           the part that has to do the work: a point sheet alone does not make
           anyone reluctant to raise something. It gets prose treatment. */}
-      <Section title="Your situation">
+      <Section title="📄 Your situation">
         <p className="prose-study max-w-prose whitespace-pre-line text-[0.8125rem] leading-relaxed">
           {brief.roleStory}
         </p>
       </Section>
 
-      <Section title="What you want">
+      <Section title="🎯 What you want">
         <ul className="list-disc space-y-1 pl-4 text-[0.8125rem]">
           {brief.objectives.map((o) => (
             <li key={o}>{o}</li>
@@ -133,50 +138,103 @@ export function BriefingPanel({
         </ul>
       </Section>
 
-      {/* The two-layer focal reason, on whichever role holds it. Layering is
-          the whole design: a reason that can be handed over, and a
-          circumstance behind it that the participant may not want said. They
-          are shown as separate cards so that "which of these may be told to
-          the other side" is a question with two answers, not one. */}
-      {brief.focalReasons && focal ? (
-        <Section title={`Why ${focal.label.toLowerCase()} matters to you`}>
-          {brief.focalThresholdNote ? (
-            <p className="mb-3 max-w-prose rounded-[var(--radius)] border border-[var(--private-line)] bg-[#fff9ef] p-3 text-[0.8125rem] leading-relaxed">
-              {brief.focalThresholdNote}
-            </p>
-          ) : null}
-          <ul className="space-y-2">
-            {brief.focalReasons.map((reason) => (
-              <li
-                key={reason.id}
-                className="rounded-[var(--radius)] border border-[var(--private-line)] p-3"
-              >
-                <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]">
-                  {reason.layer === "work"
-                    ? "A reason you could give"
-                    : "Harder to say out loud"}
-                </p>
-                <p className="max-w-prose text-[0.8125rem] leading-relaxed">
-                  {reason.text}
-                </p>
-              </li>
-            ))}
-          </ul>
+      {/* The six reason cards, in their two boxes. The visual separation is a
+          design requirement, not a preference (Design §7 UI 규칙): the whole
+          measure is which box a participant is willing to draw from, and if
+          the two read as one list that decision stops being legible. */}
+      {brief.reasonCards.length ? (
+        <Section title={`💬 Why ${requirement.label.toLowerCase()} matters to you`}>
+          <p className="mb-3 max-w-prose rounded-[var(--radius)] border border-[var(--private-line)] bg-[#fff9ef] p-3 text-[0.8125rem] leading-relaxed">
+            {brief.requirementNote}
+          </p>
+
+          <ReasonBox
+            title="Work reasons"
+            note="Nothing awkward about saying these."
+            cards={workCards}
+          />
+          <ReasonBox
+            title="Sensitive background"
+            note={brief.disclosureRisk}
+            cards={sensitiveCards}
+            sensitive
+          />
         </Section>
       ) : null}
 
-      <Section title="If there is no agreement">
+      <Section title="⚠️ If there is no agreement">
         <p className="max-w-prose text-[0.8125rem]">{brief.batnaSummary}</p>
       </Section>
 
-      <Section title="What each term is worth to you" last>
+      <Section title="🔢 What each term is worth to you" last>
         <IssueValueTable issues={task.issues} role={role} />
       </Section>
 
       <p className="mt-5 border-t border-[var(--private-line)] pt-3 text-[0.75rem]">
-        The other party has their own briefing and cannot see yours.
+        The other side has their own briefing and cannot see yours.
       </p>
     </Card>
+  );
+}
+
+/**
+ * One of the two reason boxes.
+ *
+ * `sensitive` gets a heavier border and its own heading colour so the two
+ * groups never read as one list — see the note at the call site.
+ */
+export function ReasonBox({
+  title,
+  note,
+  cards,
+  sensitive,
+  children,
+}: {
+  title: string;
+  note?: string;
+  cards: Array<{ id: string; text: string }>;
+  sensitive?: boolean;
+  /** Per-card controls, when the box is interactive (the mandate screen). */
+  children?: (card: { id: string; text: string }) => ReactNode;
+}) {
+  if (!cards.length) return null;
+  return (
+    <div
+      className={cx(
+        "mb-3 rounded-[var(--radius)] border p-3 last:mb-0",
+        sensitive
+          ? "border-[var(--caution)]/35 bg-[var(--caution-soft)]"
+          : "border-[var(--private-line)]",
+      )}
+    >
+      <p
+        className={cx(
+          "mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]",
+          sensitive ? "text-[var(--caution)]" : "",
+        )}
+      >
+        {sensitive ? "🔒 " : "💼 "}
+        {title}
+      </p>
+      {note ? (
+        <p className="mb-2.5 max-w-prose text-[0.75rem] leading-relaxed opacity-80">
+          {note}
+        </p>
+      ) : null}
+      <ul className="space-y-2">
+        {cards.map((card) => (
+          <li key={card.id}>
+            {children ? (
+              children(card)
+            ) : (
+              <p className="max-w-prose text-[0.8125rem] leading-relaxed">
+                {card.text}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -210,7 +268,7 @@ function Section({
  * button opens the same panel over the page. One panel, two placements — the
  * briefing is never a different thing depending on your screen.
  */
-export function SessionLayout({
+export function TaskLayout({
   briefing,
   children,
 }: {
@@ -220,10 +278,9 @@ export function SessionLayout({
   const [open, setOpen] = useState(false);
 
   return (
-    /* The rail carries the whole briefing — six issues, their levels and what
-       each is worth — so it widens with the page rather than staying at the
-       width it needed when the column was narrower. Past `xl` it takes a
-       little more, which keeps the value table off a second line. */
+    /* The rail carries the whole briefing — three terms, their levels, what
+       each is worth, and six reason cards — so it widens with the page rather
+       than staying at the width it needed when the column was narrower. */
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_400px] xl:gap-8">
       <div className="min-w-0">{children}</div>
 
@@ -239,7 +296,7 @@ export function SessionLayout({
         onClick={() => setOpen(true)}
         className="fixed bottom-[calc(var(--actionbar-h)+1rem)] right-4 z-20 rounded-full border border-[var(--private-line)] bg-[var(--private)] px-4 py-2.5 text-[0.8125rem] font-semibold text-[var(--private-ink)] shadow-lg lg:hidden"
       >
-        Your briefing
+        📋 Your briefing
       </button>
 
       {open ? (

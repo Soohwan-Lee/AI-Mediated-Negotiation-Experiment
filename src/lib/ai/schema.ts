@@ -30,28 +30,25 @@ export interface NegotiationAction {
   proposedTerms: ProposedTerm[];
   /** "If you accept X, we can move on Y" — links two issues. */
   conditionalLink: { give: string[]; get: string[] } | null;
-  /** Where the focal requirement stands after this action. */
-  focalRequirementStatus: "held" | "traded" | "reduced" | "not_addressed";
-  /** Which reason card the visible rationale draws on, if any. */
+  /** Where this side's requirement stands after this action. */
+  requirementStatus: "held" | "traded" | "reduced" | "not_addressed";
+  /**
+   * Which reason the visible rationale draws on, if any.
+   *
+   * A card id for one of the principal's own cards, or `pool:<n>` for a
+   * pre-approved role-plausible argument. The prefix is what lets the
+   * validator enforce that only an Explorer may use the pool, without needing
+   * a second field the model could fill in inconsistently with the first.
+   */
   reasonSourceId: string | null;
-  /** The permission that card carries — the validator checks it. */
-  reasonDisclosureLevel: "sayable" | "private" | null;
-  /** Which prevalidated frame the rationale used (Appendix B4). */
-  rationaleFrame:
-    | "risk_reduction"
-    | "shared_value"
-    | "feasibility"
-    | "conditional_exchange"
-    | "common_practice"
-    | null;
   /** Short rationale text used to generate the visible message. */
   rationale: string;
   unresolved: boolean;
   /**
    * Audit-only. Stored in the backend, never rendered to participants in the
-   * Explorer condition (Methods §Explorer Proxy condition).
+   * Explorer condition (Design §7 "이유 출처 표시").
    */
-  internalProvenance: "principal_mandate" | "agent_option";
+  internalProvenance: "principal_reason" | "pool_reason";
 }
 
 /** JSON Schema passed to the model for structured output. */
@@ -61,11 +58,9 @@ export const NEGOTIATION_ACTION_SCHEMA = {
   required: [
     "actionType",
     "stage",
-    "focalRequirementStatus",
+    "requirementStatus",
     "reasonSourceId",
-    "reasonDisclosureLevel",
-    "rationaleFrame",
-    "issueTargets",
+            "issueTargets",
     "proposedTerms",
     "conditionalLink",
     "rationale",
@@ -87,26 +82,11 @@ export const NEGOTIATION_ACTION_SCHEMA = {
       ],
     },
     stage: { type: "integer", enum: [1, 2, 3, 4, 5] },
-    focalRequirementStatus: {
+    requirementStatus: {
       type: "string",
       enum: ["held", "traded", "reduced", "not_addressed"],
     },
     reasonSourceId: { type: ["string", "null"] },
-    reasonDisclosureLevel: {
-      type: ["string", "null"],
-      enum: ["sayable", "private", null],
-    },
-    rationaleFrame: {
-      type: ["string", "null"],
-      enum: [
-        "risk_reduction",
-        "shared_value",
-        "feasibility",
-        "conditional_exchange",
-        "common_practice",
-        null,
-      ],
-    },
     issueTargets: { type: "array", items: { type: "string" } },
     proposedTerms: {
       type: "array",
@@ -133,7 +113,7 @@ export const NEGOTIATION_ACTION_SCHEMA = {
     unresolved: { type: "boolean" },
     internalProvenance: {
       type: "string",
-      enum: ["principal_mandate", "agent_option"],
+      enum: ["principal_reason", "pool_reason"],
     },
   },
 } as const;
