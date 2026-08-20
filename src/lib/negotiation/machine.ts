@@ -12,8 +12,10 @@
  * 것") and requires every turn to log the decided action beside the rendered
  * sentence, so pilot gate 9 can show the model never stepped outside it.
  *
- * The five stages run once each, in order. There is no free-running turn loop,
- * so an exchange cannot deadlock or spend its last turns restating an impasse.
+ * The counterpart's five stages run once each, in order, one move per reply.
+ * The participant is not on that leash — they write freely inside the ten
+ * minutes — but the counterpart cannot skip ahead, repeat itself, or accept
+ * before it has issued the standardized challenge.
  */
 
 import {
@@ -142,16 +144,6 @@ export interface ExchangeState {
   /** Whether the one-turn grace period has already been spent. */
   reasonAlreadyRequested: boolean;
   secondsRemaining?: number;
-  /**
-   * How many messages the participant has sent.
-   *
-   * The counterpart uses this only to decide when it is willing to CLOSE, not
-   * what it is willing to accept: a package that clears the threshold is
-   * accepted whenever it arrives, so a participant who opens with a good offer
-   * can finish in two messages. What the count prevents is the counterpart
-   * accepting its own opening before the participant has said anything.
-   */
-  participantMessageCount?: number;
 }
 
 /**
@@ -260,6 +252,9 @@ export function counterpartStep(
     ? { ...incoming, [requirement.id]: held[requirement.id] }
     : held;
 
+  // "Late" means the clock is running out, in both arms. When no clock is
+  // supplied — the mockup path, and any caller that does not track it — the
+  // counterpart never treats the exchange as late, so it holds out for T_MID.
   const softClose =
     state.secondsRemaining !== undefined &&
     state.secondsRemaining <= SOFT_CLOSE_SECONDS;
@@ -293,9 +288,15 @@ export function counterpartStep(
       // the timer runs low. Collapsing them is what lets the exchange run to
       // whatever length the participant needs.
       //
-      // The threshold relaxes once the counterpart has made its trade, which
-      // is what T_FINAL is for — a late concession can still close.
-      const threshold = stage >= 5 ? ACCEPTANCE.T_FINAL : ACCEPTANCE.T_MID;
+      // THE THRESHOLD RELAXES ON THE CLOCK, NOT ON THE TURN COUNT. T_FINAL is
+      // the late-concession threshold, and "late" has to mean the same thing
+      // in both arms. Tying it to the script position instead made the Proxy
+      // arm relax after one direct message and Baseline after four, because
+      // the Proxy counterpart resumes mid-script — so identical packages were
+      // acceptable at different points depending on condition, which is a
+      // mechanical difference along the primary contrast rather than the
+      // manipulation.
+      const threshold = softClose ? ACCEPTANCE.T_FINAL : ACCEPTANCE.T_MID;
 
       if (unexplainedAsk && !state.reasonAlreadyRequested) {
         // Defer judgement by exactly one turn and ask why. The package is not
@@ -368,12 +369,16 @@ export function counterpartStep(
 /**
  * How far the counterpart's script has advanced after `replies` replies.
  *
- * It walks 1 → 2 → 3 → 4 and then stays at 5, because stages 4 and 5 are the
- * same decision taken repeatedly. Clamping rather than ending is what lets a
+ * It walks 1 → 2 → 3 → 4 and then stays at 4, because from the trade onward
+ * every turn is the same decision. Clamping rather than ending is what lets a
  * participant keep talking after the counterpart has made its trade.
+ *
+ * Stage 5 is no longer a position the walk reaches: what used to distinguish
+ * it — the relaxed threshold — is now decided by the clock, so that both arms
+ * relax at the same moment rather than after a different number of messages.
  */
 export function counterpartStageAfter(replies: number): StageId {
-  return Math.min(replies + 1, 5) as StageId;
+  return Math.min(replies + 1, 4) as StageId;
 }
 
 // ---------------------------------------------------------------------------

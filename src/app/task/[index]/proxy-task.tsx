@@ -273,6 +273,14 @@ export function ProxyTask({
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   /** The package on the table in the direct conversation. */
   const [offer, setOffer] = useState<Package>({});
+  /**
+   * Whether the participant's own AI Proxy actually said a reason out loud.
+   *
+   * Recorded from the exchange rather than assumed, because an emergency stop
+   * or a guardrail block can leave the proxy having voiced none — and the
+   * reason-linked rule has to see the same fact the transcript shows.
+   */
+  const [proxyVoicedReason, setProxyVoicedReason] = useState(false);
   const [tentative, setTentative] = useState<Package | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: TOTAL_TURNS });
@@ -361,7 +369,7 @@ export function ProxyTask({
    * sequence. Turns are appended as they arrive, which is what makes live
    * spectating possible at all, and what keeps each request short.
    */
-  async function runNegotiation(revision?: string) {
+  async function runNegotiation() {
     setPhase("watching");
     setError(null);
     setTranscript([]);
@@ -391,9 +399,18 @@ export function ProxyTask({
       // means. Handing the participant the package the exchange was heading
       // for would make the stop cosmetic.
       setTentative(stopped.current ? null : script.tentative);
+      // The scripted exchange voices a work reason at stage 2 — unless it was
+      // stopped before reaching it.
+      setProxyVoicedReason(
+        !stopped.current &&
+          scripted.some(
+            (m) => m.speaker === "participant_proxy" && m.reasonCardId,
+          ),
+      );
       logEvent(
         "negotiation_ended",
         {
+          phase: "proxy",
           turns: scripted.length,
           mock: true,
           emergencyStop: stopped.current,
@@ -463,7 +480,6 @@ export function ProxyTask({
             lastCounterpartPackage,
             reasonsUsed,
             poolReasonsUsed,
-            revisionNote: revision ?? null,
             history: collected.map((m) => ({
               speaker: m.speaker,
               text: m.text,
@@ -489,10 +505,19 @@ export function ProxyTask({
           requirementOption?: string | null;
           accepted?: boolean;
           impasse?: boolean;
+          blocked?: boolean;
         };
 
         if (data.impasse) proxyImpasse = true;
-        if (data.reasonToken) reasonsUsed.push(data.reasonToken);
+        if (data.reasonToken) {
+          reasonsUsed.push(data.reasonToken);
+          // A token only exists when the proxy actually voiced something, and
+          // a blocked message carries none — which is exactly the case the
+          // hardcoded `true` used to paper over.
+          if (data.message?.speaker === "participant_proxy" && !data.blocked) {
+            setProxyVoicedReason(true);
+          }
+        }
         if (typeof data.poolReasonsUsed === "number") {
           poolReasonsUsed = data.poolReasonsUsed;
         }
@@ -566,6 +591,7 @@ export function ProxyTask({
       logEvent(
         "negotiation_ended",
         {
+          phase: "proxy",
           turns: collected.length,
           emergencyStop: stopped.current,
           impasse: proxyImpasse,
@@ -850,7 +876,7 @@ export function ProxyTask({
                   setShowStopped(true);
                   logEvent(
                     "negotiation_ended",
-                    { emergencyStop: true, atTurn: progress.done },
+                    { phase: "proxy", emergencyStop: true, atTurn: progress.done },
                     { sessionIndex: taskIndex },
                   );
                 }}
@@ -921,9 +947,20 @@ export function ProxyTask({
           setProxyTranscript(transcript);
           setMessages([]);
           setOffer(tentative ?? {});
-          logEvent("negotiation_started", { phase: "direct" }, {
-            sessionIndex: taskIndex,
-          });
+          logEvent(
+            "negotiation_started",
+            {
+              phase: "direct",
+              // Whether the proxies handed over a package or an impasse. A
+              // direct conversation that starts from nothing begins from a
+              // harder position than one that starts from an agreed package,
+              // and the two must be separable in the analysis rather than
+              // pooled as "the Proxy arm".
+              proxyOutcome: tentative ? "package" : "no_package",
+              proxyMessages: transcript.length,
+            },
+            { sessionIndex: taskIndex },
+          );
           setPhase("negotiate");
         }}
       />
@@ -941,6 +978,7 @@ export function ProxyTask({
         stepIndex={STEP_OF.negotiate}
         proxyTranscript={proxyTranscript}
         openingPackage={tentative}
+        reasonAlreadyVoiced={proxyVoicedReason}
         messages={messages}
         setMessages={setMessages}
         offer={offer}
@@ -962,10 +1000,16 @@ export function ProxyTask({
       steps={STEP_LABELS}
       stepIndex={STEP_OF.review}
       tentative={tentative}
-      transcript={transcript}
+      // The participant's OWN conversation, not the proxies'. Passing
+      // `transcript` here showed them the AI-AI exchange under a caption
+      // claiming it was theirs — so every item asking them to judge "what was
+      // said" would have been answered against the wrong stimulus, and the
+      // words they actually exchanged would never have been shown back.
+      transcript={messages}
+      proxyTranscript={proxyTranscript}
       isProxy
-      transcriptTitle="The full conversation"
-      transcriptHint={`Everything the two of you said, after the AI Proxies had finished.`}
+      transcriptTitle="Your conversation"
+      transcriptHint="What you and the other participant said after the AI Proxies finished."
       onDone={() => {
         logEvent("page_complete", undefined, {
           page: `task-${taskIndex}`,

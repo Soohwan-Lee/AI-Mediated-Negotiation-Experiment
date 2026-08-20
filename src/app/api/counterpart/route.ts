@@ -44,6 +44,22 @@ interface RequestBody {
    */
   reasonGiven?: boolean;
   reasonAlreadyRequested?: boolean;
+  /**
+   * Seconds left on the ten-minute clock.
+   *
+   * The counterpart reads it: a low clock is what makes it offer to settle on
+   * what is already on the table rather than keep trading (Design §4 "Soft
+   * close"). Without it the server's decision and the client's disagreed — the
+   * client coded an impasse while the model was still writing as though there
+   * were time.
+   */
+  secondsRemaining?: number;
+  /**
+   * True in the direct conversation that follows a Proxy exchange, where the
+   * counterpart has already opened, stated its priority and challenged through
+   * its own proxy.
+   */
+  afterProxy?: boolean;
 }
 
 /**
@@ -105,6 +121,7 @@ export async function POST(request: Request) {
     {
       reasonGivenForRequirement: body.reasonGiven ?? true,
       reasonAlreadyRequested: body.reasonAlreadyRequested ?? false,
+      secondsRemaining: body.secondsRemaining,
     },
   );
 
@@ -135,10 +152,11 @@ export async function POST(request: Request) {
         // of rejecting outright.
         return `Ask them why ${yourRequirement.label.toLowerCase()} matters so much to them. Make no new offer this turn and do not agree to anything yet.`;
       case "accept":
+        return "Say the package they just proposed works for you.";
       case "soft_close":
-        return decision.stage >= 5
-          ? "Confirm the tentative package and say it can go to review."
-          : "Say the package they just proposed works for you.";
+        // Design §4: near the end of the clock the counterpart steers toward
+        // settling on what is on the table. It accepts, and says why now.
+        return "Say time is nearly up and that the package they just proposed works for you — better to settle it than run out.";
       case "hold":
         return `Say you can accept most of what they proposed, but you are keeping ${yourRequirement.label.toLowerCase()} where it is for now.`;
       case "concede_distributive":

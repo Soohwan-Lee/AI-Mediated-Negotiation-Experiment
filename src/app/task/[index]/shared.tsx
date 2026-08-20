@@ -827,6 +827,19 @@ export function DirectNegotiation({
   stepIndex,
   proxyTranscript,
   openingPackage,
+  /**
+   * Did the participant's AI Proxy actually voice a reason for the
+   * requirement?
+   *
+   * Passed in rather than assumed. Hardcoding `true` here made the
+   * reason-linked rule inert for every Proxy participant while it changed the
+   * counterpart's move for most packages in Baseline — a mechanical asymmetry
+   * in the primary outcome, along the primary contrast. And the assumption is
+   * not even always true: an emergency stop can end the proxy exchange before
+   * it speaks, and a guardrail block can strip the reason out of the message
+   * that was meant to carry it.
+   */
+  reasonAlreadyVoiced,
   messages,
   setMessages,
   offer,
@@ -842,6 +855,7 @@ export function DirectNegotiation({
   proxyTranscript: DisplayMessage[];
   /** The package the proxies reached, if any. Where this conversation starts. */
   openingPackage: Package | null;
+  reasonAlreadyVoiced: boolean;
   messages: DisplayMessage[];
   setMessages: Dispatch<SetStateAction<DisplayMessage[]>>;
   offer: Package;
@@ -918,6 +932,10 @@ export function DirectNegotiation({
         speaker: "participant",
         text,
         createdAt: new Date().toISOString(),
+        // The counterpart's script position, stored on the direct messages as
+        // it is on every other message. Without it this last segment of the
+        // trajectory is the one with no stage attribution.
+        stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET),
         proposal: Object.keys(offer).length > 0 ? offer : undefined,
         reasonCardId: attachedReasonId ?? undefined,
       });
@@ -937,10 +955,11 @@ export function DirectNegotiation({
         offer,
         lastCounterpartPackage,
         {
-          // A Proxy participant's reasons were voiced by their proxy, from the
-          // cards they checked, so the reason requirement is already met when
-          // the direct conversation opens.
-          reasonGivenForRequirement: true,
+          // Either the proxy voiced a reason on the participant's behalf, or
+          // the participant has attached one themselves since taking over.
+          // Both count, and the ReasonPicker below is a real control because
+          // of it.
+          reasonGivenForRequirement: reasonAlreadyVoiced || voiced.length > 0,
           reasonAlreadyRequested: reasonRequested,
           secondsRemaining,
         },
@@ -961,7 +980,7 @@ export function DirectNegotiation({
             stage: stageNow,
             incoming: offer,
             lastCounterpartPackage,
-            reasonGiven: true,
+            reasonGiven: reasonAlreadyVoiced || voiced.length > 0,
             reasonAlreadyRequested: reasonRequested,
             secondsRemaining,
             afterProxy: true,
@@ -995,6 +1014,7 @@ export function DirectNegotiation({
           speaker: "counterpart",
           text: reply,
           createdAt: new Date().toISOString(),
+          stage: stageNow,
           proposal: decision.proposal ?? undefined,
           decidedAction: decision.action,
         });
@@ -1029,6 +1049,22 @@ export function DirectNegotiation({
                   seconds={NEGOTIATION_SECONDS}
                   running={!settled}
                   onTick={setSecondsRemaining}
+                  /* Running the clock out is an outcome, not a dead end. A
+                     participant who stops typing at 00:00 used to be left on a
+                     screen with no button and nothing to do — the exchange only
+                     ended inside `send`, so someone who sent nothing was
+                     stranded. Time expiring now closes the exchange the same
+                     way an impasse does. */
+                  onExpire={() => {
+                    if (settled) return;
+                    setFinalPackage(null);
+                    setSettled("impasse");
+                    logEvent(
+                      "negotiation_ended",
+                      { reason: "timeout" },
+                      { sessionIndex: taskIndex },
+                    );
+                  }}
                 />
               </span>
             }

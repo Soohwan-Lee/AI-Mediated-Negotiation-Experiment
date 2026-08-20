@@ -7,10 +7,12 @@
  * they send is understood by the other side as their own position — that is
  * what makes this the benchmark the two Proxy policies are read against.
  *
- * FIVE STAGES, NOT A FREE CHAT. Both conditions run the same five stages, so
- * the trajectories line up message for message. The rules bind the counterpart
- * only: Design §4 is explicit that the participant's behaviour is not forced
- * ("참가자의 행동은 강제하지 않음"), and the counterpart leads the stages.
+ * FREE CHAT ON A TEN-MINUTE CLOCK. The participant writes as much or as little
+ * as they like and may finish early; Design §4 is explicit that their
+ * behaviour is not forced ("참가자의 행동은 강제하지 않음"). What is fixed is
+ * the COUNTERPART: it walks its five-stage script one move per reply, so every
+ * participant meets the same opening, the same standardized challenge and the
+ * same thresholds in the same order, however long they take.
  *
  * The counterpart is presented as another participant. It is a controlled LLM
  * behind /api/counterpart whose moves are decided by the state machine, so
@@ -555,6 +557,22 @@ export function BaselineTask({
                   seconds={NEGOTIATION_SECONDS}
                   running={!settled}
                   onTick={setSecondsRemaining}
+                  /* Running the clock out is an outcome, not a dead end. A
+                     participant who stops typing at 00:00 used to be left on a
+                     screen with no button and nothing to do — the exchange only
+                     ended inside `send`, so someone who sent nothing was
+                     stranded. Time expiring now closes the exchange the same
+                     way an impasse does. */
+                  onExpire={() => {
+                    if (settled) return;
+                    setTentative(null);
+                    setSettled("impasse");
+                    logEvent(
+                      "negotiation_ended",
+                      { reason: "timeout" },
+                      { sessionIndex: taskIndex },
+                    );
+                  }}
                 />
               </span>
             }

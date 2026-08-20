@@ -51,7 +51,12 @@ import type {
   RatificationChoice,
   Role,
 } from "@/lib/types";
-import { DecisionButton, OutcomeValue, TermsList } from "./shared";
+import {
+  DecisionButton,
+  OutcomeValue,
+  ProxyTranscriptPanel,
+  TermsList,
+} from "./shared";
 
 /**
  * Two choices, not three.
@@ -88,6 +93,7 @@ export function ReviewPhase({
   transcript,
   transcriptTitle,
   transcriptHint,
+  proxyTranscript,
   isProxy,
   onDone,
 }: {
@@ -100,6 +106,17 @@ export function ReviewPhase({
   transcript: DisplayMessage[];
   transcriptTitle: string;
   transcriptHint: string;
+  /**
+   * The AI Proxies' exchange, in a Proxy task. Shown ALONGSIDE the
+   * participant's own conversation, never instead of it.
+   *
+   * Both have to be here. The participant's own words are what the decision is
+   * about; the proxies' are what several of the following items ask them to
+   * judge — whether the other side's requirement read as genuinely theirs,
+   * whether their own proxy represented them, who is answerable. Showing only
+   * one makes half the questionnaire a memory test.
+   */
+  proxyTranscript?: DisplayMessage[];
   /** Proxy tasks show the other participant's closing message. */
   isProxy: boolean;
   onDone: () => void;
@@ -211,7 +228,13 @@ export function ReviewPhase({
       { sessionIndex: taskIndex },
     );
 
-    logEvent("negotiation_ended", undefined, { sessionIndex: taskIndex });
+    // A Proxy task fires this twice — once when the AI Proxies finish, once
+    // here. Without a marker the two are distinguishable only by arrival
+    // order, and anything that counts or joins on the event double-counts the
+    // Proxy arm against a Baseline arm that fires it once.
+    logEvent("negotiation_ended", { phase: "ratified" }, {
+      sessionIndex: taskIndex,
+    });
     onDone();
   }
 
@@ -274,6 +297,13 @@ export function ReviewPhase({
                 flow
               />
             </Card>
+          ) : null}
+
+          {/* The proxies' exchange, collapsed. Above the participant's own
+              conversation because it came first, and collapsed because the
+              decision below is about the conversation they had themselves. */}
+          {proxyTranscript?.length ? (
+            <ProxyTranscriptPanel transcript={proxyTranscript} />
           ) : null}
 
           <Card className="mb-5 flex flex-col" padded={false}>

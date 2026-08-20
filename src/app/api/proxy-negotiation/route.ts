@@ -80,12 +80,6 @@ interface RequestBody {
    * cannot be attached to any particular message, where a marked token could.
    */
   poolReasonsUsed?: number;
-  /**
-   * The participant's instruction when they sent a package back for one
-   * revision. It narrows what the proxy does; it cannot widen the mandate,
-   * which is still the only thing that bounds it.
-   */
-  revisionNote?: string | null;
 }
 
 /**
@@ -370,9 +364,7 @@ export async function POST(request: Request) {
         stage,
         decidedAction,
         mandateSummary: isParticipantSide
-          ? body.revisionNote
-            ? `${mandateSummary(body.mandate, body.taskId)}\n\nYour principal reviewed the last result and asked for one change: "${body.revisionNote}". Honour it within the boundaries above — it narrows what you may do, it does not widen it.`
-            : mandateSummary(body.mandate, body.taskId)
+          ? mandateSummary(body.mandate, body.taskId)
           : undefined,
         authorizedReasons: isParticipantSide
           ? reasonsFor(body.taskId, body.participantRole, body.mandate)
