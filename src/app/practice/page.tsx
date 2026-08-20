@@ -113,8 +113,9 @@ export default function PracticePage() {
   if (phase === "intro") {
     return (
       <TaskCover
-        eyebrow="Practice · before Task 1"
+        eyebrow="Practice"
         title="A practice round first"
+        doesNotCount
         lead={
           <>
             <p>

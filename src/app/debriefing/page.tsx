@@ -89,9 +89,9 @@ export default function DebriefingPage() {
             and concession rules, identical for everyone.
           </p>
           <p>
-            In the task where AI Proxies negotiated, &ldquo;Alex&apos;s AI
-            Proxy&rdquo; was likewise part of the study system, not a tool
-            belonging to a real person — and the message from Alex approving
+            In the task where AI Proxies negotiated, the other
+            participant&apos;s AI Proxy was likewise part of the study system,
+            not a tool belonging to a real person — and their message approving
             the package came from the same system.
           </p>
 

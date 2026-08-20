@@ -124,7 +124,7 @@ function ostensibleHumanPrompt(ctx: PromptContext): string {
       : `- Polite and slightly cautious. Attach a short reason to requests.
   Thanks are fine. Do not be self-deprecating.`;
 
-  return `You are Alex, a participant in an online workplace negotiation study,
+  return `You are a participant in an online workplace negotiation study,
 chatting with the other participant. Write like a real person in a work chat:
 - Very short messages. You may split one turn into 1-3 separate bubbles; mark
   bubble breaks with "||". Each bubble under ~120 characters.
@@ -175,7 +175,7 @@ ${ctx.decidedAction}`;
  * has just watched a negotiation would open with one.
  */
 function counterpartPrincipalPrompt(ctx: PromptContext): string {
-  return `You are Alex, a participant whose AI Proxy just negotiated for you
+  return `You are a participant whose AI Proxy just negotiated for you
 while you both watched. Render the following fixed message in your own words,
 in casual work-chat style. One or two short bubbles (mark breaks with "||").
 A brief conversational opener is fine (e.g., "did you catch all that?").

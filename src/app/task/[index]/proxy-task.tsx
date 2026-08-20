@@ -19,7 +19,7 @@
  * spectating by both principals, which is not a presentation choice: the
  * social-cost measures ask how it felt to have this said on your behalf, and
  * that question means something different if you watched it happen than if you
- * read it later. The "Alex is watching this too" banner is part of the same
+ * read it later. The "they are watching this too" banner is part of the same
  * fact.
  */
 
@@ -27,13 +27,13 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import {
   SpectatorBanner,
-  StageRail,
   Transcript,
   type DisplayMessage,
 } from "@/components/negotiation";
 import {
   BriefingPanel,
   ReasonBox,
+  TaskCover,
   TaskHeader,
   TaskLayout,
 } from "@/components/session";
@@ -45,7 +45,7 @@ import {
   useDevGate,
   useDevMockAi,
 } from "@/lib/dev-mode";
-import { STAGES, STAGE_GOALS } from "@/lib/negotiation/machine";
+
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
@@ -67,6 +67,7 @@ import type {
 } from "@/lib/types";
 import { ReviewPhase } from "./review";
 import {
+  DirectNegotiation,
   Matchmaking,
   PreferenceForm,
   RiskForm,
@@ -97,6 +98,8 @@ type Phase =
   | "confirm"
   | "matchmaking"
   | "watching"
+  | "handover"
+  | "negotiate"
   | "review";
 
 const PHASES: Phase[] = [
@@ -108,6 +111,8 @@ const PHASES: Phase[] = [
   "confirm",
   "matchmaking",
   "watching",
+  "handover",
+  "negotiate",
   "review",
 ];
 
@@ -123,6 +128,7 @@ const STEP_LABELS = [
   "What it may say",
   "Check and start",
   "Watch",
+  "Talk it through",
   "Review",
 ];
 
@@ -136,6 +142,8 @@ const PHASE_LABELS: Record<Phase, string> = {
   confirm: "Check and start",
   matchmaking: "Connecting",
   watching: "Watch",
+  handover: "Handover",
+  negotiate: "Talk it through",
   review: "Review",
 };
 
@@ -149,11 +157,19 @@ const STEP_OF: Record<Phase, number> = {
   confirm: 4,
   matchmaking: 5,
   watching: 5,
-  review: 6,
+  handover: 6,
+  negotiate: 6,
+  review: 7,
 };
 
-/** Total messages in the exchange: one per side per stage (Design §4). */
-const TOTAL_TURNS = STAGES.length * 2;
+/**
+ * Total messages in the AI-AI exchange: one per side across the five stages.
+ *
+ * The PROXIES still run the fixed five-stage script — it is what makes their
+ * conversations comparable, and they are not the ones on a clock. The free-form
+ * timer applies to the participant's own conversation afterwards.
+ */
+const TOTAL_TURNS = 10;
 
 /**
  * What each principal is told about the policy in force (Design §7, last
@@ -245,11 +261,20 @@ export function ProxyTask({
     emptyMandate(task, role, taskIndex),
   );
   const [transcript, setTranscript] = useState<DisplayMessage[]>([]);
+  /**
+   * The AI Proxies' conversation, frozen when the participant takes over.
+   *
+   * A separate copy rather than reusing `transcript`, because the direct
+   * conversation is a different exchange and mixing them would make the
+   * transcript the participant re-reads change under them as they talk.
+   */
+  const [proxyTranscript, setProxyTranscript] = useState<DisplayMessage[]>([]);
+  /** The participant's own messages, once they take over. */
+  const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  /** The package on the table in the direct conversation. */
+  const [offer, setOffer] = useState<Package>({});
   const [tentative, setTentative] = useState<Package | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /** The participant's instruction when they send a package back once. */
-  const [revisionNote, setRevisionNote] = useState("");
-  const [liveStage, setLiveStage] = useState<StageId>(1);
   const [progress, setProgress] = useState({ done: 0, total: TOTAL_TURNS });
   /**
    * Emergency stop. Not a pause button: the participant is told they cannot
@@ -341,7 +366,6 @@ export function ProxyTask({
     setError(null);
     setTranscript([]);
     setProgress({ done: 0, total: TOTAL_TURNS });
-    setLiveStage(1);
     stopped.current = false;
     setShowStopped(false);
     logEvent("negotiation_started", { policy }, { sessionIndex: taskIndex });
@@ -361,7 +385,6 @@ export function ProxyTask({
             text: m.text,
           })),
         );
-        if (scripted[i].stage) setLiveStage(scripted[i].stage as StageId);
         setProgress({ done: i + 1, total: scripted.length });
       }
       // A stopped negotiation has no agreement — that is what stopping it
@@ -383,7 +406,7 @@ export function ProxyTask({
         },
         { sessionIndex: taskIndex },
       );
-      setPhase("review");
+      setPhase("handover");
       return;
     }
 
@@ -490,7 +513,6 @@ export function ProxyTask({
             text: data.message.text,
           });
           setTranscript([...collected]);
-          if (data.stage) setLiveStage(data.stage as StageId);
 
           // Persist the message text, not only the trajectory.
           //
@@ -553,7 +575,7 @@ export function ProxyTask({
         },
         { sessionIndex: taskIndex },
       );
-      setPhase("review");
+      setPhase("handover");
     } catch (e) {
       console.error(e);
       setError(
@@ -807,11 +829,6 @@ export function ProxyTask({
             />
 
             <Card className="mb-5 flex flex-col" padded={false}>
-              <StageRail
-                stage={liveStage}
-                goals={STAGE_GOALS}
-                note="You cannot step in — you decide at the end."
-              />
               <SpectatorBanner />
               <Transcript
                 messages={transcript}
@@ -851,9 +868,88 @@ export function ProxyTask({
         </Page>
 
         <ActionBar
-          note={`Step ${liveStage} of ${STAGES.length} · ${POLICY_DISCLOSURE[policy].split(".")[0]}.`}
+          note={`${POLICY_DISCLOSURE[policy].split(".")[0]}. You take over when they finish.`}
         />
       </>
+    );
+  }
+
+  // --- handover -----------------------------------------------------------
+  //
+  // The screen between watching and talking. It exists because the change of
+  // footing is the whole point of this condition and a silent switch would
+  // waste it: up to here the participant has been a spectator, and from here
+  // they are the one speaking. Naming that, and saying what carries over,
+  // is what makes the direct conversation feel like a continuation rather
+  // than a second unrelated task.
+  if (phase === "handover") {
+    return (
+      <TaskCover
+        eyebrow="Your turn now"
+        title="Now you talk to them directly"
+        lead={
+          <>
+            <p>
+              The two AI Proxies have finished.{" "}
+              {tentative
+                ? "They reached a package, which is on the next screen along with everything they said."
+                : "They did not reach a package. Everything they said is on the next screen."}
+            </p>
+            <p>
+              Nothing is settled. You and the other participant now talk
+              directly — you write your own messages from here — and{" "}
+              <strong>what the two of you agree is the result</strong>.
+            </p>
+          </>
+        }
+        steps={[
+          "Read what the AI Proxies said — it stays on screen while you talk",
+          "Message the other participant yourself",
+          "Settle the three terms between you, or agree that you cannot",
+        ]}
+        minutes={10}
+        note={
+          <Callout title="⏱ Ten minutes">
+            <p>
+              That is the limit, not a target. Finish sooner if you are both
+              happy.
+            </p>
+          </Callout>
+        }
+        actionLabel="Start talking to them"
+        onStart={() => {
+          setProxyTranscript(transcript);
+          setMessages([]);
+          setOffer(tentative ?? {});
+          logEvent("negotiation_started", { phase: "direct" }, {
+            sessionIndex: taskIndex,
+          });
+          setPhase("negotiate");
+        }}
+      />
+    );
+  }
+
+  // --- direct negotiation -------------------------------------------------
+  if (phase === "negotiate") {
+    return (
+      <DirectNegotiation
+        taskIndex={taskIndex}
+        task={task}
+        role={role}
+        steps={STEP_LABELS}
+        stepIndex={STEP_OF.negotiate}
+        proxyTranscript={proxyTranscript}
+        openingPackage={tentative}
+        messages={messages}
+        setMessages={setMessages}
+        offer={offer}
+        setOffer={setOffer}
+        onSettled={(pkg) => {
+          setTentative(pkg);
+          setPhase("review");
+        }}
+      />
     );
   }
 
@@ -867,25 +963,9 @@ export function ProxyTask({
       stepIndex={STEP_OF.review}
       tentative={tentative}
       transcript={transcript}
-      revisionsUsed={mandate.revisionCount}
       isProxy
       transcriptTitle="The full conversation"
-      transcriptHint={
-        revisionNote
-          ? `Your AI Proxy went back with your instruction — “${revisionNote}” — and this is what came of it.`
-          : `Every message between the two AI Proxies, ${transcript.length} in all.`
-      }
-      onRevise={async (note) => {
-        // The proxy goes back with the participant's instruction attached to
-        // its mandate. One revision only — the review screen stops offering it
-        // after the first — so this cannot loop.
-        setRevisionNote(note);
-        setMandate((m) => ({ ...m, revisionCount: m.revisionCount + 1 }));
-        logEvent("mandate_revised", { note, fromReview: true }, {
-          sessionIndex: taskIndex,
-        });
-        await runNegotiation(note);
-      }}
+      transcriptHint={`Everything the two of you said, after the AI Proxies had finished.`}
       onDone={() => {
         logEvent("page_complete", undefined, {
           page: `task-${taskIndex}`,

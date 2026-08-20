@@ -72,11 +72,18 @@ export interface ScriptedTask {
   agreed: boolean;
 }
 
-/** Counterpart persona for the Baseline condition (Design §15 P1). */
+/**
+ * Counterpart persona for the Baseline condition (Design §15 P1).
+ *
+ * Deliberately nameless. The counterpart is presented by role — "the other
+ * participant" — because a pseudonym invites the question of where it came
+ * from, and because one label for everyone cannot be compared between
+ * participants the way a name eventually would be.
+ */
 export const COUNTERPART_PERSONA = {
-  name: "Alex",
+  label: "Other Participant",
   /** Shown while the counterpart is composing. */
-  typingLabel: "Alex is typing…",
+  typingLabel: "The other participant is typing…",
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -191,7 +198,7 @@ function trajectory(task: NegotiationTask, role: Role) {
 }
 
 // ---------------------------------------------------------------------------
-// Baseline — the participant writes, "Alex" replies
+// Baseline — the participant writes, the other participant replies
 // ---------------------------------------------------------------------------
 
 function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {

@@ -60,43 +60,34 @@ export const NEGOTIATION_SECONDS = 10 * 60;
 /** Below this, the counterpart starts steering toward a close. */
 export const SOFT_CLOSE_SECONDS = 90;
 
+/**
+ * The five stages still exist as the counterpart's SCRIPT, but they are no
+ * longer a lockstep the participant is marched through.
+ *
+ * WHAT CHANGED AND WHY. Both conditions used to run exactly ten messages, one
+ * per side per stage, with the participant's composer gated to one turn at a
+ * time. That made transcripts trivially comparable and made the negotiation
+ * feel like a form. The design's actual constraint is a ten-minute timer
+ * (§8): finish early and that is fine.
+ *
+ * So the participant now writes freely, and the counterpart advances its own
+ * script one move per reply. The control that matters is unchanged — every
+ * participant still meets the same fixed opening, the same standardized
+ * challenge, and the same acceptance thresholds, in the same order. What is no
+ * longer fixed is how many messages the participant spends getting there,
+ * which was never the manipulation.
+ */
 export const STAGES: readonly StageId[] = [1, 2, 3, 4, 5];
 
-export const STAGE_LABELS: Record<StageId, string> = {
-  1: "Opening offer",
-  2: "Priorities and reasons",
-  3: "Pushback",
-  4: "Conditional trade",
-  5: "Tentative agreement",
-};
-
 /**
- * What the participant (or their proxy) is being asked to do at each stage.
+ * How long a negotiation runs (Design §8: "10분 타이머").
  *
- * Identical wording across conditions and across roles — the stage structure
- * is held constant so transcripts are comparable, and nothing here may hint at
- * the condition or at which term the study is about.
+ * The timer is the only length constraint. When it runs low the counterpart
+ * offers to settle on what is already on the table (§4 "Soft close"); an
+ * impasse remains a legitimate ending, and so does finishing in three minutes.
  */
-export const STAGE_PROMPTS: Record<StageId, string> = {
-  1: "Put a complete offer on the table — one option on each of the three terms. Say which ones matter most to you.",
-  2: "Answer what they asked, and ask what you want to know about their side.",
-  3: "They have asked you to lower one of your terms. This turn is for your reply — your next offer comes at the following step.",
-  4: "Make your counter-offer. You can tie one term to another: “if X holds, I can move on Y.”",
-  5: "This is the package that goes to review. Nothing is final until you approve it.",
-};
 
-/**
- * What each stage is for, in three or four words. Shown in the stage rail so
- * nobody has to infer where they are in a five-step exchange.
- */
-export const STAGE_GOALS: Record<StageId, string> = {
-  1: "Open with a full package",
-  2: "Trade priorities and reasons",
-  3: "Answer their pushback",
-  4: "Offer a trade",
-  5: "Settle on a package",
-};
-
+// ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Counterpart behaviour
 // ---------------------------------------------------------------------------
@@ -137,7 +128,7 @@ export interface CounterpartDecision {
 }
 
 /**
- * State the acceptance rule reads, beyond the package itself.
+ * State the counterpart reads, beyond the package itself.
  *
  * `reasonGivenForRequirement` is decided by the system from the structured
  * action log — was a reason card voiced, or (in Baseline) did the participant
@@ -151,6 +142,16 @@ export interface ExchangeState {
   /** Whether the one-turn grace period has already been spent. */
   reasonAlreadyRequested: boolean;
   secondsRemaining?: number;
+  /**
+   * How many messages the participant has sent.
+   *
+   * The counterpart uses this only to decide when it is willing to CLOSE, not
+   * what it is willing to accept: a package that clears the threshold is
+   * accepted whenever it arrives, so a participant who opens with a good offer
+   * can finish in two messages. What the count prevents is the counterpart
+   * accepting its own opening before the participant has said anything.
+   */
+  participantMessageCount?: number;
 }
 
 /**
@@ -203,18 +204,24 @@ function asksForRequirementConcession(
 }
 
 /**
- * The counterpart's move at one stage (Design §4).
+ * The counterpart's next move (Design §4).
  *
- * Stage 3 makes no offer at all — the standardized challenge occupies that
- * turn on its own, so the challenge is a fixed stimulus rather than something
- * bundled with a concession that would vary its strength.
+ * `stage` is the counterpart's own position in ITS script, not a turn the
+ * participant is locked into. It advances one step each time the counterpart
+ * replies, so every participant meets the same sequence — fixed opening, then
+ * priorities, then the standardized challenge, then a conditional trade — no
+ * matter how many messages they spend in between.
  *
- * THE REASON REQUIREMENT is applied at stage 4. If the participant is asking
- * the counterpart to move on their requirement and has never given a reason
- * for it, the counterpart asks for one and defers judgement by one turn. This
- * is what keeps reasons mechanically consequential rather than decorative —
- * Design §4 introduces it precisely because a task settled by option-swapping
- * alone would disconnect the outcome from the thing the study manipulates.
+ * ACCEPTANCE IS NOT TIED TO THE SCRIPT. From the trade stage onward the
+ * counterpart accepts any package that clears its threshold, so a participant
+ * who opens well can settle in three messages and one who circles can take
+ * ten. That is the free-form part; the thresholds are the controlled part.
+ *
+ * THE REASON REQUIREMENT applies wherever a concession is being asked for. If
+ * the participant wants the counterpart to move on their requirement and has
+ * never given a reason, the counterpart asks for one and defers judgement by
+ * one turn — which is what keeps reasons mechanically consequential rather
+ * than decorative.
  */
 export function counterpartStep(
   task: NegotiationTask,
@@ -240,12 +247,29 @@ export function counterpartStep(
     awaitingReason: false,
   };
 
+  const timing = distributiveIssue(task);
+  const requirement = requirementIssue(task, participantRole);
+
+  /** Is the participant asking for something they have not justified? */
+  const unexplainedAsk =
+    !state.reasonGivenForRequirement &&
+    asksForRequirementConcession(task, participantRole, incoming, held);
+
+  /** The same package with the participant's requirement left where it is. */
+  const withHeldRequirement = incoming
+    ? { ...incoming, [requirement.id]: held[requirement.id] }
+    : held;
+
+  const softClose =
+    state.secondsRemaining !== undefined &&
+    state.secondsRemaining <= SOFT_CLOSE_SECONDS;
+
   switch (stage) {
     case 1:
       return { ...base, action: "open" as const, proposal: opening, accepts: false };
 
     case 2:
-      // Explains its own priority and asks about yours. Position unchanged.
+      // Explains its own priority and asks about theirs. Position unchanged.
       return {
         ...base,
         action: "state_priority" as const,
@@ -254,7 +278,8 @@ export function counterpartStep(
       };
 
     case 3:
-      // The standardized challenge, and nothing else.
+      // The standardized challenge, and nothing else. It is a fixed stimulus,
+      // so it is never bundled with a concession that would vary its strength.
       return {
         ...base,
         action: "challenge" as const,
@@ -262,13 +287,17 @@ export function counterpartStep(
         accepts: false,
       };
 
-    case 4: {
-      const needsReason =
-        !state.reasonGivenForRequirement &&
-        !state.reasonAlreadyRequested &&
-        asksForRequirementConcession(task, participantRole, incoming, held);
+    default: {
+      // Stages 4 and 5 are the same decision, taken repeatedly: evaluate what
+      // is on the table, concede a step if it is not enough, and close when
+      // the timer runs low. Collapsing them is what lets the exchange run to
+      // whatever length the participant needs.
+      //
+      // The threshold relaxes once the counterpart has made its trade, which
+      // is what T_FINAL is for — a late concession can still close.
+      const threshold = stage >= 5 ? ACCEPTANCE.T_FINAL : ACCEPTANCE.T_MID;
 
-      if (needsReason) {
+      if (unexplainedAsk && !state.reasonAlreadyRequested) {
         // Defer judgement by exactly one turn and ask why. The package is not
         // rejected — it has not been evaluated yet.
         return {
@@ -280,38 +309,49 @@ export function counterpartStep(
         };
       }
 
-      if (score >= ACCEPTANCE.T_MID && state.reasonGivenForRequirement) {
+      if (score >= threshold && !unexplainedAsk) {
         return {
           ...base,
-          action: "accept" as const,
+          action: (softClose ? "soft_close" : "accept") as DecidedAction,
           proposal: incoming,
           accepts: true,
         };
       }
 
-      if (score >= ACCEPTANCE.T_MID) {
-        // Generous package, unexplained requirement: the counterpart takes the
-        // terms it was offered but holds the requirement where it stands. The
-        // rule is "no concession without a reason", not "no agreement without
-        // a reason" — refusing a package that clears the threshold outright
-        // would make the reason rule a second acceptance test, which is not
-        // what Design §4 specifies.
-        const issue = requirementIssue(task, participantRole);
-        const withHeldRequirement = {
-          ...(incoming as Package),
-          [issue.id]: held[issue.id],
-        };
+      if (unexplainedAsk) {
+        // The rule withholds the CONCESSION, not the agreement. If the rest of
+        // the package is good enough, the counterpart takes it with the
+        // requirement left where it stands — a real outcome with the
+        // requirement not preserved, which is a different code from impasse.
+        const heldScore = scorePackage(
+          task,
+          withHeldRequirement,
+          counterpartRole,
+        );
+        if (heldScore >= threshold) {
+          return {
+            ...base,
+            action: "hold" as const,
+            proposal: withHeldRequirement,
+            accepts: true,
+          };
+        }
+      }
+
+      // Out of time and still short: put the last position on the table and
+      // let the participant decide, rather than running the clock out silently.
+      if (softClose) {
         return {
           ...base,
-          action: "hold" as const,
-          proposal: withHeldRequirement,
+          action: "impasse" as const,
+          proposal: null,
           accepts: false,
+          impasse: true,
         };
       }
 
       // Otherwise trade: concede a step on the distributive issue — the
       // cheapest currency it has, and the one that keeps the logroll open.
-      const timing = distributiveIssue(task);
       return {
         ...base,
         action: "concede_distributive" as const,
@@ -322,68 +362,18 @@ export function counterpartStep(
         accepts: false,
       };
     }
-
-    case 5: {
-      const softClose =
-        state.secondsRemaining !== undefined &&
-        state.secondsRemaining <= SOFT_CLOSE_SECONDS;
-
-      // THE REASON REQUIREMENT REACHES THE CLOSING TEST TOO.
-      //
-      // It has to. Gating only stage 4 made the rule cosmetic: the counterpart
-      // would ask "why does that matter?", the participant could ignore it,
-      // and stage 5 accepted the same package anyway. A participant who never
-      // gave a reason reached exactly the same agreement as one who did — in
-      // both conditions — which is the disconnection Design §4 introduces this
-      // rule to prevent ("옵션·임계값만으로 합의가 만들어지면 이유를 쓰게 한
-      // 설계와 결과가 단절됨").
-      //
-      // What is withheld is the CONCESSION, not the agreement: if the package
-      // does not ask the counterpart to move on the unexplained requirement,
-      // it closes on the threshold alone. So a participant who never argues
-      // for their requirement can still reach a deal — just not one that hands
-      // it to them.
-      const unexplainedAsk =
-        !state.reasonGivenForRequirement &&
-        asksForRequirementConcession(task, participantRole, incoming, held);
-
-      if (score >= ACCEPTANCE.T_FINAL && !unexplainedAsk) {
-        return {
-          ...base,
-          action: (softClose ? "soft_close" : "accept") as DecidedAction,
-          proposal: incoming,
-          accepts: true,
-        };
-      }
-
-      if (unexplainedAsk) {
-        // Close on the counterpart's own standing position instead. That is a
-        // real outcome with the requirement not preserved, not an impasse —
-        // the two are different codes and must not be collapsed.
-        const issue = requirementIssue(task, participantRole);
-        const withHeldRequirement = incoming
-          ? { ...incoming, [issue.id]: held[issue.id] }
-          : held;
-        const heldScore = scorePackage(task, withHeldRequirement, counterpartRole);
-        if (heldScore >= ACCEPTANCE.T_FINAL) {
-          return {
-            ...base,
-            action: "hold" as const,
-            proposal: withHeldRequirement,
-            accepts: true,
-          };
-        }
-      }
-
-      return {
-        ...base,
-        action: "impasse" as const,
-        proposal: null,
-        accepts: false,
-        impasse: true,
-      };
-    }
   }
+}
+
+/**
+ * How far the counterpart's script has advanced after `replies` replies.
+ *
+ * It walks 1 → 2 → 3 → 4 and then stays at 5, because stages 4 and 5 are the
+ * same decision taken repeatedly. Clamping rather than ending is what lets a
+ * participant keep talking after the counterpart has made its trade.
+ */
+export function counterpartStageAfter(replies: number): StageId {
+  return Math.min(replies + 1, 5) as StageId;
 }
 
 // ---------------------------------------------------------------------------

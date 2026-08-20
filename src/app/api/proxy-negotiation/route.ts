@@ -185,7 +185,7 @@ function fallbackText(
 ): string {
   const side = isParticipantSide
     ? "On my principal's behalf"
-    : "On Alex's behalf";
+    : "On the other participant's behalf";
   if (!proposal) {
     return stage === 3
       ? `${side}: noted. The position on that term stands.`

@@ -24,31 +24,44 @@ import { Button } from "./ui";
 export function CountdownTimer({
   seconds,
   onExpire,
+  onTick,
   running = true,
 }: {
   seconds: number;
   onExpire?: () => void;
+  /**
+   * Reports the remaining seconds each tick.
+   *
+   * The counterpart reads the clock — a low one is what makes it offer to
+   * settle rather than keep trading — so the number cannot live only in here.
+   */
+  onTick?: (remaining: number) => void;
   running?: boolean;
 }) {
   const [remaining, setRemaining] = useState(seconds);
 
-  // Keep the latest callback without restarting the interval when the parent
-  // re-renders with a new function identity.
+  // Keep the latest callbacks without restarting the interval when the parent
+  // re-renders with new function identities.
   const onExpireRef = useRef(onExpire);
+  const onTickRef = useRef(onTick);
   useEffect(() => {
     onExpireRef.current = onExpire;
-  }, [onExpire]);
+    onTickRef.current = onTick;
+  });
 
   useEffect(() => {
     if (!running) return;
     const id = window.setInterval(() => {
       setRemaining((r) => {
-        if (r <= 1) {
+        const next = Math.max(0, r - 1);
+        // Reporting from inside the updater would run during render in React's
+        // strict double-invoke, so it is queued instead.
+        window.setTimeout(() => onTickRef.current?.(next), 0);
+        if (next === 0) {
           window.clearInterval(id);
-          onExpireRef.current?.();
-          return 0;
+          window.setTimeout(() => onExpireRef.current?.(), 0);
         }
-        return r - 1;
+        return next;
       });
     }, 1000);
     return () => window.clearInterval(id);
@@ -75,17 +88,26 @@ export function CountdownTimer({
 /**
  * How each speaker is named on screen.
  *
- * DECEPTION INTEGRITY: the counterpart is a person with a name, and their
- * proxy belongs to that person. Nothing here may read as a system component.
- * `counterpart_principal` is the other participant speaking in their own
- * voice, which in a Proxy task happens exactly once — at ratification.
+ * DECEPTION INTEGRITY: the counterpart is presented as the other person taking
+ * part, and their proxy belongs to that person. Nothing here may read as a
+ * system component.
+ *
+ * "Other Participant" rather than a first name. A pseudonym invites the
+ * question of where it came from; a role label is the same claim the consent
+ * form and the instructions already make, so the three agree. It also keeps
+ * the label identical for every participant, which a name could not do without
+ * someone eventually noticing that everyone met the same person.
+ *
+ * The label is a role, but the VOICE is a person — see the P1 prompt. If the
+ * counterpart ever starts writing like a system, this label stops being
+ * credible and starts being a tell.
  */
 const SPEAKER_LABEL: Record<Speaker, string> = {
   participant: "You",
-  counterpart: "Alex",
+  counterpart: "Other Participant",
   participant_proxy: "Your AI Proxy",
-  counterpart_proxy: "Alex's AI Proxy",
-  counterpart_principal: "Alex",
+  counterpart_proxy: "Their AI Proxy",
+  counterpart_principal: "Other Participant",
   system: "System",
 };
 
@@ -343,11 +365,11 @@ export function StageRail({
  * social-cost measures are asked about — a participant who believed nobody
  * else saw the exchange would be answering about a different situation.
  */
-export function SpectatorBanner({ name = "Alex" }: { name?: string }) {
+export function SpectatorBanner() {
   return (
     <p className="flex items-center gap-2 border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-2 text-[0.8125rem] text-[var(--ink-2)]">
       <span aria-hidden>👀</span>
-      {name} is watching this negotiation too. Neither of you can step in.
+      The other participant is watching this too. Neither of you can step in.
     </p>
   );
 }

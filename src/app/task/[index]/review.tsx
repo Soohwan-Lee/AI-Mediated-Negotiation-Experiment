@@ -32,9 +32,7 @@ import {
   Card,
   CardTitle,
   Cue,
-  Field,
   Page,
-  TextArea,
   cx,
 } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
@@ -55,13 +53,19 @@ import type {
 } from "@/lib/types";
 import { DecisionButton, OutcomeValue, TermsList } from "./shared";
 
+/**
+ * Two choices, not three.
+ *
+ * "Ask for one change" is gone. It existed when the AI Proxies produced the
+ * final package on their own, so the participant needed a way to send it back.
+ * Now the participant negotiates directly after watching them, which is a
+ * better version of the same control — they can change the package by asking
+ * for it themselves, in the conversation, rather than by filing a request.
+ * Keeping both would have given the Proxy arm two bites the Baseline arm did
+ * not have.
+ */
 const RATIFY_OPTIONS: Array<[RatificationChoice, string, string]> = [
   ["ratify", "Accept it", "Settle on this package"],
-  [
-    "request_revision",
-    "Ask for one change",
-    "Send it back once with an instruction",
-  ],
   ["reject", "Reject it", "End with no agreement"],
 ];
 
@@ -84,9 +88,7 @@ export function ReviewPhase({
   transcript,
   transcriptTitle,
   transcriptHint,
-  revisionsUsed,
   isProxy,
-  onRevise,
   onDone,
 }: {
   taskIndex: 1 | 2;
@@ -98,21 +100,8 @@ export function ReviewPhase({
   transcript: DisplayMessage[];
   transcriptTitle: string;
   transcriptHint: string;
-  /** How many revisions this task has already spent. Owned by the task. */
-  revisionsUsed: number;
-  /** Proxy tasks show the other participant's ratification message. */
+  /** Proxy tasks show the other participant's closing message. */
   isProxy: boolean;
-  /**
-   * Send the package back once with the participant's instruction.
-   *
-   * Required, not optional. "Ratify / one revision / reject" is what makes
-   * this bounded delegation rather than a rubber stamp — it is the commitment
-   * authority the design keeps with the human and the instructions promise in
-   * as many words. A revision that recorded the request and moved on
-   * regardless would show the participant the control is cosmetic, which is
-   * worse than not offering it.
-   */
-  onRevise: (note: string) => Promise<void> | void;
   onDone: () => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
@@ -147,14 +136,6 @@ export function ReviewPhase({
   const [requirementResponse, setRequirementResponse] =
     useState<RequirementResponse | null>(null);
   const [choice, setChoice] = useState<RatificationChoice | null>(null);
-  const [revisionNote, setRevisionNote] = useState("");
-  // "One revision" is a real limit, not a phrase in a hint — so once it has
-  // been used the option stops being offered.
-  //
-  // The count is owned by the TASK, not by this screen. A revision sends the
-  // participant back into the negotiation and returns them here, which
-  // remounts this component; a local counter reset to zero on the way and the
-  // option came back, so the cap held only until someone used it.
 
   // The decision unlocks once the end of the transcript has been seen. A
   // marker is used rather than a scroll position because a short transcript
@@ -185,8 +166,7 @@ export function ReviewPhase({
   const canSubmit = useDevGate(
     transcriptSeen &&
       choice !== null &&
-      (!needsRequirementResponse || requirementResponse !== null) &&
-      (choice !== "request_revision" || revisionNote.trim().length > 0),
+      (!needsRequirementResponse || requirementResponse !== null),
   );
 
   async function submit() {
@@ -211,7 +191,6 @@ export function ReviewPhase({
         `task_outcome_t${taskIndex}`,
         {
           choice: decided,
-          revisionNote,
           // The uptake code and the preservation code are separate on purpose:
           // a refused package that held the threshold still counts as
           // preserved.
@@ -228,17 +207,9 @@ export function ReviewPhase({
 
     logEvent(
       "ratification_choice",
-      { choice: decided, requirementResponse, revisionsUsed },
+      { choice: decided, requirementResponse },
       { sessionIndex: taskIndex },
     );
-
-    if (decided === "request_revision") {
-      setChoice(null);
-      setRevisionNote("");
-      setTranscriptSeen(false);
-      await onRevise(revisionNote);
-      return;
-    }
 
     logEvent("negotiation_ended", undefined, { sessionIndex: taskIndex });
     onDone();
@@ -384,9 +355,7 @@ export function ReviewPhase({
               )}
               aria-disabled={!canDecide}
             >
-              {RATIFY_OPTIONS.filter(
-                ([value]) => value !== "request_revision" || revisionsUsed < 1,
-              ).map(([value, label, hint]) => (
+              {RATIFY_OPTIONS.map(([value, label, hint]) => (
                 <button
                   key={value}
                   type="button"
@@ -409,21 +378,6 @@ export function ReviewPhase({
               ))}
             </div>
 
-            {choice === "request_revision" ? (
-              <div className="mt-4">
-                <Field
-                  label="What should change?"
-                  hint="You get one revision request."
-                >
-                  <TextArea
-                    value={revisionNote}
-                    onChange={setRevisionNote}
-                    rows={3}
-                    placeholder="Describe the change you want."
-                  />
-                </Field>
-              </div>
-            ) : null}
           </Card>
         </TaskLayout>
       </Page>

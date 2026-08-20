@@ -23,7 +23,6 @@ import { OptionChips } from "@/components/issues";
 import {
   CountdownTimer,
   MessageComposer,
-  StageRail,
   Transcript,
   type DisplayMessage,
 } from "@/components/negotiation";
@@ -38,9 +37,7 @@ import {
 } from "@/lib/dev-mode";
 import {
   NEGOTIATION_SECONDS,
-  STAGES,
-  STAGE_GOALS,
-  STAGE_PROMPTS,
+  counterpartStageAfter,
   counterpartStep,
 } from "@/lib/negotiation/machine";
 import { scriptedTask } from "@/lib/negotiation/script";
@@ -48,7 +45,7 @@ import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { counterpartDelayMs, nextHref } from "@/lib/study-config";
 import { counterpartOpening, getTask, requirementIssue } from "@/lib/tasks";
-import type { Package, Role, StageId, TaskId } from "@/lib/types";
+import type { Package, Role, TaskId } from "@/lib/types";
 import { ReviewPhase } from "./review";
 import {
   Matchmaking,
@@ -152,14 +149,28 @@ export function BaselineTask({
   const counterpartRole: Role = role === "leader" ? "member" : "leader";
 
   const [phase, setPhase] = useState<Phase>("intro");
-  const [stage, setStage] = useState<StageId>(1);
+  /**
+   * How many replies the counterpart has made. Its script position is derived
+   * from this, so the participant can send as many messages as they like
+   * without the counterpart skipping ahead or repeating itself.
+   */
+  const [replies, setReplies] = useState(0);
+  /** Set when the counterpart accepts or declares an impasse. */
+  const [settled, setSettled] = useState<"agreed" | "impasse" | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [offer, setOffer] = useState<Package>({});
   const [tentative, setTentative] = useState<Package | null>(null);
   const [prefs, setPrefs] = useState<Preferences | null>(null);
-  const [outOfTime, setOutOfTime] = useState(false);
+  /**
+   * Seconds left on the ten-minute clock, mirrored into state.
+   *
+   * The counterpart reads it — a low clock is what makes it offer to settle —
+   * so it cannot live only inside the timer component.
+   */
+  const [secondsRemaining, setSecondsRemaining] = useState(NEGOTIATION_SECONDS);
+  const outOfTime = secondsRemaining <= 0;
 
   /**
    * Which reason card, if any, the participant attached to this message.
@@ -176,13 +187,6 @@ export function BaselineTask({
   const [voicedReasonIds, setVoicedReasonIds] = useState<string[]>([]);
   const [reasonRequested, setReasonRequested] = useState(false);
 
-  /**
-   * Revisions spent. Held here rather than on the review screen because a
-   * revision sends the participant back into the conversation and returns
-   * them, remounting that screen — a counter living there reset on the way and
-   * the one-revision cap held only until someone used it.
-   */
-  const [revisionsUsed, setRevisionsUsed] = useState(0);
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(null);
 
@@ -191,8 +195,11 @@ export function BaselineTask({
   // An opening package needs every term chosen; later stages may reply without
   // changing the offer. Computed here rather than beside the composer because
   // the phase branches below return early, and a hook cannot sit behind that.
+  // A first message needs a complete package on the table; after that the
+  // participant may write anything, including a reply that changes nothing.
   const chosen = task.issues.filter((i) => offer[i.id]).length;
-  const canSend = useDevGate(chosen === task.issues.length || stage !== 1);
+  const complete = chosen === task.issues.length;
+  const canSend = useDevGate(complete && !settled);
 
   // The three states of the conversation, named once so the composer, the
   // terms card and the pill above them cannot disagree about which one it is.
@@ -237,14 +244,16 @@ export function BaselineTask({
   // Pre-fills the composer and the package selector for the current stage.
   useDevAutofill(() => {
     const own = script.messages.find(
-      (m) => m.stage === stage && m.speaker === "participant",
+      (m) =>
+        m.stage === counterpartStageAfter(replies) &&
+        m.speaker === "participant",
     );
     if (own) {
       setDraft(own.text);
       if (own.proposal) setOffer(own.proposal);
       if (own.reasonCardId) setAttachedReasonId(own.reasonCardId);
     }
-  }, `baseline-t${taskIndex}-${phase}-${stage}`);
+  }, `baseline-t${taskIndex}-${phase}-${replies}`);
 
   async function send(text: string) {
     const own: DisplayMessage = {
@@ -266,7 +275,8 @@ export function BaselineTask({
       "message_sent",
       {
         length: text.length,
-        stage,
+        stage: counterpartStageAfter(replies),
+        secondsRemaining,
         requirementOption: offer[requirement.id] ?? null,
         reasonCardId: attachedReasonId,
       },
@@ -280,7 +290,7 @@ export function BaselineTask({
         speaker: "participant",
         text,
         createdAt: new Date().toISOString(),
-        stage,
+        stage: counterpartStageAfter(replies),
         proposal: Object.keys(offer).length > 0 ? offer : undefined,
         reasonCardId: attachedReasonId ?? undefined,
       });
@@ -291,56 +301,26 @@ export function BaselineTask({
       let reply: string;
       let counterProposal: Package | null = null;
 
-      // The exchange state the acceptance rule reads. A reason counts as given
+      // The exchange state the counterpart reads. A reason counts as given
       // once the participant has attached any card to any message — the system
       // decides this from the log, never the model (Design §4 판정 주체).
       const exchangeState = {
         reasonGivenForRequirement: voiced.length > 0,
         reasonAlreadyRequested: reasonRequested,
+        secondsRemaining,
       };
 
-      // Design §4 gives each stage one message per side, counterpart first.
-      // The counterpart's stage-1 line was the opening the participant replied
-      // to, so what follows their stage-N message is the counterpart's
-      // stage-(N+1) line — and after stage 5 there is none: the tentative
-      // package closes the exchange at ten messages.
-      //
-      // Returning here rather than generating and then declining to show the
-      // result is the point. Deciding this from whether a reply came back
-      // empty worked in mockup mode and not in the live path, where a missing
-      // message falls back to a non-empty string and the transcript ran to
-      // eleven.
-      if (stage >= 5) {
-        // The counterpart still runs its closing test, it just does not speak
-        // again. An impasse is a real outcome: recording the participant's
-        // last offer as a tentative agreement when the counterpart rejected it
-        // would invent an agreement that never happened.
-        const decision = counterpartStep(
-          task,
-          counterpartRole,
-          5,
-          offer,
-          lastCounterpartPackage,
-          exchangeState,
-        );
-        setTentative(decision.impasse ? null : offer);
-        setPhase("review");
-        return;
-      }
-
-      // Which of the counterpart's five turns comes next.
-      //
-      // Not the participant's current stage. Its stage-1 line was the opening
-      // they are replying to, so what follows their stage-N message is the
-      // counterpart's stage-(N+1) turn. Getting this wrong put the
-      // standardized challenge — a stage-3 move — one stage late, after the
-      // participant had already replied to a challenge nobody had made.
-      const counterpartStageNow = (stage + 1) as StageId;
+      // Where the counterpart is in ITS OWN script. The participant is not
+      // marched through stages any more — they write as much as they want
+      // inside the ten minutes — but the counterpart still walks its fixed
+      // sequence one move per reply, so every participant meets the same
+      // opening, the same challenge and the same thresholds in the same order.
+      const stageNow = counterpartStageAfter(replies);
 
       const decision = counterpartStep(
         task,
         counterpartRole,
-        counterpartStageNow,
+        stageNow,
         offer,
         lastCounterpartPackage,
         exchangeState,
@@ -350,7 +330,7 @@ export function BaselineTask({
 
       if (mockAi) {
         const scripted = script.messages.find(
-          (m) => m.stage === counterpartStageNow && m.speaker === "counterpart",
+          (m) => m.stage === stageNow && m.speaker === "counterpart",
         );
         reply = scripted?.text ?? "";
         await new Promise((r) => setTimeout(r, 400));
@@ -361,11 +341,12 @@ export function BaselineTask({
           body: JSON.stringify({
             taskId,
             participantRole: role,
-            stage: counterpartStageNow,
+            stage: stageNow,
             incoming: offer,
             lastCounterpartPackage,
             reasonGiven: exchangeState.reasonGivenForRequirement,
             reasonAlreadyRequested: exchangeState.reasonAlreadyRequested,
+            secondsRemaining,
             history: next.map((m) => ({
               role: m.speaker === "participant" ? "user" : "assistant",
               content: m.text,
@@ -408,14 +389,26 @@ export function BaselineTask({
             speaker: "counterpart",
             text: reply,
             createdAt: new Date().toISOString(),
-            stage: counterpartStageNow,
+            stage: stageNow,
             proposal: counterProposal ?? undefined,
             decidedAction: decision.action,
           });
         }
       }
 
-      setStage((s) => (s + 1) as StageId);
+      setReplies((n) => n + 1);
+
+      // An accepted package or an impasse ends the exchange. The participant
+      // is not sent to the review immediately — they see the counterpart's
+      // last message first, and a Continue button appears — because being
+      // teleported off a screen mid-sentence reads as a bug.
+      if (decision.accepts) {
+        setTentative(decision.proposal ?? offer);
+        setSettled("agreed");
+      } else if (decision.impasse) {
+        setTentative(null);
+        setSettled("impasse");
+      }
     } finally {
       setPending(false);
     }
@@ -530,23 +523,9 @@ export function BaselineTask({
         stepIndex={STEP_OF.review}
         tentative={tentative}
         transcript={messages}
-        revisionsUsed={revisionsUsed}
         isProxy={false}
         transcriptTitle="The conversation"
         transcriptHint="Everything the two of you said."
-        onRevise={(note) => {
-          // Sending it back means saying so yourself: the participant returns
-          // to the conversation with one more turn to put a different package
-          // on the table. One revision only — the review screen stops offering
-          // it after the first.
-          setRevisionsUsed((n) => n + 1);
-          setDraft(note);
-          setStage(5);
-          setPhase("negotiate");
-          logEvent("mandate_revised", { note, fromReview: true }, {
-            sessionIndex: taskIndex,
-          });
-        }}
         onDone={() => {
           logEvent("page_complete", undefined, {
             page: `task-${taskIndex}`,
@@ -574,8 +553,8 @@ export function BaselineTask({
                 <span aria-hidden>⏱</span>
                 <CountdownTimer
                   seconds={NEGOTIATION_SECONDS}
-                  running={!outOfTime}
-                  onExpire={() => setOutOfTime(true)}
+                  running={!settled}
+                  onTick={setSecondsRemaining}
                 />
               </span>
             }
@@ -589,16 +568,20 @@ export function BaselineTask({
               when they can write, the terms when a first package has to be
               chosen before they can. */}
           <Card className="mb-5 flex flex-col" padded={false} cue={yourTurn}>
-            <StageRail
-              stage={stage}
-              goals={STAGE_GOALS}
-              note={outOfTime ? "Time is up — send your last message." : undefined}
-            />
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-2.5">
-              <p className="text-[0.8125rem] text-[var(--ink-2)]">
-                {STAGE_PROMPTS[stage]}
-              </p>
-              {pending ? (
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
+              <div>
+                <p className="text-[0.875rem] font-medium">
+                  Messages with the other participant
+                </p>
+                <p className="text-[0.8125rem] text-[var(--ink-2)]">
+                  {settled === "agreed"
+                    ? "You have both settled on a package."
+                    : settled === "impasse"
+                      ? "The conversation ended without an agreement."
+                      : "They can see everything you write here. Take as long as you need inside the ten minutes."}
+                </p>
+              </div>
+              {settled ? null : pending ? (
                 <Cue tone="quiet">Waiting for their reply</Cue>
               ) : yourTurn ? (
                 <Cue>Your turn</Cue>
@@ -626,11 +609,13 @@ export function BaselineTask({
               onSend={send}
               disabled={pending || !canSend}
               cue={yourTurn}
-              sendLabel={stage >= 5 ? "Send and finish" : "Send"}
+              sendLabel="Send"
               placeholder={
-                canSend
-                  ? "Write your message…"
-                  : "Choose an option on each term first."
+                settled
+                  ? "This conversation has finished."
+                  : canSend
+                    ? "Write your message…"
+                    : "Choose an option on each term first."
               }
             />
           </Card>
@@ -680,18 +665,27 @@ export function BaselineTask({
         </TaskLayout>
       </Page>
 
-      {/* No "finish early" control.
-          The five stages have to be walked, because the trajectory this study
-          measures is made of the transitions between them — what was opened
-          with, what survived the standardized challenge, what reached the
-          final package. An action bar that jumped to the review from stage 1
-          would produce a task with an opening and a final position and nothing
-          in between, and it would do so precisely for the participants least
-          engaged with the negotiation. The task ends when the last message is
-          sent. */}
-      <ActionBar
-        note={`${chosen} of ${task.issues.length} terms chosen · round ${stage} of ${STAGES.length}`}
-      />
+      {/* The bar is where the exchange ends. There is no "finish early"
+          shortcut mid-conversation — the participant either reaches an
+          agreement, hits an impasse, or runs the clock down — but once one of
+          those has happened, keeping them on the screen serves nobody. */}
+      {settled ? (
+        <ActionBar
+          label="Continue"
+          onClick={() => setPhase("review")}
+          note={
+            settled === "agreed"
+              ? "You have a package to review."
+              : "No agreement was reached."
+          }
+        />
+      ) : (
+        <ActionBar
+          note={`${chosen} of ${task.issues.length} terms chosen${
+            outOfTime ? " · time is up" : ""
+          }`}
+        />
+      )}
     </>
   );
 }

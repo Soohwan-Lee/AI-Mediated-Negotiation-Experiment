@@ -118,6 +118,10 @@ export function TaskCover({
   actionLabel,
   onStart,
   secondary,
+  /** "1 of 2" style marker, shown as a large numeral. Omitted for practice. */
+  counter,
+  /** Set on a round whose results do not count, which says so plainly. */
+  doesNotCount,
 }: {
   eyebrow: string;
   title: string;
@@ -131,39 +135,73 @@ export function TaskCover({
   actionLabel: string;
   onStart: () => void;
   secondary?: ReactNode;
+  counter?: { index: number; total: number };
+  doesNotCount?: boolean;
 }) {
   return (
     <>
       <Page>
-        <div className="pt-4 sm:pt-10">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
-            {eyebrow}
-          </p>
-          <h1 className="text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2rem]">
-            {title}
-          </h1>
-          <div className="prose-study mt-4">{lead}</div>
+        {/* A cover, not a page with a heading.
+            It is centred, it is mostly empty, and the only thing to do on it
+            is the button — because its whole job is to mark a boundary the
+            participant would otherwise cross without noticing. A dense screen
+            here would be another thing to read, which is the opposite. */}
+        <div className="flex min-h-[calc(100vh-var(--header-h)-var(--actionbar-h)-3rem)] flex-col justify-center py-10 text-center">
+          <div className="mx-auto flex w-full max-w-prose flex-col items-center">
+            {counter ? (
+              <p
+                aria-hidden
+                className="mb-5 flex items-baseline gap-1 font-semibold tracking-[-0.03em]"
+              >
+                <span className="text-[3.5rem] leading-none text-[var(--accent)]">
+                  {counter.index}
+                </span>
+                <span className="text-[1.25rem] leading-none text-[var(--ink-3)]">
+                  / {counter.total}
+                </span>
+              </p>
+            ) : null}
 
-          <Card tone="muted" className="mt-8">
-            <CardTitle hint={`About ${minutes} minutes.`}>
-              What happens in this part
-            </CardTitle>
-            <ol className="space-y-2.5">
-              {steps.map((step, i) => (
-                <li key={step} className="flex items-baseline gap-3">
-                  <span
-                    aria-hidden
-                    className="tabular flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full border border-[var(--line-strong)] bg-[var(--surface)] text-[0.75rem] font-medium text-[var(--ink-2)]"
-                  >
-                    {i + 1}
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-3)]">
+              {eyebrow}
+            </p>
+            <h1 className="text-[1.875rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2.25rem]">
+              {title}
+            </h1>
+
+            <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 py-1.5 text-[0.8125rem] text-[var(--ink-2)]">
+              <span aria-hidden>⏱</span> About {minutes} minutes
+              {doesNotCount ? (
+                <>
+                  <span aria-hidden className="text-[var(--line-strong)]">
+                    ·
                   </span>
-                  <span className="text-[0.9375rem]">{step}</span>
-                </li>
-              ))}
-            </ol>
-          </Card>
+                  <span className="font-medium">Does not count</span>
+                </>
+              ) : null}
+            </span>
 
-          {note ? <div className="mt-4">{note}</div> : null}
+            <div className="prose-study mt-6 text-left">{lead}</div>
+
+            <Card tone="muted" className="mt-8 w-full text-left">
+              <CardTitle>What happens in this part</CardTitle>
+              <ol className="space-y-2.5">
+                {steps.map((step, i) => (
+                  <li key={step} className="flex items-baseline gap-3">
+                    <span
+                      aria-hidden
+                      className="tabular flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full border border-[var(--line-strong)] bg-[var(--surface)] text-[0.75rem] font-medium text-[var(--ink-2)]"
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="text-[0.9375rem]">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+
+            {note ? <div className="mt-4 w-full text-left">{note}</div> : null}
+          </div>
         </div>
       </Page>
 

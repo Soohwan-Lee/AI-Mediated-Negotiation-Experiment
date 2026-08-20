@@ -22,8 +22,24 @@
  * so it is never taken away.
  */
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { MeasureBlock, type Answers } from "@/components/measure";
+import {
+  CountdownTimer,
+  MessageComposer,
+  Transcript,
+  type DisplayMessage,
+} from "@/components/negotiation";
+import {
+  NEGOTIATION_SECONDS,
+  counterpartStageAfter,
+  counterpartStep,
+} from "@/lib/negotiation/machine";
 import {
   BriefingPanel,
   ReasonBox,
@@ -33,11 +49,16 @@ import {
 } from "@/components/session";
 import { OptionChips } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Page } from "@/components/ui";
-import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
+import { Callout, Card, CardTitle, Cue, Page } from "@/components/ui";
+import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { dummyAnswer, riskBlock } from "@/lib/measures";
 import { useParticipant } from "@/lib/participant-context";
-import { NEGOTIATION, STAGE_MINUTES, pauseMs } from "@/lib/study-config";
+import {
+  NEGOTIATION,
+  STAGE_MINUTES,
+  counterpartDelayMs,
+  pauseMs,
+} from "@/lib/study-config";
 import { getStore } from "@/lib/store";
 import {
   packageValue,
@@ -75,7 +96,8 @@ export function TaskIntro({
 
   return (
     <TaskCover
-      eyebrow={`Task ${taskIndex} of 2`}
+      counter={{ index: taskIndex, total: 2 }}
+      eyebrow="Negotiation task"
       title={first ? "Task 1 starts here" : "Task 2, the last one"}
       lead={
         first ? (
@@ -769,5 +791,420 @@ export function DecisionButton({
       <span className="block text-[0.9375rem] font-semibold">{label}</span>
       <span className="block text-[0.8125rem] text-[var(--ink-2)]">{hint}</span>
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phase: the participant negotiates directly (Proxy condition)
+// ---------------------------------------------------------------------------
+
+/**
+ * After the two AI Proxies have finished, the participant takes over and
+ * negotiates with the other participant themselves.
+ *
+ * WHY THIS EXISTS. Watching a proxy settle something on your behalf and then
+ * being asked how it felt is a different experiment from having to carry the
+ * result into a conversation with the person it was settled with. The second
+ * is the one this study is about: the AI speaks first, and then the
+ * participant has to live with what it said in front of the other side.
+ *
+ * THE PROXY TRANSCRIPT STAYS ON SCREEN. That is not a convenience. Every
+ * measure that follows — whether the other side's requirement read as
+ * genuinely theirs, who is answerable for what was asked, whether the AI
+ * represented them well — is a judgement about words the participant needs to
+ * be able to re-read while they respond to them. Taking the transcript away
+ * would make those items a memory test.
+ *
+ * The counterpart is the same controlled counterpart as in Baseline, at the
+ * same thresholds, so the two conditions differ in what came BEFORE the direct
+ * conversation rather than in how that conversation is run.
+ */
+export function DirectNegotiation({
+  taskIndex,
+  task,
+  role,
+  steps,
+  stepIndex,
+  proxyTranscript,
+  openingPackage,
+  messages,
+  setMessages,
+  offer,
+  setOffer,
+  onSettled,
+}: {
+  taskIndex: 1 | 2;
+  task: NegotiationTask;
+  role: Role;
+  steps: string[];
+  stepIndex: number;
+  /** What the two AI Proxies said. Read-only, always on screen. */
+  proxyTranscript: DisplayMessage[];
+  /** The package the proxies reached, if any. Where this conversation starts. */
+  openingPackage: Package | null;
+  messages: DisplayMessage[];
+  setMessages: Dispatch<SetStateAction<DisplayMessage[]>>;
+  offer: Package;
+  setOffer: Dispatch<SetStateAction<Package>>;
+  onSettled: (finalPackage: Package | null) => void;
+}) {
+  const { logEvent, participantKey } = useParticipant();
+  const counterpartRole: Role = role === "leader" ? "member" : "leader";
+  const requirement = requirementIssue(task, role);
+  const mockAi = useDevMockAi();
+
+  const [draft, setDraft] = useState("");
+  const [pending, setPending] = useState(false);
+  const [replies, setReplies] = useState(0);
+  const [settled, setSettled] = useState<"agreed" | "impasse" | null>(null);
+  const [finalPackage, setFinalPackage] = useState<Package | null>(
+    openingPackage,
+  );
+  const [secondsRemaining, setSecondsRemaining] = useState(NEGOTIATION_SECONDS);
+  const [attachedReasonId, setAttachedReasonId] = useState<string | null>(null);
+  const [voicedReasonIds, setVoicedReasonIds] = useState<string[]>([]);
+  const [reasonRequested, setReasonRequested] = useState(false);
+  const [lastCounterpartPackage, setLastCounterpartPackage] =
+    useState<Package | null>(openingPackage);
+
+  const chosen = task.issues.filter((i) => offer[i.id]).length;
+  const complete = chosen === task.issues.length;
+  const canSend = useDevGate(complete && !settled);
+  const yourTurn = !pending && canSend && !settled;
+
+  useDevAutofill(() => {
+    if (settled) return;
+    setDraft(
+      "Thanks for going through all that. I'd like to keep the level we landed on — it's the part I actually need. Happy to stay flexible on the rest.",
+    );
+  }, `direct-t${taskIndex}-${replies}`);
+
+  async function send(text: string) {
+    const own: DisplayMessage = {
+      id: `d-p${messages.length}`,
+      speaker: "participant",
+      text,
+    };
+    setMessages((m) => [...m, own]);
+    setDraft("");
+
+    const voiced = attachedReasonId
+      ? [...new Set([...voicedReasonIds, attachedReasonId])]
+      : voicedReasonIds;
+    setVoicedReasonIds(voiced);
+    setAttachedReasonId(null);
+
+    logEvent(
+      "message_sent",
+      {
+        phase: "direct",
+        length: text.length,
+        secondsRemaining,
+        requirementOption: offer[requirement.id] ?? null,
+        reasonCardId: attachedReasonId,
+      },
+      { sessionIndex: taskIndex },
+    );
+
+    if (participantKey) {
+      void getStore().appendMessage(participantKey, {
+        id: own.id,
+        sessionIndex: taskIndex,
+        speaker: "participant",
+        text,
+        createdAt: new Date().toISOString(),
+        proposal: Object.keys(offer).length > 0 ? offer : undefined,
+        reasonCardId: attachedReasonId ?? undefined,
+      });
+    }
+
+    setPending(true);
+    try {
+      // The proxies already made the case, so the counterpart picks its script
+      // up mid-way rather than opening again — it has already opened, stated
+      // its priority and challenged, through its own proxy. Starting from the
+      // trade stage is what makes this a continuation instead of a rerun.
+      const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
+      const decision = counterpartStep(
+        task,
+        counterpartRole,
+        stageNow,
+        offer,
+        lastCounterpartPackage,
+        {
+          // A Proxy participant's reasons were voiced by their proxy, from the
+          // cards they checked, so the reason requirement is already met when
+          // the direct conversation opens.
+          reasonGivenForRequirement: true,
+          reasonAlreadyRequested: reasonRequested,
+          secondsRemaining,
+        },
+      );
+      if (decision.awaitingReason) setReasonRequested(true);
+
+      let reply: string;
+      if (mockAi) {
+        reply = DIRECT_MOCK_REPLIES[Math.min(replies, DIRECT_MOCK_REPLIES.length - 1)];
+        await new Promise((r) => setTimeout(r, 500));
+      } else {
+        const res = await fetch("/api/counterpart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskId: task.id,
+            participantRole: role,
+            stage: stageNow,
+            incoming: offer,
+            lastCounterpartPackage,
+            reasonGiven: true,
+            reasonAlreadyRequested: reasonRequested,
+            secondsRemaining,
+            afterProxy: true,
+            history: [...messages, own].map((m) => ({
+              role: m.speaker === "participant" ? "user" : "assistant",
+              content: m.text,
+            })),
+          }),
+        });
+        const data = (await res.json()) as {
+          message?: string;
+          proposal?: Package | null;
+        };
+        reply = data.message ?? "sorry — could you say that again?";
+        await new Promise((r) => setTimeout(r, counterpartDelayMs(reply.length)));
+      }
+
+      if (decision.proposal) setLastCounterpartPackage(decision.proposal);
+
+      const counter: DisplayMessage = {
+        id: `d-c${messages.length}`,
+        speaker: "counterpart",
+        text: reply,
+      };
+      setMessages((m) => [...m, counter]);
+
+      if (participantKey) {
+        void getStore().appendMessage(participantKey, {
+          id: counter.id,
+          sessionIndex: taskIndex,
+          speaker: "counterpart",
+          text: reply,
+          createdAt: new Date().toISOString(),
+          proposal: decision.proposal ?? undefined,
+          decidedAction: decision.action,
+        });
+      }
+
+      setReplies((n) => n + 1);
+      if (decision.accepts) {
+        setFinalPackage(decision.proposal ?? offer);
+        setSettled("agreed");
+      } else if (decision.impasse) {
+        setFinalPackage(null);
+        setSettled("impasse");
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <>
+      <Page width="wide">
+        <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
+          <TaskHeader
+            taskIndex={taskIndex}
+            title={task.title}
+            steps={steps}
+            current={stepIndex}
+            aside={
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1 text-[0.8125rem] text-[var(--ink-2)]">
+                <span aria-hidden>⏱</span>
+                <CountdownTimer
+                  seconds={NEGOTIATION_SECONDS}
+                  running={!settled}
+                  onTick={setSecondsRemaining}
+                />
+              </span>
+            }
+          />
+
+          {/* What the proxies said, kept where it can be re-read. Collapsed by
+              default so it does not push the live conversation off the screen,
+              open on demand — and open by default when there is nothing to
+              show in the live box yet. */}
+          <ProxyTranscriptPanel
+            transcript={proxyTranscript}
+            openByDefault={messages.length === 0}
+          />
+
+          <Card className="mb-5 flex flex-col" padded={false} cue={yourTurn}>
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
+              <div>
+                <p className="text-[0.875rem] font-medium">
+                  💬 You and the other participant
+                </p>
+                <p className="text-[0.8125rem] text-[var(--ink-2)]">
+                  {settled === "agreed"
+                    ? "You have both settled on a package."
+                    : settled === "impasse"
+                      ? "The conversation ended without an agreement."
+                      : "This is you writing, not your AI Proxy."}
+                </p>
+              </div>
+              {settled ? null : pending ? (
+                <Cue tone="quiet">Waiting for their reply</Cue>
+              ) : yourTurn ? (
+                <Cue>Your turn</Cue>
+              ) : (
+                <Cue tone="quiet">Choose your terms first</Cue>
+              )}
+            </div>
+            <Transcript
+              messages={messages}
+              pending={pending}
+              emptyHint="Your AI Proxy has stopped. Anything you say from here is yours."
+            />
+            <ReasonPicker
+              task={task}
+              role={role}
+              value={attachedReasonId}
+              onChange={setAttachedReasonId}
+              alreadyVoiced={voicedReasonIds}
+            />
+            <MessageComposer
+              value={draft}
+              onChange={setDraft}
+              onSend={send}
+              disabled={pending || !canSend}
+              cue={yourTurn}
+              placeholder={
+                settled
+                  ? "This conversation has finished."
+                  : canSend
+                    ? "Write your message…"
+                    : "Choose an option on each term first."
+              }
+            />
+          </Card>
+
+          <Card cue={!complete}>
+            <CardTitle
+              hint="Where the AI Proxies left it. Change anything you want to put differently."
+              aside={
+                !complete ? (
+                  <Cue>{task.issues.length - chosen} to choose</Cue>
+                ) : null
+              }
+            >
+              📦 The package on the table
+            </CardTitle>
+            <div className="space-y-4">
+              {task.issues.map((issue) => (
+                <div key={issue.id}>
+                  <p className="mb-1.5 text-[0.8125rem] font-medium">
+                    {issue.label}
+                  </p>
+                  <OptionChips
+                    issue={issue}
+                    role={role}
+                    name={`direct-${issue.id}`}
+                    value={offer[issue.id] ?? null}
+                    onChange={(v) =>
+                      setOffer((prev) => ({ ...prev, [issue.id]: v }))
+                    }
+                    allowNone
+                    noneLabel="Not specified"
+                  />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </TaskLayout>
+      </Page>
+
+      {settled ? (
+        <ActionBar
+          label="Continue"
+          onClick={() => onSettled(finalPackage)}
+          note={
+            settled === "agreed"
+              ? "You have a package to review."
+              : "No agreement was reached."
+          }
+        />
+      ) : (
+        <ActionBar
+          note={`${chosen} of ${task.issues.length} terms chosen${
+            secondsRemaining <= 0 ? " · time is up" : ""
+          }`}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Where the counterpart's script picks up in the direct conversation.
+ *
+ * Three, so its first reply is a trade rather than an opening: through its own
+ * proxy it has already opened, stated its priority and sent the standardized
+ * challenge. Replaying those would make the participant answer a challenge
+ * they watched being answered, and would give the Proxy arm two challenges
+ * where Baseline has one.
+ */
+const DIRECT_STAGE_OFFSET = 3;
+
+/** Counterpart lines for mockup mode. Ideal trajectory, as everywhere else. */
+const DIRECT_MOCK_REPLIES = [
+  "yeah, I watched the whole thing. || honestly I think they landed somewhere reasonable — I can live with where it ended up.",
+  "that works for me. || shall we call it settled there?",
+  "agreed. good to have it sorted.",
+];
+
+/**
+ * The AI Proxies' conversation, kept available during the direct one.
+ *
+ * Collapsible rather than always expanded: ten messages above a live chat
+ * pushes the thing the participant is doing off the screen. Collapsible rather
+ * than a link or a modal: every measure that follows asks them to judge what
+ * was said, so re-reading it has to cost one click, not a navigation.
+ */
+export function ProxyTranscriptPanel({
+  transcript,
+  openByDefault,
+}: {
+  transcript: DisplayMessage[];
+  openByDefault?: boolean;
+}) {
+  const [open, setOpen] = useState(Boolean(openByDefault));
+  if (!transcript.length) return null;
+
+  return (
+    <Card className="mb-5" padded={false}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+      >
+        <span>
+          <span className="block text-[0.9375rem] font-semibold">
+            🤖 What the AI Proxies said
+          </span>
+          <span className="block text-[0.8125rem] text-[var(--ink-2)]">
+            {transcript.length} messages. This is what you are both working
+            from.
+          </span>
+        </span>
+        <span className="shrink-0 text-[0.8125rem] font-medium text-[var(--accent)]">
+          {open ? "Hide" : "Show"}
+        </span>
+      </button>
+      {open ? (
+        <div className="border-t border-[var(--line)]">
+          <Transcript messages={transcript} flow />
+        </div>
+      ) : null}
+    </Card>
   );
 }
