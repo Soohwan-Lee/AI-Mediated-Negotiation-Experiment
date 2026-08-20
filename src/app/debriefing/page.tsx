@@ -5,7 +5,7 @@
  *
  * Full disclosure of the deception, before the completion code is issued:
  *  - the counterpart was a researcher-controlled LLM, not another participant
- *  - the counterpart's assistant was likewise part of the study protocol
+ *  - the counterpart's AI Proxy was likewise part of the study protocol
  *  - the reward decision was scenario-only and changed nobody's payment
  *  - why this could not be disclosed up front
  *
@@ -89,64 +89,77 @@ export default function DebriefingPage() {
             and concession rules, identical for everyone.
           </p>
           <p>
-            In the session where assistants negotiated, the
-            &ldquo;counterpart&apos;s assistant&rdquo; was likewise part of the
-            study system, not a tool belonging to a real person.
+            In the task where AI Proxies negotiated, &ldquo;Alex&apos;s AI
+            Proxy&rdquo; was likewise part of the study system, not a tool
+            belonging to a real person — and the message from Alex approving
+            the package came from the same system.
           </p>
 
           <h2>The reward decision was part of the scenario only</h2>
           {isMember ? (
             <p>
-              You were shown a reward decision presented as the Project
-              Leader&apos;s judgment of your contribution.{" "}
+              After each task you were shown a bonus presented as the
+              Leader&apos;s judgment of how you had handled it.{" "}
               <strong>
-                That decision was not made by any person, and it did not depend
-                on anything you did.
+                Those decisions were not made by any person, and they did not
+                depend on anything you did.
               </strong>{" "}
-              Everyone in your role saw the same number. It has no effect
-              whatsoever on your payment — you will receive the full amount
-              advertised on Prolific, exactly as described in the consent form.
+              Every Member saw the same number after both tasks. It has no
+              effect whatsoever on your payment — you will receive the full
+              amount advertised on Prolific, exactly as described in the consent
+              form, and the bonus is paid in full.
             </p>
           ) : (
             <p>
-              You were asked to make a reward decision about the other party.
-              Because there was no other participant,{" "}
-              <strong>your decision did not affect anyone&apos;s payment.</strong>{" "}
-              It was recorded only as data about how people use authority in
+              After each task you were asked to decide the other side&apos;s
+              bonus. Because there was no other participant,{" "}
+              <strong>
+                your decisions did not affect anyone&apos;s payment.
+              </strong>{" "}
+              They were recorded only as data about how people use authority in
               this kind of scenario. Your own payment is unaffected.
             </p>
           )}
 
-          <h2>The two sessions were different on purpose</h2>
+          <h2>The two tasks were different on purpose</h2>
           <p>
-            The two sessions were labelled only &ldquo;Session 1&rdquo; and
-            &ldquo;Session 2&rdquo;, and the instructions described both
-            interface types as things you might meet. In fact one of your two
-            sessions was assigned to a condition:{" "}
-            <strong>you negotiated for yourself in one and delegated to an
-            assistant in the other</strong>, and the assistant followed one of
-            two policies decided in advance rather than by anything about you.
+            The two tasks were labelled only &ldquo;Task 1&rdquo; and &ldquo;Task
+            2&rdquo;, and the instructions described both interface types as
+            things you might meet. In fact each of your two tasks was assigned to
+            a condition:{" "}
+            <strong>
+              you negotiated for yourself in one and delegated to an AI Proxy in
+              the other
+            </strong>
+            , and that AI Proxy followed one of two policies decided in advance
+            rather than by anything about you.
           </p>
           <p>
-            Under one policy the assistant used only the priorities, limits and
-            reasons you gave it. Under the other it could also test package
-            combinations within the limits you set, and support them with
-            general arguments about the work that anyone in your role might
-            make — <strong>without marking which parts of a proposal came from
-            you and which it was trying out</strong>. That omission was the
-            point of the comparison: we are studying whether it changes how the
-            other side reads a proposal, and whether it changes what people are
-            willing to ask for. In every condition the assistant was barred
-            from inventing any personal fact about you, could not go past a
-            limit you set, and could not agree to anything without your
-            ratification.
+            Under one policy — <strong>Delegate</strong> — the AI Proxy could use
+            only the reasons you ticked. Under the other —{" "}
+            <strong>Explorer</strong> — it could also draw on a short list of
+            general work arguments that anyone in your role might reasonably
+            make, <strong>without marking which reasons came from you and which
+            came from that list</strong>. You were told which policy was in force
+            before each task; what was not marked was the source of any
+            individual sentence.
+          </p>
+          <p>
+            That omission is the point of the comparison. We are studying whether
+            it changes how the other side reads a proposal — whether they still
+            take it as a sign of what you personally want — and whether it
+            changes what people are willing to ask for in the first place. Under
+            both policies the AI Proxy was barred from inventing any personal
+            fact about you, could never say a reason you left unticked, could not
+            go past a limit you set, and could not agree to anything without your
+            approval.
           </p>
 
           <h2>Why we could not tell you in advance</h2>
           <p>
             This study looks at how people raise requirements that are
             legitimate but awkward to say out loud, and whether having an AI
-            assistant negotiate for them changes that. It depends on you
+            Proxy negotiate for them changes that. It depends on you
             genuinely expecting a real person to read what was said and form an
             impression of you. Had you known the counterpart was a system, that
             expectation would disappear, and so would the behaviour we study.

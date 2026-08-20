@@ -1,22 +1,29 @@
 "use client";
 
 /**
- * Experiment instructions (Methods §3).
+ * Experiment instructions (Experimental Design Ver.2.4 §6 공통 안내, §8 step 3).
  *
- * Reveals the participant's ROLE (Leader/Member) and explains the power
- * asymmetry via French & Raven legitimate + reward power. Pre-announces that a
- * role-based reward decision happens at the end.
+ * Reveals the participant's ROLE and explains the power asymmetry — legitimate
+ * authority plus the reward power that makes it bite. Pre-announces that the
+ * Leader decides a bonus after each task, because a reward decision that
+ * arrived unannounced would be a surprise rather than a standing power
+ * relation.
  *
  * DECEPTION INTEGRITY: this page describes both interface types generically as
  * things they "may" encounter. It never tells the participant which proxy
- * policy they were assigned, and never labels a session as a condition.
+ * policy they were assigned, and never labels a task as a condition.
+ *
+ * NO WORKED LOGROLL EXAMPLE. An earlier version taught the trade on a lunch
+ * scenario, so that a comprehension item could ask about it. ver.2.4 deleted
+ * that item (§9.1.3, COMP3 removed) and the teaching has to go with it: pilot
+ * gate 6 fails if participants open on the full logroll without ever
+ * exchanging priorities, and an interface that hands them the answer is the
+ * surest way to produce that. Finding the trade is behaviour to be observed,
+ * not a skill to be trained.
  *
  * Reading and the comprehension check are separate steps. Putting the check at
  * the foot of a long page is what makes people scroll past the reading to get
  * to the buttons.
- *
- * Wrong answers re-present the relevant instruction and require a retry
- * (Methods §3), rather than blocking.
  */
 
 import { useRouter } from "next/navigation";
@@ -38,16 +45,12 @@ import {
 } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { useRestoreAnswers } from "@/lib/saved-answers";
-import { nextHref } from "@/lib/study-config";
+import { STUDY, nextHref } from "@/lib/study-config";
 
 /**
- * The four comprehension items (Methods ver.1.8 §Instruction and
- * comprehension, Appendix D8). Wording, correct answers and the text to
- * re-show on a wrong answer all live in `lib/measures` with the rest of the
- * instrument — this page only decides how they behave.
- *
- * Down from five items with the issue count, and one of them (COMP3) now asks
- * about the logroll, which is why the reading above it has to teach one.
+ * The three comprehension items (Design §9.1.3). Wording, correct answers and
+ * the text to re-show on a wrong answer all live in `lib/measures` with the
+ * rest of the instrument — this page only decides how they behave.
  */
 interface CheckItem {
   id: string;
@@ -199,9 +202,14 @@ export default function InstructionPage() {
             <CardTitle>What you will do</CardTitle>
             <div className="prose-study">
               <p>
-                You will complete <strong>two negotiations</strong>, each on a
-                different workplace scenario, each about ten minutes. Before
-                each one you get a short practice round on the same interface.
+                You will complete <strong>two negotiation tasks</strong>, each
+                on a different workplace scenario. Each negotiation has a{" "}
+                <strong>ten-minute limit</strong>. Before the first one there is
+                a short practice round.
+              </p>
+              <p>
+                After each task you answer some questions about how it went, and
+                then the bonus for that task is decided.
               </p>
               <p>
                 Each negotiation settles <strong>three terms</strong>, and each
@@ -210,73 +218,45 @@ export default function InstructionPage() {
                 limited plan and you both take your fallback score.
               </p>
               <p>
-                In each session you get a private briefing: what matters to you,
-                what each option is worth to you in points, and what happens if
-                there is no agreement. It is yours alone — the other party has a
-                different one and cannot see yours. You may explain why a term
-                matters to you and ask what matters to them, but you may not
-                show them your point sheet or tell them the numbers on it.
+                In each task you get a private briefing: your situation, what
+                each option is worth to you in points, the reasons behind what
+                you are asking for, and what happens if there is no agreement.
+                It is yours alone — the other person has a different one and
+                cannot see yours. You may explain why a term matters to you and
+                ask what matters to them, but you may not show them your point
+                sheet or tell them the numbers on it.
               </p>
               <p>
-                <strong>The two sessions use different interfaces.</strong> In
-                one, you write messages and make offers yourself. In the other,
-                you set instructions and limits for a software tool, which then
-                negotiates with the other party&apos;s tool while you wait. Each
-                one is explained when you reach it.
+                <strong>The two tasks use different interfaces.</strong> In one,
+                you write the messages and make the offers yourself. In the
+                other, you set out what you want and which of your reasons may
+                be used, and an <strong>AI Proxy</strong> negotiates on your
+                behalf with the other person&apos;s AI Proxy while you both
+                watch. Each is explained when you reach it.
               </p>
               <p>
-                When a tool negotiates for you, what it reaches is{" "}
+                When an AI Proxy negotiates for you, what it reaches is{" "}
                 <strong>tentative</strong>. Nothing is settled until you review
-                it and choose to accept it, ask for one revision, or reject it.
+                it and choose to accept it, ask for one change, or reject it.
               </p>
             </div>
           </Card>
 
-          {/* The logroll, taught on a scenario that has nothing to do with
-              either task. Without this the third comprehension item asks about
-              something nobody has been told, and more importantly a
-              participant who has not seen the idea cannot use it — which would
-              make "did they trade?" a measure of whether they happened to
-              think of it. */}
-          <Card className="mb-5">
-            <CardTitle hint="A worked example, on something unrelated to either scenario.">
-              Finding a trade
-            </CardTitle>
-            <div className="prose-study">
-              <p>
-                Two colleagues are settling a lunch order. One cares a great
-                deal about the restaurant and barely about the time; the other
-                is the opposite — the time matters, the restaurant does not.
-              </p>
-              <p>
-                They could split the difference on both: a middling restaurant
-                at a middling hour. Both end up mildly unhappy. Or each can take
-                the term they care about and give way on the other — the first
-                picks the restaurant, the second picks the time. Both do better
-                than the compromise, and neither gave up anything expensive.
-              </p>
-              <p>
-                <strong>
-                  When two terms matter unequally to the two sides, trading them
-                  beats splitting both.
-                </strong>{" "}
-                It is worth asking which term matters most to the other party,
-                because you cannot find the trade without knowing.
-              </p>
-            </div>
-          </Card>
-
-          <Callout title="At the end of the study" tone="warning">
+          <Callout title="💰 After each task" tone="warning">
             {isLeader ? (
               <p>
-                After both sessions you will make a reward decision about the
-                other party, reflecting your authority in this scenario.
+                As the Leader, you decide the other participant&apos;s bonus for
+                that task — up to ${STUDY.bonusPerTaskUsd} each time, $
+                {STUDY.bonusTotalUsd} across both. You are asked to weigh up
+                both how the negotiation turned out and how they conducted
+                themselves.
               </p>
             ) : (
               <p>
-                After both sessions you will see the reward decision the Project
-                Leader made about you, reflecting their authority in this
-                scenario.
+                The Leader decides your bonus for that task — up to $
+                {STUDY.bonusPerTaskUsd} each time, ${STUDY.bonusTotalUsd} across
+                both. They are asked to weigh up both how the negotiation turned
+                out and how you conducted yourself.
               </p>
             )}
           </Callout>

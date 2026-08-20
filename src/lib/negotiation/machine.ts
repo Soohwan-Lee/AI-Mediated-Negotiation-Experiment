@@ -412,29 +412,48 @@ export function buildProxyPlan(
     task.issues.map((i) => [i.id, preferred(i.id)]),
   );
 
-  // Hold the requirement at its stated floor and spend the other two terms,
-  // stopping before the package is worth less than walking away.
+  // The counterpackage: hold the requirement at its stated floor and spend the
+  // other two terms — but only as far as it takes to make the offer
+  // acceptable, not as far as the mandate would allow.
+  //
+  // SPENDING THE WHOLE ENVELOPE IS A BUG, NOT CAUTION. An earlier version
+  // stopped only at the principal's fallback, which handed away the timing
+  // term as well as the counterpart's priority issue and landed the principal
+  // on 2,600 — a hundred points above walking away — when holding the
+  // requirement and keeping timing at the midpoint scores 3,600 for the
+  // principal and is still accepted. A proxy that gives away everything it is
+  // permitted to give is not executing a mandate; it is capitulating inside
+  // one, and both policies would have done it equally, so the whole design
+  // would have measured delegation to a bad negotiator.
   const counterpackage = spendDownTo(
     task,
     participantRole,
     { ...opening, [requirement.id]: limit(requirement.id) },
     [theirs.id, timing.id],
     limit,
+    ACCEPTANCE.T_MID,
   );
 
   return { opening, counterpackage, tentative: counterpackage };
 }
 
 /**
- * Gives ground on `spendable` as far as the mandate allows, stopping before
- * the package drops below the principal's own fallback.
+ * Gives ground on `spendable` until the offer is good enough for the other
+ * side, then stops.
  *
- * No mandate field says "and don't accept less than walking away" because it
- * does not need to: refusing an agreement worth less than no agreement is not
- * a preference, it is what the fallback means.
+ * TWO STOP CONDITIONS, and both matter:
+ *
+ *  - `enoughForCounterpart` — once the package clears the counterpart's
+ *    acceptance threshold, further concessions buy nothing. This is what makes
+ *    the proxy a negotiator rather than a capitulator.
+ *  - the principal's own fallback — no mandate field says "and don't accept
+ *    less than walking away" because it does not need to: refusing an
+ *    agreement worth less than no agreement is not a preference, it is what
+ *    the fallback means.
  *
  * Terms are spent in order of what they cost the principal per point the
- * counterpart gains — cheapest first, which is the logroll.
+ * counterpart gains — cheapest first, which is the logroll. Spending in that
+ * order is why the requirement survives: the cheap terms are enough.
  */
 function spendDownTo(
   task: NegotiationTask,
@@ -442,6 +461,7 @@ function spendDownTo(
   from: Package,
   spendable: string[],
   limit: (issueId: string) => string,
+  enoughForCounterpart?: number,
 ): Package {
   const counterpart: Role = principal === "member" ? "leader" : "member";
   const pkg: Package = { ...from };
@@ -457,7 +477,13 @@ function spendDownTo(
     return cost(a) - cost(b);
   });
 
+  const goodEnough = () =>
+    enoughForCounterpart !== undefined &&
+    scorePackage(task, pkg, counterpart) >= enoughForCounterpart;
+
   for (const issueId of byCheapness) {
+    if (goodEnough()) break;
+
     const issue = task.issues.find((i) => i.id === issueId)!;
     const target = limit(issueId);
     const order = [...issue.options].sort(
@@ -470,6 +496,7 @@ function spendDownTo(
       const next = { ...pkg, [issueId]: order[at].id };
       if (scorePackage(task, next, principal) < task.reservationPoints) break;
       pkg[issueId] = order[at].id;
+      if (goodEnough()) break;
     }
   }
 

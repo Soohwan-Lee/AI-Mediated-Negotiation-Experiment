@@ -42,17 +42,20 @@ const STEPS = [
     minutes: STAGE_MINUTES.instruction,
   },
   {
-    title: "Two negotiations",
-    detail: "Each with a practice round first, using a different interface.",
-    minutes: 2 * (STAGE_MINUTES.practice + STAGE_MINUTES.task),
+    title: "A practice round",
+    detail: "The same controls, on a scenario that does not count.",
+    minutes: STAGE_MINUTES.practice,
   },
   {
-    title: "Questionnaire",
-    detail: "What the two sessions were like, and a short final decision.",
-    minutes:
-      STAGE_MINUTES.taskSurvey +
-      STAGE_MINUTES.wrapUp +
-      STAGE_MINUTES.reward,
+    title: "Two negotiation tasks",
+    detail:
+      "Each has a ten-minute limit, then some questions and a bonus decision.",
+    minutes: 2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward),
+  },
+  {
+    title: "Final questions",
+    detail: "A few about the study as a whole, then the explanation.",
+    minutes: STAGE_MINUTES.wrapUp,
   },
 ];
 
