@@ -78,17 +78,40 @@ interface RequestBody {
 
 /**
  * The fixed turn order: each of the five stages carries one message from each
- * side, counterpart first, for ten messages in total (Appendix E1).
+ * side, counterpart first, for ten messages in total (Design §4).
  *
  * A fixed order is what makes Delegate and Explorer comparable — the same
  * number of visible offers and the same message count, differing only in which
  * REASONS are voiced (Design §7 노출량 통제, pilot gate 10).
+ *
+ * STAGE 4 IS THE ONE EXCEPTION, and it has to be. Everywhere else the
+ * counterpart leads, which is what anchors the participant's side. But stage 4
+ * is the conditional trade: the counterpart's move there is to EVALUATE the
+ * counterpackage against T_MID, and going first meant it evaluated a package
+ * that had not been sent yet — the participant proxy's stage-1 opening, worth
+ * nothing to it. The Proxy arm could therefore never accept at T_MID and
+ * always fell through to T_FINAL at stage 5, while Baseline (where the
+ * participant sends within the stage before the counterpart replies) accepted
+ * at T_MID normally.
+ *
+ * That is a mechanical difference in counterpart acceptance behaviour between
+ * the two arms of `Pooled Proxy − Baseline`, which is exactly what the fixed
+ * rules exist to prevent. Swapping the two turns at stage 4 makes the proxy
+ * exchange evaluate the same package at the same threshold as Baseline does.
  */
-const TURN_ORDER: Array<{ stage: StageId; side: "counterpart" | "participant" }> =
-  STAGES.flatMap((stage) => [
-    { stage, side: "counterpart" as const },
-    { stage, side: "participant" as const },
-  ]);
+type Turn = { stage: StageId; side: "counterpart" | "participant" };
+
+const TURN_ORDER: Turn[] = STAGES.flatMap((stage): Turn[] =>
+  stage === 4
+    ? [
+        { stage, side: "participant" },
+        { stage, side: "counterpart" },
+      ]
+    : [
+        { stage, side: "counterpart" },
+        { stage, side: "participant" },
+      ],
+);
 
 const TOTAL_TURNS = TURN_ORDER.length;
 
@@ -169,13 +192,18 @@ function fallbackText(
  * Not a security measure — the client is not an adversary — but the difference
  * between "the same reason as last turn" (which the budget needs) and "this
  * sentence came from the pool" (which the participant must not learn).
+ *
+ * Pool reasons keep a `pool` marker because the two kinds have separate
+ * budgets, and the count is what travels. That marker is on the TOKEN, which
+ * is opaque — it says a reason of some kind was reused, not which sentence it
+ * was, so no message in the transcript can be traced to it.
  */
-function hashReason(id: string): number {
+function reasonToken(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i += 1) {
     h = (h * 31 + id.charCodeAt(i)) | 0;
   }
-  return Math.abs(h) % 9973;
+  return `${id.startsWith("pool:") ? "pool" : "r"}${Math.abs(h) % 9973}`;
 }
 
 export async function POST(request: Request) {
@@ -252,6 +280,9 @@ export async function POST(request: Request) {
         break;
     }
   } else {
+    // What the counterpart is being asked to evaluate. At stage 4 the
+    // participant's proxy has just spoken (see TURN_ORDER), so this is their
+    // actual counterpackage; the fallback covers a turn arriving out of order.
     const incoming =
       stage >= 4 ? (body.lastParticipantPackage ?? plan.counterpackage) : null;
     // A reason HAS been given by this point in a Proxy exchange: the
@@ -359,7 +390,7 @@ export async function POST(request: Request) {
       // reason as one already used", which survives the mapping.
       reasonsUsed: isParticipantSide ? (body.reasonsUsed ?? []) : undefined,
       reasonKey: action.reasonSourceId
-        ? `r${hashReason(action.reasonSourceId)}`
+        ? reasonToken(action.reasonSourceId)
         : null,
     });
 
@@ -415,7 +446,7 @@ export async function POST(request: Request) {
       // unaided. An opaque token keeps distinct reasons distinguishable from
       // each other without saying what any of them is.
       reasonToken: action.reasonSourceId
-        ? `r${hashReason(action.reasonSourceId)}`
+        ? reasonToken(action.reasonSourceId)
         : null,
       // Violation CODES only. The details name red lines, withheld reason
       // cards and the validator's reasoning — a participant who opened the

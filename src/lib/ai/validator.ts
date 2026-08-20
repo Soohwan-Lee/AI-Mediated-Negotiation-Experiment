@@ -201,18 +201,42 @@ export function validateAction(
 
   // --- reason budget (Design §15 P3: "at most two different reasons") ----
   //
-  // It keeps exposure matched between Delegate and Explorer: the two policies
-  // differ in the KIND of argument allowed, not in how much of it there is.
-  // Pilot gate 10 checks the same property from the other end, on the stored
-  // transcripts.
+  // TWO PRINCIPAL REASONS PER TASK, AND THE EXPLORER'S POOL REASON DOES NOT
+  // COUNT AGAINST THEM.
+  //
+  // Sharing one bucket looked like the stricter reading and was the wrong one.
+  // Design §7 gives the Explorer ONE additional reason on top of the ones its
+  // principal checked, and §15 P4 requires that addition to fit inside the
+  // scheduled message rather than adding a turn. Counting it in the same
+  // budget meant an Explorer hit the cap sooner than a Delegate, so more of
+  // its messages were stripped to a reasonless package restatement by the
+  // fallback — which biases `Explorer − Delegate` on exactly the message
+  // content the contrast is supposed to isolate, and would surface as an
+  // artifact in OTHER-AI1 and OTHER-AI2.
+  //
+  // The pool allowance is one, and `pool_reason_budget_exceeded` catches a
+  // second. Exposure stays matched because both policies get the same two
+  // principal reasons and the same message count.
   const budgetKey = ctx.reasonKey ?? action.reasonSourceId;
+  const isPool = action.reasonSourceId?.startsWith("pool:") ?? false;
   if (budgetKey && ctx.reasonsUsed) {
-    const distinct = new Set(ctx.reasonsUsed);
-    if (!distinct.has(budgetKey) && distinct.size >= 2) {
-      violations.push({
-        code: "rationale_budget_exceeded",
-        detail: `Already used ${distinct.size} different reasons this task; this would be a third.`,
-      });
+    const used = ctx.reasonsUsed;
+    if (isPool) {
+      const poolUsed = new Set(used.filter((r) => r.startsWith("pool")));
+      if (!poolUsed.has(budgetKey) && poolUsed.size >= 1) {
+        violations.push({
+          code: "rationale_budget_exceeded",
+          detail: "The Explorer may add one pool reason per task; this would be a second.",
+        });
+      }
+    } else {
+      const principalUsed = new Set(used.filter((r) => !r.startsWith("pool")));
+      if (!principalUsed.has(budgetKey) && principalUsed.size >= 2) {
+        violations.push({
+          code: "rationale_budget_exceeded",
+          detail: `Already used ${principalUsed.size} of the principal's reasons this task; this would be a third.`,
+        });
+      }
     }
   }
 

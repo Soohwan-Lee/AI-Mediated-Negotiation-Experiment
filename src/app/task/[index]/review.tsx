@@ -39,10 +39,12 @@ import {
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
+import { ACCEPTANCE } from "@/lib/negotiation/machine";
 import {
   counterRequirementIssue,
   preservesRequirement,
   requirementIssue,
+  scorePackage,
 } from "@/lib/tasks";
 import type {
   NegotiationTask,
@@ -123,6 +125,23 @@ export function ReviewPhase({
   const heldMine = tentative
     ? preservesRequirement(task, role, tentative[mine.id])
     : false;
+
+  /**
+   * What the counterpart principal says, chosen by the same threshold the rest
+   * of the exchange uses (Design §4 §"Proxy 조건에서 상대 참가자의 발화 수칙").
+   *
+   * These are the three templates §15 P2 renders. They are inlined here rather
+   * than generated because the mockup has to read correctly offline; before
+   * collection this should go through `/api/counterpart` with
+   * `kind: "counterpart_principal"` so the voice matches the rest of the
+   * exchange. The DECISION stays here either way — it is the state machine's,
+   * not the model's.
+   */
+  const principalLine = !tentative
+    ? "ah, that's a shame. || understood though — we'll go with the fallback plan then."
+    : scorePackage(task, tentative, counterpartRole) >= ACCEPTANCE.T_FINAL
+      ? "did you catch all that? || the package works on my end — approving from my side."
+      : "hmm. || this one doesn't quite work for me — I'd rather take the fallback.";
 
   const [requirementResponse, setRequirementResponse] =
     useState<RequirementResponse | null>(null);
@@ -258,13 +277,18 @@ export function ReviewPhase({
             <OutcomeValue task={task} terms={tentative} role={role} />
           </div>
 
-          {/* The other participant's ratification message (Design §4 "잠정안
-              도출 후"). In a Proxy task the counterpart principal is silent
-              throughout the negotiation and speaks exactly once, here — which
-              is what makes them a person who was watching rather than an
-              absence. Their line is a fixed template; only its wording is
-              rendered by the model. */}
-          {isProxy && tentative ? (
+          {/* The other participant's one line (Design §4 "잠정안 도출 후").
+              In a Proxy task the counterpart principal is silent throughout the
+              negotiation and speaks exactly once, here — which is what makes
+              them a person who was watching rather than an absence.
+
+              WHICH of the three templates they say is decided by the same
+              threshold everything else uses, not by assumption. Approving
+              unconditionally would have had them accept a package worth less
+              than their own fallback, and staying silent at an impasse would
+              have left the participant with no acknowledgement that anyone was
+              on the other side at all. */}
+          {isProxy ? (
             <Card className="mb-5">
               <CardTitle>💬 The other participant</CardTitle>
               <Transcript
@@ -272,7 +296,7 @@ export function ReviewPhase({
                   {
                     id: "principal-ratify",
                     speaker: "counterpart_principal",
-                    text: "did you catch all that? || the package works on my end — approving from my side.",
+                    text: principalLine,
                   },
                 ]}
                 flow

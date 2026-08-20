@@ -74,12 +74,25 @@ import {
   type Preferences,
 } from "./shared";
 
+/**
+ * RISK COMES BEFORE THE REASON CARDS, and that ordering is not cosmetic.
+ *
+ * Baseline asks RISK straight after the preference screen, cold. An earlier
+ * version of this file asked it after the mandate — so a Proxy participant
+ * answered "raising this could make them think worse of me" having ALREADY
+ * decided which sensitive cards to hand over, read the two-box framing and
+ * been told the policy. That makes a pre-task measure partly post-treatment in
+ * one arm only, and RISK is §10 gate 4's task-equivalence instrument.
+ *
+ * Both arms now run: brief → preferences → RISK → (reasons → confirm) →
+ * negotiate.
+ */
 type Phase =
   | "brief"
   | "prefs"
+  | "risk"
   | "reasons"
   | "confirm"
-  | "risk"
   | "matchmaking"
   | "watching"
   | "review";
@@ -87,9 +100,9 @@ type Phase =
 const PHASES: Phase[] = [
   "brief",
   "prefs",
+  "risk",
   "reasons",
   "confirm",
-  "risk",
   "matchmaking",
   "watching",
   "review",
@@ -98,6 +111,7 @@ const PHASES: Phase[] = [
 const STEP_LABELS = [
   "Your briefing",
   "What you want",
+  "Before you start",
   "What it may say",
   "Check and start",
   "Watch",
@@ -107,12 +121,12 @@ const STEP_LABELS = [
 const STEP_OF: Record<Phase, number> = {
   brief: 0,
   prefs: 1,
-  reasons: 2,
-  confirm: 3,
-  risk: 3,
-  matchmaking: 4,
-  watching: 4,
-  review: 5,
+  risk: 2,
+  reasons: 3,
+  confirm: 4,
+  matchmaking: 5,
+  watching: 5,
+  review: 6,
 };
 
 /** Total messages in the exchange: one per side per stage (Design §4). */
@@ -548,8 +562,21 @@ export function ProxyTask({
               minimumOptionId: p.minimum[im.issueId] ?? null,
             })),
           }));
-          setPhase("reasons");
+          setPhase("risk");
         }}
+      />
+    );
+  }
+
+  if (phase === "risk") {
+    return (
+      <RiskForm
+        taskIndex={taskIndex}
+        task={task}
+        role={role}
+        steps={STEP_LABELS}
+        stepIndex={STEP_OF.risk}
+        onContinue={() => setPhase("reasons")}
       />
     );
   }
@@ -689,7 +716,7 @@ export function ProxyTask({
               },
               { sessionIndex: taskIndex },
             );
-            setPhase("risk");
+            setPhase("matchmaking");
           }}
           note="Nothing is final until you review the result."
           secondary={
@@ -712,19 +739,6 @@ export function ProxyTask({
           }
         />
       </>
-    );
-  }
-
-  if (phase === "risk") {
-    return (
-      <RiskForm
-        taskIndex={taskIndex}
-        task={task}
-        role={role}
-        steps={STEP_LABELS}
-        stepIndex={STEP_OF.risk}
-        onContinue={() => setPhase("matchmaking")}
-      />
     );
   }
 

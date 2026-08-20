@@ -328,7 +328,26 @@ export function counterpartStep(
         state.secondsRemaining !== undefined &&
         state.secondsRemaining <= SOFT_CLOSE_SECONDS;
 
-      if (score >= ACCEPTANCE.T_FINAL) {
+      // THE REASON REQUIREMENT REACHES THE CLOSING TEST TOO.
+      //
+      // It has to. Gating only stage 4 made the rule cosmetic: the counterpart
+      // would ask "why does that matter?", the participant could ignore it,
+      // and stage 5 accepted the same package anyway. A participant who never
+      // gave a reason reached exactly the same agreement as one who did — in
+      // both conditions — which is the disconnection Design §4 introduces this
+      // rule to prevent ("옵션·임계값만으로 합의가 만들어지면 이유를 쓰게 한
+      // 설계와 결과가 단절됨").
+      //
+      // What is withheld is the CONCESSION, not the agreement: if the package
+      // does not ask the counterpart to move on the unexplained requirement,
+      // it closes on the threshold alone. So a participant who never argues
+      // for their requirement can still reach a deal — just not one that hands
+      // it to them.
+      const unexplainedAsk =
+        !state.reasonGivenForRequirement &&
+        asksForRequirementConcession(task, participantRole, incoming, held);
+
+      if (score >= ACCEPTANCE.T_FINAL && !unexplainedAsk) {
         return {
           ...base,
           action: (softClose ? "soft_close" : "accept") as DecidedAction,
@@ -336,6 +355,26 @@ export function counterpartStep(
           accepts: true,
         };
       }
+
+      if (unexplainedAsk) {
+        // Close on the counterpart's own standing position instead. That is a
+        // real outcome with the requirement not preserved, not an impasse —
+        // the two are different codes and must not be collapsed.
+        const issue = requirementIssue(task, participantRole);
+        const withHeldRequirement = incoming
+          ? { ...incoming, [issue.id]: held[issue.id] }
+          : held;
+        const heldScore = scorePackage(task, withHeldRequirement, counterpartRole);
+        if (heldScore >= ACCEPTANCE.T_FINAL) {
+          return {
+            ...base,
+            action: "hold" as const,
+            proposal: withHeldRequirement,
+            accepts: true,
+          };
+        }
+      }
+
       return {
         ...base,
         action: "impasse" as const,
