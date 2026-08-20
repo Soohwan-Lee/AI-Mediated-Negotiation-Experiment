@@ -874,8 +874,13 @@ export function DirectNegotiation({
 
   useDevAutofill(() => {
     if (settled) return;
+    // Named, so the mockup shows a person defending a specific term rather
+    // than a generic pleasantry — which is the thing worth reading on this
+    // screen: does taking over from your own proxy sound natural?
     setDraft(
-      "Thanks for going through all that. I'd like to keep the level we landed on — it's the part I actually need. Happy to stay flexible on the rest.",
+      replies === 0
+        ? `Thanks for going through all that. || the ${requirement.label.toLowerCase()} is the part I really need to hold — that's the one that changes how the work actually goes for me. happy to stay flexible on the rest.`
+        : "that works for me. || glad we got there.",
     );
   }, `direct-t${taskIndex}-${replies}`);
 
