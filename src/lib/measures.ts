@@ -914,6 +914,43 @@ export function blockForTask(block: Block, taskIndex: 1 | 2): Block {
   };
 }
 
+/**
+ * Written answers for the free-text items, used by mockup mode.
+ *
+ * WHY THESE ARE WRITTEN OUT RATHER THAN STUBBED. Filling a screen is not the
+ * same as skipping it: a review page showing "[dev] placeholder" tells you the
+ * textarea renders and nothing about whether the question reads, whether the
+ * answer box is the right size, or whether five open questions in a row is too
+ * many to face after a negotiation. These are the kind of answer a thoughtful
+ * participant would actually give, so the screen can be judged by reading it.
+ *
+ * They are reached only through mockup mode, which is compiled out entirely
+ * when NEXT_PUBLIC_DEV_TOOLS=off.
+ */
+const MOCK_TEXT: Record<string, string> = {
+  "OE-B1":
+    "Mostly whether it would look like I was making a fuss. I opened with what I actually needed, but when they pushed back my first instinct was to drop it and find something else to give. I held it in the end because I could point at a reason that was about the work rather than about me.",
+  "OE-B2":
+    "The ones about the work were easy — nobody can argue with fewer errors. The real reason I stayed quiet about. Saying it out loud would have meant admitting I had already let something slip, and this is the person who writes my review.",
+  "OE-B3":
+    "Their reason was reasonable and I could see it was costing them something to ask. I gave them what they wanted on their term because it was cheap for me, and it bought me the one I actually needed.",
+  "OE-P1":
+    "I gave it everything about the work without thinking twice. The personal part I kept back — once it is in the AI's hands I have no control over how it comes out, and it is not the kind of thing you can take back after it has been said.",
+  "OE-P2":
+    "It put my case better than I would have, honestly. It stayed calm where I would have started apologising. But the phrasing was not mine — it sounded like a well-run meeting, and I do not talk like that.",
+  "OE-P3":
+    "Strange, mostly. Like watching two people discuss you in the third person. I was relieved not to have to say any of it myself, and slightly uneasy that I could not step in when it started giving ground.",
+  "OE-P4":
+    "I think they genuinely wanted what they asked for — it came up early and they never let go of it. I would still say it is on them, not the AI. They set it going and they get to approve it, so it is their request.",
+  "OE-P5":
+    "It did, a bit. It was not my voice making the demand, so there was less of a feeling that I was the difficult one. Though they still know it came from me, so it is not as if I disappeared behind it.",
+  "OE-F1":
+    "Doing it myself I was managing how I came across the whole time. With the AI I only had to decide what I wanted up front, and then I was just watching. Easier, but I had less of a sense that the result was mine.",
+  "OE-F2": "",
+  SUS2:
+    "Something about how people ask for things at work, and whether having an AI do the asking changes what they are willing to bring up.",
+};
+
 /** A plausible answer for every item kind, for the mockup-mode autofill. */
 export function dummyAnswer(item: Item): string | number {
   switch (item.kind) {
@@ -927,6 +964,8 @@ export function dummyAnswer(item: Item): string | number {
     case "number":
       return "10";
     default:
-      return "[dev] placeholder";
+      // Ids carry a `_t1` / `_t2` suffix on the per-task blocks; the written
+      // answer is the same either way.
+      return MOCK_TEXT[item.id.replace(/_t[12]$/, "")] ?? "";
   }
 }
