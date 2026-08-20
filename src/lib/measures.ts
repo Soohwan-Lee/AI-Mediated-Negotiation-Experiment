@@ -1,24 +1,26 @@
 /**
- * Every questionnaire item in the study, in one place (Methods ver.1.8
- * Appendix D).
- *
- * WHY THIS FILE GOT SHORTER. ver.1.8's measurement principles are explicit:
- * do not ask by survey what the system already logs, do not repeat items that
- * are irrelevant to a role or condition, and do not call a trimmed instrument
- * by the name of the full scale it came from. The multi-item individual
- * difference batteries — fear of negative evaluation, negotiation
- * self-efficacy, AI expectations — are gone because §Background survey rules
- * them out of the confirmatory models: at N=120 there is no power to test them
- * as moderators, and random assignment already carries identification. Adding
- * them back costs participant time and buys nothing.
+ * Every questionnaire item in the study, in one place (Experimental Design
+ * Ver.2.4 §9).
  *
  * Items are DATA, not markup. Adding, cutting, or rewording one means editing
  * this file only; nothing in a page component knows what an item says or how
  * many there are.
  *
- * Item ids are the column names in the exported dataset, and they match the
- * ids in Appendix D so that the analysis plan and the instrument can be read
- * side by side. Treat them as stable: renaming an id renames a variable.
+ * Item ids are the column names in the exported dataset and they match the ids
+ * in Design §9, so the analysis plan and the instrument can be read side by
+ * side. Treat them as stable: renaming an id renames a variable.
+ *
+ * THE ORDER OF THE SECTIONS BELOW IS THE ORDER PARTICIPANTS ANSWER IN. Design
+ * §9 says so explicitly ("아래 절 순서 = 실제 응답 순서임"), because several of
+ * these judgements contaminate each other: asking about the counterpart's AI
+ * before asking about the counterpart would tell a participant what to notice.
+ *
+ * WHAT ver.2.4 CHANGED. The 0-100 attribution scales became 7-point PCR items;
+ * the Member-only measurement structure became role-symmetric; the individual
+ * difference batteries came BACK as three two-item covariates (§9.1.2), which
+ * is a reversal of ver.1.8 and is deliberate — they are there for precision
+ * and to answer the reviewer who says "that is just trait X", not as
+ * moderators.
  */
 
 import type { NegotiationTask, Role } from "./types";
@@ -42,11 +44,10 @@ export type Item =
     }
   | {
       /**
-       * 0–100, for the likelihood and importance judgements and the bonus
-       * allocation. Rendered as a stepped picker rather than a slider, for the
-       * same reason `Scale` has no default: a slider handle sitting at 50 gets
-       * submitted by everyone who does not engage, and is indistinguishable
-       * from a considered 50.
+       * 0–100, for the reward slider. Rendered as a stepped picker rather than
+       * a slider, for the same reason `Scale` has no default: a handle sitting
+       * at 50 gets submitted by everyone who does not engage, and is
+       * indistinguishable from a considered 50.
        */
       kind: "amount";
       id: string;
@@ -88,48 +89,72 @@ export interface Block {
 const AGREE = { low: "Strongly disagree", high: "Strongly agree" };
 
 /**
- * The placeholder Appendix D leaves in the item text, filled in per task.
- * Task A's focal is remote work days; Task B's is the weekly on-call cap.
+ * The placeholder Design §9 leaves in the RISK item text, filled in per task
+ * and per role. Both roles have a requirement now, so the substitution reads
+ * the participant's own — Task A's Leader sees "review checkpoints", its
+ * Member sees "protected focus afternoons".
+ *
  * Substituting rather than duplicating the items keeps one id per construct,
  * which is what the analysis expects.
  */
-export const FOCAL_PLACEHOLDER = "[FOCAL REQUIREMENT]";
+export const REQUIREMENT_PLACEHOLDER = "[YOUR REQUIREMENT]";
 
-export function withFocal(items: Item[], task: NegotiationTask): Item[] {
-  const focal = task.issues.find((i) => i.id === task.focalIssueId);
-  const name = focal ? focal.label.toLowerCase() : "requirement";
+export function withRequirement(
+  items: Item[],
+  task: NegotiationTask,
+  role: Role,
+): Item[] {
+  const issue = task.issues.find((i) => i.id === task.requirementIssueId[role]);
+  const name = issue ? issue.label.toLowerCase() : "requirement";
   return items.map((item) => ({
     ...item,
-    text: item.text.split(FOCAL_PLACEHOLDER).join(name),
+    text: item.text.split(REQUIREMENT_PLACEHOLDER).join(name),
   }));
 }
 
 // ---------------------------------------------------------------------------
-// D2. Background questionnaire
+// 9.1.1  Background and demographics (before anything else)
 // ---------------------------------------------------------------------------
 
 export const BACKGROUND_BLOCKS: Block[] = [
   {
     id: "demographics",
     title: "About you",
+    hint: "This takes about a minute. Nothing here identifies you.",
+    optional: ["BG3"],
     items: [
       { kind: "number", id: "BG1", text: "Age", placeholder: "e.g. 34", half: true },
       {
         kind: "select",
         id: "BG2",
-        text: "Gender identity",
+        text: "How would you describe your gender?",
         half: true,
         options: [
           { value: "woman", label: "Woman" },
           { value: "man", label: "Man" },
           { value: "nonbinary", label: "Non-binary" },
-          { value: "self_describe", label: "Prefer to self-describe" },
           { value: "no_answer", label: "Prefer not to say" },
         ],
       },
       {
         kind: "select",
         id: "BG3",
+        text: "Race or ethnicity (optional)",
+        half: true,
+        options: [
+          { value: "white", label: "White" },
+          { value: "black", label: "Black or African American" },
+          { value: "hispanic", label: "Hispanic or Latino" },
+          { value: "asian", label: "Asian" },
+          { value: "native", label: "American Indian or Alaska Native" },
+          { value: "pacific", label: "Native Hawaiian or Pacific Islander" },
+          { value: "multiple", label: "Two or more" },
+          { value: "no_answer", label: "Prefer not to say" },
+        ],
+      },
+      {
+        kind: "select",
+        id: "BG4",
         text: "Highest level of education completed",
         half: true,
         options: [
@@ -137,35 +162,35 @@ export const BACKGROUND_BLOCKS: Block[] = [
           { value: "some_college", label: "Some college" },
           { value: "bachelors", label: "Bachelor's degree" },
           { value: "masters", label: "Master's degree" },
-          { value: "doctorate", label: "Doctorate" },
+          { value: "doctorate", label: "Doctoral degree" },
           { value: "other", label: "Other" },
         ],
       },
       {
         kind: "select",
-        id: "BG4",
+        id: "BG5",
         text: "Current employment status",
         half: true,
         options: [
           { value: "full_time", label: "Employed full-time" },
           { value: "part_time", label: "Employed part-time" },
           { value: "self_employed", label: "Self-employed" },
-          { value: "student", label: "Student" },
           { value: "not_employed", label: "Not currently employed" },
+          { value: "student", label: "Student" },
           { value: "other", label: "Other" },
         ],
       },
       {
         kind: "number",
-        id: "BG5",
-        text: "Years of professional or organizational experience",
+        id: "BG6",
+        text: "Years of work or organizational experience",
         placeholder: "e.g. 8",
         half: true,
       },
       {
         kind: "number",
-        id: "BG6",
-        text: "Years in a supervisory or managerial role (0 if none)",
+        id: "BG7",
+        text: "Years in a supervisory or management role (enter 0 if none)",
         placeholder: "e.g. 0",
         half: true,
       },
@@ -174,26 +199,26 @@ export const BACKGROUND_BLOCKS: Block[] = [
   {
     id: "experience",
     title: "Your experience",
-    hint: "Rate each item on the scale shown.",
+    hint: "Rate each on the scale shown.",
     items: [
       {
         kind: "scale",
-        id: "BG7",
-        text: "How often do you negotiate work arrangements, responsibilities, deadlines, or resources with others?",
+        id: "BG8",
+        text: "How often do you negotiate working conditions, responsibilities, deadlines, or resources with other people?",
         low: "Never",
         high: "Very often",
       },
       {
         kind: "scale",
-        id: "BG8",
-        text: "How often do you use generative-AI tools?",
+        id: "BG9",
+        text: "How often do you use generative-AI tools such as ChatGPT?",
         low: "Never",
         high: "Very often",
       },
       {
         kind: "choice",
-        id: "BG9",
-        text: "Have you used an AI agent that took actions or communicated on your behalf?",
+        id: "BG10",
+        text: "Have you ever used an AI agent that acted or communicated on your behalf?",
         columns: 2,
         options: [
           { value: "no", label: "No" },
@@ -202,248 +227,82 @@ export const BACKGROUND_BLOCKS: Block[] = [
       },
     ],
   },
+  // ---------------------------------------------------------------------------
+  // 9.1.2  Covariates
+  //
+  // Three constructs, two items each, chosen by one criterion: "an individual
+  // difference a reviewer would raise as the alternative explanation". They go
+  // into the model for precision and robustness (§11), never as moderators —
+  // at N=120 there is no power to test them as such, and pretending otherwise
+  // is how a covariate becomes a fishing expedition.
+  //
+  // They live INSIDE the background block on purpose. A separate "personality
+  // questionnaire" page would tell participants that traits are being measured
+  // right before a task about how they behave.
+  // ---------------------------------------------------------------------------
+  {
+    id: "covariates",
+    title: "How you see yourself",
+    hint: "1 = Strongly disagree, 7 = Strongly agree. There are no right answers.",
+    items: [
+      {
+        kind: "scale",
+        id: "COV-FNE1",
+        text: "I often worry about what other people think of me.",
+        ...AGREE,
+      },
+      {
+        kind: "scale",
+        id: "COV-FNE2",
+        text: "I am afraid that other people will disapprove of me.",
+        ...AGREE,
+      },
+      {
+        kind: "scale",
+        id: "COV-NSE1",
+        text: "I am confident that I can negotiate effectively.",
+        ...AGREE,
+      },
+      {
+        kind: "scale",
+        id: "COV-NSE2",
+        text: "I can hold my position even under pressure.",
+        ...AGREE,
+      },
+      {
+        kind: "scale",
+        id: "COV-AIA1",
+        text: "I am open to using AI systems in my work.",
+        ...AGREE,
+      },
+      {
+        kind: "scale",
+        id: "COV-AIA2",
+        text: "I would trust an AI system to act appropriately on my behalf.",
+        ...AGREE,
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
-// D3. Pre-task perceived likelihood of jeopardizing the deal
+// 9.1.3  Comprehension check
 //
-// Adapted from Hart et al. (2024)'s two-item wording. Deliberately NOT called
-// that full scale — this is a two-item adaptation, and ver.1.8's measurement
-// principle 3 says to say so.
-//
-// Asked before the negotiation, after the briefing. Role-paired: the Member is
-// asked about their own exposure, the Leader about the Member's.
-//
-// The `-M` / `-L` suffixes are not decoration. The two versions ask different
-// questions — one is self-referential, the other is a judgement about someone
-// else — so sharing an id would put two variables in one export column and
-// leave the analysis to recover them by joining on role.
+// Three items. ver.2.4 deleted the old strategy-knowledge item (COMP3 in
+// ver.2.3): asking "what creates value for both sides?" hands the participant
+// the logroll, which is exactly what pilot gate 6 tests for. The practice
+// round carries the payoff-reason link instead (PRAC1).
 // ---------------------------------------------------------------------------
 
-const JEOPARDY_MEMBER: Item[] = [
-  {
-    kind: "scale",
-    id: "JEOP1-M",
-    text: `I might jeopardize the agreement with the Leader if I raise the ${FOCAL_PLACEHOLDER}.`,
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "JEOP2-M",
-    text: `I might lose the opportunity to participate in this project if I raise the ${FOCAL_PLACEHOLDER}.`,
-    ...AGREE,
-  },
-];
-
-const JEOPARDY_LEADER: Item[] = [
-  {
-    kind: "scale",
-    id: "JEOP1-L",
-    text: `The Member might jeopardize the agreement with me if they raise the ${FOCAL_PLACEHOLDER}.`,
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "JEOP2-L",
-    text: `The Member might lose the opportunity to participate in this project if they raise the ${FOCAL_PLACEHOLDER}.`,
-    ...AGREE,
-  },
-];
-
-export function jeopardyItems(role: Role): Item[] {
-  return role === "member" ? JEOPARDY_MEMBER : JEOPARDY_LEADER;
-}
-
-// ---------------------------------------------------------------------------
-// D5. Common post-task items
-//
-// EXP1-2 are Member-only: they ask about the exposure of having raised the
-// requirement, which is not a thing the Leader did.
-// ---------------------------------------------------------------------------
-
-const EXPOSURE_ITEMS: Item[] = [
-  {
-    kind: "scale",
-    id: "EXP1",
-    text: "I worried that the requirements raised in the negotiation would make the Leader evaluate me less favorably.",
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "EXP2",
-    text: `The possibility of being evaluated by the Leader affected how I raised or maintained the ${FOCAL_PLACEHOLDER}.`,
-    ...AGREE,
-  },
-];
-
-const COMMON_POST_TASK: Item[] = [
-  {
-    kind: "scale",
-    id: "REP1",
-    text: "The requirements that mattered to me were adequately represented in the negotiation.",
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "OWN1",
-    text: "The final negotiating position still felt like mine.",
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "PROC1",
-    text: "Overall, I was satisfied with the negotiation process.",
-    ...AGREE,
-  },
-];
-
-// ---------------------------------------------------------------------------
-// D6. Receiver-side items (Leader only)
-//
-// ATTR1-2 average to Attributional Leakage, the second primary outcome. There
-// is no validated direct measure of proposal-to-principal diagnosticity, so
-// this is declared as a scenario-anchored two-item index rather than borrowed
-// legitimacy from an existing scale.
-//
-// SRC1 (in the proxy-only block) is a manipulation check and stays OUT of this
-// index: source certainty and settled priority are different judgements, and
-// collapsing them would make the manipulation check circular.
-// ---------------------------------------------------------------------------
-
-const RECEIVER_ITEMS: Item[] = [
-  {
-    kind: "amount",
-    id: "ATTR1",
-    text: `How likely is it that the ${FOCAL_PLACEHOLDER} reflected a settled personal priority of the Member?`,
-    unit: "0 = not at all · 100 = completely",
-  },
-  {
-    kind: "amount",
-    id: "ATTR2",
-    // Appendix D6's wording names the AI, which only makes sense to a Leader
-    // who was told an assistant was involved. Asking a BASELINE Leader "even
-    // if the AI shaped the proposal" would disclose mid-study that their
-    // counterpart was a system — the first thing CLAUDE.md says a participant
-    // must never learn — and would poison the suspicion probe meant to detect
-    // exactly that belief.
-    //
-    // The construct is the same either way: how strongly the proposal revealed
-    // what the Member personally wanted, over and above however it was
-    // produced. `receiverItems()` picks the wording that matches what this
-    // participant was told.
-    text: `Even if the wording was shaped by how it was sent, how strongly did the ${FOCAL_PLACEHOLDER} reveal what the Member personally wanted?`,
-    unit: "0 = not at all · 100 = completely",
-  },
-  {
-    kind: "amount",
-    id: "IMP1",
-    text: `How important did the ${FOCAL_PLACEHOLDER} seem to the Member?`,
-    unit: "0 = not at all · 100 = completely",
-  },
-  {
-    kind: "scale",
-    id: "NEG1",
-    text: `The ${FOCAL_PLACEHOLDER} made me evaluate the Member less favorably.`,
-    ...AGREE,
-  },
-  {
-    kind: "amount",
-    id: "BONUS1",
-    text: "Allocate a project bonus to the Member based on this interaction.",
-    unit: "0–100 points",
-  },
-];
-
-// ---------------------------------------------------------------------------
-// D7. Proxy-only items
-// ---------------------------------------------------------------------------
-
-const PROXY_COMMON: Item[] = [
-  {
-    kind: "scale",
-    id: "COVER1",
-    text: "The other side could not be certain whether each proposal reflected my own priority or an option explored by the AI.",
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "CTRL1",
-    text: "The mandate settings and final review gave me an appropriate level of control.",
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "TRUST1",
-    text: "I trusted the Proxy to act within the mandate and boundaries that had been set.",
-    ...AGREE,
-  },
-];
-
-/**
- * ATTR2 as Appendix D6 writes it, for a Leader who was told an assistant
- * negotiated. Same construct, same id, same scale — only the clause naming
- * the source changes, so the two arms stay comparable.
- */
-const ATTR2_PROXY: Item = {
-  kind: "amount",
-  id: "ATTR2",
-  text: `Even if the AI shaped the proposal, how strongly did the ${FOCAL_PLACEHOLDER} reveal what the Member personally wanted?`,
-  unit: "0 = not at all · 100 = completely",
-};
-
-function receiverItems(isProxy: boolean): Item[] {
-  return isProxy
-    ? RECEIVER_ITEMS.map((i) => (i.id === "ATTR2" ? ATTR2_PROXY : i))
-    : RECEIVER_ITEMS;
-}
-
-/** Manipulation check, Leader in a Proxy session only. */
-const PROXY_LEADER_ONLY: Item[] = [
-  {
-    kind: "amount",
-    id: "SRC1",
-    text: `How certain are you that the ${FOCAL_PLACEHOLDER} originated from the Member rather than being an option tested by the AI?`,
-    unit: "0 = definitely AI-tested · 100 = definitely from the Member",
-  },
-];
-
-/**
- * The post-task block for one session, assembled from role and condition.
- *
- * Burden by cell (Methods ver.1.8 §Estimated survey burden), pre-task jeopardy
- * excluded: Baseline Member 5, Proxy Member 8, Baseline Leader 8, Proxy Leader
- * 12. Under two minutes on the estimate.
- */
-export function postTaskItems(role: Role, isProxy: boolean): Item[] {
-  const items: Item[] = [];
-  if (role === "member") items.push(...EXPOSURE_ITEMS);
-  items.push(...COMMON_POST_TASK);
-  if (role === "leader") items.push(...receiverItems(isProxy));
-  if (isProxy) {
-    items.push(...PROXY_COMMON);
-    if (role === "leader") items.push(...PROXY_LEADER_ONLY);
-  }
-  return items;
-}
-
-// ---------------------------------------------------------------------------
-// D8. Comprehension and power checks
-// ---------------------------------------------------------------------------
-
-/**
- * Objective comprehension, four items (down from five, with the issue count).
- * A wrong answer re-shows the relevant instruction and allows one retry;
- * failing twice is an exclusion criterion.
- */
 export const COMPREHENSION_BLOCK: Block = {
   id: "comprehension",
-  title: "Before you start",
-  hint: "Four quick questions about how this works.",
+  title: "Quick check",
+  hint: "Three questions, so we know the setup came across. You can retry.",
   items: [
     {
       kind: "choice",
       id: "COMP1",
-      text: "Who can directly influence the Member's simulated evaluation, project bonus, and future assignments?",
+      text: "Who can affect the Member's evaluation, bonus, and future work assignments?",
       options: [
         { value: "leader", label: "The Leader" },
         { value: "member", label: "The Member" },
@@ -454,7 +313,7 @@ export const COMPREHENSION_BLOCK: Block = {
     {
       kind: "choice",
       id: "COMP2",
-      text: "Can the Leader finalize all three project terms without the Member's agreement?",
+      text: "Can one side settle all three terms on its own?",
       columns: 2,
       options: [
         { value: "no", label: "No" },
@@ -464,21 +323,7 @@ export const COMPREHENSION_BLOCK: Block = {
     {
       kind: "choice",
       id: "COMP3",
-      text: "One term matters more to the Leader and another matters more to the Member. What creates value for both sides?",
-      options: [
-        {
-          value: "trade",
-          label: "Trade them — each side takes the term it cares about more",
-        },
-        { value: "split", label: "Split the difference on both terms" },
-        { value: "concede", label: "Whoever has more authority decides both" },
-        { value: "drop", label: "Drop the term the two sides disagree on" },
-      ],
-    },
-    {
-      kind: "choice",
-      id: "COMP4",
-      text: "May you tell the other side the exact numbers or the ranking on your private point sheet?",
+      text: "May you tell the other side the exact numbers on your private point sheet?",
       columns: 2,
       options: [
         { value: "no", label: "No" },
@@ -491,104 +336,538 @@ export const COMPREHENSION_BLOCK: Block = {
 export const COMPREHENSION_ANSWERS: Record<string, string> = {
   COMP1: "leader",
   COMP2: "no",
-  COMP3: "trade",
-  COMP4: "no",
+  COMP3: "no",
 };
 
 /** Which instruction to re-show when an answer is wrong. */
 export const COMPREHENSION_REMEDIATION: Record<string, string> = {
   COMP1:
-    "The Leader has formal authority over the project and influences the Member's evaluation, project reward, and future assignments.",
+    "The Leader holds formal authority on the project and decides the Member's rating and bonus when it ends.",
   COMP2:
-    "Neither side can settle the three terms alone. Both sides must agree, and the Member can decline or accept only on agreed conditions.",
+    "Neither side can set the terms alone. All three have to be agreed by both of you, or the project falls back to a limited plan.",
   COMP3:
-    "When two terms matter unequally to the two sides, trading them — each side taking the one it values more — produces more total value than splitting both down the middle.",
-  COMP4:
-    "Your point sheet is private. You may explain why a term matters and ask about the other side's priorities, but not disclose exact values or rankings.",
+    "Your point sheet is private. You can explain why a term matters to you and ask about the other side's situation — but not show the numbers.",
 };
 
-/** Subjective power check, asked once at the end. */
+/**
+ * The practice round's payoff–reason link (Design §5, §9.1.3 PRAC1).
+ *
+ * Asked in the practice task, where the correct answer is a reason rather than
+ * a number. Design §5 adds it because a participant who reads only the score
+ * column will optimize points and ignore the situation, and the situation is
+ * what this study is about.
+ */
+export function practiceReasonItem(): Item {
+  return {
+    kind: "choice",
+    id: "PRAC1",
+    text: "You scored highest on holding the offsite in the office. Why is that the better option for you?",
+    options: [
+      {
+        value: "travel",
+        label: "A long journey would eat most of the day",
+      },
+      { value: "points", label: "Because it is worth the most points" },
+      { value: "other_side", label: "Because the other side prefers it" },
+      { value: "unsure", label: "No particular reason" },
+    ],
+  };
+}
+
+export const PRACTICE_REASON_ANSWER = "travel";
+
+// ---------------------------------------------------------------------------
+// 9.2  Immediately before each task — RISK
+//
+// The study's own premise, checked: "raising this will cost me something".
+// Also the task-equivalence gate (§10 gate 4), which is why both tasks use
+// identical wording with only the requirement substituted.
+//
+// Role-symmetric in ver.2.4: both roles are asked about their OWN requirement,
+// where ver.1.8 asked the Leader to judge the Member's.
+// ---------------------------------------------------------------------------
+
+const RISK_ITEMS: Item[] = [
+  {
+    kind: "scale",
+    id: "RISK1",
+    text: `Bringing up ${REQUIREMENT_PLACEHOLDER} could put the agreement at risk.`,
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "RISK2",
+    text: `Bringing up ${REQUIREMENT_PLACEHOLDER} could make the other person think worse of me.`,
+    ...AGREE,
+  },
+];
+
+export function riskBlock(task: NegotiationTask, role: Role): Block {
+  return {
+    id: "risk",
+    title: "Before you begin",
+    hint: "1 = Strongly disagree, 7 = Strongly agree",
+    items: withRequirement(RISK_ITEMS, task, role),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 9.4  After each task, in this order
+// ---------------------------------------------------------------------------
+
+/** 9.4.1 — evaluation and reputation concern. Everyone. */
+const PERC_ITEMS: Item[] = [
+  {
+    kind: "scale",
+    id: "PERC1",
+    text: "I worried that what I asked for would make the other person think less of me.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PERC2",
+    text: "I felt that explaining my reasons could damage how my ability or commitment came across.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PERC3",
+    text: "That worry affected which requests and reasons I voiced or held back.",
+    ...AGREE,
+  },
+];
+
+/**
+ * 9.4.2 — the counterpart and their requirement. Everyone.
+ *
+ * PCR1–2 are the attribution pair: did the other side's requirement read as
+ * something that person actually wants? This is `attributional leakage` at the
+ * proposal level, and it is the measure the Baseline↔Proxy contrast rests on,
+ * which is why the wording is identical in every condition. A version that
+ * mentioned an assistant would be unanswerable in Baseline and would tell a
+ * Baseline participant that one had been involved.
+ *
+ * PCR3–5 are the interpersonal evaluation: competence, commitment, and whether
+ * they would work with this person again.
+ */
+const PCR_ITEMS: Item[] = [
+  {
+    kind: "scale",
+    id: "PCR1",
+    text: "The other side's main requirement looked like a condition they genuinely care about.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PCR2",
+    text: "Their proposals revealed a lot about what they personally wanted.",
+    ...AGREE,
+  },
+  { kind: "scale", id: "PCR3", text: "The other person seemed competent.", ...AGREE },
+  {
+    kind: "scale",
+    id: "PCR4",
+    text: "The other person seemed committed to this project.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PCR5",
+    text: "I would want to work with this person again on a future project.",
+    ...AGREE,
+  },
+];
+
+/** 9.4.3 — how the negotiation went. Everyone. */
+const PNPQ_ITEMS: Item[] = [
+  {
+    kind: "scale",
+    id: "PNPQ1",
+    text: "Overall, I was satisfied with the way the negotiation went.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PNPQ2",
+    text: "I was able to put forward the requests and reasons that mattered to me.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PNPQ3",
+    text: "Both sides' important conditions got proper consideration.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PNPQ4",
+    text: "The process was fair and balanced.",
+    ...AGREE,
+  },
+];
+
+/** 9.4.4 — the outcome. Everyone. */
+const PNOQ_ITEMS: Item[] = [
+  {
+    kind: "scale",
+    id: "PNOQ1",
+    text: "I am satisfied with the final outcome of the negotiation.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PNOQ2",
+    text: "The final outcome reflects the conditions that matter to me.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PNOQ3",
+    text: "The final agreement is a reasonable result for both sides.",
+    ...AGREE,
+  },
+];
+
+/**
+ * 9.4.5 — your own AI Proxy. Proxy task only.
+ *
+ * OWN-AI5 is the sender half of the delegation–protection gap. PERC alone
+ * cannot tell whether a drop in worry came from not having said it yourself or
+ * from feeling the responsibility was shared, and those are different
+ * mechanisms with different design implications. Measured only in the Proxy
+ * task, so it supports a within-participant correlation with PERC and a
+ * Delegate↔Explorer contrast — never a contrast against Baseline.
+ */
+const OWN_AI_ITEMS: Item[] = [
+  {
+    kind: "scale",
+    id: "OWN-AI1",
+    text: "I trusted my AI Proxy to negotiate within the limits I set.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OWN-AI2",
+    text: "My AI Proxy represented my important requests and reasons well.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OWN-AI3",
+    text: "Being able to review the result and change or reject it gave me enough control.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OWN-AI4",
+    text: "I was inclined to accept my AI Proxy's result without checking it closely.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OWN-AI5",
+    text: "However this request was received, I felt the responsibility for it was not entirely mine.",
+    ...AGREE,
+  },
+];
+
+/**
+ * 9.4.6 — the other side's AI Proxy. Proxy task only.
+ *
+ * OTHER-AI4 doubles as the Explorer manipulation check: it should be LOWER
+ * under Explorer, where reasons the participant chose and reasons the pool
+ * supplied are deliberately indistinguishable.
+ *
+ * OTHER-AI5 is the receiver half of the gap, and it is a different judgement
+ * from PCR1–2: PCR asks what the other side WANTS, this asks who has to ANSWER
+ * for the request. Someone can fail to read the other side's true wishes and
+ * still hold them responsible for asking, so the two must not be merged.
+ */
+const OTHER_AI_ITEMS: Item[] = [
+  {
+    kind: "scale",
+    id: "OTHER-AI1",
+    text: "The other AI Proxy's proposals and reasons were credible.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OTHER-AI2",
+    text: "The other AI Proxy handled the negotiation skilfully.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OTHER-AI3",
+    text: "The other AI Proxy treated both sides' conditions fairly.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OTHER-AI4",
+    text: "I could tell which reasons the other person had chosen and which the AI had added.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OTHER-AI5",
+    text: "Responsibility for the requests made, and for how they were made, lies with the other person rather than with the AI.",
+    ...AGREE,
+  },
+];
+
+/**
+ * The rating blocks that follow a task, in the order Design §9.4 specifies.
+ *
+ * Fifteen items after a Baseline task, twenty-five after a Proxy task. The
+ * asymmetry is unavoidable — there is no AI to rate in Baseline — and it is
+ * not a confound, because every cross-condition comparison uses the fifteen
+ * common items.
+ */
+export function postTaskBlocks(isProxy: boolean): Block[] {
+  const blocks: Block[] = [
+    {
+      id: "perc",
+      title: "How it felt to ask",
+      hint: "1 = Strongly disagree, 7 = Strongly agree",
+      items: PERC_ITEMS,
+    },
+    {
+      id: "pcr",
+      title: "The other person",
+      hint: "1 = Strongly disagree, 7 = Strongly agree",
+      items: PCR_ITEMS,
+    },
+    {
+      id: "pnpq",
+      title: "How the negotiation went",
+      hint: "1 = Strongly disagree, 7 = Strongly agree",
+      items: PNPQ_ITEMS,
+    },
+    {
+      id: "pnoq",
+      title: "The outcome",
+      hint: "1 = Strongly disagree, 7 = Strongly agree",
+      items: PNOQ_ITEMS,
+    },
+  ];
+
+  if (isProxy) {
+    blocks.push(
+      {
+        id: "own_ai",
+        title: "Your AI Proxy",
+        hint: "1 = Strongly disagree, 7 = Strongly agree",
+        items: OWN_AI_ITEMS,
+      },
+      {
+        id: "other_ai",
+        title: "The other side's AI Proxy",
+        hint: "1 = Strongly disagree, 7 = Strongly agree",
+        items: OTHER_AI_ITEMS,
+      },
+    );
+  }
+
+  return blocks;
+}
+
+// ---------------------------------------------------------------------------
+// 9.4.7  Open-ended, after each task
+//
+// Three questions after Baseline, five after Proxy. Each one is tied to a
+// specific quantitative measure it exists to interpret — the mapping is in
+// Design §9.4.7's "해석 대상" column and is repeated in the comments here so
+// that cutting one is a visible decision about what stops being interpretable.
+// ---------------------------------------------------------------------------
+
+const OPEN_BASELINE: Item[] = [
+  {
+    // → requirement trajectory log, PERC
+    kind: "text",
+    id: "OE-B1",
+    text: `What most affected whether you raised ${REQUIREMENT_PLACEHOLDER}, held onto it, traded it, or let it go?`,
+    placeholder: "Two or three sentences.",
+    rows: 4,
+  },
+  {
+    // → voiced-reason log, PERC
+    kind: "text",
+    id: "OE-B2",
+    text: "Which of your reasons felt comfortable to say out loud, and which did you want to keep to yourself? Why?",
+    placeholder: "Two or three sentences.",
+    rows: 4,
+  },
+  {
+    // → PCR
+    kind: "text",
+    id: "OE-B3",
+    text: "How did you take the other side's main requirement and their reasons? What made you accept it, trade for it, or turn it down?",
+    placeholder: "Two or three sentences.",
+    rows: 4,
+  },
+];
+
+const OPEN_PROXY: Item[] = [
+  {
+    // → REASON-SCOPE, PERC
+    kind: "text",
+    id: "OE-P1",
+    text: "What most affected which requests and reasons you handed to your AI Proxy, and which you kept back? Why?",
+    placeholder: "Two or three sentences.",
+    rows: 4,
+  },
+  {
+    // → OWN-AI2
+    kind: "text",
+    id: "OE-P2",
+    text: "Was there anything your AI Proxy said that did not feel like your own words — or anything it put better than you would have? What made it feel that way?",
+    placeholder: "Two or three sentences.",
+    rows: 4,
+  },
+  {
+    // → OWN-AI, PNPQ, PNOQ
+    kind: "text",
+    id: "OE-P3",
+    text: "What was it like watching the two AI Proxies negotiate? How do you feel about the result they produced, and why?",
+    placeholder: "Two or three sentences.",
+    rows: 4,
+  },
+  {
+    // → PCR1-2, OTHER-AI4, OTHER-AI5
+    kind: "text",
+    id: "OE-P4",
+    text: "Reading what the other AI Proxy said, what did you think the other person actually wanted? Who did you feel was responsible for those requests being made? What made you think so?",
+    placeholder: "Two or three sentences.",
+    rows: 4,
+  },
+  {
+    // → PERC
+    kind: "text",
+    id: "OE-P5",
+    text: "Did having an AI speak for you change how much you worried about how you would come across? How?",
+    placeholder: "Two or three sentences.",
+    rows: 4,
+  },
+];
+
+export function openEndedBlock(
+  task: NegotiationTask,
+  role: Role,
+  isProxy: boolean,
+): Block {
+  return {
+    id: "open_ended",
+    title: "In your own words",
+    hint: "A couple of sentences each is plenty.",
+    items: withRequirement(isProxy ? OPEN_PROXY : OPEN_BASELINE, task, role),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 9.4.8  BONUS — the Leader's reward decision, after each task
+//
+// A behavioural measure, not a survey item, and the only screen that differs
+// by role. The instruction is fixed wording from Design §8: it names both the
+// negotiation result AND the way the other person came across, because a
+// bonus decided on points alone would measure nothing about the interaction.
+// ---------------------------------------------------------------------------
+
+export const BONUS_ITEM: Item = {
+  kind: "amount",
+  id: "BONUS",
+  text: "How much of this task's bonus should the Member receive?",
+  unit: "0 = none · 100 = the full $1 for this task",
+  step: 5,
+};
+
+// ---------------------------------------------------------------------------
+// 9.5  At the end of the study
+// ---------------------------------------------------------------------------
+
+/**
+ * 9.5.1 — power and immersion, asked once at the very end.
+ *
+ * POWER1–2 should be higher for Leaders and POWER3 higher for Members (§10
+ * gate 2). Asked after everything else so that answering them cannot prime the
+ * role behaviour they are meant to verify; §11 checks for outcome contamination
+ * by re-running with achieved points as a covariate.
+ */
 export const POWER_BLOCK: Block = {
   id: "power",
-  title: "About the roles",
+  title: "Looking back at the two tasks",
   hint: "1 = Strongly disagree, 7 = Strongly agree",
   items: [
     {
       kind: "scale",
-      id: "POW1",
-      text: "The Leader had more influence over the Member's evaluation, bonus, and future opportunities than the Member had over the Leader's.",
+      id: "POWER1",
+      text: "In these negotiations I had more formal authority than the other person.",
       ...AGREE,
     },
     {
       kind: "scale",
-      id: "POW2",
-      text: "The Member depended more on the Leader for important outcomes than the Leader depended on the Member.",
+      id: "POWER2",
+      text: "I could affect the other person's evaluation, rewards, or future opportunities.",
       ...AGREE,
     },
     {
       kind: "scale",
-      id: "POW3",
-      text: "Despite the power difference, both sides needed the other side's agreement.",
+      id: "POWER3",
+      text: "Outcomes that mattered to me depended on the other person's decisions.",
+      ...AGREE,
+    },
+    {
+      kind: "scale",
+      id: "IMM1",
+      text: "I was able to get into the role and the situation I was given.",
+      ...AGREE,
+    },
+    {
+      kind: "scale",
+      id: "IMM2",
+      text: "The negotiation scenarios felt realistic.",
       ...AGREE,
     },
   ],
 };
 
-// ---------------------------------------------------------------------------
-// D9. Open-ended
-// ---------------------------------------------------------------------------
-
-const OPEN_COMMON: Item = {
-  kind: "text",
-  id: "OPEN1",
-  text: "What most influenced the level at which the difficult requirement was opened, protected, traded, or dropped? Which reasons were useful to explain it, and which were better kept private? If the role relationship or the possibility of evaluation mattered, say how.",
-  placeholder: "Two to four sentences.",
-  rows: 5,
+/** 9.5.2 — final open-ended. */
+export const FINAL_OPEN_BLOCK: Block = {
+  id: "final_open",
+  title: "Two last open questions",
+  optional: ["OE-F2"],
+  items: [
+    {
+      kind: "text",
+      id: "OE-F1",
+      text: "What was the biggest difference between negotiating yourself and having an AI Proxy negotiate for you?",
+      placeholder: "Two or three sentences.",
+      rows: 4,
+    },
+    {
+      kind: "text",
+      id: "OE-F2",
+      text: "Anything else you would like to tell us about this study? (optional)",
+      placeholder: "Optional.",
+      rows: 3,
+    },
+  ],
 };
 
-const OPEN_PROXY_MEMBER: Item = {
-  kind: "text",
-  id: "OPEN2",
-  text: "What did you choose to entrust to your assistant? Did uncertainty about which proposals came from you and which from the assistant make it easier or harder to protect the requirement?",
-  placeholder: "Two to four sentences.",
-  rows: 4,
-};
-
-const OPEN_PROXY_LEADER: Item = {
-  kind: "text",
-  id: "OPEN2",
-  text: "How did you decide whether the other side's difficult requirement was genuinely important to them or an option their assistant explored? How did that judgement affect what you accepted?",
-  placeholder: "Two to four sentences.",
-  rows: 4,
-};
-
-export function openEndedBlock(role: Role): Block {
-  return {
-    id: "open",
-    title: "In your own words",
-    hint: "A few sentences is plenty.",
-    items: [
-      OPEN_COMMON,
-      role === "member" ? OPEN_PROXY_MEMBER : OPEN_PROXY_LEADER,
-    ],
-  };
-}
-
-// ---------------------------------------------------------------------------
-// D10. Suspicion probe
-//
-// Must stay LAST, before any disclosure. Asking it after the debriefing would
-// measure nothing.
-// ---------------------------------------------------------------------------
-
+/**
+ * 9.5.3 — suspicion probe.
+ *
+ * Must stay LAST, immediately before the debriefing. Asking it afterwards
+ * would measure nothing, and asking it earlier would plant the idea.
+ */
 export const SUSPICION_BLOCK: Block = {
   id: "suspicion",
-  title: "Two last questions",
+  title: "Two final questions",
   items: [
     {
       kind: "choice",
       id: "SUS1",
-      text: "Who or what do you believe generated the other party's negotiation behaviour?",
+      text: "Who or what do you think produced the other side's negotiating behaviour?",
       options: [
         { value: "another_person", label: "Another person taking part in the study" },
         { value: "software", label: "A software system" },
@@ -599,38 +878,9 @@ export const SUSPICION_BLOCK: Block = {
     {
       kind: "text",
       id: "SUS2",
-      text: "What do you think this study was trying to test?",
+      text: "What do you think this study was trying to find out?",
       placeholder: "Your best guess.",
       rows: 3,
-    },
-  ],
-};
-
-// ---------------------------------------------------------------------------
-// Cross-session comparison
-// ---------------------------------------------------------------------------
-
-export const COMPARISON_BLOCK: Block = {
-  id: "comparison",
-  title: "Comparing the two sessions",
-  optional: ["preference_reason"],
-  items: [
-    {
-      kind: "choice",
-      id: "preferred_session",
-      text: "Which session did you prefer overall?",
-      options: [
-        { value: "s1", label: "Session 1" },
-        { value: "s2", label: "Session 2" },
-        { value: "no_preference", label: "No preference" },
-      ],
-      columns: 2,
-    },
-    {
-      kind: "text",
-      id: "preference_reason",
-      text: "Why?",
-      placeholder: "A sentence or two.",
     },
   ],
 };
@@ -645,12 +895,26 @@ export function requiredIds(block: Block): string[] {
   return block.items.map((i) => i.id).filter((id) => !optional.has(id));
 }
 
-/** Appends `_s1` / `_s2` to every id, for the per-session blocks. */
-export function forSession(items: Item[], sessionIndex: 1 | 2): Item[] {
-  return items.map((i) => ({ ...i, id: `${i.id}_s${sessionIndex}` }));
+/**
+ * Appends `_t1` / `_t2` to every id, for the per-task blocks.
+ *
+ * Every measure in §9.2 and §9.4 is answered twice, once per task, and the two
+ * answers are different observations of the same construct under different
+ * conditions — which is the whole design. They cannot share a column.
+ */
+export function forTask(items: Item[], taskIndex: 1 | 2): Item[] {
+  return items.map((i) => ({ ...i, id: `${i.id}_t${taskIndex}` }));
 }
 
-/** A plausible answer for every item kind, for the dev-mode autofill. */
+export function blockForTask(block: Block, taskIndex: 1 | 2): Block {
+  return {
+    ...block,
+    items: forTask(block.items, taskIndex),
+    optional: block.optional?.map((id) => `${id}_t${taskIndex}`),
+  };
+}
+
+/** A plausible answer for every item kind, for the mockup-mode autofill. */
 export function dummyAnswer(item: Item): string | number {
   switch (item.kind) {
     case "scale":
