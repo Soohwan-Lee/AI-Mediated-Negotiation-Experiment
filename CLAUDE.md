@@ -61,11 +61,21 @@ outcomes: identical behaviour already produces identical results.
 
 Both conditions run the same **five stages** — opening, priorities and reasons,
 the standardized challenge, a conditional trade, the tentative package — one
-message per side each, ten in total, **counterpart first at every stage**. That
-shared structure is what makes a Baseline transcript and a Proxy transcript
-comparable, so a task may not skip stages or end early, and the counterpart's
-fixed opening must be on screen before the participant writes anything: it is
-the anchor their reply is measured against.
+message per side each, ten in total, **counterpart first at every stage except
+stage 4**. That shared structure is what makes a Baseline transcript and a
+Proxy transcript comparable, so a task may not skip stages or end early, and
+the counterpart's fixed opening must be on screen before the participant writes
+anything: it is the anchor their reply is measured against.
+
+**Stage 4 inverts, and it has to.** Everywhere else the counterpart leads,
+which is what anchors the participant's side. But stage 4 is the conditional
+trade, and the counterpart's move there is to *evaluate* against T_MID rather
+than to lead. With the counterpart going first it evaluated a package that had
+not been sent yet — the proxy's stage-1 opening, worth nothing to it — so the
+Proxy arm could never accept at T_MID and always fell through to T_FINAL while
+Baseline accepted at T_MID normally. That is a mechanical difference in
+counterpart behaviour between the two arms of `Pooled Proxy − Baseline`, which
+is exactly what fixed rules exist to prevent.
 
 **Both sides challenge at stage 3**, each naming the *other* role's
 requirement. `standardizedChallenge` is therefore keyed by the role being
@@ -85,6 +95,24 @@ ticked cards; in Baseline it is the reason a participant attaches to a message
 via `ReasonPicker`. That control may never suggest attaching one helps, may
 never default to a card, and may never treat the sensitive cards as the better
 answer.
+
+**The rule has to reach stage 5, not only stage 4.** Gating only the trade made
+it cosmetic: the counterpart asked "why does that matter?", the participant
+could ignore it, and the closing test accepted the same package anyway — so a
+participant who never argued for their requirement got the identical agreement
+as one who did, in both conditions. What is withheld is the **concession, not
+the agreement**: an unexplained requirement is held where the counterpart
+stands, so a deal is still reachable, just not one that hands the requirement
+over. Across all four cells, giving a reason preserves the requirement (3,200)
+and never giving one loses it (1,200).
+
+**The Explorer's pool reason has its own budget.** Two principal reasons per
+task either way, plus one pool reason for the Explorer. Sharing one bucket
+looked stricter and was wrong: only the Explorer is instructed to add on top of
+its principal's reasons, so it hit the cap sooner and more of its messages were
+stripped to a reasonless package restatement by the guardrail fallback — which
+biases `Explorer − Delegate` on exactly the message content the contrast is
+meant to isolate.
 
 ## Things the participant must never learn mid-study
 
@@ -146,8 +174,16 @@ specific negotiation, so asking it after a second, differently conditioned
 negotiation would blend the two conditions inside a single answer. Item ids
 carry a `_t1` / `_t2` suffix for the same reason.
 
-Inside a task: brief → preferences (→ reason cards → confirm, in Proxy) → RISK
-→ "waiting for the other participant" → negotiate or watch → review.
+Inside a task: brief → preferences → **RISK** → (reason cards → confirm, in
+Proxy) → "waiting for the other participant" → negotiate or watch → review.
+
+**RISK sits in the same place in both arms, and that position is load-bearing.**
+It asks what the participant *expects* raising their requirement to cost. Asked
+after the mandate — as an earlier version did in Proxy only — they answer it
+having already decided which sensitive cards to hand over and read the policy
+disclosure, which makes a pre-task measure partly post-treatment in one arm.
+RISK is also §10 gate 4's task-equivalence instrument, so it cannot carry a
+condition effect.
 
 ## Interface rules
 
@@ -325,10 +361,12 @@ Nothing structural. What remains is values to fix and behaviour to exercise:
   emergency stop, the reason-request branch and the one revision all work when
   driven by hand, but mockup mode carries only the ideal trajectories, so a
   regression in any of them would be quiet. Worth a test before collection.
-- **The counterpart principal's ratification line is hardcoded** in
-  `review.tsx` rather than rendered through P2. Fine for the mockup; it should
-  go through `/api/counterpart` with `kind: "counterpart_principal"` before
-  collection, so its voice matches the rest of the exchange.
+- **The counterpart principal's three templates are inlined** in `review.tsx`
+  rather than rendered through P2. The *decision* between them is the state
+  machine's and is correct — ratify above T_FINAL, reject below, fallback on no
+  agreement — but the wording should go through `/api/counterpart` with
+  `kind: "counterpart_principal"` before collection so its voice matches the
+  rest of the exchange.
 - Fixed vs. jittered counterpart delay · final IRB language · English
   translation of the item wording (Design §12 lists the items as Korean
   drafts; the implementation is already English and needs checking against the
