@@ -106,7 +106,7 @@ create table events (
   participant_key  text not null references participants,
   type             text not null,
   page             text,
-  session_index    smallint,
+  task_index    smallint,
   payload          jsonb,
   client_timestamp timestamptz,
   server_timestamp timestamptz not null default now()
@@ -120,19 +120,32 @@ tamper-resistant record.
 
 ### `responses`
 
-One row per block per participant. Blocks: `background`, `survey`,
-`manipulation_check`, `reward_decision`, `debriefing`, `instruction_check`,
-`private_target_s{1,2}`, `post_task_s{1,2}`, `session_outcome_s{1,2}`.
+One row per block per participant. Blocks: `background`, `instruction_check`,
+`practice`, `preferences_t{1,2}`, `risk_t{1,2}`, `post_task_t{1,2}`,
+`task_outcome_t{1,2}`, `reward_t{1,2}`, `wrap_up`, `debriefing`.
 
-`private_target_s{n}` holds the focal level the participant privately judged
-sufficient plus the two pre-task jeopardy items, and it is written before the
-session's condition is visible — the first point on the trajectory in Methods
-ver.1.8 §Primary outcome 1.
+**Everything measured about a negotiation is scoped `_t1` / `_t2`.** The same
+construct measured after two differently conditioned tasks is two observations,
+not one, and the within-participant contrast is the whole design — they cannot
+share a column.
 
-`session_outcome_s{n}` carries the ratification choice, the Leader's
-structured focal response (Requirement Uptake), and the coded focal level of
-the final package. The last two are stored separately on purpose: a package
-that broke the threshold and was then rejected is still coded as preserved.
+`preferences_t{n}` holds what the participant wanted and the least they would
+take on all three terms, written before anything about the task's condition is
+visible. It is the first point on the trajectory (Design §9.3.1).
+
+`risk_t{n}` holds the two RISK items, asked immediately before the negotiation
+because they ask what the participant EXPECTS raising their requirement to
+cost.
+
+`task_outcome_t{n}` carries the ratification choice, the participant's
+structured response to the OTHER side's requirement, and the coded level of
+both requirements in the final package. The response and the preservation code
+are stored separately on purpose: a package that broke a threshold and was then
+rejected is still coded as preserved.
+
+`reward_t{n}` stores the Leader's `BONUS` slider value, or — for a Member — the
+fixed value they were shown. Only the Leader's is data; the Member's is a
+stimulus, recorded so the export can show what they were told.
 
 ```sql
 create table responses (
@@ -148,26 +161,29 @@ create table responses (
 
 ```sql
 create table mandates (
-  participant_key    text not null references participants,
-  session_index      smallint not null,
-  -- IssueMandate[]: per term, { preferred, acceptable_floor, hard_boundary }
-  issues             jsonb not null,
-  -- { reason_card_id: 'sayable' | 'private' } — the disclosure measure
-  reason_permissions jsonb not null,
-  conditional_trade  boolean not null default true,
-  revision_count     integer not null default 0,
-  created_at         timestamptz not null default now(),
-  primary key (participant_key, session_index)
+  participant_key       text not null references participants,
+  task_index            smallint not null,
+  -- IssueMandate[]: per term, { preferred, minimum }
+  issues                jsonb not null,
+  -- Reason card ids the AI Proxy may say. Unchecked cards may inform which
+  -- package it chooses and must never appear in its text (Design §7).
+  authorized_reason_ids jsonb not null,
+  revision_count        integer not null default 0,
+  created_at            timestamptz not null default now(),
+  primary key (participant_key, task_index)
 );
 ```
 
-Two behavioural codes come straight out of this table. `MANDATE` is whether
-the hard boundary on the focal term preserves the participant's private
-target; the disclosure measure is which reason cards they marked sayable. Both
-are participant choices, not failures — a participant who entrusted no
-boundary has `MANDATE = 0`, which is data (Methods ver.1.8 §Missingness).
+`REASON-SCOPE` (Design §9.3.1) comes straight out of `authorized_reason_ids`,
+and it is reported as its parts, never as one number: how many cards, whether
+any sensitive one, and how far into the situation they went (`incident` →
+`undisclosed` → `worry`). "Checked four cards" means something entirely
+different depending on which four.
 
-Store each revision as a separate `events` row so mandate revision behavior is
+Ticking no sensitive card is a participant choice, not a failure — it is the
+specified default and it is the measure.
+
+Store each revision as a separate `events` row so mandate revision behaviour is
 recoverable.
 
 ### `messages`
@@ -176,44 +192,55 @@ recoverable.
 create table messages (
   id                  bigserial primary key,
   participant_key     text not null references participants,
-  session_index       smallint not null,
+  task_index          smallint not null,
   turn_index          integer not null,
-  stage               smallint,       -- 1..5, the controlled interaction stage
+  stage               smallint,       -- 1..5, the fixed progression stage
   speaker             text not null,
   text                text not null,
   proposal            jsonb,          -- the package on the table, if any
-  rationale_frame     text,           -- Appendix B4; 'common_practice' = Explorer only
-  reason_source_id    text,           -- which reason card the rationale used
+  reason_card_id      text,           -- which reason this message voiced
+  decided_action      text,           -- what the state machine chose this turn
   structured_action   jsonb,          -- NegotiationAction
-  internal_provenance text,           -- 'principal_mandate' | 'agent_option'
+  internal_provenance text,           -- 'principal_reason' | 'pool_reason'
   validator_result    jsonb,
   created_at          timestamptz not null default now()
 );
 
-create index on messages (participant_key, session_index, turn_index);
+create index on messages (participant_key, task_index, turn_index);
 ```
 
-`internal_provenance`, `structured_action`, `rationale_frame` and
-`reason_source_id` are audit fields. Never select them into a
-participant-facing response — the Explorer condition is defined by the
-participant being unable to tell an explored option from an authorized one, so
-a leak here is not a privacy bug but a destroyed manipulation.
+`internal_provenance`, `structured_action` and `decided_action` are audit
+fields. Never select them into a participant-facing response — the Explorer
+condition is defined by the participant being unable to tell a pool reason from
+one of their own, and OTHER-AI4 asks them to try, so a leak here is not a
+privacy bug but a destroyed manipulation.
 
-`stage` and `proposal` are what make the trajectory recoverable: the focal
-level at stage 1 is opening advocacy, at stage 4 is retention after the
-standardized challenge, and at stage 5 is the final package.
+`decided_action` beside `text` is what pilot gate 9 reads: the pair shows the
+model said what the state machine decided and nothing else.
+
+`reason_card_id` is not decoration. The reason-linked acceptance rule (Design
+§4) needs a deterministic answer to "has a reason been given for this
+requirement", and it is decided from this column rather than by asking a model
+to grade an argument. In Baseline it is what the participant attached to the
+message; in Proxy it is the card the proxy voiced.
+
+`stage` and `proposal` are what make the trajectory recoverable: the
+requirement level at stage 1 is opening advocacy, at stage 4 is retention after
+the standardized challenge, and at stage 5 is the final package. A Proxy task
+has no participant messages at all, so without this the trajectory would jump
+from what was entrusted straight to the final package and the two middle
+transitions would not exist for half the design.
 
 ### `guardrail_events`
 
-Every validator block and regeneration (Methods §Guardrail and validation).
-Needed for the fidelity measures — notably false personal-fact fabrication,
-whose target value is 0.
+Every validator block and regeneration. Needed for pilot gate 9 (rationale
+audit): zero packages, reasons or personal facts outside the rules.
 
 ```sql
 create table guardrail_events (
   id              bigserial primary key,
   participant_key text not null references participants,
-  session_index   smallint not null,
+  task_index   smallint not null,
   turn_index      integer,
   violation_code  text not null,
   detail          text,
@@ -227,14 +254,14 @@ create table guardrail_events (
 ```sql
 create table agreements (
   participant_key      text not null references participants,
-  session_index        smallint not null,
+  task_index        smallint not null,
   terms                jsonb not null,   -- AgreementTerm[]
   unresolved_issue_ids text[] not null default '{}',
   ratification_choice  text,             -- ratify | request_revision | reject
   edited_terms         jsonb,
   revision_note        text,
   decided_at           timestamptz,
-  primary key (participant_key, session_index)
+  primary key (participant_key, task_index)
 );
 ```
 
