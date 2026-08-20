@@ -365,6 +365,14 @@ Tested end to end against `gpt-5.6-sol` (2026-08-11). Findings worth keeping:
   invalid options all block. Two checks are specific to ver.2.4: an unchecked
   reason card may not be voiced under *either* policy, and a `pool:`-prefixed
   reason is Explorer-only.
+- **The validator fires on live wording in ordinary runs**, usually
+  `stage_mismatch` — the model claiming a stage other than the one it was
+  given. The fallback absorbs it correctly: the sentence is replaced, the state
+  machine's package survives, and the message count stays at ten. But it means
+  the plain fallback text ("On my principal's behalf: …") will appear in real
+  transcripts at some rate, so it is worth reading a sample from the pilot
+  rather than assuming every message is model prose. If the rate is high, the
+  fix is the prompt's stage block, not the validator.
 
 ## Still open
 
