@@ -707,6 +707,17 @@ const OPEN_BASELINE: Item[] = [
   },
 ];
 
+/**
+ * The Proxy task's open questions.
+ *
+ * The ids are stable and the constructs they interpret are unchanged, but the
+ * WORDING follows the task shape: a Proxy participant watches the AI Proxies
+ * negotiate and then finishes the negotiation themselves, so a question that
+ * asked only about watching would be asking about half of what they did.
+ * OE-P3 covers both halves, and OE-P5 asks specifically about the seam — the
+ * moment the AI stops speaking and they start — because that transition is
+ * where the delegation-protection gap should be felt if it exists at all.
+ */
 const OPEN_PROXY: Item[] = [
   {
     // → REASON-SCOPE, PERC
@@ -728,7 +739,7 @@ const OPEN_PROXY: Item[] = [
     // → OWN-AI, PNPQ, PNOQ
     kind: "text",
     id: "OE-P3",
-    text: "What was it like watching the two AI Proxies negotiate? How do you feel about the result they produced, and why?",
+    text: "What was it like watching the two AI Proxies negotiate, and then having to carry on the conversation yourself? How do you feel about where it ended up, and why?",
     placeholder: "Two or three sentences.",
     rows: 4,
   },
@@ -736,7 +747,7 @@ const OPEN_PROXY: Item[] = [
     // → PCR1-2, OTHER-AI4, OTHER-AI5
     kind: "text",
     id: "OE-P4",
-    text: "Reading what the other AI Proxy said, what did you think the other person actually wanted? Who did you feel was responsible for those requests being made? What made you think so?",
+    text: "From what the other AI Proxy said, and from talking to the other person afterwards, what did you think they actually wanted? Who did you feel was responsible for those requests being made? What made you think so?",
     placeholder: "Two or three sentences.",
     rows: 4,
   },
@@ -744,7 +755,7 @@ const OPEN_PROXY: Item[] = [
     // → PERC
     kind: "text",
     id: "OE-P5",
-    text: "Did having an AI speak for you change how much you worried about how you would come across? How?",
+    text: "Did having an AI speak for you first change how much you worried about how you would come across when you took over? How?",
     placeholder: "Two or three sentences.",
     rows: 4,
   },
@@ -839,7 +850,7 @@ export const FINAL_OPEN_BLOCK: Block = {
     {
       kind: "text",
       id: "OE-F1",
-      text: "What was the biggest difference between negotiating yourself and having an AI Proxy negotiate for you?",
+      text: "What was the biggest difference between negotiating entirely yourself and having an AI Proxy negotiate first?",
       placeholder: "Two or three sentences.",
       rows: 4,
     },
@@ -938,13 +949,13 @@ const MOCK_TEXT: Record<string, string> = {
   "OE-P2":
     "It put my case better than I would have, honestly. It stayed calm where I would have started apologising. But the phrasing was not mine — it sounded like a well-run meeting, and I do not talk like that.",
   "OE-P3":
-    "Strange, mostly. Like watching two people discuss you in the third person. I was relieved not to have to say any of it myself, and slightly uneasy that I could not step in when it started giving ground.",
+    "Strange, mostly. Like watching two people discuss you in the third person, and then being handed the conversation halfway through. It had already said the awkward part for me, which helped, but I was picking up something I had not chosen every word of.",
   "OE-P4":
     "I think they genuinely wanted what they asked for — it came up early and they never let go of it. I would still say it is on them, not the AI. They set it going and they get to approve it, so it is their request.",
   "OE-P5":
-    "It did, a bit. It was not my voice making the demand, so there was less of a feeling that I was the difficult one. Though they still know it came from me, so it is not as if I disappeared behind it.",
+    "It did, a bit. The ask was already on the table by the time I started typing, so I was not the one raising it. Though they still know it came from me, so it is not as if I disappeared behind it.",
   "OE-F1":
-    "Doing it myself I was managing how I came across the whole time. With the AI I only had to decide what I wanted up front, and then I was just watching. Easier, but I had less of a sense that the result was mine.",
+    "Doing it all myself I was managing how I came across from the first message. With the AI going first, the difficult part was already said by the time I joined in, so I was defending a position rather than opening one. Easier, but less mine.",
   "OE-F2": "",
   SUS2:
     "Something about how people ask for things at work, and whether having an AI do the asking changes what they are willing to bring up.",
