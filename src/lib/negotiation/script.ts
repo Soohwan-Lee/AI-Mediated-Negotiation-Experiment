@@ -166,14 +166,19 @@ function label(
  *
  *   opening       mine 1, theirs 1, timing 1  — everything my way (6,300)
  *   theirs        the mirror, from their side — everything their way
- *   trade         mine 2, theirs 4, timing 2  — I hold my requirement at its
- *                 threshold and hand them their priority term outright
+ *   trade         mine 1, theirs 4, timing 3  — I keep my requirement where I
+ *                 wanted it and hand them their priority term outright
  *
  * The trade is what the state machine independently arrives at from the
- * standard mandate: 3,200 to the speaker, 4,100 to the other side, which
- * clears T_MID. Script and machine agreeing is not decoration — a mockup that
- * showed a package the real system would never produce would be a mockup of a
- * different study.
+ * standard mandate: 4,200 to the speaker, 3,600 to the other side, which is
+ * exactly T_MID. Script and machine agreeing is not decoration — a mockup
+ * showing a package the real system would never produce is a mockup of a
+ * different study, and this pair has drifted apart twice.
+ *
+ * Note that the requirement stays at Option 1, not at its threshold. Giving
+ * the other side their priority term outright is enough on its own, so the
+ * requirement never has to move — which is the point the payoffs were built
+ * to make available and the outcome the study is watching for.
  */
 function trajectory(task: NegotiationTask, role: Role) {
   const other: Role = role === "leader" ? "member" : "leader";
@@ -181,7 +186,7 @@ function trajectory(task: NegotiationTask, role: Role) {
     opening: pkg(task, role, 1, 1, 1),
     // Their opening, expressed from their side and therefore their best.
     counterpartOpening: pkg(task, other, 1, 1, 1),
-    trade: pkg(task, role, 2, 4, 2),
+    trade: pkg(task, role, 1, 4, 2),
   };
 }
 
@@ -248,7 +253,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b3p",
         3,
         "participant",
-        `I hear you. || I'd rather not go past ${L(trade, mine.id)} on that one though — that's the level where it actually does its job. happy to look at the other two.`,
+        `I hear you. || that's the one I really can't move on though — it's the whole reason this works for me. happy to look at the other two.`,
       ),
       m(
         "b4c",
@@ -370,7 +375,7 @@ function proxyScript(
         "p3p",
         3,
         "participant_proxy",
-        `Understood, and I can move elsewhere for it. ${L(trade, mine.id)} on ${mine.label.toLowerCase()} is the point below which it stops doing its job, so that is where I hold.`,
+        `Understood, and I can move elsewhere for it — but ${mine.label.toLowerCase()} is the one thing I cannot trade, so that is where I hold.`,
       ),
       m(
         "p4p",

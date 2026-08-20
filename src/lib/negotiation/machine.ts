@@ -426,6 +426,8 @@ export function buildProxyPlan(
   const requirement = requirementIssue(task, participantRole);
   const theirs = counterRequirementIssue(task, participantRole);
   const timing = distributiveIssue(task);
+  const counterpartRole: Role =
+    participantRole === "leader" ? "member" : "leader";
 
   const preferred = (issueId: string) => {
     const im = mandate.issues.find((i) => i.issueId === issueId);
@@ -451,27 +453,51 @@ export function buildProxyPlan(
     task.issues.map((i) => [i.id, preferred(i.id)]),
   );
 
-  // The counterpackage: hold the requirement at its stated floor and spend the
-  // other two terms — but only as far as it takes to make the offer
-  // acceptable, not as far as the mandate would allow.
+  // The counterpackage: spend the OTHER two terms first, and move the
+  // requirement only if that was not enough.
   //
-  // SPENDING THE WHOLE ENVELOPE IS A BUG, NOT CAUTION. An earlier version
-  // stopped only at the principal's fallback, which handed away the timing
-  // term as well as the counterpart's priority issue and landed the principal
-  // on 2,600 — a hundred points above walking away — when holding the
-  // requirement and keeping timing at the midpoint scores 3,600 for the
-  // principal and is still accepted. A proxy that gives away everything it is
-  // permitted to give is not executing a mandate; it is capitulating inside
-  // one, and both policies would have done it equally, so the whole design
-  // would have measured delegation to a bad negotiator.
-  const counterpackage = spendDownTo(
+  // TWO THINGS HAVE TO BE TRUE HERE, and each was got wrong once.
+  //
+  // It must not spend the whole envelope. An early version stopped only at the
+  // principal's fallback, which handed away the timing term as well as the
+  // counterpart's priority issue and landed the principal a hundred points
+  // above walking away, when a package worth far more was still acceptable. A
+  // proxy that gives away everything it is permitted to give is not executing
+  // a mandate, it is capitulating inside one — and both policies would have
+  // done it equally, so the design would have measured delegation to a bad
+  // negotiator rather than delegation as such.
+  //
+  // And it must not spend the requirement FIRST. The version after that seeded
+  // the package with the requirement already at its mandated floor and then
+  // excluded it from the spendable list, so the cheapest-first ordering that
+  // is supposed to protect it never applied — it was gone before the
+  // negotiation started. Requirement preservation is the study's primary
+  // outcome and only the Proxy arm has code that can abandon it on its own, so
+  // conceding it by default would put a mechanical difference straight into
+  // `Pooled Proxy − Baseline`.
+  //
+  // The requirement is therefore the LAST currency. If the other two terms are
+  // enough, it never moves at all.
+  const spentOthers = spendDownTo(
     task,
     participantRole,
-    { ...opening, [requirement.id]: limit(requirement.id) },
+    opening,
     [theirs.id, timing.id],
     limit,
     ACCEPTANCE.T_MID,
   );
+
+  const counterpackage =
+    scorePackage(task, spentOthers, counterpartRole) >= ACCEPTANCE.T_MID
+      ? spentOthers
+      : spendDownTo(
+          task,
+          participantRole,
+          spentOthers,
+          [requirement.id, theirs.id, timing.id],
+          limit,
+          ACCEPTANCE.T_MID,
+        );
 
   return { opening, counterpackage, tentative: counterpackage };
 }
@@ -505,38 +531,56 @@ function spendDownTo(
   const counterpart: Role = principal === "member" ? "leader" : "member";
   const pkg: Package = { ...from };
 
-  const byCheapness = [...spendable].sort((a, b) => {
-    const cost = (id: string) => {
-      const issue = task.issues.find((i) => i.id === id)!;
-      const best = Math.max(...issue.options.map((o) => o.points[principal]));
-      const worst = Math.min(...issue.options.map((o) => o.points[principal]));
-      const gain = Math.max(...issue.options.map((o) => o.points[counterpart]));
-      return gain > 0 ? (best - worst) / gain : Number.POSITIVE_INFINITY;
-    };
-    return cost(a) - cost(b);
-  });
-
   const goodEnough = () =>
     enoughForCounterpart !== undefined &&
     scorePackage(task, pkg, counterpart) >= enoughForCounterpart;
 
-  for (const issueId of byCheapness) {
-    if (goodEnough()) break;
-
+  /**
+   * The next single step available on an issue, and what it costs.
+   *
+   * Chosen STEP BY STEP rather than issue by issue. Ordering whole issues by
+   * their overall cost ratio spent the distributive term to its floor once it
+   * was picked, and on a constant-sum term every point the principal gives is
+   * exactly one point the counterpart gains — so it is pure transfer, always
+   * the worst rate available, and never the way to close a gap the integrative
+   * terms could close more cheaply. Re-choosing after every step lets the
+   * logroll take what it needs and stop.
+   */
+  const nextStep = (issueId: string) => {
     const issue = task.issues.find((i) => i.id === issueId)!;
-    const target = limit(issueId);
     const order = [...issue.options].sort(
       (a, b) => b.points[principal] - a.points[principal],
     );
-    const stop = order.findIndex((o) => o.id === target);
-    const start = order.findIndex((o) => o.id === pkg[issueId]);
+    const stop = order.findIndex((o) => o.id === limit(issueId));
+    const at = order.findIndex((o) => o.id === pkg[issueId]);
+    if (at < 0 || at >= stop) return null;
 
-    for (let at = start + 1; at <= stop; at += 1) {
-      const next = { ...pkg, [issueId]: order[at].id };
-      if (scorePackage(task, next, principal) < task.reservationPoints) break;
-      pkg[issueId] = order[at].id;
-      if (goodEnough()) break;
+    const next = { ...pkg, [issueId]: order[at + 1].id };
+    if (scorePackage(task, next, principal) < task.reservationPoints) {
+      return null;
     }
+    const cost =
+      scorePackage(task, pkg, principal) - scorePackage(task, next, principal);
+    const gain =
+      scorePackage(task, next, counterpart) -
+      scorePackage(task, pkg, counterpart);
+    // A step that buys the counterpart nothing is never worth taking, whatever
+    // it costs — that is what stopped the old loop giving away the timing term
+    // for no return.
+    if (gain <= 0) return null;
+    return { issueId, optionId: order[at + 1].id, ratio: cost / gain };
+  };
+
+  // Take the cheapest available step, repeatedly, until the offer is good
+  // enough or nothing worth spending is left.
+  for (;;) {
+    if (goodEnough()) break;
+    const steps = spendable
+      .map(nextStep)
+      .filter((s): s is NonNullable<typeof s> => s !== null)
+      .sort((a, b) => a.ratio - b.ratio);
+    if (!steps.length) break;
+    pkg[steps[0].issueId] = steps[0].optionId;
   }
 
   return pkg;

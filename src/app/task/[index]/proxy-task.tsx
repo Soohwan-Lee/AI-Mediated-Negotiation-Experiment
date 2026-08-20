@@ -395,6 +395,10 @@ export function ProxyTask({
     // but the client is deliberately not told WHICH reasons they were, since
     // that would name the Explorer's additions.
     const reasonsUsed: string[] = [];
+    // The Explorer's pool allowance, carried as a bare count. See the note on
+    // `reasonToken` in the route: a marked token would name which messages
+    // carried an AI-added reason.
+    let poolReasonsUsed = 0;
 
     try {
       for (let turn = 0; turn < TOTAL_TURNS; turn += 1) {
@@ -412,6 +416,7 @@ export function ProxyTask({
             lastParticipantPackage,
             lastCounterpartPackage,
             reasonsUsed,
+            poolReasonsUsed,
             revisionNote: revision ?? null,
             history: collected.map((m) => ({
               speaker: m.speaker,
@@ -432,6 +437,7 @@ export function ProxyTask({
           done: boolean;
           totalTurns?: number;
           reasonToken?: string | null;
+          poolReasonsUsed?: number;
           decidedAction?: string;
           stage?: number;
           requirementOption?: string | null;
@@ -441,6 +447,9 @@ export function ProxyTask({
 
         if (data.impasse) proxyImpasse = true;
         if (data.reasonToken) reasonsUsed.push(data.reasonToken);
+        if (typeof data.poolReasonsUsed === "number") {
+          poolReasonsUsed = data.poolReasonsUsed;
+        }
         if (
           data.message?.speaker === "participant_proxy" &&
           data.stage !== undefined

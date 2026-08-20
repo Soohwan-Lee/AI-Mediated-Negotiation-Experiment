@@ -106,6 +106,26 @@ stands, so a deal is still reachable, just not one that hands the requirement
 over. Across all four cells, giving a reason preserves the requirement (3,200)
 and never giving one loses it (1,200).
 
+**The requirement is the LAST currency the proxy spends, not the first.**
+`buildProxyPlan` spends the other two terms, and touches the requirement only
+if that was not enough — which on the standard mandate is never, because
+handing the other side their priority term outright is already worth T_MID to
+them. An earlier version seeded the package with the requirement already at its
+mandated floor and then excluded it from the spendable list, so the
+cheapest-first ordering that protects it never applied and it was conceded
+before the negotiation started. Requirement preservation is the primary
+outcome and only the Proxy arm has code that can abandon it unprompted, so
+that put a mechanical difference straight into `Pooled Proxy − Baseline`.
+
+**Concessions are chosen step by step, not issue by issue.** Ordering whole
+issues by cost ratio spent the distributive term to its floor once picked, and
+on a constant-sum term every point given is exactly one point gained — pure
+transfer, always the worst rate, never the way to close a gap the integrative
+terms could close more cheaply. A step that buys the counterpart nothing is
+never taken. Across the whole mandate space this is the difference between the
+proxy breaking its principal's requirement in 50% of mandates and in 31%, all
+of the remainder being mandates the participant set below their own threshold.
+
 **The Explorer's pool reason has its own budget.** Two principal reasons per
 task either way, plus one pool reason for the Explorer. Sharing one bucket
 looked stricter and was wrong: only the Explorer is instructed to add on top of
@@ -130,6 +150,13 @@ These are load-bearing. Breaking any one invalidates the data.
    provenance is recorded for audit and stripped server-side before the
    response leaves `/api/proxy-negotiation`. `DisplayMessage` has no field for
    it, so a transcript component cannot render it even by accident.
+
+   Nothing else in the response may carry the kind either. The running reason
+   budget travels as an opaque token, and an earlier version prefixed pool
+   reasons with `pool` "because the token is opaque" — but the token is
+   returned with every message, so the prefix said *this message's reason was
+   AI-added*, per message, for the whole transcript. The pool count now travels
+   as a bare number, which cannot attach to any particular message.
 4. **That the Member's bonus is fixed.** It is a constant, identical in every
    condition, presented as the Leader's judgement. Disclosed at `/debriefing`.
 5. **Which term the study is about.** All three terms are entered the same way
@@ -255,10 +282,11 @@ hold, the counterpart accepts at stage 4. They are for reading the flow, not
 for exercising the failure branches.
 
 **The scripts must agree with the state machine.** All twelve cells settle at
-3,200 for the speaker and 4,100 for the other side, which is what
+4,200 for the speaker and 3,600 for the other side, which is what
 `buildProxyPlan` independently produces from the standard mandate. A mockup
 showing a package the real system would never reach is a mockup of a different
-study — and levels named in a message are read from the package that message
+study, and this pair has drifted apart twice — check it after any change to
+either file. Levels named in a message are read from the package that message
 carries, never from an option index, because option order is role-relative.
 
 It is present by default on every build, including deployed ones, so the layout

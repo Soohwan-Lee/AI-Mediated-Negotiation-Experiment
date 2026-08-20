@@ -66,8 +66,20 @@ interface RequestBody {
   /** The package each side last put on the table. */
   lastParticipantPackage?: Package | null;
   lastCounterpartPackage?: Package | null;
-  /** Reason card ids this side has already voiced, for the budget check. */
+  /**
+   * Opaque tokens for the reasons this side has already voiced, for the
+   * budget check. Deliberately carries no indication of which kind each was —
+   * see `reasonToken`.
+   */
   reasonsUsed?: string[];
+  /**
+   * How many pool reasons this side has already spent.
+   *
+   * A COUNT, not a list. The Explorer's pool allowance is one per task and the
+   * route is stateless, so the client has to carry something — but a count
+   * cannot be attached to any particular message, where a marked token could.
+   */
+  poolReasonsUsed?: number;
   /**
    * The participant's instruction when they sent a package back for one
    * revision. It narrows what the proxy does; it cannot widen the mandate,
@@ -193,17 +205,23 @@ function fallbackText(
  * between "the same reason as last turn" (which the budget needs) and "this
  * sentence came from the pool" (which the participant must not learn).
  *
- * Pool reasons keep a `pool` marker because the two kinds have separate
- * budgets, and the count is what travels. That marker is on the TOKEN, which
- * is opaque — it says a reason of some kind was reused, not which sentence it
- * was, so no message in the transcript can be traced to it.
+ * NO KIND MARKER. An earlier version prefixed pool reasons with `pool` so the
+ * separate budgets could be counted client-side, with a comment claiming that
+ * was safe because the token is opaque. It was not: the token is returned with
+ * EVERY message, so the prefix said "the reason in this particular message was
+ * added by the AI" — per message, for the whole transcript. That is precisely
+ * the judgement OTHER-AI4 asks the participant to make unaided, and it is the
+ * Explorer manipulation itself.
+ *
+ * The kind stays server-side (`poolReasonsUsed` below), which the budget can
+ * reconstruct without the client ever holding it.
  */
 function reasonToken(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i += 1) {
     h = (h * 31 + id.charCodeAt(i)) | 0;
   }
-  return `${id.startsWith("pool:") ? "pool" : "r"}${Math.abs(h) % 9973}`;
+  return `r${Math.abs(h) % 9973}`;
 }
 
 export async function POST(request: Request) {
@@ -392,6 +410,7 @@ export async function POST(request: Request) {
       reasonKey: action.reasonSourceId
         ? reasonToken(action.reasonSourceId)
         : null,
+      poolReasonsUsed: isParticipantSide ? (body.poolReasonsUsed ?? 0) : 0,
     });
 
     // A blocked action loses its WORDING, not the move behind it.
@@ -448,6 +467,11 @@ export async function POST(request: Request) {
       reasonToken: action.reasonSourceId
         ? reasonToken(action.reasonSourceId)
         : null,
+      // A bare count, so the client can carry the pool allowance forward
+      // without holding anything that ties a kind to a message.
+      poolReasonsUsed:
+        (body.poolReasonsUsed ?? 0) +
+        (action.reasonSourceId?.startsWith("pool:") ? 1 : 0),
       // Violation CODES only. The details name red lines, withheld reason
       // cards and the validator's reasoning — a participant who opened the
       // network tab and found "disclosure_permission_violation: reason a_m_s2

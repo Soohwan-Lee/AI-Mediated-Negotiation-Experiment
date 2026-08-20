@@ -66,6 +66,14 @@ export interface ValidationContext {
    * one already used" — is answerable either way.
    */
   reasonKey?: string | null;
+  /**
+   * How many pool reasons this side has already spent this task.
+   *
+   * The pool allowance is separate from the principal's two, but the token
+   * history carries no kind marker (that would name the Explorer's additions
+   * to the client), so the pool count arrives on its own.
+   */
+  poolReasonsUsed?: number;
 }
 
 /**
@@ -219,24 +227,27 @@ export function validateAction(
   // principal reasons and the same message count.
   const budgetKey = ctx.reasonKey ?? action.reasonSourceId;
   const isPool = action.reasonSourceId?.startsWith("pool:") ?? false;
-  if (budgetKey && ctx.reasonsUsed) {
-    const used = ctx.reasonsUsed;
-    if (isPool) {
-      const poolUsed = new Set(used.filter((r) => r.startsWith("pool")));
-      if (!poolUsed.has(budgetKey) && poolUsed.size >= 1) {
-        violations.push({
-          code: "rationale_budget_exceeded",
-          detail: "The Explorer may add one pool reason per task; this would be a second.",
-        });
-      }
-    } else {
-      const principalUsed = new Set(used.filter((r) => !r.startsWith("pool")));
-      if (!principalUsed.has(budgetKey) && principalUsed.size >= 2) {
-        violations.push({
-          code: "rationale_budget_exceeded",
-          detail: `Already used ${principalUsed.size} of the principal's reasons this task; this would be a third.`,
-        });
-      }
+  if (isPool) {
+    if ((ctx.poolReasonsUsed ?? 0) >= 1) {
+      violations.push({
+        code: "rationale_budget_exceeded",
+        detail:
+          "The Explorer may add one pool reason per task; this would be a second.",
+      });
+    }
+  } else if (budgetKey && ctx.reasonsUsed) {
+    // The token history mixes both kinds, so subtract the pool ones by count
+    // rather than by inspecting the tokens — they carry no kind on purpose.
+    const distinct = new Set(ctx.reasonsUsed);
+    const principalCount = Math.max(
+      0,
+      distinct.size - (ctx.poolReasonsUsed ?? 0),
+    );
+    if (!distinct.has(budgetKey) && principalCount >= 2) {
+      violations.push({
+        code: "rationale_budget_exceeded",
+        detail: `Already used ${principalCount} of the principal's reasons this task; this would be a third.`,
+      });
     }
   }
 
