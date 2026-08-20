@@ -103,16 +103,48 @@ function pkg(
   const theirs = counterRequirementIssue(task, role);
   const timing = distributiveIssue(task);
   return {
-    [mine.id]: mine.options[mineAt - 1].id,
-    [theirs.id]: theirs.options[theirsAt - 1].id,
-    [timing.id]: timing.options[timingAt - 1].id,
+    [mine.id]: byPreference(mine, role)[mineAt - 1].id,
+    [theirs.id]: byPreference(theirs, role)[theirsAt - 1].id,
+    [timing.id]: byPreference(timing, role)[timingAt - 1].id,
   };
 }
 
-/** The label a participant sees for one position on an issue. */
-function opt(task: NegotiationTask, issueId: string, at: number): string {
+/**
+ * This role's options, best for THEM first.
+ *
+ * Issue options are stored in the order that favours whichever role the issue
+ * belongs to, so "position 2" means opposite things to the two roles on the
+ * same issue — and a script written by raw index came out asymmetric: a Leader
+ * landed on 3,200 and a Member on 2,600 for what was meant to be the identical
+ * ideal trajectory. Ordering by the speaker's own preference makes "hold mine
+ * at 2, give them theirs" mean the same thing for both.
+ */
+function byPreference(
+  issue: NegotiationTask["issues"][number],
+  role: Role,
+) {
+  return [...issue.options].sort((a, b) => b.points[role] - a.points[role]);
+}
+
+/**
+ * The label an issue carries IN A GIVEN PACKAGE.
+ *
+ * Messages name levels by reading the package they are attached to, never by
+ * index. Naming by index is how a message came to say "you take 1 review in
+ * full" while the package it carried said 4 reviews: the sentence counted from
+ * the speaker's own preference and the package counted from the other side's.
+ * There is only one right answer to "what does this offer say about reviews",
+ * and it is in the offer.
+ */
+function label(
+  task: NegotiationTask,
+  pack: Package,
+  issueId: string,
+): string {
   const issue = task.issues.find((i) => i.id === issueId)!;
-  return issue.options[at - 1].label.toLowerCase();
+  return (
+    issue.options.find((o) => o.id === pack[issueId])?.label.toLowerCase() ?? "—"
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -120,24 +152,36 @@ function opt(task: NegotiationTask, issueId: string, at: number): string {
 // ---------------------------------------------------------------------------
 
 /**
- * The packages the exchange moves through, from the participant's side.
+ * The packages the exchange moves through.
+ *
+ * EVERY POSITION IS COUNTED FROM THE SPEAKER'S OWN BEST OPTION, so `1` always
+ * means "the most I could want on this term" whichever role is speaking. That
+ * is what makes one script serve both roles and produce identical numbers.
  *
  * The shape is the same in every cell because the ideal trajectory IS the
  * same: open at your best on everything, discover that the two of you want
  * different terms, hold your requirement at its threshold and pay for it with
  * the term the other side actually wants. That is the logroll, and it is the
- * outcome the numbers were built to make available.
+ * outcome the payoffs were built to make available.
  *
- *   opening        mine 1, theirs 4, timing 1   — everything my way
- *   counterparty   mine 4, theirs 1, timing 4   — everything their way
- *   trade          mine 2, theirs 1, timing 2   — I hold mine, they get theirs
- *   tentative      same as the trade
+ *   opening       mine 1, theirs 1, timing 1  — everything my way (6,300)
+ *   theirs        the mirror, from their side — everything their way
+ *   trade         mine 2, theirs 4, timing 2  — I hold my requirement at its
+ *                 threshold and hand them their priority term outright
+ *
+ * The trade is what the state machine independently arrives at from the
+ * standard mandate: 3,200 to the speaker, 4,100 to the other side, which
+ * clears T_MID. Script and machine agreeing is not decoration — a mockup that
+ * showed a package the real system would never produce would be a mockup of a
+ * different study.
  */
 function trajectory(task: NegotiationTask, role: Role) {
+  const other: Role = role === "leader" ? "member" : "leader";
   return {
-    opening: pkg(task, role, 1, 4, 1),
-    counterpartOpening: pkg(task, role, 4, 1, 4),
-    trade: pkg(task, role, 2, 1, 2),
+    opening: pkg(task, role, 1, 1, 1),
+    // Their opening, expressed from their side and therefore their best.
+    counterpartOpening: pkg(task, other, 1, 1, 1),
+    trade: pkg(task, role, 2, 4, 2),
   };
 }
 
@@ -164,6 +208,10 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
     extra: Partial<ScriptedMessage> = {},
   ): ScriptedMessage => ({ id, stage, speaker, text, ...extra });
 
+  // Every level named in a message is read out of the package that message
+  // carries, so prose and offer can never disagree.
+  const L = (pack: Package, issueId: string) => label(task, pack, issueId);
+
   return {
     agreed: true,
     tentative: trade,
@@ -172,53 +220,48 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b1c",
         1,
         "counterpart",
-        `hi! good to be sorting this out. || my opening would be ${opt(task, theirs.id, 1)} on ${theirs.label.toLowerCase()}, ${opt(task, mine.id, 4)} on ${mine.label.toLowerCase()}, and ${opt(task, timing.id, 4)}. tell me what matters most your end though.`,
+        `hi! good to be sorting this out. || my opening would be ${L(theirOpen, theirs.id)} on ${theirs.label.toLowerCase()}, ${L(theirOpen, mine.id)} on ${mine.label.toLowerCase()}, and ${L(theirOpen, timing.id)}. tell me what matters most your end though.`,
         { proposal: theirOpen },
       ),
       m(
         "b1p",
         1,
         "participant",
-        `hi — likewise. mine's a bit of a mirror image: ${opt(task, mine.id, 1)} on ${mine.label.toLowerCase()}, ${opt(task, theirs.id, 4)}, and ${opt(task, timing.id, 1)}. || so we've got some sorting out to do.`,
+        `hi — likewise. || mine's a mirror image really: ${L(opening, mine.id)} on ${mine.label.toLowerCase()}, ${L(opening, theirs.id)} on ${theirs.label.toLowerCase()}, and ${L(opening, timing.id)}.`,
         { proposal: opening },
       ),
       m(
         "b2c",
         2,
         "counterpart",
-        `ha, we have. || honestly ${theirs.label.toLowerCase()} is the one I really need — fewer than that and I'm exposed if something goes wrong. what's the one that matters most to you?`,
+        `ha, we have. || honestly ${theirs.label.toLowerCase()} is the one I really need — going short there leaves me exposed if something goes wrong. what's the one that matters most to you?`,
       ),
       m(
         "b2p",
         2,
         "participant",
-        `${mine.label.toLowerCase()}, easily. ${workCard ? workCard.text.toLowerCase() : "it is the one that changes how the work actually goes."} || the timing I'm more relaxed about.`,
+        `${mine.label.toLowerCase()}, easily. ${workCard ? lowerFirst(workCard.text) : "it's the one that changes how the work actually goes."} || the timing I'm more relaxed about.`,
         { reasonCardId: workCard?.id },
       ),
-      m(
-        "b3c",
-        3,
-        "counterpart",
-        task.standardizedChallenge[role],
-      ),
+      m("b3c", 3, "counterpart", task.standardizedChallenge[role]),
       m(
         "b3p",
         3,
         "participant",
-        `I hear you. || I'd rather not drop below ${opt(task, mine.id, 2)} on that one though — that's the level where it actually does its job. happy to look at the other two.`,
+        `I hear you. || I'd rather not go past ${L(trade, mine.id)} on that one though — that's the level where it actually does its job. happy to look at the other two.`,
       ),
       m(
         "b4c",
         4,
         "counterpart",
-        `ok, that's fair. || so if I get ${opt(task, theirs.id, 1)} on ${theirs.label.toLowerCase()}, I can live with ${opt(task, mine.id, 2)} on yours. would you move on the date?`,
+        `ok, that's fair. || so if I get ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()}, I can live with ${L(trade, mine.id)} on yours. would you move on the date?`,
         { proposal: trade },
       ),
       m(
         "b4p",
         4,
         "participant",
-        `that works for me. || ${opt(task, theirs.id, 1)} on yours, ${opt(task, mine.id, 2)} on mine, and I'll take ${opt(task, timing.id, 2)} on the date to meet you halfway.`,
+        `that works for me. || ${L(trade, theirs.id)} on yours, ${L(trade, mine.id)} on mine, and ${L(trade, timing.id)} on the date to meet you halfway.`,
         { proposal: trade },
       ),
       m(
@@ -228,15 +271,16 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         `great — that's the three then. || sending it through as it stands.`,
         { proposal: trade },
       ),
-      m(
-        "b5p",
-        5,
-        "participant",
-        `agreed. good to get it settled.`,
-        { proposal: trade },
-      ),
+      m("b5p", 5, "participant", `agreed. good to get it settled.`, {
+        proposal: trade,
+      }),
     ],
   };
+}
+
+/** Lowercases the first letter only, so a card reads naturally mid-sentence. */
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,6 +329,8 @@ function proxyScript(
       ? ` Holding it also keeps the risk of rework down for both sides.`
       : "";
 
+  const L = (pack: Package, issueId: string) => label(task, pack, issueId);
+
   return {
     agreed: true,
     tentative: trade,
@@ -293,27 +339,27 @@ function proxyScript(
         "p1c",
         1,
         "counterpart_proxy",
-        `Opening for my principal: ${opt(task, theirs.id, 1)} on ${theirs.label.toLowerCase()}, ${opt(task, mine.id, 4)} on ${mine.label.toLowerCase()}, ${opt(task, timing.id, 4)}. ${theirs.label} is where their weight is.`,
+        `Opening for my principal: ${L(theirOpen, theirs.id)} on ${theirs.label.toLowerCase()}, ${L(theirOpen, mine.id)} on ${mine.label.toLowerCase()}, ${L(theirOpen, timing.id)}. ${theirs.label} is where their weight is.`,
         { proposal: theirOpen },
       ),
       m(
         "p1p",
         1,
         "participant_proxy",
-        `Noted — and close to a mirror of ours. Opening: ${opt(task, mine.id, 1)} on ${mine.label.toLowerCase()}, ${opt(task, theirs.id, 4)}, ${opt(task, timing.id, 1)}. ${mine.label} is the one my principal needs held.`,
+        `Noted — close to a mirror of ours. Opening: ${L(opening, mine.id)} on ${mine.label.toLowerCase()}, ${L(opening, theirs.id)} on ${theirs.label.toLowerCase()}, ${L(opening, timing.id)}. ${mine.label} is the one my principal needs held.`,
         { proposal: opening },
       ),
       m(
         "p2c",
         2,
         "counterpart_proxy",
-        `Then we may have room. Mine can move on the date if ${theirs.label.toLowerCase()} holds — going short there leaves them carrying the risk if it goes wrong. Where is your flexibility?`,
+        `Then we may have room. Mine can move on the date if ${theirs.label.toLowerCase()} holds — going short there leaves them carrying the risk. Where is your flexibility?`,
       ),
       m(
         "p2p",
         2,
         "participant_proxy",
-        `That is workable. Ours is on the date and on ${theirs.label.toLowerCase()}. ${workCard ? workCard.text : "The requirement term is where the work is affected."}`,
+        `That is workable — ours is on the date and on ${theirs.label.toLowerCase()}. ${workCard ? workCard.text : "The requirement term is where the work is affected."}`,
         {
           reasonCardId: workCard?.id,
           internalProvenance: "principal_reason",
@@ -324,13 +370,13 @@ function proxyScript(
         "p3p",
         3,
         "participant_proxy",
-        `Understood, and I can move elsewhere for it. ${opt(task, mine.id, 2)} on ${mine.label.toLowerCase()} is the point below which it stops doing its job, so that is where I am holding.`,
+        `Understood, and I can move elsewhere for it. ${L(trade, mine.id)} on ${mine.label.toLowerCase()} is the point below which it stops doing its job, so that is where I hold.`,
       ),
       m(
         "p4p",
         4,
         "participant_proxy",
-        `Here is the trade: you take ${opt(task, theirs.id, 1)} on ${theirs.label.toLowerCase()} in full, I hold ${opt(task, mine.id, 2)} on ${mine.label.toLowerCase()}, and we meet at ${opt(task, timing.id, 2)}.${explorerAddition}`,
+        `Then here is the trade: you take ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()} in full, I hold ${L(trade, mine.id)} on ${mine.label.toLowerCase()}, and we meet at ${L(trade, timing.id)}.${explorerAddition}`,
         {
           proposal: trade,
           ...(policy === "explorer"
@@ -342,14 +388,14 @@ function proxyScript(
         "p4c",
         4,
         "counterpart_proxy",
-        `That is acceptable to my principal. ${theirs.label} in full is what they needed, and the date at ${opt(task, timing.id, 2)} is a fair split.`,
+        `That works for my principal. ${theirs.label} in full is what they needed, and ${L(trade, timing.id)} on the date is a fair split.`,
         { proposal: trade },
       ),
       m(
         "p5p",
         5,
         "participant_proxy",
-        `Then this is the package for review: ${opt(task, theirs.id, 1)}, ${opt(task, mine.id, 2)}, ${opt(task, timing.id, 2)}. Neither principal is bound until they approve it.`,
+        `Then this is the package for review: ${L(trade, theirs.id)}, ${L(trade, mine.id)}, ${L(trade, timing.id)}. Neither principal is bound until they approve it.`,
         { proposal: trade },
       ),
       m(
