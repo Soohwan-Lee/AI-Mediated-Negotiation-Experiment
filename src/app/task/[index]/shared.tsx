@@ -883,7 +883,11 @@ export function DirectNegotiation({
 
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const complete = chosen === task.issues.length;
-  const canSend = useDevGate(complete && !settled);
+  // `settled` is OUTSIDE the dev gate on purpose. `useDevGate` exists to let a
+  // walkthrough past an unfilled form, but "the conversation is over" is not a
+  // validation to skip — bypassing it let the send loop keep firing after the
+  // counterpart had accepted, which logged the same ending five times.
+  const canSend = useDevGate(complete) && !settled;
   const yourTurn = !pending && canSend && !settled;
 
   useDevAutofill(() => {
@@ -1021,12 +1025,21 @@ export function DirectNegotiation({
       }
 
       setReplies((n) => n + 1);
-      if (decision.accepts) {
-        setFinalPackage(decision.proposal ?? offer);
-        setSettled("agreed");
-      } else if (decision.impasse) {
-        setFinalPackage(null);
-        setSettled("impasse");
+      if (decision.accepts || decision.impasse) {
+        setFinalPackage(decision.accepts ? (decision.proposal ?? offer) : null);
+        setSettled(decision.accepts ? "agreed" : "impasse");
+        // Every ending logs, not only the timeout one, so the direct
+        // conversation's started event always has a matching ended event.
+        logEvent(
+          "negotiation_ended",
+          {
+            phase: "direct",
+            reason: decision.accepts ? "agreed" : "impasse",
+            replies: replies + 1,
+            secondsRemaining,
+          },
+          { sessionIndex: taskIndex },
+        );
       }
     } finally {
       setPending(false);
@@ -1061,7 +1074,7 @@ export function DirectNegotiation({
                     setSettled("impasse");
                     logEvent(
                       "negotiation_ended",
-                      { reason: "timeout" },
+                      { phase: "direct", reason: "timeout" },
                       { sessionIndex: taskIndex },
                     );
                   }}

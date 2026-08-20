@@ -201,7 +201,11 @@ export function BaselineTask({
   // participant may write anything, including a reply that changes nothing.
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const complete = chosen === task.issues.length;
-  const canSend = useDevGate(complete && !settled);
+  // `settled` is OUTSIDE the dev gate on purpose. `useDevGate` exists to let a
+  // walkthrough past an unfilled form, but "the conversation is over" is not a
+  // validation to skip — bypassing it let the send loop keep firing after the
+  // counterpart had accepted, which logged the same ending five times.
+  const canSend = useDevGate(complete) && !settled;
 
   // The three states of the conversation, named once so the composer, the
   // terms card and the pill above them cannot disagree about which one it is.
@@ -404,12 +408,21 @@ export function BaselineTask({
       // is not sent to the review immediately — they see the counterpart's
       // last message first, and a Continue button appears — because being
       // teleported off a screen mid-sentence reads as a bug.
-      if (decision.accepts) {
-        setTentative(decision.proposal ?? offer);
-        setSettled("agreed");
-      } else if (decision.impasse) {
-        setTentative(null);
-        setSettled("impasse");
+      if (decision.accepts || decision.impasse) {
+        setTentative(decision.accepts ? (decision.proposal ?? offer) : null);
+        setSettled(decision.accepts ? "agreed" : "impasse");
+        // Every ending logs, not only the timeout one — otherwise a started
+        // event has no matching ended event on the ordinary paths.
+        logEvent(
+          "negotiation_ended",
+          {
+            phase: "baseline",
+            reason: decision.accepts ? "agreed" : "impasse",
+            replies: replies + 1,
+            secondsRemaining,
+          },
+          { sessionIndex: taskIndex },
+        );
       }
     } finally {
       setPending(false);
@@ -569,7 +582,7 @@ export function BaselineTask({
                     setSettled("impasse");
                     logEvent(
                       "negotiation_ended",
-                      { reason: "timeout" },
+                      { phase: "baseline", reason: "timeout" },
                       { sessionIndex: taskIndex },
                     );
                   }}
