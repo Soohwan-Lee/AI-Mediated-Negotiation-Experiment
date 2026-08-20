@@ -59,23 +59,22 @@ way. A counterpart whose judgement is the model's is a different counterpart
 for every participant, and it is why the design does not need to randomize
 outcomes: identical behaviour already produces identical results.
 
-Both conditions run the same **five stages** — opening, priorities and reasons,
-the standardized challenge, a conditional trade, the tentative package — one
-message per side each, ten in total, **counterpart first at every stage except
-stage 4**. That shared structure is what makes a Baseline transcript and a
-Proxy transcript comparable, so a task may not skip stages or end early, and
-the counterpart's fixed opening must be on screen before the participant writes
-anything: it is the anchor their reply is measured against.
+**The participant's conversation is free-form, bounded only by a ten-minute
+timer.** They write as many messages as they like and may finish early. The
+five stages still exist, but as the COUNTERPART'S script, not a lockstep the
+participant is marched through: it advances one move per reply, so every
+participant meets the same fixed opening, the same standardized challenge and
+the same thresholds in the same order however long they take to get there.
+`counterpartStageAfter(replies)` is where that mapping lives.
 
-**Stage 4 inverts, and it has to.** Everywhere else the counterpart leads,
-which is what anchors the participant's side. But stage 4 is the conditional
-trade, and the counterpart's move there is to *evaluate* against T_MID rather
-than to lead. With the counterpart going first it evaluated a package that had
-not been sent yet — the proxy's stage-1 opening, worth nothing to it — so the
-Proxy arm could never accept at T_MID and always fell through to T_FINAL while
-Baseline accepted at T_MID normally. That is a mechanical difference in
-counterpart behaviour between the two arms of `Pooled Proxy − Baseline`, which
-is exactly what fixed rules exist to prevent.
+**The challenge always lands before any acceptance.** The counterpart cannot
+accept before it reaches its trade stage, which is after it has opened, stated
+its priority and challenged. So a participant who opens with a perfect package
+still has to answer the challenge — the manipulation cannot be skipped by
+negotiating well. Check this after any change to `counterpartStep`.
+
+**The counterpart's fixed opening must be on screen before the participant
+writes anything**: it is the anchor their reply is measured against.
 
 **Both sides challenge at stage 3**, each naming the *other* role's
 requirement. `standardizedChallenge` is therefore keyed by the role being
@@ -139,8 +138,16 @@ meant to isolate.
 These are load-bearing. Breaking any one invalidates the data.
 
 1. **The counterpart is an AI.** It is presented as another Prolific
-   participant ("Alex"). In the Proxy task, its AI Proxy is presented as that
-   person's. Disclosed only at `/debriefing`.
+   participant — labelled **"Other Participant"**, never a name. A role label
+   is a stronger claim to being a real person than a pseudonym, it matches what
+   the consent form and instructions already say, and it cannot be compared
+   between participants the way a name eventually would be. In the Proxy task
+   its AI Proxy is presented as that person's. Disclosed only at
+   `/debriefing`.
+
+   The label is a role but the VOICE is a person (prompt P1: very short
+   messages, `||` bubble splits, lowercase openings). If the counterpart starts
+   writing like a system, the label stops being credible and becomes a tell.
 2. **Which condition they are in.** Tasks are labelled "Task 1" and "Task 2",
    never "Baseline"/"Delegate"/"Explorer". The URL carries only the task index.
    The *policy* is disclosed (both principals are told whether pool reasons are
@@ -201,8 +208,36 @@ specific negotiation, so asking it after a second, differently conditioned
 negotiation would blend the two conditions inside a single answer. Item ids
 carry a `_t1` / `_t2` suffix for the same reason.
 
-Inside a task: brief → preferences → **RISK** → (reason cards → confirm, in
-Proxy) → "waiting for the other participant" → negotiate or watch → review.
+Inside a Baseline task: cover → brief → preferences → **RISK** → "waiting for
+the other participant" → negotiate → review.
+
+Inside a Proxy task: cover → brief → preferences → **RISK** → reason cards →
+confirm → watch the two AI Proxies → **handover** → negotiate directly →
+review.
+
+**The Proxy participant takes over from their AI Proxy and finishes the
+negotiation themselves.** The proxies run ONCE — there is no revision, and no
+second run — and then the participant talks to the other participant directly,
+with the proxies' full transcript on screen beside them. What the two people
+agree is the result.
+
+That transcript is not a convenience. Every §9.4 measure asks the participant
+to judge what was said on their behalf — whether the other side's requirement
+read as genuinely theirs, who is answerable for it, whether their own proxy
+represented them well — so taking it away would turn those items into a memory
+test. `ProxyTranscriptPanel` keeps it one click away, never behind a
+navigation.
+
+**The counterpart picks its script up mid-way in the direct conversation**
+(`DIRECT_STAGE_OFFSET`), because through its own proxy it has already opened,
+stated its priority and challenged. Replaying those would make the participant
+answer a challenge they watched being answered, and would give the Proxy arm
+two challenges where Baseline has one.
+
+**There is no "ask for one change".** It existed when the proxies produced the
+final package alone. Talking to the other side directly is a better version of
+the same control, and keeping both would give the Proxy arm two bites Baseline
+does not have.
 
 **RISK sits in the same place in both arms, and that position is load-bearing.**
 It asks what the participant *expects* raising their requirement to cost. Asked
@@ -409,10 +444,20 @@ Nothing structural. What remains is values to fix and behaviour to exercise:
   it moves with T_FINAL rather than with any code change.
 - **Timing.** `STAGE_MINUTES` sums to about 55 minutes, which is what the
   consent page advertises. Design §10 gate 8 asks for a task median under 12
-  minutes; the 10-minute negotiation cap plus briefing, mandate and review sits
-  above that, and the pilot decides whether the lever is the reply-delay range
-  or the turn budget. Not the advertised figure, which must not drift below
-  what the study actually takes.
+  minutes, and a Proxy task now contains two conversations — the proxies'
+  ~2 minutes of watching plus up to 10 minutes of direct talk — so it is the
+  longer of the two arms. The timer is a cap rather than a target and a
+  participant who is happy can finish in three minutes, so the pilot median is
+  what decides this. The lever is the reply-delay range, not the advertised
+  figure, which must not drift below what the study actually takes.
+
+- **Whether the two arms are matched on the participant's own airtime.** A
+  Baseline participant writes the whole negotiation; a Proxy participant
+  watches one and then writes a shorter one. That asymmetry is the design —
+  delegation is the manipulation — but it means "how much did they say" is not
+  a between-condition control, and any measure that behaves like a word count
+  should be read with that in mind. Worth checking against the pilot
+  transcripts.
 - **Whether three issues survive the demand-characteristic check.** With only
   three terms each requirement is salient, and the suspicion probe may show
   that participants guessed the design. The preregistered fallback is a fourth
