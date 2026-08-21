@@ -1,25 +1,31 @@
 "use client";
 
 /**
- * The review and ratification phase, shared by both conditions.
+ * Where the task landed, shared by both conditions.
  *
- * TWO DECISIONS HAPPEN HERE, and keeping them apart is the whole point.
+ * THERE IS NO LONGER AN APPROVE/REJECT STEP, and its removal follows from the
+ * ver.2.4 handover. Ratification made sense when the AI Proxies produced the
+ * final package on their own and the participant had never spoken: something
+ * had to stand between a machine's agreement and the participant's own. Now
+ * both arms end with the participant themselves agreeing a package in
+ * conversation, so asking "do you accept this?" immediately afterwards asks
+ * them to re-decide what they have just decided. Worse, it offers a way to
+ * undo an agreement that the other side has no matching way to undo, which is
+ * not a control either arm's counterpart has.
  *
- * First a response to THE OTHER SIDE'S requirement — accept it, keep it in
- * exchange for something, or ask for it to be reduced. Both roles answer it
- * now, because ver.2.4 gives both roles a requirement, so both are receivers
- * of one.
+ * ONE JUDGEMENT REMAINS: what they want to do about THE OTHER SIDE'S
+ * requirement. That is not a duplicate of the negotiation — it is the §9.3.1
+ * uptake code, and reading it off the transcript afterwards would mean a coder
+ * inferring an intention the participant can simply be asked for. Both roles
+ * answer it, because ver.2.4 gives both roles a requirement.
  *
- * Then everyone ratifies, revises once, or rejects. This is deliberately not
- * folded into the previous decision: the tentative package is coded for
- * whether each requirement survived REGARDLESS of ratification, because a
- * participant who refuses a package that broke their own threshold has not
- * failed to preserve it — they preserved it by refusing. Collapsing the two
- * would lose that distinction (Design §9.3.1).
+ * The outcome is therefore recorded straight from the package the two of them
+ * reached. `ownRequirementPreserved` is coded from the package regardless of
+ * how they feel about it, which is what §9.3.1 asks for.
  *
- * The transcript is here too, and the decision waits for its end to come into
- * view. Accepting an agreement without reading how it was reached would make
- * the representation and ownership items meaningless — and OWN-AI4
+ * The transcript is here too, and the screen waits for its end to come into
+ * view. Moving on without reading how it was reached would make the
+ * representation and ownership items meaningless — and OWN-AI4
  * (over-reliance) is interpreted against exactly this: whether they looked.
  */
 
@@ -45,34 +51,13 @@ import {
   requirementIssue,
   scorePackage,
 } from "@/lib/tasks";
-import type {
-  NegotiationTask,
-  Package,
-  RatificationChoice,
-  Role,
-} from "@/lib/types";
+import type { NegotiationTask, Package, Role } from "@/lib/types";
 import {
   DecisionButton,
   OutcomeValue,
   ProxyTranscriptPanel,
   TermsList,
 } from "./shared";
-
-/**
- * Two choices, not three.
- *
- * "Ask for one change" is gone. It existed when the AI Proxies produced the
- * final package on their own, so the participant needed a way to send it back.
- * Now the participant negotiates directly after watching them, which is a
- * better version of the same control — they can change the package by asking
- * for it themselves, in the conversation, rather than by filing a request.
- * Keeping both would have given the Proxy arm two bites the Baseline arm did
- * not have.
- */
-const RATIFY_OPTIONS: Array<[RatificationChoice, string, string]> = [
-  ["ratify", "Accept it", "Settle on this package"],
-  ["reject", "Reject it", "End with no agreement"],
-];
 
 /**
  * How the participant responded to the other side's requirement.
@@ -152,9 +137,8 @@ export function ReviewPhase({
 
   const [requirementResponse, setRequirementResponse] =
     useState<RequirementResponse | null>(null);
-  const [choice, setChoice] = useState<RatificationChoice | null>(null);
 
-  // The decision unlocks once the end of the transcript has been seen. A
+  // The question unlocks once the end of the transcript has been seen. A
   // marker is used rather than a scroll position because a short transcript
   // may already be fully visible, and that counts as read.
   const transcriptEndRef = useRef<HTMLDivElement>(null);
@@ -172,7 +156,6 @@ export function ReviewPhase({
 
   useDevAutofill(() => {
     setRequirementResponse((c) => c ?? "accommodate");
-    setChoice((c) => c ?? "ratify");
     // The gate is "have they read to the end"; in mockup mode nobody has, and
     // waiting for an intersection that will not happen would strand the walk.
     setTranscriptSeen(true);
@@ -181,15 +164,10 @@ export function ReviewPhase({
   const canDecide = useDevGate(transcriptSeen);
   const needsRequirementResponse = Boolean(theirOption);
   const canSubmit = useDevGate(
-    transcriptSeen &&
-      choice !== null &&
-      (!needsRequirementResponse || requirementResponse !== null),
+    transcriptSeen && (!needsRequirementResponse || requirementResponse !== null),
   );
 
   async function submit() {
-    const decided = choice ?? (canSubmit ? "ratify" : null);
-    if (!decided) return;
-
     if (participantKey) {
       await getStore().saveAgreement(participantKey, {
         sessionIndex: taskIndex,
@@ -202,15 +180,18 @@ export function ReviewPhase({
           ? task.issues.filter((i) => !tentative[i.id]).map((i) => i.id)
           : task.issues.map((i) => i.id),
       });
-      await getStore().saveRatification(participantKey, taskIndex, decided);
       await getStore().saveResponses(
         participantKey,
         `task_outcome_t${taskIndex}`,
         {
-          choice: decided,
-          // The uptake code and the preservation code are separate on purpose:
-          // a refused package that held the threshold still counts as
-          // preserved.
+          // Whether the negotiation produced a package at all. This used to be
+          // implicit in the ratification choice; with the choice gone it is
+          // stated, because "no agreement" and "an agreement" are different
+          // outcomes and every downstream measure needs to tell them apart.
+          outcome: tentative ? "agreement" : "no_agreement",
+          // The uptake code (§9.3.1). Asked rather than inferred, because a
+          // coder reading the transcript would be guessing at an intention the
+          // participant can be asked for directly.
           requirementResponse,
           ownRequirementOptionId: tentative?.[mine.id] ?? null,
           ownRequirementPreserved: heldMine,
@@ -223,16 +204,21 @@ export function ReviewPhase({
     }
 
     logEvent(
-      "ratification_choice",
-      { choice: decided, requirementResponse },
+      "task_outcome_recorded",
+      {
+        outcome: tentative ? "agreement" : "no_agreement",
+        requirementResponse,
+      },
       { sessionIndex: taskIndex },
     );
 
-    // A Proxy task fires this twice — once when the AI Proxies finish, once
-    // here. Without a marker the two are distinguishable only by arrival
-    // order, and anything that counts or joins on the event double-counts the
-    // Proxy arm against a Baseline arm that fires it once.
-    logEvent("negotiation_ended", { phase: "ratified" }, {
+    // A Proxy task fires `negotiation_ended` more than once — once when the AI
+    // Proxies finish, once when the direct conversation closes. The marker is
+    // what keeps them apart; without it they are distinguishable only by
+    // arrival order, and anything that counts or joins on the event
+    // double-counts the Proxy arm against a Baseline arm that fires it fewer
+    // times. This one closes the task itself.
+    logEvent("negotiation_ended", { phase: "task_closed" }, {
       sessionIndex: taskIndex,
     });
     onDone();
@@ -249,13 +235,27 @@ export function ReviewPhase({
             current={stepIndex}
           />
 
+          {/* This states the result; it does not ask for one. The participant
+              settled these terms themselves a moment ago, so a screen that
+              asked "do you accept this?" would be asking them to re-decide
+              what they have just decided — see the note at the top of the
+              file. */}
           <div className="mb-5">
-            <Callout title="⏸ Nothing is settled until you say so">
-              <p>
-                This is the package on the table. It is not binding — you decide
-                below whether it stands.
-              </p>
-            </Callout>
+            {tentative ? (
+              <Callout title="✅ This is what the two of you agreed">
+                <p>
+                  The negotiation is over and this is where it settled. Below is
+                  what it is worth to you, and everything that was said.
+                </p>
+              </Callout>
+            ) : (
+              <Callout title="🤝 You did not reach an agreement" tone="warning">
+                <p>
+                  The negotiation ended without a package, so the project falls
+                  back to the limited plan and you take your fallback score.
+                </p>
+              </Callout>
+            )}
           </div>
 
           <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -310,8 +310,10 @@ export function ReviewPhase({
             <div className="border-b border-[var(--line)] px-5 py-4">
               <h2 className="text-[0.95rem] font-semibold">{transcriptTitle}</h2>
               <p className="mt-1 max-w-prose text-[0.875rem] text-[var(--ink-2)]">
-                {transcriptHint} Read it before you decide — the decision below
-                unlocks at the end.
+                {transcriptHint}{" "}
+                {needsRequirementResponse
+                  ? "Read to the end — the question below it opens once you have."
+                  : "Read to the end before you continue."}
               </p>
             </div>
             <Transcript
@@ -322,17 +324,51 @@ export function ReviewPhase({
             />
           </Card>
 
-          {/* The response to THE OTHER SIDE'S requirement. Both roles answer
-              it: ver.2.4 gives each role a requirement, so each is also the
-              receiver of one. */}
+          {/* The response to THE OTHER SIDE'S requirement — the one judgement
+              left on this screen, and the §9.3.1 uptake code. Both roles
+              answer it: ver.2.4 gives each role a requirement, so each is also
+              the receiver of one.
+
+              It carries the cue now that the approve/reject card is gone,
+              which is also why it is inert until the transcript has been read:
+              the question is about how they handled something specific that
+              was said, so answering it without having read to the end would be
+              answering about a conversation they had not looked at. */}
           {theirOption ? (
-            <Card className="mb-5" id="q-requirement-response">
+            <Card
+              className="mb-5"
+              id="q-requirement-response"
+              cue={canDecide && requirementResponse === null}
+            >
               <CardTitle
                 hint={`They ended up at ${theirOption.label.toLowerCase()} on ${theirs.label.toLowerCase()}.`}
+                aside={
+                  canDecide && requirementResponse === null ? (
+                    <Cue>Choose one</Cue>
+                  ) : null
+                }
               >
                 🤝 What do you want to do about what they asked for?
               </CardTitle>
-              <div className="grid gap-2 sm:grid-cols-3">
+
+              {!canDecide ? (
+                <div className="mb-4">
+                  <Callout tone="warning">
+                    <p>
+                      Read to the end of the conversation above, then come back
+                      here.
+                    </p>
+                  </Callout>
+                </div>
+              ) : null}
+
+              <div
+                className={cx(
+                  "grid gap-2 transition-opacity sm:grid-cols-3",
+                  !canDecide && "pointer-events-none opacity-40",
+                )}
+                aria-disabled={!canDecide}
+              >
                 <DecisionButton
                   selected={requirementResponse === "accommodate"}
                   onClick={() => setRequirementResponse("accommodate")}
@@ -354,61 +390,6 @@ export function ReviewPhase({
               </div>
             </Card>
           ) : null}
-
-          {/* The cue arrives when the decision does. Before the transcript has
-              been read the card is inert and says so; after it, this is the
-              one thing left on the screen to do. */}
-          <Card cue={canDecide && choice === null}>
-            <CardTitle
-              aside={
-                canDecide && choice === null ? <Cue>Choose one</Cue> : null
-              }
-            >
-              ✅ Your decision
-            </CardTitle>
-
-            {!canDecide ? (
-              <div className="mb-4">
-                <Callout tone="warning">
-                  <p>
-                    Read to the end of the conversation above, then come back
-                    here.
-                  </p>
-                </Callout>
-              </div>
-            ) : null}
-
-            <div
-              className={cx(
-                "space-y-2 transition-opacity",
-                !canDecide && "pointer-events-none opacity-40",
-              )}
-              aria-disabled={!canDecide}
-            >
-              {RATIFY_OPTIONS.map(([value, label, hint]) => (
-                <button
-                  key={value}
-                  type="button"
-                  disabled={!canDecide}
-                  onClick={() => setChoice(value)}
-                  className={cx(
-                    "block w-full rounded-[var(--radius)] border-2 p-3.5 text-left transition-colors",
-                    choice === value
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                      : "border-[var(--line)] hover:border-[var(--ink-3)]",
-                  )}
-                >
-                  <span className="block text-[0.9375rem] font-semibold">
-                    {label}
-                  </span>
-                  <span className="block text-[0.8125rem] text-[var(--ink-2)]">
-                    {hint}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-          </Card>
         </TaskLayout>
       </Page>
 
@@ -421,9 +402,7 @@ export function ReviewPhase({
             ? "Read the conversation to the end first."
             : canSubmit
               ? ""
-              : needsRequirementResponse
-                ? "Answer both questions above."
-                : "Make a decision."
+              : "Answer the question above."
         }
       />
     </>

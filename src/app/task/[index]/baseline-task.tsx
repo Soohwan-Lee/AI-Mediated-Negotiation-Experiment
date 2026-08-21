@@ -598,7 +598,11 @@ export function BaselineTask({
               cue sits on whichever card is actually blocking: the composer
               when they can write, the terms when a first package has to be
               chosen before they can. */}
-          <Card className="mb-5 flex flex-col" padded={false} cue={yourTurn}>
+          {/* The ring goes on the COMPOSER inside this card, not on the card
+              itself — see the matching note in `shared.tsx`. Two nested glows
+              read as a rendering fault, and the composer is the control
+              actually being waited on. */}
+          <Card className="mb-5 flex flex-col" padded={false}>
             <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
               <div>
                 <p className="text-[0.875rem] font-medium">

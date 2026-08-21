@@ -336,7 +336,7 @@ export interface TranscriptMessage {
 }
 
 // ---------------------------------------------------------------------------
-// Agreement + ratification
+// Agreement
 // ---------------------------------------------------------------------------
 
 export interface AgreementTerm {
@@ -350,8 +350,6 @@ export interface CandidateAgreement {
   terms: AgreementTerm[];
   unresolvedIssueIds: string[];
 }
-
-export type RatificationChoice = "ratify" | "request_revision" | "reject";
 
 /**
  * The requirement's level at each point in the trajectory (Design §9.3.1).
@@ -407,7 +405,7 @@ export type EventType =
   | "message_sent"
   | "negotiation_started"
   | "negotiation_ended"
-  | "ratification_choice"
+  | "task_outcome_recorded"
   | "survey_saved"
   | "reward_decision"
   | "debriefing_acknowledged"

@@ -1092,7 +1092,12 @@ export function DirectNegotiation({
             openByDefault={messages.length === 0}
           />
 
-          <Card className="mb-5 flex flex-col" padded={false} cue={yourTurn}>
+          {/* The ring goes on the COMPOSER, not on this card. Both carried it
+              while the cue was a flat outline and the duplication was merely
+              redundant; as a glow, two nested halos read as a rendering fault.
+              The composer is also the more accurate target — it is the control
+              being waited on, and rule 9 asks the cue to point at one thing. */}
+          <Card className="mb-5 flex flex-col" padded={false}>
             <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
               <div>
                 <p className="text-[0.875rem] font-medium">

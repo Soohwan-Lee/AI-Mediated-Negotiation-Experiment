@@ -17,7 +17,6 @@ import type {
   ExperimentEvent,
   Mandate,
   ProlificContext,
-  RatificationChoice,
   SurveyResponses,
   TranscriptMessage,
 } from "./types";
@@ -62,12 +61,6 @@ export interface Store {
   saveAgreement(
     participantKey: string,
     agreement: CandidateAgreement,
-  ): Promise<void>;
-  saveRatification(
-    participantKey: string,
-    sessionIndex: 1 | 2,
-    choice: RatificationChoice,
-    editedTerms?: CandidateAgreement,
   ): Promise<void>;
 }
 
@@ -152,19 +145,6 @@ class LocalStore implements Store {
 
   async saveAgreement(participantKey: string, agreement: CandidateAgreement) {
     write(key("agreement", participantKey, agreement.sessionIndex), agreement);
-  }
-
-  async saveRatification(
-    participantKey: string,
-    sessionIndex: 1 | 2,
-    choice: RatificationChoice,
-    editedTerms?: CandidateAgreement,
-  ) {
-    write(key("ratification", participantKey, sessionIndex), {
-      choice,
-      editedTerms: editedTerms ?? null,
-      decidedAt: new Date().toISOString(),
-    });
   }
 }
 

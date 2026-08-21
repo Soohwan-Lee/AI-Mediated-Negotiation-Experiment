@@ -177,19 +177,64 @@ body {
  *
  * A halo, never a fill. The surface colour of a card is what says who can see
  * what is on it (see the note at the top of this file), so a cue may not touch
- * it — it adds an outline and nothing else. Sand cards get the sand outline
- * for the same reason.
+ * it — it lights the edge and nothing else. Sand cards get the sand light for
+ * the same reason.
+ *
+ * It GLOWS rather than drawing a line. A hard 3px ring read as a validation
+ * error — the same shape a form uses to say something is wrong — on a control
+ * whose message is the opposite: this one is ready for you. A diffuse edge
+ * carries "look here" without carrying "you have made a mistake".
+ *
+ * The breathing is deliberately slower than a person notices deliberately
+ * (4s, and the difference between its two ends is small). It is there to catch
+ * the eye returning to the screen after several seconds of waiting for a
+ * reply, which is the actual moment this cue exists for. Anything faster reads
+ * as an alert, and an alert every turn is a nag.
  *
  * Used sparingly: at most one cue on a screen, on the control the participant
  * is waiting to be told to use. */
 .cue-ring {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  box-shadow:
+    0 0 0 4px var(--accent-soft),
+    0 0 16px 2px color-mix(in srgb, var(--accent) 22%, transparent);
+  animation: cue-breathe 4s ease-in-out infinite;
 }
 
 .cue-ring-private {
-  border-color: var(--private-strong);
-  box-shadow: 0 0 0 3px #f6ecd8;
+  border-color: color-mix(in srgb, var(--private-strong) 65%, var(--line));
+  box-shadow:
+    0 0 0 4px #f6ecd8,
+    0 0 16px 2px color-mix(in srgb, var(--private-strong) 25%, transparent);
+  animation: cue-breathe-private 4s ease-in-out infinite;
+}
+
+@keyframes cue-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px var(--accent-soft),
+      0 0 12px 1px color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px var(--accent-soft),
+      0 0 22px 4px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+}
+
+@keyframes cue-breathe-private {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px #f6ecd8,
+      0 0 12px 1px color-mix(in srgb, var(--private-strong) 16%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px #f6ecd8,
+      0 0 22px 4px color-mix(in srgb, var(--private-strong) 32%, transparent);
+  }
 }
 
 /* Visible, consistent focus for keyboard participants. */
@@ -212,5 +257,25 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* The blanket rule above collapses an animation to a single 0.01ms run,
+     which for the cue means it stops wherever the last frame put it. The glow
+     is the signal, not the movement, so it is restated here as a static one —
+     otherwise a participant who asked for reduced motion loses the cue instead
+     of losing the pulse. */
+  .cue-ring {
+    animation: none !important;
+    box-shadow:
+      0 0 0 4px var(--accent-soft),
+      0 0 18px 3px color-mix(in srgb, var(--accent) 24%, transparent) !important;
+  }
+
+  .cue-ring-private {
+    animation: none !important;
+    box-shadow:
+      0 0 0 4px #f6ecd8,
+      0 0 18px 3px
+        color-mix(in srgb, var(--private-strong) 26%, transparent) !important;
   }
 }

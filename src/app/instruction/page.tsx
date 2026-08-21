@@ -27,7 +27,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ActionBar, BackButton } from "@/components/study-chrome";
 import {
   Callout,
@@ -36,6 +36,7 @@ import {
   ChoiceList,
   Page,
   PageHeader,
+  cx,
 } from "@/components/ui";
 import { useDevAutofill, useDevBypass } from "@/lib/dev-mode";
 import {
@@ -73,6 +74,84 @@ const CHECKS: CheckItem[] = COMPREHENSION_BLOCK.items.flatMap((item) =>
       ]
     : [],
 );
+
+/**
+ * One fact from the instructions, under a heading that names it.
+ *
+ * The emoji is a landmark, not decoration: it is what lets someone who read
+ * this page five minutes ago find the paragraph about their point sheet again
+ * without re-reading the card. It is `aria-hidden` because the heading beside
+ * it already says the same thing in words.
+ */
+function Fact({
+  icon,
+  title,
+  children,
+}: {
+  icon: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex gap-3">
+      <span aria-hidden className="mt-0.5 text-[1.125rem] leading-none">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="mb-1 text-[0.9375rem] font-semibold">{title}</p>
+        <p className="max-w-prose text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+          {children}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One side's standing in the role relation.
+ *
+ * COLOUR RULE (interface rule 1): neither box may use the sand palette. What
+ * is in them is not private information — it is the role relation both sides
+ * are told about, and the study's whole colour convention is that sand means
+ * "only you can see this". The two are told apart by weight, not by hue.
+ */
+function PowerBox({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  tone: "own" | "theirs";
+}) {
+  return (
+    <div
+      className={cx(
+        "rounded-[var(--radius)] border p-3.5",
+        tone === "own"
+          ? "border-[var(--ink-3)] bg-[var(--surface)]"
+          : "border-[var(--line)] bg-[var(--surface-muted)]",
+      )}
+    >
+      <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+        {title}
+      </p>
+      <ul className="space-y-1.5">
+        {items.map((item) => (
+          <li
+            key={item}
+            className="flex gap-2 text-[0.875rem] leading-relaxed text-[var(--ink-2)]"
+          >
+            <span aria-hidden className="text-[var(--ink-3)]">
+              •
+            </span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function InstructionPage() {
   usePageEnter("instruction");
@@ -150,95 +229,130 @@ export default function InstructionPage() {
             subtitle="Read this carefully — you will be asked a few questions about it next."
           />
 
+          {/* The role, as two columns of what each side holds.
+              The power asymmetry (Design §6) is the point of this card, and as
+              two paragraphs it had to be held in the head to be compared. Side
+              by side, the asymmetry is the layout: what you hold, what they
+              hold, and neither list is enough on its own. The wording of each
+              item is unchanged — this is the same claim, arranged so it can be
+              seen rather than assembled. */}
           <Card className="mb-5">
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
               You have been assigned the role of
             </p>
-            <p className="mb-4 text-2xl font-semibold tracking-[-0.02em]">
+            <p className="mb-5 text-2xl font-semibold tracking-[-0.02em]">
               {isLeader ? "Project Leader" : "Team Member"}
             </p>
 
-            <div className="prose-study">
-              {isLeader ? (
-                <>
-                  <p>
-                    You hold formal authority over the project. You approve work
-                    assignments, you write the performance evaluation that feeds
-                    into bonus decisions, and you recommend who is staffed on
-                    future high-visibility projects.
-                  </p>
-                  <p>
-                    At the same time, the project depends on the Team
-                    Member&apos;s specialist expertise and their willingness to
-                    take part. You cannot simply issue instructions and get the
-                    outcome you want — you need an agreement.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p>
-                    You hold the specialist expertise the project depends on,
-                    and you may decline extra participation or accept it on
-                    conditions.
-                  </p>
-                  <p>
-                    At the same time, the Project Leader holds formal authority.
-                    They approve work assignments, write the performance
-                    evaluation that feeds into bonus decisions, and recommend
-                    who is staffed on future high-visibility projects. Your
-                    evaluation and future opportunities depend on their
-                    assessment.
-                  </p>
-                </>
-              )}
-              <p>
-                Neither side can settle everything alone. Both of you have to
-                negotiate.
-              </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <PowerBox
+                title="What you hold"
+                tone="own"
+                items={
+                  isLeader
+                    ? [
+                        "Formal authority over the project",
+                        "You approve work assignments",
+                        "You write the performance evaluation that feeds into bonus decisions",
+                        "You recommend who is staffed on future high-visibility projects",
+                      ]
+                    : [
+                        "The specialist expertise the project depends on",
+                        "You may decline extra participation, or accept it on conditions",
+                      ]
+                }
+              />
+              <PowerBox
+                title={
+                  isLeader
+                    ? "What the Team Member holds"
+                    : "What the Project Leader holds"
+                }
+                tone="theirs"
+                items={
+                  isLeader
+                    ? [
+                        "The specialist expertise the project depends on",
+                        "Their willingness to take part — you cannot simply issue instructions and get the outcome you want",
+                      ]
+                    : [
+                        "Formal authority over the project",
+                        "They approve work assignments",
+                        "They write the performance evaluation that feeds into bonus decisions",
+                        "They recommend who is staffed on future high-visibility projects",
+                      ]
+                }
+              />
             </div>
+
+            <p className="mt-4 max-w-prose text-[0.9375rem] font-medium">
+              {isLeader
+                ? "Neither side can settle everything alone. You need an agreement."
+                : "Your evaluation and future opportunities depend on their assessment — and neither side can settle everything alone. You both have to negotiate."}
+            </p>
           </Card>
 
+          {/* Five short blocks, not five paragraphs.
+              This was one card of continuous prose, and it is the densest
+              reading in the study — every fact in it is load-bearing, so none
+              could be cut. What could change is the shape: a participant
+              scanning for "how long is this" or "can I show them my points"
+              had to read the whole thing to find either. Each fact now sits
+              under a heading that names it, so the card can be scanned first
+              and read second. Nothing here has been dropped. */}
           <Card className="mb-5">
             <CardTitle>What you will do</CardTitle>
-            <div className="prose-study">
-              <p>
-                You will complete <strong>two negotiation tasks</strong>, each
-                on a different workplace scenario. Each negotiation has a{" "}
-                <strong>ten-minute limit</strong>. Before the first one there is
-                a short practice round.
-              </p>
-              <p>
-                After each task you answer some questions about how it went, and
-                then the bonus for that task is decided.
-              </p>
-              <p>
-                Each negotiation settles <strong>three terms</strong>, and each
-                term has four options. You and the other party have to agree on
-                the same option for all three, or the project falls back to a
-                limited plan and you both take your fallback score.
-              </p>
-              <p>
-                In each task you get a private briefing: your situation, what
-                each option is worth to you in points, the reasons behind what
-                you are asking for, and what happens if there is no agreement.
-                It is yours alone — the other person has a different one and
-                cannot see yours. You may explain why a term matters to you and
-                ask what matters to them, but you may not show them your point
-                sheet or tell them the numbers on it.
-              </p>
-              <p>
-                <strong>The two tasks use different interfaces.</strong> In one,
-                you write the messages and make the offers yourself. In the
-                other, you set out what you want and which of your reasons may
-                be used, and an <strong>AI Proxy</strong> negotiates on your
+            <div className="space-y-4">
+              <Fact icon="🗂" title="Two tasks, on two different scenarios">
+                Each negotiation has a <strong>ten-minute limit</strong> — that
+                is a cap, not a target, and you may finish sooner. Before the
+                first one there is a short practice round.
+              </Fact>
+
+              <Fact icon="📊" title="Three terms to settle, four options each">
+                You and the other party have to agree on the same option for
+                all three. If you do not, the project falls back to a limited
+                plan and you both take your fallback score.
+              </Fact>
+
+              <Fact icon="🔒" title="Your briefing is private">
+                It holds your situation, what each option is worth to you in
+                points, the reasons behind what you are asking for, and what
+                happens if there is no agreement. The other person has a
+                different one and cannot see yours. You may explain why a term
+                matters to you and ask what matters to them, but{" "}
+                <strong>
+                  you may not show them your point sheet or tell them the
+                  numbers on it
+                </strong>
+                .
+              </Fact>
+
+              <Fact icon="💬" title="The two tasks work differently">
+                In one you write the messages and make the offers yourself. In
+                the other you set out what you want and which of your reasons
+                may be used, and an <strong>AI Proxy</strong> negotiates on your
                 behalf with the other person&apos;s AI Proxy while you both
                 watch. Each is explained when you reach it.
-              </p>
-              <p>
-                When an AI Proxy negotiates for you, what it reaches is{" "}
-                <strong>tentative</strong>. Nothing is settled until you review
-                it and choose to accept it, ask for one change, or reject it.
-              </p>
+              </Fact>
+
+              {/* This replaced a sentence promising a review step where the
+                  participant could "accept, ask for one change, or reject".
+                  That step no longer exists: the AI Proxies negotiate once and
+                  then the participant takes over and finishes the negotiation
+                  themselves. Leaving the old wording in would have told every
+                  Proxy participant to expect a screen they never reach. */}
+              <Fact icon="🤝" title="After the AI Proxies, you take over">
+                What they reach is not final. You then talk to the other
+                participant <strong>directly</strong>, with everything the
+                proxies said still on screen, and{" "}
+                <strong>what the two of you agree is the result</strong>.
+              </Fact>
+
+              <Fact icon="💵" title="Then questions, then the bonus">
+                After each task you answer some questions about how it went, and
+                then the bonus for that task is decided.
+              </Fact>
             </div>
           </Card>
 

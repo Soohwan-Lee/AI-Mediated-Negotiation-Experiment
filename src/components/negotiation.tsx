@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NEGOTIATION } from "@/lib/study-config";
 import type { StageId, Speaker } from "@/lib/types";
-import { Button } from "./ui";
+import { Button, cx } from "./ui";
 
 // ---------------------------------------------------------------------------
 // Timer
@@ -281,11 +281,16 @@ export function MessageComposer({
               submit();
             }
           }}
-          className={`flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)] ${
-            cue && !value
-              ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-              : "border-[var(--line)]"
-          }`}
+          /* The cue is the glow on the edge, never a fill. Tinting the box
+             said "this field is special" in the same language the sand
+             surfaces use to say "this is private to you", which is the one
+             thing colour is reserved for here (interface rule 1). It also
+             clears the moment they start typing — once there are words in the
+             box, the participant plainly knows it is their turn. */
+          className={cx(
+            "flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-shadow focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)]",
+            cue && !value ? "cue-ring" : "border-[var(--line)]",
+          )}
         />
         <Button onClick={submit} disabled={disabled || !trimmed || over}>
           {sendLabel}
