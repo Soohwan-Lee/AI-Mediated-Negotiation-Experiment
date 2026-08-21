@@ -256,7 +256,14 @@ export function ProxyTask({
   const requirement = requirementIssue(task, role);
   const reasonCards = task.roleBriefs[role].reasonCards;
 
-  const [phase, setPhase] = useState<Phase>("brief");
+  // "intro", not "brief". This started on the brief and so the Proxy arm's
+  // cover was unreachable — `phase === "intro"` was rendered but never true,
+  // while the Baseline arm opened on its cover as intended. That put a whole
+  // orientation screen (the step list, the time estimate, "neither of you can
+  // settle anything alone") in one condition and not the other, which is a
+  // between-condition difference in what participants were told before the
+  // task rather than a layout slip.
+  const [phase, setPhase] = useState<Phase>("intro");
   const [mandate, setMandate] = useState<Mandate>(() =>
     emptyMandate(task, role, taskIndex),
   );
@@ -617,6 +624,7 @@ export function ProxyTask({
       <TaskIntro
         taskIndex={taskIndex}
         steps={STEP_LABELS}
+        scene="proxy"
         onStart={() => setPhase("brief")}
       />
     );
@@ -913,6 +921,11 @@ export function ProxyTask({
       <TaskCover
         eyebrow="Your turn now"
         title="Now you talk to them directly"
+        /* The handover draws the DIRECT shape, not the proxy one — the proxies
+           have finished and the rest of this task is the two people talking.
+           Repeating the proxy picture here would say the opposite of what the
+           screen exists to announce. */
+        scene="direct"
         lead={
           <>
             <p>

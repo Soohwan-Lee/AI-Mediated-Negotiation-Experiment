@@ -128,12 +128,22 @@ function PowerBox({
     <div
       className={cx(
         "rounded-[var(--radius)] border p-3.5",
+        // The participant's own column reads first: a solid surface and a
+        // darker heading against the other side's muted one. The bullets are
+        // full-strength ink on their side too, because "what they hold" is
+        // the half that has to land — it is the power they are negotiating
+        // against, not background.
         tone === "own"
-          ? "border-[var(--ink-3)] bg-[var(--surface)]"
+          ? "border-[var(--line-strong)] bg-[var(--surface)]"
           : "border-[var(--line)] bg-[var(--surface-muted)]",
       )}
     >
-      <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+      <p
+        className={cx(
+          "mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]",
+          tone === "own" ? "text-[var(--ink)]" : "text-[var(--ink-3)]",
+        )}
+      >
         {title}
       </p>
       <ul className="space-y-1.5">
@@ -244,7 +254,11 @@ export default function InstructionPage() {
               {isLeader ? "Project Leader" : "Team Member"}
             </p>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            {/* `items-start` so the shorter column ends where its content
+                ends. Stretched to equal height, the side with fewer items
+                showed a panel of empty space, which reads as something
+                missing rather than as a shorter list. */}
+            <div className="grid items-start gap-3 sm:grid-cols-2">
               <PowerBox
                 title="What you hold"
                 tone="own"

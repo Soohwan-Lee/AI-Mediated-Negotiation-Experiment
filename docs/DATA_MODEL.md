@@ -137,11 +137,19 @@ visible. It is the first point on the trajectory (Design §9.3.1).
 because they ask what the participant EXPECTS raising their requirement to
 cost.
 
-`task_outcome_t{n}` carries the ratification choice, the participant's
-structured response to the OTHER side's requirement, and the coded level of
-both requirements in the final package. The response and the preservation code
-are stored separately on purpose: a package that broke a threshold and was then
-rejected is still coded as preserved.
+`task_outcome_t{n}` carries `outcome` (`agreement` | `no_agreement`), the
+participant's structured response to the OTHER side's requirement, and the
+coded level of both requirements in the final package.
+
+There is no ratification choice. Both arms now end with the participant
+agreeing a package in conversation, so a screen asking them to approve it
+afterwards asked them to re-decide what they had just decided — and gave the
+Proxy arm a way to undo an agreement neither counterpart has. `outcome` is
+what that column used to carry implicitly.
+
+The uptake response and the preservation code are still stored separately, and
+still for the §9.3.1 reason: `ownRequirementPreserved` is coded from the
+package regardless of how the participant feels about it.
 
 `reward_t{n}` stores the Leader's `BONUS` slider value, or — for a Member — the
 fixed value they were shown. Only the Leader's is data; the Member's is a
@@ -257,9 +265,9 @@ create table agreements (
   task_index        smallint not null,
   terms                jsonb not null,   -- AgreementTerm[]
   unresolved_issue_ids text[] not null default '{}',
-  ratification_choice  text,             -- ratify | request_revision | reject
-  edited_terms         jsonb,
-  revision_note        text,
+  -- No ratification columns. The participant agrees the package in the
+  -- conversation itself; whether one was reached is `task_outcome_t{n}.outcome`
+  -- in `responses`, and the terms above are what they agreed.
   decided_at           timestamptz,
   primary key (participant_key, task_index)
 );

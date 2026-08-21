@@ -116,6 +116,7 @@ export default function PracticePage() {
         eyebrow="Practice"
         title="A practice round first"
         doesNotCount
+        scene="practice"
         lead={
           <>
             <p>

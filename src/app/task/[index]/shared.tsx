@@ -44,6 +44,7 @@ import {
   BriefingPanel,
   ReasonBox,
   TaskCover,
+  type CoverScene,
   TaskHeader,
   TaskLayout,
 } from "@/components/session";
@@ -86,10 +87,20 @@ import type { NegotiationTask, Package, Role } from "@/lib/types";
 export function TaskIntro({
   taskIndex,
   steps,
+  scene,
   onStart,
 }: {
   taskIndex: 1 | 2;
   steps: string[];
+  /**
+   * Which shape of exchange this task uses.
+   *
+   * The one thing on this cover that differs between the two arms, and it is
+   * allowed to differ because it draws the INTERFACE, not the condition — the
+   * participant is told plainly which of the two they are about to use, and
+   * Delegate and Explorer produce the same picture. See `CoverArt`.
+   */
+  scene: CoverScene;
   onStart: () => void;
 }) {
   const first = taskIndex === 1;
@@ -133,6 +144,7 @@ export function TaskIntro({
         )
       }
       steps={steps}
+      scene={scene}
       minutes={STAGE_MINUTES.task}
       actionLabel={`Start Task ${taskIndex}`}
       onStart={onStart}

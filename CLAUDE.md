@@ -85,7 +85,13 @@ decision depends only on the package and the clock; verify that after touching
 either.
 
 **The counterpart's fixed opening must be on screen before the participant
-writes anything**: it is the anchor their reply is measured against.
+writes anything**: it is the anchor their reply is measured against. It is
+seeded when the negotiation starts, and **that seed counts as the
+counterpart's first reply** — `setReplies(1)`. Left at zero,
+`counterpartStageAfter(0)` returned stage 1 again on the participant's first
+message, so the counterpart repeated its opening verbatim and every later move
+slid one message down the script, landing the standardized challenge later
+than the design places it.
 
 **Both sides challenge at stage 3**, each naming the *other* role's
 requirement. `standardizedChallenge` is therefore keyed by the role being
@@ -260,10 +266,21 @@ it. Assuming it made the rule inert for every Proxy participant while it kept
 biting in Baseline — a mechanical asymmetry in the primary outcome, along the
 primary contrast.
 
-**There is no "ask for one change".** It existed when the proxies produced the
-final package alone. Talking to the other side directly is a better version of
-the same control, and keeping both would give the Proxy arm two bites Baseline
-does not have.
+**There is no "ask for one change", and no approve/reject either.** The
+revision existed when the proxies produced the final package alone; talking to
+the other side directly is a better version of the same control, and keeping
+both would give the Proxy arm two bites Baseline does not have.
+
+Ratification went for the same reason one step later. Both arms now end with
+the participant agreeing a package *in conversation*, so a screen asking "do
+you accept this?" asked them to re-decide what they had just decided — and it
+handed the Proxy arm a way to undo an agreement that neither counterpart has.
+The review screen states the outcome instead. What survives is the §9.3.1
+uptake question about the OTHER side's requirement, which is asked rather than
+coded off the transcript, and `outcome: agreement | no_agreement`, which used
+to be implicit in the ratification choice and is now recorded explicitly.
+`RatificationChoice` and `saveRatification` are gone, so the Supabase port does
+not inherit a table nothing writes.
 
 **RISK sits in the same place in both arms, and that position is load-bearing.**
 It asks what the participant *expects* raising their requirement to cost. Asked
@@ -328,16 +345,35 @@ compiles.
    about 50rem, so "Strongly agree" hung outside the card. Rows flex, and the
    parts that cannot shrink are grids that fit their container.
 9. **A cue points, it does not colour.** The one thing a screen is waiting for
-   gets `.cue-ring` (an outline) and a `Cue` pill — "Your turn", "3 to
-   answer", "Waiting for their reply". It may never change a card's surface,
-   because the surface is what says who can see what is on it (rule 1), and it
-   may never suggest an answer, only that one is expected. At most one ring on
-   a screen; pills that count what is left may repeat.
+   gets `.cue-ring` and a `Cue` pill — "Your turn", "3 to answer", "Waiting
+   for their reply". It may never change a card's surface, because the surface
+   is what says who can see what is on it (rule 1), and it may never suggest
+   an answer, only that one is expected. At most one ring on a screen; pills
+   that count what is left may repeat.
+
+   The ring is a **glow, not a line**. A hard outline is the shape a form uses
+   to mark a field as wrong, and it was reading as an error on controls whose
+   message is the opposite. It breathes on a 4s cycle, slow enough to catch
+   the eye returning after a wait rather than to nag; `prefers-reduced-motion`
+   restates it as a static glow, because the blanket
+   `animation-iteration-count: 1` in that block would otherwise freeze it on
+   whatever frame it stopped at and lose the signal along with the movement.
+   Nest two and it reads as a rendering fault, so the ring goes on the control
+   (the composer), never also on the card around it.
 10. **A task announces itself.** The practice round and every task opens on a
     `TaskCover`: which of the two it is, whether it counts, what happens in
-    it, how long it takes. It is a phase, not a route — the flow step still
-    comes from the URL alone (rule 3) — and it is deliberately not counted as
-    one of the task's own steps.
+    it, how long it takes, and a `CoverArt` row showing who talks to whom. It
+    is a phase, not a route — the flow step still comes from the URL alone
+    (rule 3) — and it is deliberately not counted as one of the task's own
+    steps.
+
+    **Both arms get a cover and both get a scene.** `proxy-task.tsx` opened on
+    `brief` for a while, so its `intro` phase was unreachable and only Baseline
+    participants ever saw a cover — a whole orientation screen present in one
+    condition and not the other. The art draws the INTERFACE, never the
+    condition: Delegate and Explorer are the same picture, the other side is
+    drawn as a person with the same figure the participant gets, and the
+    handover uses the direct scene because from there the proxies are done.
 
 ## Dev / mockup mode
 

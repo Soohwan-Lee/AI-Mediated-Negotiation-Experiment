@@ -108,6 +108,93 @@ export function TaskHeader({
  * ("What it may say"), never a condition, and Delegate and Explorer produce
  * the same list. Nothing here may say why this task differs from the last one.
  */
+/**
+ * Who talks to whom in the round about to start, drawn in emoji.
+ *
+ * A cover says what is about to happen in a paragraph and a numbered list, and
+ * both have to be read. The shape of the exchange — two people talking, or two
+ * people who each send a proxy and then talk themselves — is the one thing on
+ * the cover that a picture states faster than a sentence, and it is also the
+ * thing a participant most needs to have right before they start.
+ *
+ * DECEPTION INTEGRITY, and this is the whole reason the component takes a
+ * `scene` rather than reading the assignment:
+ *
+ *  - It draws the INTERFACE, never the condition. Delegate and Explorer are
+ *    the same picture, because they are the same interface — the difference
+ *    between them is which reasons a proxy may voice, which is not a shape.
+ *    A participant who compared covers with someone else must find the two
+ *    Proxy covers identical.
+ *  - The other side is drawn as a person, with the same figure the participant
+ *    gets. Drawing them as a machine, or leaving them out, would contradict
+ *    what every other screen says about who is on the other end.
+ *  - Both arms get a scene. If only one condition had a picture, the picture
+ *    itself would become the tell that the two tasks differ in kind.
+ *
+ * `aria-hidden`, with the same content stated in the lead text — this is a
+ * restatement for people who skim, not a source of new information.
+ */
+export type CoverScene = "direct" | "proxy" | "practice";
+
+function CoverArt({ scene }: { scene: CoverScene }) {
+  const figures =
+    scene === "proxy"
+      ? // You → your proxy … their proxy ← them. The proxies meet in the
+        // middle, and the two principals are still the ends of the line,
+        // because the participant does take over from theirs.
+        [
+          { emoji: "🧑‍💼", label: "You" },
+          { emoji: "🤖", label: "Your AI Proxy" },
+          { emoji: "🤝", label: "", joint: true },
+          { emoji: "🤖", label: "Their AI Proxy" },
+          { emoji: "🧑‍💼", label: "Other Participant" },
+        ]
+      : scene === "direct"
+        ? [
+            { emoji: "🧑‍💼", label: "You" },
+            { emoji: "💬", label: "", joint: true },
+            { emoji: "🧑‍💼", label: "Other Participant" },
+          ]
+        : [
+            { emoji: "🧑‍💼", label: "You" },
+            { emoji: "💬", label: "", joint: true },
+            { emoji: "🎯", label: "A practice scenario" },
+          ];
+
+  return (
+    <div
+      aria-hidden
+      className="mt-7 flex w-full items-start justify-center gap-2 sm:gap-4"
+    >
+      {figures.map((f, i) => (
+        <div
+          key={`${f.emoji}-${i}`}
+          className={cx(
+            "flex flex-col items-center",
+            f.joint ? "pt-3 sm:pt-4" : "w-[4.5rem] sm:w-24",
+          )}
+        >
+          <span
+            className={cx(
+              "flex items-center justify-center rounded-full",
+              f.joint
+                ? "text-[1.25rem] sm:text-[1.5rem]"
+                : "h-12 w-12 border border-[var(--line)] bg-[var(--surface)] text-[1.5rem] sm:h-14 sm:w-14 sm:text-[1.75rem]",
+            )}
+          >
+            {f.emoji}
+          </span>
+          {f.label ? (
+            <span className="mt-2 text-center text-[0.6875rem] leading-tight text-[var(--ink-3)]">
+              {f.label}
+            </span>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function TaskCover({
   eyebrow,
   title,
@@ -122,6 +209,7 @@ export function TaskCover({
   counter,
   /** Set on a round whose results do not count, which says so plainly. */
   doesNotCount,
+  scene,
 }: {
   eyebrow: string;
   title: string;
@@ -137,6 +225,8 @@ export function TaskCover({
   secondary?: ReactNode;
   counter?: { index: number; total: number };
   doesNotCount?: boolean;
+  /** Who talks to whom in this round. See `CoverArt`. */
+  scene?: CoverScene;
 }) {
   return (
     <>
@@ -180,6 +270,8 @@ export function TaskCover({
                 </>
               ) : null}
             </span>
+
+            {scene ? <CoverArt scene={scene} /> : null}
 
             <div className="prose-study mt-6 text-left">{lead}</div>
 

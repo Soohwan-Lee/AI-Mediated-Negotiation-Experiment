@@ -301,7 +301,7 @@ export type Speaker =
   | "counterpart"
   | "participant_proxy"
   | "counterpart_proxy"
-  /** The counterpart principal, who speaks only at ratification (Design §4). */
+  /** The counterpart principal, who speaks once on the review screen (Design §4). */
   | "counterpart_principal"
   | "system";
 

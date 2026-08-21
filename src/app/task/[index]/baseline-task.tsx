@@ -436,6 +436,7 @@ export function BaselineTask({
       <TaskIntro
         taskIndex={taskIndex}
         steps={STEP_LABELS}
+        scene="direct"
         onStart={() => setPhase("brief")}
       />
     );
@@ -519,6 +520,14 @@ export function BaselineTask({
               text: scripted?.text ?? openingLine(task, counterpartRole),
             },
           ]);
+          // The opening IS the counterpart's stage-1 move, so it counts as a
+          // reply. Left at zero, `counterpartStageAfter(0)` returned stage 1
+          // again on the participant's first message and the counterpart
+          // repeated its opening word for word — visibly so in mockup mode,
+          // where both come from the same scripted line. It also cost the
+          // script a turn, pushing the standardized challenge a message later
+          // than the design places it.
+          setReplies(1);
           logEvent("negotiation_started", undefined, {
             sessionIndex: taskIndex,
           });

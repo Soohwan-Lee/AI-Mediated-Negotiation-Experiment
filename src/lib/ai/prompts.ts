@@ -14,7 +14,7 @@
  * Three agent kinds:
  *  - ostensible_human    : the Baseline counterpart (P1), which must read as a
  *    real person. The participant is never told otherwise until debriefing.
- *  - counterpart_principal : the other participant's one line at ratification
+ *  - counterpart_principal : the other participant's one line on the review screen
  *    (P2). A fixed template, rendered in a human voice.
  *  - delegate / explorer : the two Proxy policies (P3, P4).
  */
@@ -166,7 +166,7 @@ ${ctx.decidedAction}`;
 }
 
 /**
- * The counterpart principal's single line at ratification (P2).
+ * The counterpart principal's single line on the review screen (P2).
  *
  * In a Proxy task this person is silent throughout and speaks exactly once.
  * That is what removes their free speech from the design: the model renders
