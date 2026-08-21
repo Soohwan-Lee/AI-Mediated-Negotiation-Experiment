@@ -309,12 +309,38 @@ export function TaskCover({
 // Briefing
 // ---------------------------------------------------------------------------
 
+/**
+ * The private briefing.
+ *
+ * EVERYTHING IN IT STAYS (interface rule 5) — a participant is expected to
+ * negotiate from this, and taking a part away to tidy the panel would take
+ * away something they were told to negotiate from. What changed is that it is
+ * no longer all expanded at once.
+ *
+ * As one continuous scroll it held: role, position, a paragraph of situation,
+ * objectives, a requirement note, six reason cards in two boxes, the fallback,
+ * and the payoff table. In the rail that is several screens, and the payoff
+ * table — the part most often wanted DURING a negotiation — sat at the bottom
+ * of all of it. So the sections fold, and what is open by default is chosen by
+ * what a participant reaches for mid-sentence rather than by document order:
+ * the numbers and the fallback, which are lookups, plus the reason cards,
+ * which are rule 5's explicit requirement and rule 6's two-box decision. The
+ * situation and objectives have been read on the brief phase and fold away;
+ * they are one click, never a navigation.
+ *
+ * `defaultOpen` overrides that on the brief phase, where the whole thing is
+ * being read for the first time in the main column and nothing should be
+ * hidden behind a control.
+ */
 export function BriefingPanel({
   task,
   role,
+  defaultOpen,
 }: {
   task: NegotiationTask;
   role: Role;
+  /** Open every section — used where the briefing is being read, not consulted. */
+  defaultOpen?: boolean;
 }) {
   const brief = task.roleBriefs[role];
   const requirement = requirementIssue(task, role);
@@ -335,39 +361,48 @@ export function BriefingPanel({
       <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]">
         You are
       </p>
-      <p className="mb-3 text-[0.9375rem] font-semibold text-[var(--ink)]">
+      <p className="mb-2 text-[0.9375rem] font-semibold text-[var(--ink)]">
         {brief.title}
       </p>
-      {/* The panel is read in the rail most of the time, but on the brief
-          phase it sits in the full-width column — so its prose keeps a
-          reading measure of its own rather than following the container. */}
-      <p className="mb-5 max-w-prose text-[0.8125rem] leading-relaxed">
+      <p className="mb-4 max-w-prose text-[0.8125rem] leading-relaxed">
         {brief.organizationalPosition}
       </p>
 
       {/* The role story is several sentences of concrete situation, and it is
           the part that has to do the work: a point sheet alone does not make
-          anyone reluctant to raise something. It gets prose treatment. */}
-      <Section title="📄 Your situation">
-        <p className="prose-study max-w-prose whitespace-pre-line text-[0.8125rem] leading-relaxed">
+          anyone reluctant to raise something.
+
+          It does NOT get `.prose-study`. That class sets 1.0625rem, so the
+          story rendered half again the size of everything around it and took
+          most of the rail on its own — the `text-[0.8125rem]` here was being
+          overridden. Prose treatment in a 13px panel means the leading and the
+          measure, not the display face. */}
+      <Fold title="📄 Your situation" defaultOpen={defaultOpen}>
+        <p className="max-w-prose whitespace-pre-line text-[0.8125rem] leading-[1.65]">
           {brief.roleStory}
         </p>
-      </Section>
+      </Fold>
 
-      <Section title="🎯 What you want">
+      <Fold title="🎯 What you want" defaultOpen={defaultOpen}>
         <ul className="list-disc space-y-1 pl-4 text-[0.8125rem]">
           {brief.objectives.map((o) => (
             <li key={o}>{o}</li>
           ))}
         </ul>
-      </Section>
+      </Fold>
 
-      {/* The six reason cards, in their two boxes. The visual separation is a
-          design requirement, not a preference (Design §7 UI 규칙): the whole
-          measure is which box a participant is willing to draw from, and if
-          the two read as one list that decision stops being legible. */}
+      {/* The six reason cards, in their two boxes. Open by default: rule 5
+          names them as something the participant is expected to negotiate
+          from, and rule 6's whole measure is which box they are willing to
+          draw from — a decision that has to be visible to be made. The visual
+          separation is a design requirement, not a preference (Design §7 UI
+          규칙): if the two read as one list that decision stops being
+          legible. */}
       {brief.reasonCards.length ? (
-        <Section title={`💬 Why ${requirement.label.toLowerCase()} matters to you`}>
+        <Fold
+          title={`💬 Why ${requirement.label.toLowerCase()} matters to you`}
+          defaultOpen
+        >
           <p className="mb-3 max-w-prose rounded-[var(--radius)] border border-[var(--private-line)] bg-[#fff9ef] p-3 text-[0.8125rem] leading-relaxed">
             {brief.requirementNote}
           </p>
@@ -383,21 +418,61 @@ export function BriefingPanel({
             cards={sensitiveCards}
             sensitive
           />
-        </Section>
+        </Fold>
       ) : null}
 
-      <Section title="⚠️ If there is no agreement">
+      <Fold title="⚠️ If there is no agreement" defaultOpen>
         <p className="max-w-prose text-[0.8125rem]">{brief.batnaSummary}</p>
-      </Section>
+      </Fold>
 
-      <Section title="🔢 What each term is worth to you" last>
+      <Fold title="🔢 What each term is worth to you" defaultOpen last>
         <IssueValueTable issues={task.issues} role={role} />
-      </Section>
+      </Fold>
 
       <p className="mt-5 border-t border-[var(--private-line)] pt-3 text-[0.75rem]">
         The other side has their own briefing and cannot see yours.
       </p>
     </Card>
+  );
+}
+
+/**
+ * One foldable section of the briefing.
+ *
+ * A `<details>` rather than state, so a section the participant opens stays
+ * open across the re-renders a live negotiation produces, and so it is
+ * keyboard- and screen-reader-navigable without any work. Closed sections keep
+ * their content in the DOM, which also means the browser's own find-in-page
+ * still reaches it.
+ */
+function Fold({
+  title,
+  children,
+  defaultOpen,
+  last,
+}: {
+  title: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <details open={defaultOpen} className={cx("group", last ? "" : "mb-3")}>
+      {/* `items-start` and a nudged chevron, because these titles wrap: "Why
+          quality review checkpoints matters to you" is two lines in the rail,
+          and a vertically centred marker beside a two-line label points at the
+          gap between them. */}
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded-[var(--radius)] py-1 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] hover:text-[var(--ink)] [&::-webkit-details-marker]:hidden">
+        <span>{title}</span>
+        <span
+          aria-hidden
+          className="mt-px shrink-0 text-[0.8125rem] leading-none opacity-50 transition-transform group-open:rotate-90"
+        >
+          ›
+        </span>
+      </summary>
+      <div className="mt-1.5">{children}</div>
+    </details>
   );
 }
 
@@ -458,25 +533,6 @@ export function ReasonBox({
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-function Section({
-  title,
-  children,
-  last,
-}: {
-  title: string;
-  children: ReactNode;
-  last?: boolean;
-}) {
-  return (
-    <div className={last ? "" : "mb-5"}>
-      <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]">
-        {title}
-      </p>
-      {children}
     </div>
   );
 }

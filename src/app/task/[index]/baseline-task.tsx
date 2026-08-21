@@ -79,6 +79,20 @@ function openingLine(
   return `hi! good to be sorting this out. || my opening would be ${terms} — but tell me what matters most on your side.`;
 }
 
+/**
+ * Stages the counterpart has already spent before its first live reply.
+ *
+ * One: the fixed opening, seeded on screen before the participant writes
+ * anything (it is the anchor their reply is measured against). It is a real
+ * stage-1 move, so the counterpart's first *reply* is stage 2 — otherwise it
+ * re-serves stage 1 and repeats its opening word for word.
+ *
+ * The Proxy arm has the same idea at a different size: `DIRECT_STAGE_OFFSET`
+ * is 3 there, because through its own proxy the counterpart has opened, stated
+ * its priority and challenged before the direct conversation starts.
+ */
+const SEEDED_OPENING_STAGES = 1;
+
 type Phase =
   | "intro"
   | "brief"
@@ -155,6 +169,21 @@ export function BaselineTask({
    * How many replies the counterpart has made. Its script position is derived
    * from this, so the participant can send as many messages as they like
    * without the counterpart skipping ahead or repeating itself.
+   *
+   * THE SEEDED OPENING IS NOT COUNTED HERE, and the two positions it produces
+   * are deliberately different numbers:
+   *
+   *   - the counterpart has already SPOKEN stage 1 (the seeded opening), so
+   *     its next move is stage 2 — `counterpartMoveStage` below;
+   *   - the participant is replying TO that opening, so their script slot is
+   *     stage 1 — `counterpartStageAfter(replies)`, used by the autofill.
+   *
+   * Conflating them is what produced two separate bugs. Deriving the
+   * counterpart's move from `replies` alone re-served stage 1 and had it
+   * repeat its opening word for word. "Fixing" that by seeding `replies` at 1
+   * moved BOTH positions, so the mockup's `b1p` was skipped and the
+   * standardized challenge arrived a message early — and CLAUDE.md is
+   * explicit that the script and the machine must agree.
    */
   const [replies, setReplies] = useState(0);
   /** Set when the counterpart accepts or declares an impasse. */
@@ -209,6 +238,13 @@ export function BaselineTask({
 
   // The three states of the conversation, named once so the composer, the
   // terms card and the pill above them cannot disagree about which one it is.
+  //
+  // These are exact complements (`canSend` / `!canSend`), which is what keeps
+  // interface rule 9's "at most one ring on a screen" true: the composer's cue
+  // and the terms card's cue can never both be lit. That was already the case
+  // when the cue was a flat outline and merely tidy; now that it is a diffuse
+  // glow, two at once would read as a rendering fault, so it is worth stating
+  // rather than leaving to be re-derived.
   const yourTurn = !pending && canSend;
   const needsTerms = !pending && !canSend;
 
@@ -248,12 +284,23 @@ export function BaselineTask({
   );
 
   // Pre-fills the composer and the package selector for the current stage.
+  //
+  // Keyed on `replies` WITHOUT the seeded-opening offset: the participant is
+  // replying to the opening, so their first line is the script's stage-1
+  // `b1p`. The counterpart's own move is a stage further on — see the note on
+  // `replies`. Past the clamp the stage-5 close is used, for the same reason
+  // the counterpart's lookup does it.
   useDevAutofill(() => {
-    const own = script.messages.find(
-      (m) =>
-        m.stage === counterpartStageAfter(replies) &&
-        m.speaker === "participant",
-    );
+    const stage = counterpartStageAfter(replies);
+    const own =
+      (stage === 4 && replies > 3
+        ? script.messages.find(
+            (m) => m.stage === 5 && m.speaker === "participant",
+          )
+        : undefined) ??
+      script.messages.find(
+        (m) => m.stage === stage && m.speaker === "participant",
+      );
     if (own) {
       setDraft(own.text);
       if (own.proposal) setOffer(own.proposal);
@@ -321,7 +368,13 @@ export function BaselineTask({
       // inside the ten minutes — but the counterpart still walks its fixed
       // sequence one move per reply, so every participant meets the same
       // opening, the same challenge and the same thresholds in the same order.
-      const stageNow = counterpartStageAfter(replies);
+      //
+      // `+ SEEDED_OPENING_STAGES` because the opening it already said IS stage
+      // 1: without it the counterpart re-serves stage 1 and repeats itself
+      // verbatim. The offset belongs HERE and not in `replies`, because the
+      // participant's own script slot is still stage 1 — they are replying to
+      // that opening. See the note on `replies`.
+      const stageNow = counterpartStageAfter(replies + SEEDED_OPENING_STAGES);
 
       const decision = counterpartStep(
         task,
@@ -335,9 +388,22 @@ export function BaselineTask({
       counterProposal = decision.proposal;
 
       if (mockAi) {
-        const scripted = script.messages.find(
-          (m) => m.stage === stageNow && m.speaker === "counterpart",
-        );
+        // `counterpartStageAfter` clamps at 4, so a participant who keeps
+        // talking after the trade meets stage 4 again — correct for the state
+        // machine, where every turn from there is the same decision, but it
+        // made the MOCKUP repeat one line verbatim. The script's stage-5
+        // close is the line for that turn, so a second visit to the clamped
+        // stage advances to it rather than saying the same thing twice.
+        const atClamp = stageNow === 4 && replies + SEEDED_OPENING_STAGES > 3;
+        const scripted =
+          (atClamp
+            ? script.messages.find(
+                (m) => m.stage === 5 && m.speaker === "counterpart",
+              )
+            : undefined) ??
+          script.messages.find(
+            (m) => m.stage === stageNow && m.speaker === "counterpart",
+          );
         reply = scripted?.text ?? "";
         await new Promise((r) => setTimeout(r, 400));
       } else {
@@ -520,14 +586,6 @@ export function BaselineTask({
               text: scripted?.text ?? openingLine(task, counterpartRole),
             },
           ]);
-          // The opening IS the counterpart's stage-1 move, so it counts as a
-          // reply. Left at zero, `counterpartStageAfter(0)` returned stage 1
-          // again on the participant's first message and the counterpart
-          // repeated its opening word for word — visibly so in mockup mode,
-          // where both come from the same scripted line. It also cost the
-          // script a turn, pushing the standardized challenge a message later
-          // than the design places it.
-          setReplies(1);
           logEvent("negotiation_started", undefined, {
             sessionIndex: taskIndex,
           });

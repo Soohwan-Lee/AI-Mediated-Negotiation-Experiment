@@ -194,7 +194,7 @@ export interface NegotiationTask {
    * not vary by participant.
    */
   standardizedChallenge: Record<Role, string>;
-  /** Fallback points if no agreement is ratified. Same for both roles. */
+  /** Fallback points if no agreement is reached. Same for both roles. */
   reservationPoints: number;
 }
 
@@ -220,7 +220,7 @@ export interface RoleBrief {
   requirementNote: string;
   /** Why saying the sensitive reason out loud would cost something. */
   disclosureRisk: string;
-  /** What happens if nothing is ratified. */
+  /** What happens if nothing is agreed. */
   batnaSummary: string;
 }
 

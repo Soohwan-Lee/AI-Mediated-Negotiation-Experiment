@@ -289,7 +289,7 @@ export function ReviewPhase({
               <Transcript
                 messages={[
                   {
-                    id: "principal-ratify",
+                    id: "principal-close",
                     speaker: "counterpart_principal",
                     text: principalLine,
                   },

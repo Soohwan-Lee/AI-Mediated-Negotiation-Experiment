@@ -191,7 +191,13 @@ export function TaskBrief({
           </p>
         </Card>
 
-        <BriefingPanel task={task} role={role} />
+        {/* Fully expanded here, and only here. This is the phase where the
+            briefing is READ — it sits in the main column, it is the first
+            time they see it, and a section folded shut is a section they may
+            not know exists. From the next phase on it lives in the rail as
+            something to consult, where the folds are what keep the numbers
+            reachable without scrolling past the story again. */}
+        <BriefingPanel task={task} role={role} defaultOpen />
       </Page>
 
       <ActionBar
@@ -883,6 +889,18 @@ export function DirectNegotiation({
   const [pending, setPending] = useState(false);
   const [replies, setReplies] = useState(0);
   const [settled, setSettled] = useState<"agreed" | "impasse" | null>(null);
+  /**
+   * What this conversation ends with. Seeded from the proxies' package,
+   * because that is what is on the table when the participant takes over.
+   *
+   * BOTH impasse paths must clear it to null — the state machine's impasse and
+   * the timer running out. They do, and it matters more than it looks: the
+   * seed is the PROXIES' package, so an impasse that left it in place would
+   * report `outcome: "agreement"` for a conversation that failed, and only in
+   * the Proxy arm, since Baseline starts from nothing. That is a mechanical
+   * difference in the primary outcome along the primary contrast. `onSettled`
+   * below reads it, and is only reachable once `settled` is set.
+   */
   const [finalPackage, setFinalPackage] = useState<Package | null>(
     openingPackage,
   );
@@ -1197,7 +1215,14 @@ export function DirectNegotiation({
       {settled ? (
         <ActionBar
           label="Continue"
-          onClick={() => onSettled(finalPackage)}
+          /* `settled === "agreed" ? … : null` rather than `finalPackage`
+             alone. Both impasse paths already clear it, so this changes
+             nothing today — it makes "an impasse hands on no package" true by
+             construction instead of by three call sites agreeing, on the field
+             the primary outcome is coded from. The seed is the PROXIES'
+             package, so a missed clear would report an agreement for a failed
+             conversation, in the Proxy arm only. */
+          onClick={() => onSettled(settled === "agreed" ? finalPackage : null)}
           note={
             settled === "agreed"
               ? "You have a package to review."

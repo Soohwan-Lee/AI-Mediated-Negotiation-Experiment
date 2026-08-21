@@ -85,13 +85,22 @@ decision depends only on the package and the clock; verify that after touching
 either.
 
 **The counterpart's fixed opening must be on screen before the participant
-writes anything**: it is the anchor their reply is measured against. It is
-seeded when the negotiation starts, and **that seed counts as the
-counterpart's first reply** — `setReplies(1)`. Left at zero,
-`counterpartStageAfter(0)` returned stage 1 again on the participant's first
-message, so the counterpart repeated its opening verbatim and every later move
-slid one message down the script, landing the standardized challenge later
-than the design places it.
+writes anything**: it is the anchor their reply is measured against.
+
+That seed produces **two different stage positions, and they must stay
+different.** The counterpart has already *spoken* stage 1, so its next move is
+stage 2 — `counterpartStageAfter(replies + SEEDED_OPENING_STAGES)`. The
+participant is replying *to* that opening, so their script slot is still stage
+1 — `counterpartStageAfter(replies)`. Conflating them broke it twice in a row:
+without the offset the counterpart re-served stage 1 and repeated its opening
+word for word, and "fixing" that by seeding `replies` at 1 moved both
+positions, skipping the mockup's `b1p` and landing the standardized challenge
+a message early. The Proxy arm has the same idea at a different size —
+`DIRECT_STAGE_OFFSET` is 3, because through its proxy the counterpart has
+opened, stated its priority and challenged.
+
+Check the transcript, not the code, after touching either: the ideal
+trajectory is ten messages, and the challenge is the fifth.
 
 **Both sides challenge at stage 3**, each naming the *other* role's
 requirement. `standardizedChallenge` is therefore keyed by the role being
@@ -319,6 +328,22 @@ compiles.
    from `lg` up and behind one tap below that, at every phase. Anything a
    participant is expected to negotiate from belongs in it — including all six
    reason cards.
+
+   **Its sections fold, but nothing is removed.** As one scroll it ran to
+   several screens in the rail and buried the payoff table — the part most
+   often wanted mid-negotiation — under the story. What is open by default is
+   chosen by what a participant reaches for mid-sentence: the numbers, the
+   fallback, and the reason cards (rule 6's decision has to be visible to be
+   made). The situation and objectives fold, because by then they have been
+   read on the brief phase, where `defaultOpen` expands everything. Use
+   `<details>`, not state — a section stays open across the re-renders a live
+   negotiation produces, and find-in-page still reaches closed ones.
+
+   Do not put `.prose-study` inside the panel. It sets `1.0625rem`, so the
+   role story rendered half again the size of everything around it and took
+   most of the rail on its own — the panel's own `text-[0.8125rem]` was being
+   silently overridden. Prose treatment at 13px means the leading and the
+   measure, not the display face.
 6. **The two reason boxes stay visually separate.** Work and sensitive cards
    get their own headings, borders and colours, on the briefing, on the mandate
    screen and in the Baseline reason picker. The whole measure is which box a

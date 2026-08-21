@@ -78,7 +78,7 @@ function options(
 /** Individual maximum, used for the normalized bonus and the value bars. */
 export const MAX_INDIVIDUAL_POINTS = 6300;
 
-/** Fallback if nothing is ratified. Working value — Design §12. */
+/** Fallback if nothing is agreed. Working value — Design §12. */
 export const RESERVATION_POINTS = 2500;
 
 /**

@@ -141,7 +141,7 @@ ${brief.roleStory}
 WHAT YOU WANT:
 ${brief.objectives.map((o) => `- ${o}`).join("\n")}
 
-IF NO AGREEMENT IS RATIFIED:
+IF NO AGREEMENT IS REACHED:
 ${brief.batnaSummary}
 
 SCENARIO (both sides can see this):

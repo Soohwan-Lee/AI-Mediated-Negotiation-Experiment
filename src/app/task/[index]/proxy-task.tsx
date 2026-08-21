@@ -3,8 +3,22 @@
 /**
  * Proxy task (Experimental Design Ver.2.4 §8 "Proxy task 흐름").
  *
- * Flow: brief → preferences → reason cards → confirm → RISK → matchmaking
- *       → WATCH the two AI Proxies negotiate → review and ratify.
+ * Flow: cover → brief → preferences → RISK → reason cards → confirm →
+ *       matchmaking → WATCH the two AI Proxies negotiate → handover →
+ *       negotiate directly → review.
+ *
+ * Three things in that line are recent and easy to write back the old way:
+ *
+ *  - RISK is before the reason cards, not after. It asks what the participant
+ *    EXPECTS raising their requirement to cost, so asking it after the mandate
+ *    would have them answer having already decided which sensitive cards to
+ *    hand over and read the policy disclosure — a pre-task measure turned
+ *    partly post-treatment, in one arm only.
+ *  - The proxies run ONCE. There is no revision and no second run; the
+ *    participant takes over and finishes the negotiation themselves, and what
+ *    the two people agree is the result.
+ *  - The review does not ratify. Both arms now end with the participant
+ *    agreeing a package in conversation, so there is nothing left to approve.
  *
  * DECEPTION INTEGRITY: Delegate and Explorer render the SAME interface. The
  * only difference is what the backend permits the proxies to do. The

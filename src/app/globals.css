@@ -209,6 +209,22 @@ body {
   animation: cue-breathe-private 4s ease-in-out infinite;
 }
 
+/* A cue that has been answered stops asking.
+ *
+ * On a focusable control — the composer is the one that matters — the cue and
+ * the focus ring would otherwise overlap: the border flips to `--focus` while
+ * the glow keeps breathing underneath, so the participant cannot tell from the
+ * edge whether the field is focused, and a pulsing outline around a field they
+ * are typing in reads as "something is still wrong here". Focus means they
+ * have arrived, which is exactly what the cue was pointing at. */
+.cue-ring:focus,
+.cue-ring:focus-within,
+.cue-ring-private:focus,
+.cue-ring-private:focus-within {
+  animation: none;
+  box-shadow: none;
+}
+
 @keyframes cue-breathe {
   0%,
   100% {

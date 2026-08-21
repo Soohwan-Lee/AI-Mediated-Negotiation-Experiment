@@ -265,10 +265,12 @@ create table agreements (
   task_index        smallint not null,
   terms                jsonb not null,   -- AgreementTerm[]
   unresolved_issue_ids text[] not null default '{}',
-  -- No ratification columns. The participant agrees the package in the
-  -- conversation itself; whether one was reached is `task_outcome_t{n}.outcome`
-  -- in `responses`, and the terms above are what they agreed.
-  decided_at           timestamptz,
+  -- No ratification columns, and no `decided_at`. The participant agrees the
+  -- package in the conversation itself; whether one was reached is
+  -- `task_outcome_t{n}.outcome` in `responses`, and the terms above are what
+  -- they agreed. `decided_at` timestamped the ratification decision and has
+  -- no writer now that there is none — `created_at` below is the row's time.
+  created_at           timestamptz not null default now(),
   primary key (participant_key, task_index)
 );
 ```
