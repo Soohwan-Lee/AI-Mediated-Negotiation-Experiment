@@ -1510,7 +1510,9 @@ export function RehearsalChat({
           role,
           policy,
           mandate,
-          question: text,
+          // The question is the last entry of `history`, not a field of its
+          // own. Sending it twice invites a future reader to append it to the
+          // prompt as well, which would ask it twice in one turn.
           history: history.map((m) => ({
             role: m.speaker === "participant" ? "user" : "assistant",
             content: m.text,

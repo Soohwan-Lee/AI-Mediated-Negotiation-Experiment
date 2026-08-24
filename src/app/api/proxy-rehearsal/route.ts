@@ -47,8 +47,8 @@ interface RequestBody {
   role: Role;
   policy: "delegate" | "explorer";
   mandate: Mandate;
+  /** Oldest first; the participant's new question is the last entry. */
   history: Array<{ role: "assistant" | "user"; content: string }>;
-  question: string;
 }
 
 /** The mandate in words, for the prompt. */
@@ -104,8 +104,9 @@ export async function POST(request: Request) {
         authorizedReasons: authorized.map((c) => ({ id: c.id, text: c.text })),
         forbiddenReasons: forbidden.map((c) => ({ id: c.id, text: c.text })),
       },
+      // Last eight turns. The participant's new question is the final entry,
+      // so it needs no separate field — and must not be added twice.
       history: body.history.slice(-8),
-      // The question is appended by the caller as the last history entry.
     });
 
     // What the proxy is allowed to talk about: the reasons it may voice, plus
