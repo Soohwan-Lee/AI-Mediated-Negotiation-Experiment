@@ -42,8 +42,10 @@ next-env.d.ts
 .omc/logs/
 .omc/artifacts/
 .omc/handoffs/
+.omc/sessions/
 .omc/notepad.md
 .omc/project-memory.json
+.omc/template-version.json
 
 # Browser-automation scratch output (snapshots, screenshots, console logs)
 .playwright-mcp/
