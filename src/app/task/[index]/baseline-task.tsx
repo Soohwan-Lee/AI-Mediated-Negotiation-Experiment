@@ -93,11 +93,27 @@ function openingLine(
  */
 const SEEDED_OPENING_STAGES = 1;
 
+/**
+ * RISK COMES BEFORE THE LEVELS SCREEN, in this arm and in the Proxy arm.
+ *
+ * RISK asks what the participant EXPECTS raising their requirement to cost, so
+ * it has to be asked before anything about their own position is committed. It
+ * used to sit after the preference screen, which was already safe — but the
+ * Proxy arm now settles levels and reason cards on one screen, and asking RISK
+ * after that would have a Proxy participant answer it having decided which
+ * sensitive cards to hand over and read the policy disclosure. That makes a
+ * pre-task measure partly post-treatment in one arm only, and RISK is §10 gate
+ * 4's task-equivalence instrument, so it cannot carry a condition effect.
+ *
+ * Asking it straight after the briefing is what keeps the two arms identical
+ * on this point: both are asked cold, with the situation read and nothing yet
+ * decided.
+ */
 type Phase =
   | "intro"
   | "brief"
-  | "prefs"
   | "risk"
+  | "prefs"
   | "matchmaking"
   | "negotiate"
   | "review";
@@ -105,8 +121,8 @@ type Phase =
 const PHASES: Phase[] = [
   "intro",
   "brief",
-  "prefs",
   "risk",
+  "prefs",
   "matchmaking",
   "negotiate",
   "review",
@@ -122,8 +138,8 @@ const PHASES: Phase[] = [
  */
 const STEP_LABELS = [
   "Your briefing",
-  "What you want",
   "Before you start",
+  "What you want",
   "Negotiate",
   "Review",
 ];
@@ -131,8 +147,8 @@ const STEP_LABELS = [
 const PHASE_LABELS: Record<Phase, string> = {
   intro: "Start screen",
   brief: "Your briefing",
-  prefs: "What you want",
   risk: "Before you start",
+  prefs: "What you want",
   matchmaking: "Connecting",
   negotiate: "Negotiate",
   review: "Review",
@@ -141,8 +157,8 @@ const PHASE_LABELS: Record<Phase, string> = {
 const STEP_OF: Record<Phase, number> = {
   intro: 0,
   brief: 0,
-  prefs: 1,
-  risk: 2,
+  risk: 1,
+  prefs: 2,
   matchmaking: 3,
   negotiate: 3,
   review: 4,
@@ -515,6 +531,20 @@ export function BaselineTask({
         task={task}
         role={role}
         steps={STEP_LABELS}
+        onContinue={() => setPhase("risk")}
+      />
+    );
+  }
+
+  if (phase === "risk") {
+    return (
+      <RiskForm
+        taskIndex={taskIndex}
+        task={task}
+        role={role}
+        steps={STEP_LABELS}
+        stepIndex={STEP_OF.risk}
+        continueLabel="Continue"
         onContinue={() => setPhase("prefs")}
       />
     );
@@ -541,22 +571,8 @@ export function BaselineTask({
                 .filter(([, v]) => v) as Array<[string, string]>,
             ),
           );
-          setPhase("risk");
+          setPhase("matchmaking");
         }}
-      />
-    );
-  }
-
-  if (phase === "risk") {
-    return (
-      <RiskForm
-        taskIndex={taskIndex}
-        task={task}
-        role={role}
-        steps={STEP_LABELS}
-        stepIndex={STEP_OF.risk}
-        continueLabel="Start the negotiation"
-        onContinue={() => setPhase("matchmaking")}
       />
     );
   }

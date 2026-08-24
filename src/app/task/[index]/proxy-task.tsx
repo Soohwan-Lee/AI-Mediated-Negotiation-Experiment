@@ -3,17 +3,22 @@
 /**
  * Proxy task (Experimental Design Ver.2.4 §8 "Proxy task 흐름").
  *
- * Flow: cover → brief → preferences → RISK → reason cards → confirm →
+ * Flow: cover → brief → RISK → mandate (levels + reasons) → confirm →
  *       matchmaking → WATCH the two AI Proxies negotiate → handover →
  *       negotiate directly → review.
  *
- * Three things in that line are recent and easy to write back the old way:
+ * Four things in that line are recent and easy to write back the old way:
  *
- *  - RISK is before the reason cards, not after. It asks what the participant
+ *  - RISK comes before the mandate, not after. It asks what the participant
  *    EXPECTS raising their requirement to cost, so asking it after the mandate
  *    would have them answer having already decided which sensitive cards to
  *    hand over and read the policy disclosure — a pre-task measure turned
- *    partly post-treatment, in one arm only.
+ *    partly post-treatment, in one arm only. It is now asked straight after
+ *    the briefing, which is where Baseline asks it too.
+ *  - The mandate is ONE screen. Levels on all three terms and the reason cards
+ *    used to be two screens in sequence; deciding a position and deciding what
+ *    may be said for it is one act, and that the second half was never asked
+ *    is the gap this study is about.
  *  - The proxies run ONCE. There is no revision and no second run; the
  *    participant takes over and finishes the negotiation themselves, and what
  *    the two people agree is the result.
@@ -56,7 +61,6 @@ import { Callout, Card, CardTitle, Page } from "@/components/ui";
 import {
   useDevActions,
   useDevAutofill,
-  useDevGate,
   useDevMockAi,
 } from "@/lib/dev-mode";
 
@@ -91,24 +95,28 @@ import {
 } from "./shared";
 
 /**
- * RISK COMES BEFORE THE REASON CARDS, and that ordering is not cosmetic.
+ * RISK COMES BEFORE THE MANDATE, and that ordering is not cosmetic.
  *
- * Baseline asks RISK straight after the preference screen, cold. An earlier
- * version of this file asked it after the mandate — so a Proxy participant
- * answered "raising this could make them think worse of me" having ALREADY
- * decided which sensitive cards to hand over, read the two-box framing and
- * been told the policy. That makes a pre-task measure partly post-treatment in
- * one arm only, and RISK is §10 gate 4's task-equivalence instrument.
+ * An earlier version of this file asked it after the mandate — so a Proxy
+ * participant answered "raising this could make them think worse of me" having
+ * ALREADY decided which sensitive cards to hand over, read the two-box framing
+ * and been told the policy. That makes a pre-task measure partly
+ * post-treatment in one arm only, and RISK is §10 gate 4's task-equivalence
+ * instrument, so it cannot carry a condition effect.
  *
- * Both arms now run: brief → preferences → RISK → (reasons → confirm) →
- * negotiate.
+ * Merging the levels and the reason cards onto one screen made the old
+ * placement unsafe even where it had been fine: after that screen is after the
+ * mandate. Both arms now ask it in the same place, cold, straight after the
+ * briefing:
+ *
+ *   Baseline: brief → RISK → levels → negotiate
+ *   Proxy:    brief → RISK → levels + reasons → confirm → watch → negotiate
  */
 type Phase =
   | "intro"
   | "brief"
-  | "prefs"
   | "risk"
-  | "reasons"
+  | "mandate"
   | "confirm"
   | "matchmaking"
   | "watching"
@@ -119,9 +127,8 @@ type Phase =
 const PHASES: Phase[] = [
   "intro",
   "brief",
-  "prefs",
   "risk",
-  "reasons",
+  "mandate",
   "confirm",
   "matchmaking",
   "watching",
@@ -137,9 +144,8 @@ const PHASES: Phase[] = [
  */
 const STEP_LABELS = [
   "Your briefing",
-  "What you want",
   "Before you start",
-  "What it may say",
+  "Your instructions",
   "Check and start",
   "Watch",
   "Talk it through",
@@ -150,9 +156,8 @@ const STEP_LABELS = [
 const PHASE_LABELS: Record<Phase, string> = {
   intro: "Start screen",
   brief: "Your briefing",
-  prefs: "What you want",
   risk: "Before you start",
-  reasons: "What it may say",
+  mandate: "Your instructions",
   confirm: "Check and start",
   matchmaking: "Connecting",
   watching: "Watch",
@@ -165,15 +170,14 @@ const STEP_OF: Record<Phase, number> = {
   /* The cover is not a counted step — see the note on STEP_LABELS. */
   intro: 0,
   brief: 0,
-  prefs: 1,
-  risk: 2,
-  reasons: 3,
-  confirm: 4,
-  matchmaking: 5,
-  watching: 5,
-  handover: 6,
-  negotiate: 6,
-  review: 7,
+  risk: 1,
+  mandate: 2,
+  confirm: 3,
+  matchmaking: 4,
+  watching: 4,
+  handover: 5,
+  negotiate: 5,
+  review: 6,
 };
 
 /**
@@ -651,31 +655,7 @@ export function ProxyTask({
         task={task}
         role={role}
         steps={STEP_LABELS}
-        onContinue={() => setPhase("prefs")}
-      />
-    );
-  }
-
-  if (phase === "prefs") {
-    return (
-      <PreferenceForm
-        taskIndex={taskIndex}
-        task={task}
-        role={role}
-        steps={STEP_LABELS}
-        stepIndex={STEP_OF.prefs}
-        isProxy
-        onContinue={(p: Preferences) => {
-          setMandate((m) => ({
-            ...m,
-            issues: m.issues.map((im) => ({
-              ...im,
-              preferredOptionId: p.preferred[im.issueId] ?? null,
-              minimumOptionId: p.minimum[im.issueId] ?? null,
-            })),
-          }));
-          setPhase("risk");
-        }}
+        onContinue={() => setPhase("risk")}
       />
     );
   }
@@ -688,22 +668,47 @@ export function ProxyTask({
         role={role}
         steps={STEP_LABELS}
         stepIndex={STEP_OF.risk}
-        onContinue={() => setPhase("reasons")}
+        onContinue={() => setPhase("mandate")}
       />
     );
   }
 
-  // --- reason cards -------------------------------------------------------
-  if (phase === "reasons") {
+  /* THE MANDATE IS ONE SCREEN: the levels on all three terms, and which of the
+     participant's reasons the proxy may say. It was two screens in sequence,
+     and merging them is the point of the study rather than a tidy-up —
+     deciding a position and deciding what may be said for it is one act, and
+     the gap in prior work is that the second half was never asked at all.
+     `PreferenceForm` owns the layout; the reason section is passed in and
+     renders below the three term cards, never inside one of them, so no term
+     is visibly singled out (Design §5 principle 4). */
+  if (phase === "mandate") {
     return (
-      <ReasonMandatePhase
+      <PreferenceForm
         taskIndex={taskIndex}
         task={task}
         role={role}
-        policy={policy}
-        mandate={mandate}
-        onToggle={toggleReason}
-        onContinue={() => {
+        steps={STEP_LABELS}
+        stepIndex={STEP_OF.mandate}
+        isProxy
+        reasonsComplete={hasWorkReason(task, role, mandate.authorizedReasonIds)}
+        reasons={
+          <ReasonMandateSection
+            task={task}
+            role={role}
+            policy={policy}
+            mandate={mandate}
+            onToggle={toggleReason}
+          />
+        }
+        onContinue={(p: Preferences) => {
+          setMandate((m) => ({
+            ...m,
+            issues: m.issues.map((im) => ({
+              ...im,
+              preferredOptionId: p.preferred[im.issueId] ?? null,
+              minimumOptionId: p.minimum[im.issueId] ?? null,
+            })),
+          }));
           setPhase("confirm");
           window.scrollTo({ top: 0 });
         }}
@@ -842,7 +847,7 @@ export function ProxyTask({
                 logEvent("mandate_revised", undefined, {
                   sessionIndex: taskIndex,
                 });
-                setPhase("reasons");
+                setPhase("mandate");
               }}
               className="rounded-[var(--radius)] px-3 py-2 text-[0.9375rem] font-medium text-[var(--ink-2)] hover:bg-[var(--surface-muted)]"
             >
@@ -1068,32 +1073,23 @@ export function ProxyTask({
  * only shared one reason" nudge, or a sensitive box styled as an upsell would
  * all manufacture the disclosure the study is trying to observe.
  */
-function ReasonMandatePhase({
-  taskIndex,
+function ReasonMandateSection({
   task,
   role,
   policy,
   mandate,
   onToggle,
-  onContinue,
 }: {
-  taskIndex: 1 | 2;
   task: ReturnType<typeof getTask>;
   role: Role;
   policy: "delegate" | "explorer";
   mandate: Mandate;
   onToggle: (cardId: string) => void;
-  onContinue: () => void;
 }) {
   const cards = task.roleBriefs[role].reasonCards;
   const workCards = cards.filter((c) => c.layer === "work");
   const sensitiveCards = cards.filter((c) => c.layer === "sensitive");
   const requirement = requirementIssue(task, role);
-
-  const workChecked = workCards.filter((c) =>
-    mandate.authorizedReasonIds.includes(c.id),
-  ).length;
-  const canContinue = useDevGate(workChecked >= 1);
 
   const row = (card: { id: string; text: string }) => (
     <label className="flex cursor-pointer gap-2.5 rounded-[var(--radius)] p-1.5 hover:bg-[var(--surface)]/60">
@@ -1111,63 +1107,51 @@ function ReasonMandatePhase({
 
   return (
     <>
-      <Page width="wide">
-        <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
-          <TaskHeader
-            taskIndex={taskIndex}
-            title="What your AI Proxy may say about why"
-            steps={STEP_LABELS}
-            current={STEP_OF.reasons}
-          />
+      <div className="mb-5">
+        <Callout title="🤖 How this AI Proxy works">
+          <p className="max-w-prose">{POLICY_DISCLOSURE[policy]}</p>
+          <p className="mt-2 max-w-prose">
+            It can put your reasons in its own words. It cannot invent a fact
+            about you, and it will never say a reason you leave unticked.
+          </p>
+        </Callout>
+      </div>
 
-          <div className="mb-5">
-            <Callout title="🤖 How this AI Proxy works">
-              <p className="max-w-prose">{POLICY_DISCLOSURE[policy]}</p>
-              <p className="mt-2 max-w-prose">
-                It can put your reasons in its own words. It cannot invent a
-                fact about you, and it will never say a reason you leave
-                unticked.
-              </p>
-            </Callout>
-          </div>
+      <Card tone="private" className="text-[var(--private-ink)]">
+        <CardTitle
+          hint={`Tick the ones your AI Proxy may use when it argues for ${requirement.label.toLowerCase()}.`}
+        >
+          💬 What it may say about why
+        </CardTitle>
 
-          <Card tone="private" className="text-[var(--private-ink)]">
-            <CardTitle
-              hint={`Tick the ones your AI Proxy may use when it argues for ${requirement.label.toLowerCase()}.`}
-            >
-              Your reasons
-            </CardTitle>
+        <ReasonBox
+          title="Work reasons"
+          note="Nothing awkward about saying these. Tick at least one."
+          cards={workCards}
+        >
+          {row}
+        </ReasonBox>
 
-            <ReasonBox
-              title="Work reasons"
-              note="Nothing awkward about saying these. Tick at least one."
-              cards={workCards}
-            >
-              {row}
-            </ReasonBox>
-
-            <ReasonBox
-              title="Sensitive background"
-              note={`${task.roleBriefs[role].disclosureRisk} These are yours to keep — leaving them all unticked is a normal choice.`}
-              cards={sensitiveCards}
-              sensitive
-            >
-              {row}
-            </ReasonBox>
-          </Card>
-        </TaskLayout>
-      </Page>
-
-      <ActionBar
-        label="Continue"
-        onClick={onContinue}
-        disabled={!canContinue}
-        note={
-          canContinue
-            ? "Ready."
-            : "Tick at least one work reason so it has something to argue with."
-        }
-      />
+        <ReasonBox
+          title="Sensitive background"
+          note={`${task.roleBriefs[role].disclosureRisk} These are yours to keep — leaving them all unticked is a normal choice.`}
+          cards={sensitiveCards}
+          sensitive
+        >
+          {row}
+        </ReasonBox>
+      </Card>
     </>
+  );
+}
+
+/** Design §7: the mandate needs at least one work reason, and never a sensitive one. */
+function hasWorkReason(
+  task: ReturnType<typeof getTask>,
+  role: Role,
+  authorizedReasonIds: string[],
+): boolean {
+  return task.roleBriefs[role].reasonCards.some(
+    (c) => c.layer === "work" && authorizedReasonIds.includes(c.id),
   );
 }

@@ -6,16 +6,22 @@
  *
  * The order of the first three matters and is not arbitrary:
  *
- *   brief → preferences (+ mandate, in Proxy) → RISK → negotiate
+ *   brief → RISK → levels (+ reason cards, in Proxy) → negotiate
  *
- * PREFERENCES come before anything about how this task will run. They are the
- * first point on the trajectory the study measures — what you wanted, then
- * what you entrusted, then what you opened with, then what survived the
- * challenge, then what reached the final package — and taking them after the
- * condition were visible would contaminate the baseline.
+ * RISK IS FIRST, straight after the briefing and before anything about the
+ * participant's own position is committed. It asks what they EXPECT raising
+ * their requirement to cost — an expectation, which stops being one the moment
+ * a decision has been taken. Asking it here is also what keeps the two arms
+ * identical on this point, now that the Proxy arm settles levels and reason
+ * cards on a single screen: "after the levels screen" would mean "after the
+ * mandate" in one arm and not the other, and RISK is §10 gate 4's
+ * task-equivalence instrument.
  *
- * RISK comes next and before any negotiation, because it asks what the
- * participant EXPECTS raising their requirement to cost, not what it did.
+ * THE LEVELS come next. They are the first point on the trajectory the study
+ * measures — what you wanted, then what you entrusted, then what you opened
+ * with, then what survived the challenge, then what reached the final
+ * package — and taking them after the condition were visible would contaminate
+ * the baseline.
  *
  * The brief is the one phase that puts the briefing in the main column: it is
  * being read for the first time. From the next phase on it lives in the rail,
@@ -26,6 +32,7 @@ import {
   useEffect,
   useState,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
 } from "react";
 import { MeasureBlock, type Answers } from "@/components/measure";
@@ -221,7 +228,8 @@ export interface Preferences {
 }
 
 /**
- * "What do you want, and what is the least you'd take" on every term.
+ * "What do you want, and what is the least you'd take" on every term — and, in
+ * the Proxy arm, which of your reasons may be said for you.
  *
  * ALL THREE TERMS ARE ENTERED THE SAME WAY. Design §5 principle 4 is explicit
  * about this, and it is the reason the requirement issue gets no extra
@@ -229,10 +237,27 @@ export interface Preferences {
  * the participant which term the study is about, and pilot gate 6 exists to
  * catch exactly that kind of transparency.
  *
- * Used by BOTH conditions. In Baseline it is a private plan; in Proxy the same
- * two numbers per term become the mandate the AI Proxy is bound by. Keeping
- * one screen for both is what makes the two conditions comparable at the point
- * where the participant decides what they want.
+ * WHY THE REASONS ARE ON THIS SCREEN. They used to be a screen of their own,
+ * after this one. Putting the two together is the point of the study rather
+ * than a layout preference: deciding a position and deciding what may be said
+ * for it is one act, and the gap in the prior work is precisely that the
+ * second half was never asked. Two screens made them two decisions, taken in
+ * order, with the position already fixed before the reasons were considered.
+ *
+ * WHERE THEY SIT, AND WHY NOT UNDER THE TERM THEY BELONG TO. The reason cards
+ * exist for one term — the participant's requirement — so the tempting layout
+ * is to nest them inside that term's card. That would break §5 principle 4:
+ * one of the three cards would be visibly taller and carry a control the
+ * others do not, which tells the participant which term the study is about
+ * without a word being said. So the reasons are a section BELOW all three
+ * cards, addressed to the requirement in their own heading, exactly as the
+ * briefing already presents them. The three term cards stay identical.
+ *
+ * Used by BOTH conditions. In Baseline it is a private plan and there is no
+ * reasons section; in Proxy the same two levels per term plus the ticked cards
+ * are the mandate the AI Proxy is bound by. Keeping one screen for both is
+ * what makes the conditions comparable at the point where the participant
+ * decides what they want.
  */
 export function PreferenceForm({
   taskIndex,
@@ -241,6 +266,13 @@ export function PreferenceForm({
   steps,
   stepIndex,
   isProxy,
+  /**
+   * The mandate's reason section, in the Proxy arm. Rendered below the three
+   * term cards — see the note above on why it is not inside one of them.
+   */
+  reasons,
+  /** Whether the reason section's own requirement (≥1 work card) is met. */
+  reasonsComplete = true,
   onContinue,
 }: {
   taskIndex: 1 | 2;
@@ -249,6 +281,8 @@ export function PreferenceForm({
   steps: string[];
   stepIndex: number;
   isProxy: boolean;
+  reasons?: ReactNode;
+  reasonsComplete?: boolean;
   onContinue: (prefs: Preferences) => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
@@ -290,7 +324,10 @@ export function PreferenceForm({
     ...(preferred[i.id] ? [] : [`pref-${i.id}`]),
     ...(minimum[i.id] ? [] : [`min-${i.id}`]),
   ]);
-  const canContinue = useDevGate(missing.length === 0);
+  // The reason section carries its own requirement (Design §7: at least one
+  // work reason) and it gates the same button, because the two halves of this
+  // screen are one decision.
+  const canContinue = useDevGate(missing.length === 0 && reasonsComplete);
 
   async function save() {
     if (!canContinue) return;
@@ -314,7 +351,11 @@ export function PreferenceForm({
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <TaskHeader
             taskIndex={taskIndex}
-            title="What you want from this"
+            title={
+              isProxy
+                ? "What you want, and what may be said for you"
+                : "What you want from this"
+            }
             steps={steps}
             current={stepIndex}
           />
@@ -399,6 +440,10 @@ export function PreferenceForm({
               label="Your least-acceptable set adds up to"
             />
           </div>
+
+          {/* The reason half of the mandate, below all three term cards and
+              never inside one of them — see the note on this component. */}
+          {reasons ? <div className="mt-5">{reasons}</div> : null}
         </TaskLayout>
       </Page>
 
@@ -408,7 +453,13 @@ export function PreferenceForm({
         disabled={!canContinue}
         remaining={missing.length}
         firstUnansweredId={missing[0] ?? null}
-        note={missing.length === 0 ? "Ready." : ""}
+        note={
+          missing.length > 0
+            ? ""
+            : reasonsComplete
+              ? "Ready."
+              : "Tick at least one work reason so it has something to argue with."
+        }
       />
     </>
   );
