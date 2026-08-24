@@ -108,6 +108,26 @@ function Fact({
 }
 
 /**
+ * One line of the opening summary: a label, and the thing itself.
+ *
+ * A `<dl>` rather than a bulleted list, because each line answers a question
+ * the label names — the label is what makes the four lines scannable in the
+ * order someone would ask them.
+ */
+function Gist({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 sm:flex-nowrap">
+      <dt className="w-24 shrink-0 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+        {term}
+      </dt>
+      <dd className="min-w-0 flex-1 text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+/**
  * One side's standing in the role relation.
  *
  * COLOUR RULE (interface rule 1): neither box may use the sand palette. What
@@ -239,6 +259,36 @@ export default function InstructionPage() {
             subtitle="Read this carefully — you will be asked a few questions about it next."
           />
 
+          {/* THE WHOLE STUDY IN FOUR LINES, before any of the detail.
+              This card is new because the page it opens had a real failure:
+              every fact was present and correct, and a participant could still
+              finish the page unable to say what they were about to do. The
+              detail below answers "how does this work"; nothing answered "what
+              is this". Four lines, in the order someone actually asks them —
+              who am I, who are they, what has to happen, what do I get. Every
+              one of them is repeated in full further down, so this card can be
+              skipped by anyone who would rather read the detail. */}
+          <Card className="mb-5" tone="muted">
+            <dl className="space-y-2.5">
+              <Gist term="You are">
+                a <strong>{isLeader ? "Project Leader" : "Team Member"}</strong>{" "}
+                on a work project.
+              </Gist>
+              <Gist term="With you">
+                one other participant, holding the other role.
+              </Gist>
+              <Gist term="The job">
+                agree on <strong>three terms</strong> of the project. Neither of
+                you can decide them alone.
+              </Gist>
+              <Gist term="The catch">
+                you each want different things, and{" "}
+                <strong>only you can see what each option is worth to you</strong>
+                .
+              </Gist>
+            </dl>
+          </Card>
+
           {/* The role, as two columns of what each side holds.
               The power asymmetry (Design §6) is the point of this card, and as
               two paragraphs it had to be held in the head to be compared. Side
@@ -306,66 +356,57 @@ export default function InstructionPage() {
             </p>
           </Card>
 
-          {/* Five short blocks, not five paragraphs.
+          {/* Short blocks, not paragraphs.
               This was one card of continuous prose, and it is the densest
-              reading in the study — every fact in it is load-bearing, so none
-              could be cut. What could change is the shape: a participant
-              scanning for "how long is this" or "can I show them my points"
-              had to read the whole thing to find either. Each fact now sits
-              under a heading that names it, so the card can be scanned first
-              and read second. Nothing here has been dropped. */}
+              reading in the study. Each fact sits under a heading that names
+              it, so the card can be scanned first and read second.
+
+              FOUR, NOT SIX. Two of the six earned their way out rather than
+              being trimmed for length. "Then questions, then the bonus" said
+              what the callout directly beneath it says with the actual dollar
+              figures, so it was the same fact told twice, weaker first. And
+              the two AI-Proxy blocks were one thing split in half — how a
+              proxy task runs, and what happens at the end of it — which made
+              the arm that needs the clearest explanation read as two separate
+              rules to remember. Everything either said is still here. */}
           <Card className="mb-5">
-            <CardTitle>What you will do</CardTitle>
+            <CardTitle>How the tasks work</CardTitle>
             <div className="space-y-4">
-              <Fact icon="🗂" title="Two tasks, on two different scenarios">
-                Each negotiation has a <strong>ten-minute limit</strong> — that
-                is a cap, not a target, and you may finish sooner. Before the
-                first one there is a short practice round.
+              <Fact icon="🗂" title="Two tasks, two different scenarios">
+                Each negotiation has a <strong>ten-minute limit</strong> — a
+                cap, not a target, so you may finish sooner. A short practice
+                round comes first.
               </Fact>
 
-              <Fact icon="📊" title="Three terms to settle, four options each">
-                You and the other party have to agree on the same option for
-                all three. If you do not, the project falls back to a limited
-                plan and you both take your fallback score.
+              <Fact icon="📊" title="Three terms, four options each">
+                You both have to land on the same option for all three. If you
+                do not, the project falls back to a limited plan and you each
+                take your fallback score.
               </Fact>
 
               <Fact icon="🔒" title="Your briefing is private">
-                It holds your situation, what each option is worth to you in
-                points, the reasons behind what you are asking for, and what
+                Your situation, what each option is worth to you, and what
                 happens if there is no agreement. The other person has a
-                different one and cannot see yours. You may explain why a term
-                matters to you and ask what matters to them, but{" "}
-                <strong>
-                  you may not show them your point sheet or tell them the
-                  numbers on it
-                </strong>
-                .
+                different one and cannot see yours. Explain why a term matters
+                and ask what matters to them — but{" "}
+                <strong>never show them your points or say the numbers</strong>.
               </Fact>
 
-              <Fact icon="💬" title="The two tasks work differently">
-                In one you write the messages and make the offers yourself. In
-                the other you set out what you want and which of your reasons
-                may be used, and an <strong>AI Proxy</strong> negotiates on your
-                behalf with the other person&apos;s AI Proxy while you both
-                watch. Each is explained when you reach it.
-              </Fact>
-
-              {/* This replaced a sentence promising a review step where the
-                  participant could "accept, ask for one change, or reject".
-                  That step no longer exists: the AI Proxies negotiate once and
-                  then the participant takes over and finishes the negotiation
-                  themselves. Leaving the old wording in would have told every
-                  Proxy participant to expect a screen they never reach. */}
-              <Fact icon="🤝" title="After the AI Proxies, you take over">
-                What they reach is not final. You then talk to the other
-                participant <strong>directly</strong>, with everything the
-                proxies said still on screen, and{" "}
-                <strong>what the two of you agree is the result</strong>.
-              </Fact>
-
-              <Fact icon="💵" title="Then questions, then the bonus">
-                After each task you answer some questions about how it went, and
-                then the bonus for that task is decided.
+              {/* The two arms in one block, and the ending stated for both.
+                  An earlier version promised a review step where the
+                  participant could "accept, ask for one change, or reject" —
+                  that step no longer exists, so the wording would have told
+                  every Proxy participant to expect a screen they never
+                  reach. */}
+              <Fact icon="💬" title="One you do yourself, one through an AI Proxy">
+                In one task you write the messages and make the offers. In the
+                other you set out what you want and which of your reasons may
+                be used, an <strong>AI Proxy</strong> negotiates for you while
+                you watch, and then{" "}
+                <strong>you take over and finish it yourself</strong> with
+                everything it said still on screen. Either way,{" "}
+                <strong>what the two of you agree is the result</strong>. Each
+                is explained when you reach it.
               </Fact>
             </div>
           </Card>
