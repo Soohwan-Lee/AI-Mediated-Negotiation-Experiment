@@ -24,7 +24,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Checkbox, Page, PageHeader } from "@/components/ui";
+import { Card, CardTitle, Checkbox, Page, PageHeader } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
 import { STAGE_MINUTES, STUDY, nextHref } from "@/lib/study-config";
@@ -110,8 +110,25 @@ export default function ConsentPage() {
           </dl>
         </Card>
 
+        {/* The study in one sentence, before the schedule of it.
+            The page listed five stages with times and never said what the
+            thing itself was, so a participant decided whether to accept a
+            55-minute study from the title alone. This is the plainest true
+            description that does not disclose the design: two negotiations, a
+            partner, and a software tool involved in one of them. */}
         <Card className="mb-5">
-          <CardTitle>What you will do</CardTitle>
+          <p className="max-w-prose text-[0.9375rem] leading-relaxed">
+            You will play a role in{" "}
+            <strong>two short workplace negotiations</strong> — agreeing the
+            terms of a project with another participant. In one of them, a{" "}
+            <strong>software tool negotiates on your behalf</strong> before you
+            finish the conversation yourself. Afterwards we ask how each one
+            went.
+          </p>
+        </Card>
+
+        <Card className="mb-5">
+          <CardTitle>The schedule</CardTitle>
           <ol className="relative">
             {STEPS.map((step, i) => (
               <li key={step.title} className="relative flex gap-4 pb-5 last:pb-0">
@@ -174,36 +191,40 @@ export default function ConsentPage() {
           </Card>
         </div>
 
-        <div className="mb-5 grid gap-5 sm:grid-cols-2">
-          <Card>
-            <CardTitle>Risks</CardTitle>
-            <p className="text-[0.875rem] leading-relaxed text-[var(--ink-2)]">
+        {/* Risks and voluntariness, as two rows of one card rather than two
+            cards of one paragraph.
+            Both are IRB obligations and neither loses a clause here — what
+            changes is that the consent page stops being eight stacked cards
+            of similar weight, which is the shape that gets scrolled past. A
+            skimmed consent form is not consent, so the structure is doing
+            ethical work, not decorative work. */}
+        <Card className="mb-5">
+          <dl className="space-y-3">
+            <Term label="⚖️ Risks">
               Minimal, and comparable to an everyday conversation at work. Some
               scenarios ask you to negotiate over workload, credit, or
               evaluation, which a few people find mildly uncomfortable. There is
               no benefit to you beyond the payment above.
-            </p>
-          </Card>
-
-          <Card>
-            <CardTitle>Taking part is voluntary</CardTitle>
-            <p className="text-[0.875rem] leading-relaxed text-[var(--ink-2)]">
+            </Term>
+            <Term label="🚪 Taking part is voluntary">
               You can stop at any time by closing this window, and it will not
               affect your standing on Prolific. If you do stop, please return
               your submission there so the slot is released.
-            </p>
-          </Card>
-        </div>
-
-        <div className="mb-5">
-          <Callout title="Some details are withheld until the end" tone="warning">
-            <p>
+            </Term>
+            {/* The withheld-details disclosure. It stays on this page and in
+                these words: the study uses deception, and telling participants
+                up front that something is held back — without saying what — is
+                the part of that arrangement they consent to. It reads as a row
+                here rather than a warning callout because a yellow banner
+                above the consent checkboxes made the whole page look like a
+                risk notice. */}
+            <Term label="🔎 Some details are withheld until the end">
               To keep the study valid, a few specific details about its design
               are not described up front. You will get the full explanation on
               the last page, before you finish.
-            </p>
-          </Callout>
-        </div>
+            </Term>
+          </dl>
+        </Card>
 
         <Card className="mb-5" tone="muted">
           <CardTitle>Who is running this</CardTitle>
@@ -264,6 +285,24 @@ export default function ConsentPage() {
         }
       />
     </>
+  );
+}
+
+/**
+ * One labelled obligation on the consent form.
+ *
+ * The label carries an emoji landmark so the three rows can be told apart
+ * without reading them — which is what lets someone find "can I stop?" again
+ * after they have scrolled past it.
+ */
+function Term({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt className="mb-0.5 text-[0.875rem] font-semibold">{label}</dt>
+      <dd className="max-w-prose text-[0.875rem] leading-relaxed text-[var(--ink-2)]">
+        {children}
+      </dd>
+    </div>
   );
 }
 
