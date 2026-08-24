@@ -28,11 +28,27 @@ these are the four things that still need doing.
    trip there is a visible stall between turns. The local store cannot fail, so
    those sites were written with no error branch — correct then, silently lossy
    over a network. `WriteQueue` closes it without touching a call site: writes
-   are enqueued synchronously, mirrored to localStorage, retried with backoff,
-   and flushed on `visibilitychange` via `sendBeacon` (the study ends on a
-   completion screen people close at once). Writes a later screen depends on —
-   participant creation, assignment, responses, mandate, agreement — call
-   `queue.flush()` and are awaited.
+   are enqueued synchronously, mirrored to localStorage, and flushed on
+   `visibilitychange` via `sendBeacon` (the study ends on a completion screen
+   people close at once). Writes a later screen depends on — participant
+   creation, assignment, responses, mandate, agreement — go through `settle()`,
+   which awaits the drain and logs if it did not land.
+
+   **Retries are event-driven, not budgeted, and that is deliberate.** A drain
+   makes one attempt per item and returns at the first failure; nothing is
+   dropped and nothing is reordered, because the queue is a transcript and its
+   order is data. The next attempt comes from another `push`, the browser's
+   `online` event, or the next `settle`. An attempt budget was tried and is the
+   wrong shape: once spent while the network was down it could never be
+   unspent, so a failing item rotated to the back of the queue stopped every
+   later drain dead. `attempts` survives as diagnostics only, and is reset for a
+   queue restored from a previous session.
+
+   `settle()` logs and continues rather than throwing. Refusing to advance
+   until the server answers turns a dropped connection into a dead end in the
+   middle of a 55-minute study, and the write is durable locally either way —
+   what must not happen is failing silently. `queue.pending` is readable at the
+   end of the study.
 
 4. **`claimSlot` is the one place the local stand-in is not merely a stand-in.**
    `lib/assignment.ts#claimSlot` is deterministic local logic, and the atomic

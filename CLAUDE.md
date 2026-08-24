@@ -243,9 +243,18 @@ Two things there are easy to get wrong later:
   Awaiting `appendMessage` mid-negotiation is a visible stall between turns.
   The local store cannot fail so those call sites have no error branch — fine
   locally, silently lossy over a network. `WriteQueue` closes it without
-  touching a call site: enqueue synchronously, mirror to localStorage, retry
-  with backoff, flush on `visibilitychange` via `sendBeacon`, since the study
-  ends on a screen people close at once.
+  touching a call site: enqueue synchronously, mirror to localStorage, flush on
+  `visibilitychange` via `sendBeacon`, since the study ends on a screen people
+  close at once.
+
+  Its retries are **event-driven, not budgeted**, and that is load-bearing: one
+  attempt per item per drain, return at the first failure, nothing dropped and
+  nothing reordered (the queue is a transcript, so its order is data). The next
+  try comes from another push, the `online` event, or the next flush. An
+  attempt budget was tried and is the wrong shape — once spent while the
+  network was down it could never be unspent, and a failing item rotated to the
+  back stopped every later drain dead. Tests in `tests/write-queue.test.mjs`;
+  `npm run test:units`.
 
 The dev panel's slot picker does **not** go through any of this. It swaps the
 assignment the UI renders, in memory, for previewing; it never claims a slot
