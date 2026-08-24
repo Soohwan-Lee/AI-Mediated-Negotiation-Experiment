@@ -35,6 +35,7 @@
 
 import { NextResponse } from "next/server";
 import { generateText } from "@/lib/ai/client";
+import { leaksForbiddenReason } from "@/lib/ai/reason-leak";
 import { getTask, requirementIssue } from "@/lib/tasks";
 import type { Mandate, Role, TaskId } from "@/lib/types";
 
@@ -67,44 +68,6 @@ function mandateSummary(
     })
     .filter(Boolean)
     .join("\n");
-}
-
-/**
- * Does the reply reproduce a reason the participant did not authorize?
- *
- * A content check on the generated text, because the prompt asking for it is
- * not a guarantee. Matching is on distinctive words from each forbidden card
- * rather than the whole sentence: the proxy is explicitly allowed to paraphrase
- * what it MAY say, so a leak will be a paraphrase too. The bar is deliberately
- * low-precision — a false positive costs one regeneration-free fallback, a
- * false negative shows the participant a disclosure they refused.
- */
-function leaksForbiddenReason(
-  text: string,
-  forbidden: Array<{ id: string; text: string }>,
-): boolean {
-  const haystack = text.toLowerCase();
-  const STOP = new Set([
-    "about", "after", "again", "also", "anything", "because", "been", "before",
-    "could", "every", "from", "have", "here", "into", "just", "know", "known",
-    "made", "make", "makes", "many", "more", "most", "much", "only", "over",
-    "same", "should", "some", "something", "still", "take", "takes", "than",
-    "that", "their", "them", "then", "there", "these", "they", "this", "those",
-    "very", "were", "what", "when", "which", "with", "would", "your", "yours",
-  ]);
-  for (const card of forbidden) {
-    const words = card.text
-      .toLowerCase()
-      .replace(/[^a-z\s]/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 4 && !STOP.has(w));
-    if (words.length === 0) continue;
-    const hits = words.filter((w) => haystack.includes(w)).length;
-    // Half the distinctive words of a card, or three of them, is a paraphrase
-    // of that card rather than a coincidence of vocabulary.
-    if (hits >= Math.max(3, Math.ceil(words.length / 2))) return true;
-  }
-  return false;
 }
 
 export async function POST(request: Request) {
@@ -145,7 +108,16 @@ export async function POST(request: Request) {
       // The question is appended by the caller as the last history entry.
     });
 
-    if (leaksForbiddenReason(text, forbidden)) {
+    // What the proxy is allowed to talk about: the reasons it may voice, plus
+    // the terms themselves. Subtracted from each forbidden card so an ordinary
+    // answer about an authorized reason cannot trip the check.
+    const sayable = [
+      ...authorized.map((c) => c.text),
+      ...task.issues.map((i) => i.label),
+      ...task.issues.map((i) => i.description),
+    ];
+
+    if (leaksForbiddenReason(text, forbidden, sayable)) {
       const requirement = requirementIssue(task, body.role);
       return NextResponse.json({
         text: `I have not been authorized to raise that, so I will not bring it up. What I can argue on ${requirement.label.toLowerCase()} is the reasons you have ticked — you can change which ones any time before we start.`,
