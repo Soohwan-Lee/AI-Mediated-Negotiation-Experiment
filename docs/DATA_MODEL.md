@@ -4,6 +4,48 @@ Not yet implemented. `lib/store.ts` is a localStorage stand-in behind an
 interface shaped like these tables — implementing `SupabaseStore` against this
 schema should require no page changes.
 
+## Readiness: what the swap actually needs
+
+`lib/store-supabase.ts` now holds a written `SupabaseStore` against this
+interface. It is not wired up — `getStore()` still returns the local store and
+nothing imports it at runtime — but writing it is how the claim above got
+tested rather than assumed. The result: the page components are clean, and
+these are the four things that still need doing.
+
+1. **`/api/persist` does not exist yet.** Every read and write in
+   `SupabaseStore` posts `{op, payload}` to it. It has to run with the service
+   role key and switch on `op`. Reads go through it too, so the anon key never
+   needs table access at all.
+
+2. **Writes must not be inferable from the network tab.** This is the reason
+   the route is a single opaque endpoint rather than one path per operation. A
+   participant who can watch their own traffic can infer their condition from
+   it, and knowing the condition is the one thing that invalidates their data.
+   Same-shaped requests for every op is the cheapest way to keep that shut.
+
+3. **Several call sites do not await their write, and should not start.**
+   `appendMessage` is called from inside a live negotiation; awaiting a round
+   trip there is a visible stall between turns. The local store cannot fail, so
+   those sites were written with no error branch — correct then, silently lossy
+   over a network. `WriteQueue` closes it without touching a call site: writes
+   are enqueued synchronously, mirrored to localStorage, retried with backoff,
+   and flushed on `visibilitychange` via `sendBeacon` (the study ends on a
+   completion screen people close at once). Writes a later screen depends on —
+   participant creation, assignment, responses, mandate, agreement — call
+   `queue.flush()` and are awaited.
+
+4. **`claimSlot` is the one place the local stand-in is not merely a stand-in.**
+   `lib/assignment.ts#claimSlot` is deterministic local logic, and the atomic
+   claim it stands in for is what keeps the four cells balanced. Replace its
+   body with the `claim_assignment_slot` RPC below; `/api/assign` is the only
+   caller.
+
+Two gaps in this document were closed while writing that store:
+`saveAgreement` had no reader (`loadAgreement` now exists), and
+`guardrail_events` was specified here with no interface method able to write to
+it — so pilot gate 9's rationale audit had no source. `logGuardrailEvent` now
+exists.
+
 ## Principles
 
 - **Pseudonymous keys.** `participant_key` is the join key everywhere.
@@ -238,6 +280,44 @@ the standardized challenge, and at stage 5 is the final package. A Proxy task
 has no participant messages at all, so without this the trajectory would jump
 from what was entrusted straight to the final package and the two middle
 transitions would not exist for half the design.
+
+### `rehearsal_messages`
+
+The participant questioning their own AI Proxy about the mandate, before it
+negotiates. Proxy tasks only.
+
+```sql
+create table rehearsal_messages (
+  id              bigserial primary key,
+  participant_key text not null references participants,
+  task_index      smallint not null,
+  turn_index      integer not null,
+  speaker         text not null check (speaker in ('participant','proxy')),
+  text            text not null,
+  -- The guardrail replaced the model's wording because it reproduced a reason
+  -- card the participant had not authorized. Recorded rather than silently
+  -- swapped: the rate is a pilot audit number.
+  blocked         boolean not null default false,
+  -- How many times the mandate had been edited when this turn was taken, so
+  -- "asked, then changed their instructions" is recoverable.
+  revision_count  integer not null default 0,
+  created_at      timestamptz not null default now()
+);
+
+create index on rehearsal_messages (participant_key, task_index, turn_index);
+```
+
+**A separate table from `messages`, deliberately.** A rehearsal turn was never
+part of a negotiation: no stage, no package, and nothing reached the
+counterpart. Per-stage message counts and the message trajectory are reported
+measures (§9.3.2), so putting these rows in `messages` would put turns that
+were never in an exchange into the transcript the analysis reads.
+
+It is still behavioural data worth having. Whether a participant interrogates a
+delegate before trusting it with a socially costly argument — and whether they
+revise the mandate afterwards — is the same delegation decision `REASON-SCOPE`
+measures, approached from a different side. The turn count also lands in
+`events` as `rehearsal_finished`.
 
 ### `guardrail_events`
 
