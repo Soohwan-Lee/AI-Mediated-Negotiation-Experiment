@@ -46,6 +46,19 @@ them:
   O2→O3 breaks it, which is why the trajectory is reported as transitions and
   never summed
 
+**A bare point number is not information, so two anchors travel with it.**
+`PointsKey` names the most the task could pay this participant (6,300) and the
+fallback they get with no agreement (2,500); `PackageValue` shows what the
+currently-selected package pays, against that fallback, once all three terms
+have a level. Both are already the participant's own — the fallback is in the
+briefing and the maximum is the sum of their own best levels — so neither
+discloses anything the design withholds. Neither may ever show the other side's
+numbers, the joint total, or any hint that trading term against term pays
+better than splitting each one: finding the logroll is the behaviour being
+observed (pilot gate 6). A partial package total is withheld for the same
+reason a running subtotal misleads — it reads as the total and falls as terms
+are added.
+
 Each requirement is worth 3,000 on purpose. If it were cheap, giving it up
 would be explicable as a sensible low-priority concession — exactly the thing
 this study has to distinguish from withdrawal under evaluative pressure.
@@ -217,6 +230,23 @@ Currently `lib/assignment.ts#claimSlot` is a deterministic local stand-in.
 call is the whole change, because nothing else in the app decides an
 assignment.
 
+`lib/store-supabase.ts` holds a written `SupabaseStore` — not wired up, nothing
+imports it, `getStore()` still returns the local store. It exists because
+writing it is how the "no page changes" claim got tested instead of assumed.
+The pages are clean; what remains is in docs/DATA_MODEL.md under **Readiness**.
+Two things there are easy to get wrong later:
+
+- **One opaque `/api/persist` endpoint, not a path per operation.** A
+  participant who reads their own network tab can infer their condition from
+  it, and that is the one thing that invalidates their data.
+- **Several writes are deliberately not awaited and must stay that way.**
+  Awaiting `appendMessage` mid-negotiation is a visible stall between turns.
+  The local store cannot fail so those call sites have no error branch — fine
+  locally, silently lossy over a network. `WriteQueue` closes it without
+  touching a call site: enqueue synchronously, mirror to localStorage, retry
+  with backoff, flush on `visibilitychange` via `sendBeacon`, since the study
+  ends on a screen people close at once.
+
 The dev panel's slot picker does **not** go through any of this. It swaps the
 assignment the UI renders, in memory, for previewing; it never claims a slot
 and never writes one. Keep it that way — a preview control that could consume a
@@ -234,12 +264,50 @@ specific negotiation, so asking it after a second, differently conditioned
 negotiation would blend the two conditions inside a single answer. Item ids
 carry a `_t1` / `_t2` suffix for the same reason.
 
-Inside a Baseline task: cover → brief → preferences → **RISK** → "waiting for
+Inside a Baseline task: cover → brief → **RISK** → what you want → "waiting for
 the other participant" → negotiate → review.
 
-Inside a Proxy task: cover → brief → preferences → **RISK** → reason cards →
-confirm → watch the two AI Proxies → **handover** → negotiate directly →
-review.
+Inside a Proxy task: cover → brief → **RISK** → **mandate (levels + reason
+cards, one screen)** → check with your proxy → confirm → watch the two AI
+Proxies → **handover** → negotiate directly → review.
+
+**The mandate is ONE screen: the levels on all three terms and the reason
+cards.** They were two screens in sequence, which made them two decisions
+taken in order — the position fixed before the reasons were considered. The
+gap this study is about is precisely that the second half was never asked, so
+splitting them contradicted the contribution.
+
+Where the cards sit took care and must not be "tidied". They exist for one
+term — the participant's requirement — so the obvious layout nests them in that
+term's card. That breaks §5 principle 4: one of the three cards would be
+visibly taller and carry a control the others do not, which tells the
+participant which term the study is about without a word being said. The
+reasons are therefore a section BELOW all three cards, addressed to the
+requirement in their own heading exactly as the briefing presents them, and the
+three term cards stay identical. `PreferenceForm` takes the section as a prop;
+Baseline passes none.
+
+**The participant can question their own AI Proxy before it runs**
+(`RehearsalChat`, `/api/proxy-rehearsal`). They ask what it will open with, how
+far it will go, which reasons it may use, and can then go back and change the
+mandate. It is optional and says so. Three limits keep it from disturbing the
+design, and all three are enforced rather than intended:
+
+- **Not a negotiation.** The counterpart is absent and never spoken for.
+  Nothing is proposed or agreed, and `machine.ts` is never called — so no
+  negotiation decision moves to the model.
+- **Not a second bite.** It is BEFORE the exchange. The deleted post-hoc
+  revision let a Proxy participant re-run a finished negotiation, which is a
+  bite Baseline never had; editing instructions before anyone has spoken is
+  just writing a mandate.
+- **No unticked card, ever.** The route screens the generated text against the
+  cards left unticked and substitutes a refusal. Hearing a sensitive card read
+  aloud without authorizing it would stage the disclosure being measured, so a
+  prompt instruction alone is not enough.
+
+What it costs, and it is real: the Proxy arm gains screen time and a written
+exchange Baseline has no counterpart for. Read it as part of the manipulation,
+and against the §10 gate 8 timing budget.
 
 **The Proxy participant takes over from their AI Proxy and finishes the
 negotiation themselves.** The proxies run ONCE — there is no revision, and no
@@ -298,6 +366,15 @@ having already decided which sensitive cards to hand over and read the policy
 disclosure, which makes a pre-task measure partly post-treatment in one arm.
 RISK is also §10 gate 4's task-equivalence instrument, so it cannot carry a
 condition effect.
+
+It is now asked **straight after the briefing, before the levels screen**, in
+both arms. Merging the levels and the reason cards made the old placement
+unsafe even where it had been fine: "after the levels screen" became "after the
+mandate" in the Proxy arm and not in Baseline. Asked cold, right after the
+situation is read and before anything about their own position is committed, it
+is identical in both arms and cannot be reached by any condition-specific
+screen. Do not move it back down the flow to group it with the other pre-task
+screens.
 
 ## Interface rules
 
@@ -459,7 +536,9 @@ fills once and every screen after it inside the same component arrives empty.
 
 | Task | File |
 |---|---|
-| Supabase persistence | `lib/store.ts` — write a `SupabaseStore`, change `getStore()` |
+| Supabase persistence | `lib/store.ts` — swap `getStore()` to the `SupabaseStore` in `lib/store-supabase.ts` |
+| The `{op, payload}` persistence endpoint | `app/api/persist/route.ts` — does not exist yet |
+| Rehearsal chat (participant ↔ own proxy) | `app/api/proxy-rehearsal/route.ts` · prompt P5 in `lib/ai/prompts.ts` |
 | Atomic slot claim | `app/api/assign/route.ts` |
 | Task payoffs, role stories, reason cards, Explorer pool | `lib/tasks.ts` |
 | Counterpart moves, acceptance thresholds, concessions | `lib/negotiation/machine.ts` |
