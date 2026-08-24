@@ -88,6 +88,7 @@ import {
   DirectNegotiation,
   Matchmaking,
   PreferenceForm,
+  RehearsalChat,
   RiskForm,
   TaskBrief,
   TaskIntro,
@@ -117,6 +118,7 @@ type Phase =
   | "brief"
   | "risk"
   | "mandate"
+  | "rehearsal"
   | "confirm"
   | "matchmaking"
   | "watching"
@@ -129,6 +131,7 @@ const PHASES: Phase[] = [
   "brief",
   "risk",
   "mandate",
+  "rehearsal",
   "confirm",
   "matchmaking",
   "watching",
@@ -146,6 +149,7 @@ const STEP_LABELS = [
   "Your briefing",
   "Before you start",
   "Your instructions",
+  "Check with it",
   "Check and start",
   "Watch",
   "Talk it through",
@@ -158,6 +162,7 @@ const PHASE_LABELS: Record<Phase, string> = {
   brief: "Your briefing",
   risk: "Before you start",
   mandate: "Your instructions",
+  rehearsal: "Check with it",
   confirm: "Check and start",
   matchmaking: "Connecting",
   watching: "Watch",
@@ -172,12 +177,13 @@ const STEP_OF: Record<Phase, number> = {
   brief: 0,
   risk: 1,
   mandate: 2,
-  confirm: 3,
-  matchmaking: 4,
-  watching: 4,
-  handover: 5,
-  negotiate: 5,
-  review: 6,
+  rehearsal: 3,
+  confirm: 4,
+  matchmaking: 5,
+  watching: 5,
+  handover: 6,
+  negotiate: 6,
+  review: 7,
 };
 
 /**
@@ -709,6 +715,32 @@ export function ProxyTask({
               minimumOptionId: p.minimum[im.issueId] ?? null,
             })),
           }));
+          setPhase("rehearsal");
+          window.scrollTo({ top: 0 });
+        }}
+      />
+    );
+  }
+
+  /* Questioning your own proxy before it runs. Optional, and before anything
+     has been said to anyone — see `RehearsalChat`. */
+  if (phase === "rehearsal") {
+    return (
+      <RehearsalChat
+        taskIndex={taskIndex}
+        task={task}
+        role={role}
+        policy={policy}
+        mandate={mandate}
+        steps={STEP_LABELS}
+        stepIndex={STEP_OF.rehearsal}
+        onBackToMandate={() => {
+          setMandate((m) => ({ ...m, revisionCount: m.revisionCount + 1 }));
+          logEvent("mandate_revised", undefined, { sessionIndex: taskIndex });
+          setPhase("mandate");
+          window.scrollTo({ top: 0 });
+        }}
+        onContinue={() => {
           setPhase("confirm");
           window.scrollTo({ top: 0 });
         }}

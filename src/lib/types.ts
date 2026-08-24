@@ -335,6 +335,37 @@ export interface TranscriptMessage {
   decidedAction?: string;
 }
 
+/**
+ * One turn of the rehearsal — the participant questioning their own AI Proxy
+ * about its mandate, before it negotiates anything.
+ *
+ * Kept apart from `TranscriptMessage` on purpose. A rehearsal turn is not part
+ * of any negotiation: it has no stage, carries no package, and nothing in it
+ * reaches the counterpart. Storing it in the same table as negotiation messages
+ * would put turns that were never part of an exchange into the transcript the
+ * analysis reads, and the message count per stage is a reported measure.
+ *
+ * It is still worth recording: which participants interrogated their proxy,
+ * what they asked, and whether they revised the mandate afterwards is
+ * delegation behaviour of exactly the kind REASON-SCOPE is trying to capture.
+ */
+export interface RehearsalMessage {
+  id: string;
+  sessionIndex: 1 | 2;
+  /** "participant" asks; "proxy" is their own AI Proxy answering. */
+  speaker: "participant" | "proxy";
+  text: string;
+  createdAt: string;
+  /**
+   * True when the guardrail replaced the model's wording because it reproduced
+   * a reason card the participant had not authorized. Recorded rather than
+   * silently swapped, because the rate is a pilot audit number.
+   */
+  blocked?: boolean;
+  /** How many times the mandate had been edited when this turn was taken. */
+  revisionCount?: number;
+}
+
 // ---------------------------------------------------------------------------
 // Agreement
 // ---------------------------------------------------------------------------
@@ -402,6 +433,13 @@ export type EventType =
   | "initial_preference_saved"
   | "mandate_saved"
   | "mandate_revised"
+  /**
+   * The participant finished questioning their own AI Proxy about the mandate
+   * before it ran. The turn count is delegation behaviour worth having beside
+   * REASON-SCOPE: whether someone interrogates a delegate before trusting it
+   * with an argument is the same decision measured a different way.
+   */
+  | "rehearsal_finished"
   | "message_sent"
   | "negotiation_started"
   | "negotiation_ended"

@@ -73,7 +73,7 @@ import {
   preservesRequirement,
   requirementIssue,
 } from "@/lib/tasks";
-import type { NegotiationTask, Package, Role } from "@/lib/types";
+import type { Mandate, NegotiationTask, Package, Role } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Phase: the cover
@@ -1377,5 +1377,230 @@ export function ProxyTranscriptPanel({
         </div>
       ) : null}
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phase: rehearsal — questioning your own AI Proxy before it runs
+// ---------------------------------------------------------------------------
+
+/**
+ * A short conversation with the participant's OWN AI Proxy, after the mandate
+ * is set and before the two proxies negotiate.
+ *
+ * The participant asks what it will do — what it opens with, where it stops,
+ * which of their reasons it may use, what it says when pushed — and can then go
+ * back and change the mandate. It is a way of checking instructions you have
+ * written, which is exactly what you cannot do with a delegate you never speak
+ * to, and it is what a participant reaches for when asked to hand over an
+ * argument sight-unseen.
+ *
+ * WHAT IT IS NOT, and every one of these is enforced rather than intended:
+ *
+ *  - NOT a negotiation. The counterpart is absent and never spoken for. No
+ *    package is proposed, nothing is agreed, and `machine.ts` is not consulted
+ *    (see `/api/proxy-rehearsal`).
+ *  - NOT a second bite at a finished exchange. That was the deleted post-hoc
+ *    revision, which gave the Proxy arm a way to undo an agreement Baseline
+ *    could not. This is before anyone has spoken.
+ *  - NOT a place an unauthorized reason can be heard. The route screens the
+ *    generated text for the cards the participant left unticked, because
+ *    hearing a sensitive card read aloud without authorizing it would stage
+ *    the disclosure this study measures.
+ *
+ * OPTIONAL, AND SAID TO BE. A participant who does not want it continues
+ * straight past. Making it a required step would spend a minute of everyone's
+ * §10 gate 8 budget on a screen half of them did not want.
+ */
+export function RehearsalChat({
+  taskIndex,
+  task,
+  role,
+  policy,
+  mandate,
+  steps,
+  stepIndex,
+  onBackToMandate,
+  onContinue,
+}: {
+  taskIndex: 1 | 2;
+  task: NegotiationTask;
+  role: Role;
+  policy: "delegate" | "explorer";
+  mandate: Mandate;
+  steps: string[];
+  stepIndex: number;
+  onBackToMandate: () => void;
+  onContinue: () => void;
+}) {
+  const { participantKey, logEvent } = useParticipant();
+  const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  const [draft, setDraft] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const mockAi = useDevMockAi();
+
+  useDevAutofill(
+    () => setDraft("what will you say if they push back on my main term?"),
+    `rehearsal-t${taskIndex}`,
+  );
+
+  async function record(message: DisplayMessage, blocked?: boolean) {
+    if (!participantKey) return;
+    await getStore().appendRehearsalMessage(participantKey, {
+      id: message.id,
+      sessionIndex: taskIndex,
+      speaker: message.speaker === "participant" ? "participant" : "proxy",
+      text: message.text,
+      createdAt: new Date().toISOString(),
+      blocked,
+      revisionCount: mandate.revisionCount,
+    });
+  }
+
+  async function ask(text: string) {
+    const mine: DisplayMessage = {
+      id: `r-you-${messages.length}`,
+      speaker: "participant",
+      text,
+    };
+    const history = [...messages, mine];
+    setMessages(history);
+    void record(mine);
+    setPending(true);
+    setError(null);
+
+    // Mockup mode answers from a fixed line rather than the model: this screen
+    // exists to be read in a walkthrough, and it must not need an API key.
+    if (mockAi) {
+      await new Promise((r) => setTimeout(r, 500));
+      const reply: DisplayMessage = {
+        id: `r-proxy-${history.length}`,
+        speaker: "participant_proxy",
+        text: "I'll hold your main term at the level you set and offer movement on the other two instead. If they push back on it I'll give one of the reasons you've ticked — I won't raise anything you left unticked.",
+      };
+      setMessages([...history, reply]);
+      void record(reply);
+      setPending(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/proxy-rehearsal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: task.id,
+          role,
+          policy,
+          mandate,
+          question: text,
+          history: history.map((m) => ({
+            role: m.speaker === "participant" ? "user" : "assistant",
+            content: m.text,
+          })),
+        }),
+      });
+      const data = (await response.json()) as {
+        text?: string;
+        blocked?: boolean;
+        error?: string;
+      };
+      if (!response.ok || !data.text) {
+        throw new Error(data.error ?? "Could not reach your AI Proxy.");
+      }
+      const reply: DisplayMessage = {
+        id: `r-proxy-${history.length}`,
+        speaker: "participant_proxy",
+        text: data.text,
+      };
+      setMessages([...history, reply]);
+      void record(reply, data.blocked);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not reach your AI Proxy.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <>
+      <Page width="wide">
+        <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
+          <TaskHeader
+            taskIndex={taskIndex}
+            title="Check with your AI Proxy"
+            steps={steps}
+            current={stepIndex}
+          />
+
+          <div className="mb-5">
+            <Callout title="💬 Ask it anything about your instructions">
+              <p className="max-w-prose">
+                It can tell you what it will open with, how far it will go, and
+                which of your reasons it may use. It has not started
+                negotiating, and the other participant cannot see this.
+              </p>
+              <p className="mt-2 max-w-prose">
+                This step is optional — you can go straight on, or go back and
+                change your instructions.
+              </p>
+            </Callout>
+          </div>
+
+          {error ? (
+            <div className="mb-5">
+              <Callout tone="warning">
+                <p>{error}</p>
+              </Callout>
+            </div>
+          ) : null}
+
+          <Card padded={false} className="flex flex-col">
+            <Transcript
+              messages={messages}
+              pending={pending}
+              emptyHint="Nothing asked yet. Try “what will you open with?” or “what if they push back on my main term?”"
+            />
+            <MessageComposer
+              value={draft}
+              onChange={setDraft}
+              onSend={(text) => {
+                setDraft("");
+                void ask(text);
+              }}
+              disabled={pending}
+              placeholder="Ask your AI Proxy…"
+              sendLabel="Ask"
+              cue={messages.length === 0 && !pending}
+            />
+          </Card>
+        </TaskLayout>
+      </Page>
+
+      <ActionBar
+        label="Continue"
+        onClick={() => {
+          logEvent(
+            "rehearsal_finished",
+            { turns: messages.filter((m) => m.speaker === "participant").length },
+            { sessionIndex: taskIndex },
+          );
+          onContinue();
+        }}
+        note="Your AI Proxy has not started negotiating yet."
+        secondary={
+          <button
+            type="button"
+            onClick={onBackToMandate}
+            className="rounded-[var(--radius)] px-3 py-2 text-[0.9375rem] font-medium text-[var(--ink-2)] hover:bg-[var(--surface-muted)]"
+          >
+            Change my instructions
+          </button>
+        }
+      />
+    </>
   );
 }

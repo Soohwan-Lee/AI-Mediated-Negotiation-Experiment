@@ -17,6 +17,7 @@ import type {
   ExperimentEvent,
   Mandate,
   ProlificContext,
+  RehearsalMessage,
   SurveyResponses,
   TranscriptMessage,
 } from "./types";
@@ -58,10 +59,55 @@ export interface Store {
     sessionIndex: 1 | 2,
   ): Promise<TranscriptMessage[]>;
 
+  /**
+   * One turn of the rehearsal conversation (participant ↔ their own proxy).
+   *
+   * Deliberately NOT `appendMessage`. A rehearsal turn was never part of a
+   * negotiation — no stage, no package, nothing sent to the counterpart — and
+   * per-stage message counts are a reported measure, so mixing the two would
+   * corrupt the transcript the analysis reads.
+   */
+  appendRehearsalMessage(
+    participantKey: string,
+    message: RehearsalMessage,
+  ): Promise<void>;
+  loadRehearsalMessages(
+    participantKey: string,
+    sessionIndex: 1 | 2,
+  ): Promise<RehearsalMessage[]>;
+
   saveAgreement(
     participantKey: string,
     agreement: CandidateAgreement,
   ): Promise<void>;
+  loadAgreement(
+    participantKey: string,
+    sessionIndex: 1 | 2,
+  ): Promise<CandidateAgreement | null>;
+
+  /**
+   * A validator block or regeneration (docs/DATA_MODEL.md `guardrail_events`).
+   *
+   * The table was in the schema with no way to write to it, so pilot gate 9's
+   * rationale audit had no source. Guardrail behaviour is also the thing most
+   * likely to differ silently between the two policies, which makes its rate
+   * part of the Explorer − Delegate contrast rather than an implementation
+   * detail.
+   */
+  logGuardrailEvent(
+    participantKey: string,
+    event: GuardrailEvent,
+  ): Promise<void>;
+}
+
+/** One validator block or regeneration, for the pilot audit. */
+export interface GuardrailEvent {
+  sessionIndex: 1 | 2;
+  turnIndex?: number;
+  violationCode: string;
+  detail?: string;
+  disposition: "accept" | "regenerate" | "mark_unresolved";
+  createdAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,8 +189,38 @@ class LocalStore implements Store {
     return read<TranscriptMessage[]>(key("messages", participantKey, sessionIndex)) ?? [];
   }
 
+  async appendRehearsalMessage(
+    participantKey: string,
+    message: RehearsalMessage,
+  ) {
+    const k = key("rehearsal", participantKey, message.sessionIndex);
+    const existing = read<RehearsalMessage[]>(k) ?? [];
+    existing.push(message);
+    write(k, existing);
+  }
+
+  async loadRehearsalMessages(participantKey: string, sessionIndex: 1 | 2) {
+    return (
+      read<RehearsalMessage[]>(key("rehearsal", participantKey, sessionIndex)) ??
+      []
+    );
+  }
+
   async saveAgreement(participantKey: string, agreement: CandidateAgreement) {
     write(key("agreement", participantKey, agreement.sessionIndex), agreement);
+  }
+
+  async loadAgreement(participantKey: string, sessionIndex: 1 | 2) {
+    return read<CandidateAgreement>(
+      key("agreement", participantKey, sessionIndex),
+    );
+  }
+
+  async logGuardrailEvent(participantKey: string, event: GuardrailEvent) {
+    const k = key("guardrail", participantKey);
+    const existing = read<GuardrailEvent[]>(k) ?? [];
+    existing.push(event);
+    write(k, existing);
   }
 }
 

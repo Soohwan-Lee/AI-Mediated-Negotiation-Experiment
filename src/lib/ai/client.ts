@@ -109,6 +109,62 @@ export async function generateAction(
   };
 }
 
+/**
+ * A plain-text turn, for the rehearsal conversation.
+ *
+ * Separate from `generateAction` because the rehearsal produces no negotiation
+ * action: nothing is proposed, conceded or accepted, so there is no structured
+ * move to validate and no schema to force. `lib/negotiation/machine` is not
+ * involved at all — which is the point. The proxy is describing a mandate it
+ * has been handed, and the state machine still owns every real decision.
+ */
+export async function generateText(args: {
+  kind: AgentKind;
+  ctx: PromptContext;
+  history: Array<{ role: "assistant" | "user"; content: string }>;
+}): Promise<{ text: string; stubbed: boolean }> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return {
+      text: "[SCAFFOLD] No model configured, so I cannot answer properly yet. With a key set I would tell you what I will open with, how far I will go, and which of your reasons I may use.",
+      stubbed: true,
+    };
+  }
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: AI_CONFIG.model,
+      // No `temperature` — see ai/config.ts.
+      reasoning: { effort: AI_CONFIG.reasoningEffort },
+      max_output_tokens: AI_CONFIG.maxOutputTokens,
+      input: [
+        { role: "system", content: buildSystemPrompt(args.kind, args.ctx) },
+        ...args.history.map((m) => ({ role: m.role, content: m.content })),
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `LLM request failed: ${response.status} ${await response.text()}`,
+    );
+  }
+
+  const payload = (await response.json()) as ResponsesPayload;
+  const text = extractOutputText(payload);
+  if (!text) {
+    throw new Error(
+      `LLM returned no message content (status: ${payload.status ?? "unknown"})`,
+    );
+  }
+  return { text: text.trim(), stubbed: false };
+}
+
 interface ResponsesPayload {
   status?: string;
   output_text?: string;

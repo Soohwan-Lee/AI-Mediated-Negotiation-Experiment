@@ -17,6 +17,9 @@
  *  - counterpart_principal : the other participant's one line on the review screen
  *    (P2). A fixed template, rendered in a human voice.
  *  - delegate / explorer : the two Proxy policies (P3, P4).
+ *  - rehearsal           : the participant's own proxy, answering questions
+ *    about the mandate before it runs (P5). It describes instructions; it does
+ *    not negotiate and holds no judgement.
  */
 
 import type { Issue, Role, StageId, NegotiationTask } from "../types";
@@ -25,7 +28,9 @@ export type AgentKind =
   | "ostensible_human"
   | "counterpart_principal"
   | "delegate"
-  | "explorer";
+  | "explorer"
+  /** The participant's own proxy, answering questions about its mandate (P5). */
+  | "rehearsal";
 
 export interface PromptContext {
   task: NegotiationTask;
@@ -280,6 +285,81 @@ PLAUSIBLE REASONS (pre-approved, this role and task):
 ${pool}`;
 }
 
+/**
+ * P5 — the rehearsal. The participant's OWN proxy, answering questions about
+ * the mandate before it goes anywhere.
+ *
+ * This is not a negotiation and it is not a preview of one. The participant is
+ * checking what they have instructed: what it will open with, where it will
+ * stop, which of their reasons it may use, what it will do when challenged.
+ * Then they can change the mandate and ask again.
+ *
+ * WHAT MAKES IT SAFE TO ADD. Three things, and all three are constraints on
+ * this prompt rather than promises about it:
+ *
+ *  1. NO COUNTERPART. The other side is not in this conversation and is never
+ *     spoken for. The proxy may not report what the other side will accept,
+ *     because it does not know and a guess would become an expectation the
+ *     real exchange then confirms or breaks.
+ *  2. NO JUDGEMENT. `lib/negotiation/machine` owns every negotiation decision.
+ *     Here the proxy DESCRIBES a mandate it has been handed — the opening
+ *     level, the floor, the reason list — and describes nothing else. It may
+ *     not advise, may not rank the participant's options, and may not suggest
+ *     that ticking another card would serve them better. Advice would make the
+ *     model a participant in the decision the study measures.
+ *  3. NO UNTICKED CARD, EVER. The same rule as in the negotiation, and for a
+ *     sharper reason: a participant could otherwise use the rehearsal to hear
+ *     a sensitive card spoken aloud without ever authorizing it, which is
+ *     precisely the disclosure being measured.
+ */
+function rehearsalPrompt(ctx: PromptContext): string {
+  const brief = ctx.task.roleBriefs[ctx.agentRole];
+
+  return `You are an AI Proxy that will negotiate on behalf of your principal,
+the ${ctx.agentRole === "leader" ? "Project Leader" : "Team Member"}. You have
+not started yet. Your principal is checking their instructions with you.
+
+YOUR PRINCIPAL'S SITUATION
+${brief.organizationalPosition}
+
+THE TERMS
+${issueBlock(ctx.issues)}
+
+YOUR INSTRUCTIONS
+${ctx.mandateSummary ?? "No instructions set yet."}
+
+REASONS YOU MAY SAY
+${listOrNone(ctx.authorizedReasons, "- none selected yet")}
+
+REASONS YOU MAY NEVER SAY
+${listOrNone(ctx.forbiddenReasons, "- none")}
+
+WHAT THIS CONVERSATION IS
+Your principal is asking what you will do. Answer about YOUR INSTRUCTIONS and
+nothing else: what you will open with, how far you will go on a term, which
+reasons you may use, what you will say if the other side pushes back on a term.
+If they change their instructions, answer from the new ones.
+
+HARD RULES
+- Never say, quote, paraphrase or hint at a reason under "REASONS YOU MAY NEVER
+  SAY". If asked about one, say only that you have not been authorized to raise
+  it and that they can authorize it if they want to.
+- Never speak for the other side. You do not know what they want, what they
+  will accept, or what their situation is. If asked, say so plainly.
+- Never advise. Do not say which option is better for your principal, do not
+  suggest they change a level or authorize another reason, and do not comment
+  on whether their instructions are wise. If pressed for advice, say the
+  decision is theirs and restate what you have been told to do.
+- Never predict the outcome, and never promise a result.
+- Never reveal point values, scorecards or thresholds.
+- Never state or imply that this is an experiment.
+
+HOW TO WRITE
+- Two or three sentences. Plain, calm, specific.
+- Refer to levels by their labels, never by option number.
+- Reply with the message text only. No JSON, no labels, no preamble.`;
+}
+
 export function buildSystemPrompt(
   kind: AgentKind,
   ctx: PromptContext,
@@ -293,6 +373,8 @@ export function buildSystemPrompt(
       return delegatePrompt(ctx);
     case "explorer":
       return explorerPrompt(ctx);
+    case "rehearsal":
+      return rehearsalPrompt(ctx);
   }
 }
 
