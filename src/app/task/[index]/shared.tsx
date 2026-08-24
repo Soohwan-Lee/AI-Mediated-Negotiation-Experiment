@@ -473,15 +473,23 @@ export function PreferenceForm({
 }
 
 // ---------------------------------------------------------------------------
-// Phase: RISK, immediately before the negotiation
+// Phase: RISK, straight after the briefing
 // ---------------------------------------------------------------------------
 
 /**
  * The two RISK items (Design §9.2).
  *
- * Its own screen, right before the negotiation opens, because it asks what the
- * participant expects it to cost to raise their requirement — an expectation,
- * which stops being one the moment anything has happened.
+ * Its own screen, asked as early as it can be: the situation has been read and
+ * nothing about the participant's own position has been decided. It asks what
+ * they EXPECT it to cost to raise their requirement, and an expectation stops
+ * being one the moment a decision has been taken.
+ *
+ * It sat after the levels screen until the Proxy arm merged levels and reason
+ * cards onto one screen. "After the levels screen" then meant "after the
+ * mandate" in that arm and not in Baseline — and RISK is §10 gate 4's
+ * task-equivalence instrument, so it cannot carry a condition effect. Asking it
+ * here is what keeps the two arms identical on this point. Do not move it back
+ * down the flow to group it with the other pre-task screens.
  */
 export function RiskForm({
   taskIndex,
@@ -489,13 +497,6 @@ export function RiskForm({
   role,
   steps,
   stepIndex,
-  /**
-   * What the button says. Baseline goes straight into the negotiation from
-   * here; Proxy still has the mandate screens to come, and a button promising
-   * a negotiation that does not start is a small lie the participant catches
-   * immediately.
-   */
-  continueLabel = "Continue",
   onContinue,
 }: {
   taskIndex: 1 | 2;
@@ -503,7 +504,6 @@ export function RiskForm({
   role: Role;
   steps: string[];
   stepIndex: number;
-  continueLabel?: string;
   onContinue: () => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
@@ -544,7 +544,12 @@ export function RiskForm({
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <TaskHeader
             taskIndex={taskIndex}
-            title="One last thing before you start"
+            /* NOT "one last thing": the levels screen (and in the Proxy arm
+               the reason cards with it) still comes after this one. The title
+               said otherwise while RISK sat last, and a promise that the next
+               button starts the negotiation is one the participant checks
+               immediately. */
+            title="First, two quick questions"
             steps={steps}
             current={stepIndex}
           />
@@ -560,7 +565,11 @@ export function RiskForm({
       </Page>
 
       <ActionBar
-        label={continueLabel}
+        /* Always "Continue". The prop that used to make this configurable
+           existed so Baseline could say "Start the negotiation" — true when
+           RISK was the last screen before it, and a lie now that the levels
+           screen follows in both arms. */
+        label="Continue"
         onClick={save}
         disabled={!canContinue}
         remaining={missing.length}
