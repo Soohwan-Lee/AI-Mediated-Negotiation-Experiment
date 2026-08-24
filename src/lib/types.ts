@@ -252,6 +252,26 @@ export interface Mandate {
    * (Design §7).
    */
   authorizedReasonIds: string[];
+  /**
+   * How many times the participant went back and edited this mandate BEFORE
+   * the proxies ran.
+   *
+   * Not the deleted post-hoc revision. That one let a Proxy participant re-run
+   * a negotiation that had already finished — a bite Baseline never had, which
+   * is why it is gone (CLAUDE.md, "There is no 'ask for one change'"). This
+   * counts edits made while nothing has been said to anyone: from the
+   * rehearsal screen ("Change my instructions") and from the confirm screen
+   * ("Change something"). Both are the ordinary act of writing a mandate, and
+   * Baseline's equivalent is that a Baseline participant can change their mind
+   * freely before they type.
+   *
+   * It is behavioural data rather than bookkeeping: whether someone
+   * interrogates a delegate and then revises what they entrusted is the same
+   * delegation decision REASON-SCOPE measures, seen from another side. Each
+   * increment also lands in `events` as `mandate_revised`, and
+   * `rehearsal_messages.revision_count` stamps which revision a given question
+   * was asked under.
+   */
   revisionCount: number;
 }
 

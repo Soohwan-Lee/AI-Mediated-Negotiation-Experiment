@@ -273,6 +273,7 @@ export function PreferenceForm({
   reasons,
   /** Whether the reason section's own requirement (≥1 work card) is met. */
   reasonsComplete = true,
+  initial,
   onContinue,
 }: {
   taskIndex: 1 | 2;
@@ -283,14 +284,32 @@ export function PreferenceForm({
   isProxy: boolean;
   reasons?: ReactNode;
   reasonsComplete?: boolean;
+  /**
+   * Levels already chosen, when this screen is being returned to.
+   *
+   * Interface rule 4: anything reachable by Back must restore its saved
+   * answers, "or Back is a trap that blanks the screen". This screen became
+   * reachable again when the rehearsal gained "Change my instructions", and
+   * without this it was exactly that trap — the component remounts, its own
+   * state initialises to null, and a participant who went back to re-tick one
+   * reason card found all six of their level choices gone. The reason cards
+   * survived, because those live in the parent's mandate; the levels did not,
+   * because they lived here. Mockup mode hid it, since autofill re-fills on
+   * every mount.
+   */
+  initial?: Preferences;
   onContinue: (prefs: Preferences) => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
   const [preferred, setPreferred] = useState<Record<string, string | null>>(
-    Object.fromEntries(task.issues.map((i) => [i.id, null])),
+    () =>
+      initial?.preferred ??
+      Object.fromEntries(task.issues.map((i) => [i.id, null])),
   );
   const [minimum, setMinimum] = useState<Record<string, string | null>>(
-    Object.fromEntries(task.issues.map((i) => [i.id, null])),
+    () =>
+      initial?.minimum ??
+      Object.fromEntries(task.issues.map((i) => [i.id, null])),
   );
 
   useDevAutofill(() => {

@@ -697,6 +697,17 @@ export function ProxyTask({
         stepIndex={STEP_OF.mandate}
         isProxy
         reasonsComplete={hasWorkReason(task, role, mandate.authorizedReasonIds)}
+        /* Levels already entrusted, so returning here from the rehearsal
+           restores them (interface rule 4). The mandate is the parent's state
+           and survives the remount; `PreferenceForm`'s own state does not. */
+        initial={{
+          preferred: Object.fromEntries(
+            mandate.issues.map((im) => [im.issueId, im.preferredOptionId]),
+          ),
+          minimum: Object.fromEntries(
+            mandate.issues.map((im) => [im.issueId, im.minimumOptionId]),
+          ),
+        }}
         reasons={
           <ReasonMandateSection
             task={task}
