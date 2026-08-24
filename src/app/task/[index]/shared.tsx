@@ -48,7 +48,7 @@ import {
   TaskHeader,
   TaskLayout,
 } from "@/components/session";
-import { OptionChips } from "@/components/issues";
+import { OptionChips, PackageValue, PointsKey } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Cue, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
@@ -326,6 +326,10 @@ export function PreferenceForm({
                   ? "These two answers per term are the limits your AI Proxy negotiates inside. It will open at what you want and will not go past the least you would take."
                   : "Nobody else sees this — not the other side, not later in the task. It is recorded so we can compare what you wanted with how things turned out."}
               </p>
+              {/* The scale the point numbers are on. This is the screen where
+                  they are acted on rather than read, so the anchors belong
+                  here too — see `PointsKey`. */}
+              <PointsKey className="mt-2" />
             </Callout>
           </div>
 
@@ -374,6 +378,26 @@ export function PreferenceForm({
                 </div>
               </Card>
             ))}
+          </div>
+
+          {/* What the two positions add up to, once all three terms have one.
+              A level's number only means something against the package total
+              and the fallback — see `PackageValue`. Both lines are the
+              participant's OWN totals; nothing here says what the other side
+              would get, or that trading terms beats splitting them. */}
+          <div className="mt-4 space-y-1.5 rounded-[var(--radius)] border border-[var(--private-line)] bg-[var(--private)]/40 px-4 py-3">
+            <PackageValue
+              issues={task.issues}
+              role={role}
+              selection={preferred}
+              label="What you would like adds up to"
+            />
+            <PackageValue
+              issues={task.issues}
+              role={role}
+              selection={minimum}
+              label="Your least-acceptable set adds up to"
+            />
           </div>
         </TaskLayout>
       </Page>
