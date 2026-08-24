@@ -1149,6 +1149,24 @@ function ReasonMandateSection({
         </Callout>
       </div>
 
+      {/* THE HINT NAMES THE REQUIREMENT TERM, and that is allowed — but it is
+          the closest this screen comes to §5 principle 4, so the reasoning is
+          worth stating.
+
+          What principle 4 forbids is the UI singling out one of the three
+          terms where the LEVELS are chosen: no extra control, no highlight, no
+          separate heading, because that would tell the participant which term
+          the study is about. The three term cards above are identical and stay
+          identical.
+
+          These six cards, though, exist only for the requirement term — and
+          the briefing already presents them under a heading that names it
+          ("Why protected focus afternoons matters to you", open by default,
+          `BriefingPanel`). The participant has therefore already read this
+          pairing before reaching this screen. A deliberately vague heading
+          here would not restore neutrality; it would just make the control
+          harder to understand while telling them nothing they had not been
+          told, which is the worst of both. */}
       <Card tone="private" className="text-[var(--private-ink)]">
         <CardTitle
           hint={`Tick the ones your AI Proxy may use when it argues for ${requirement.label.toLowerCase()}.`}
