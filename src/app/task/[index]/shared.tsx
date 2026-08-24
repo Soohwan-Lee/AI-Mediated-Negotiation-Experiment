@@ -370,7 +370,12 @@ export function PreferenceForm({
               {/* The scale the point numbers are on. This is the screen where
                   they are acted on rather than read, so the anchors belong
                   here too — see `PointsKey`. */}
-              <PointsKey className="mt-2" />
+              <PointsKey
+                issues={task.issues}
+                role={role}
+                reservationPoints={task.reservationPoints}
+                className="mt-2"
+              />
             </Callout>
           </div>
 
@@ -430,12 +435,14 @@ export function PreferenceForm({
             <PackageValue
               issues={task.issues}
               role={role}
+              reservationPoints={task.reservationPoints}
               selection={preferred}
               label="What you would like adds up to"
             />
             <PackageValue
               issues={task.issues}
               role={role}
+              reservationPoints={task.reservationPoints}
               selection={minimum}
               label="Your least-acceptable set adds up to"
             />

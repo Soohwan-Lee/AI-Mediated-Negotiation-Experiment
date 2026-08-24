@@ -426,7 +426,11 @@ export function BriefingPanel({
       </Fold>
 
       <Fold title="🔢 What each term is worth to you" defaultOpen last>
-        <IssueValueTable issues={task.issues} role={role} />
+        <IssueValueTable
+          issues={task.issues}
+          role={role}
+          reservationPoints={task.reservationPoints}
+        />
       </Fold>
 
       <p className="mt-5 border-t border-[var(--private-line)] pt-3 text-[0.75rem]">
