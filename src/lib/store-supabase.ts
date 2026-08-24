@@ -51,12 +51,18 @@ interface QueuedWrite {
   /** Which server-route operation this is. */
   op: string;
   payload: unknown;
+  /**
+   * How many times this item has been tried. Diagnostics only — nothing is
+   * dropped or reordered on a count. Retries are triggered by events that mean
+   * conditions actually changed (another push, `online`, the next flush), not
+   * by a budget being spent, because a budget spent while the network was down
+   * used to leave the queue permanently refusing to drain.
+   */
   attempts: number;
   queuedAt: string;
 }
 
 const QUEUE_KEY = "amne:writequeue";
-const MAX_ATTEMPTS = 6;
 
 function readQueue(): QueuedWrite[] {
   if (typeof window === "undefined") return [];
@@ -87,17 +93,28 @@ function writeQueue(queue: QueuedWrite[]): void {
  */
 export class WriteQueue {
   private queue: QueuedWrite[] = [];
-  private draining = false;
+  /** The in-flight drain, so a second caller awaits it instead of skipping it. */
+  private draining: Promise<void> | null = null;
   private seq = 0;
 
   constructor(private endpoint: string) {
     this.queue = readQueue();
+    // Anything left from a previous session had its attempts counted against a
+    // server that may since have come back. Start it fresh, or a queue that
+    // exhausted its retries yesterday would refuse to drain today.
+    for (const item of this.queue) item.attempts = 0;
     if (this.queue.length) void this.drain();
     if (typeof window !== "undefined") {
       // A tab closing mid-flush is the common case, not an edge case: the
       // study ends on a completion screen people close immediately.
       window.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden") this.flushBeacon();
+      });
+      // Coming back online is the moment a stalled queue should retry, and it
+      // costs nothing to wait for it rather than backing off blindly.
+      window.addEventListener("online", () => {
+        for (const item of this.queue) item.attempts = 0;
+        void this.drain();
       });
     }
   }
@@ -115,46 +132,73 @@ export class WriteQueue {
     void this.drain();
   }
 
-  /** Await this where the next screen depends on the write having landed. */
-  async flush(): Promise<void> {
+  /**
+   * Await this where the next screen depends on the write having landed.
+   *
+   * It must await the IN-FLIGHT drain, not start a second one and return.
+   * `drain()` used to bail out at its re-entrancy guard, so `flush()` was
+   * `await Promise.resolve()` whenever a background drain happened to be
+   * running — and the writes that are awaited precisely because the next
+   * screen depends on them (participant creation, assignment, the mandate)
+   * would resolve while still sitting in the queue.
+   */
+  async flush(): Promise<boolean> {
     await this.drain();
+    // Reported, not thrown. A drain that gave up leaves the queue non-empty,
+    // and the caller needs to know — but throwing here would surface a
+    // transient network failure as a crashed screen in the middle of a study,
+    // which is worse than proceeding with the write still queued. The write is
+    // in localStorage and will be retried.
+    return this.queue.length === 0;
   }
 
-  private async drain(): Promise<void> {
-    if (this.draining || typeof window === "undefined") return;
-    this.draining = true;
-    try {
-      while (this.queue.length) {
-        const item = this.queue[0];
-        try {
-          const response = await fetch(this.endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ op: item.op, payload: item.payload }),
-          });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          this.queue.shift();
-          writeQueue(this.queue);
-        } catch {
-          item.attempts += 1;
-          writeQueue(this.queue);
-          if (item.attempts >= MAX_ATTEMPTS) {
-            // Drop to the back rather than discarding: a later flush, or the
-            // next session, gets another go. Losing a transcript row is worse
-            // than sending it late.
-            this.queue.push(this.queue.shift()!);
-            writeQueue(this.queue);
-          }
-          // Exponential backoff, capped. Stop draining; the next push or a
-          // visibility change restarts it.
-          await new Promise((r) =>
-            setTimeout(r, Math.min(1000 * 2 ** item.attempts, 30_000)),
-          );
-          if (item.attempts >= MAX_ATTEMPTS) break;
-        }
+  /** How many writes are still waiting. Surfaced for a completion-page check. */
+  get pending(): number {
+    return this.queue.length;
+  }
+
+  /**
+   * Send whatever is queued, oldest first, and stop at the first item that
+   * will not go.
+   *
+   * ONE PASS PER ITEM, and the backoff is between passes rather than inside
+   * them. An earlier version retried the head item up to six times within a
+   * single drain, sleeping up to thirty seconds between tries — ninety seconds
+   * of a drain that `flush()` awaited, during which the study appeared frozen.
+   * Worse, the item was then rotated to the back still carrying six attempts,
+   * so every later drain broke on it immediately and the queue never moved
+   * again. Retries now come from the events that mean "conditions changed":
+   * another `push`, coming back online, or the next `flush`.
+   */
+  private drain(): Promise<void> {
+    if (this.draining) return this.draining;
+    if (typeof window === "undefined") return Promise.resolve();
+    this.draining = this.run().finally(() => {
+      this.draining = null;
+    });
+    return this.draining;
+  }
+
+  private async run(): Promise<void> {
+    while (this.queue.length) {
+      const item = this.queue[0];
+      try {
+        const response = await fetch(this.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ op: item.op, payload: item.payload }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        this.queue.shift();
+        writeQueue(this.queue);
+      } catch {
+        item.attempts += 1;
+        writeQueue(this.queue);
+        // Nothing is discarded and nothing is reordered: the queue is a
+        // transcript and its order is data. Stop here and let the next push,
+        // an `online` event, or the next flush try again.
+        return;
       }
-    } finally {
-      this.draining = false;
     }
   }
 
@@ -187,6 +231,24 @@ export class WriteQueue {
 export class SupabaseStore implements Store {
   private queue = new WriteQueue("/api/persist");
 
+  /**
+   * Await a write the next screen depends on, and note it if it did not land.
+   *
+   * Deliberately does NOT block the participant. The alternative — refusing to
+   * advance until the server answers — turns a dropped connection into a dead
+   * end in the middle of a 55-minute study, and the write is durable locally
+   * either way. What must not happen is failing silently, so the console
+   * carries it and `queue.pending` can be read at the end.
+   */
+  private async settle(label: string): Promise<void> {
+    const landed = await this.queue.flush();
+    if (!landed) {
+      console.warn(
+        `[store] ${label} is queued but not yet saved (${this.queue.pending} pending).`,
+      );
+    }
+  }
+
   private async get<T>(op: string, params: unknown): Promise<T | null> {
     const response = await fetch("/api/persist", {
       method: "POST",
@@ -201,12 +263,12 @@ export class SupabaseStore implements Store {
   async createParticipant(participantKey: string, prolific: ProlificContext) {
     this.queue.push("createParticipant", { participantKey, prolific });
     // Awaited: everything downstream is keyed on this row existing.
-    await this.queue.flush();
+    await this.settle("createParticipant");
   }
 
   async saveAssignment(assignment: Assignment) {
     this.queue.push("saveAssignment", assignment);
-    await this.queue.flush();
+    await this.settle("saveAssignment");
   }
 
   async loadAssignment(participantKey: string) {
@@ -224,7 +286,7 @@ export class SupabaseStore implements Store {
     responses: SurveyResponses,
   ) {
     this.queue.push("saveResponses", { participantKey, block, responses });
-    await this.queue.flush();
+    await this.settle("saveResponses");
   }
 
   async loadResponses(participantKey: string, block: string) {
@@ -236,7 +298,7 @@ export class SupabaseStore implements Store {
 
   async saveMandate(participantKey: string, mandate: Mandate) {
     this.queue.push("saveMandate", { participantKey, mandate });
-    await this.queue.flush();
+    await this.settle("saveMandate");
   }
 
   async loadMandate(participantKey: string, sessionIndex: 1 | 2) {
@@ -276,7 +338,7 @@ export class SupabaseStore implements Store {
 
   async saveAgreement(participantKey: string, agreement: CandidateAgreement) {
     this.queue.push("saveAgreement", { participantKey, agreement });
-    await this.queue.flush();
+    await this.settle("saveAgreement");
   }
 
   async loadAgreement(participantKey: string, sessionIndex: 1 | 2) {
