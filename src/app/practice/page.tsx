@@ -130,6 +130,11 @@ export default function PracticePage() {
             </p>
           </>
         }
+        /* The practice round's OWN steps, not the task's. It deliberately does
+           not preview the mandate or the rehearsal: this round teaches the
+           controls common to both arms, and listing a screen only one arm
+           reaches would tell a participant something about their condition
+           before Task 1. */
         steps={[
           "Read the practice scenario and your private briefing",
           "Try the message box — a reply comes straight back",
@@ -164,18 +169,24 @@ export default function PracticePage() {
 
           <div className="mb-5">
             <Callout title="🔭 What the real tasks look like">
+              {/* WHAT THESE TWO SENTENCES MAY NOT PROMISE. Both used to end
+                  on the participant deciding "whether to accept" the result.
+                  That screen is gone: there is no ratification in either arm
+                  now, because both end with the participant agreeing a
+                  package in the conversation itself. Promising a decision they
+                  never get to make is how the practice round becomes a
+                  briefing for a different study. */}
               {isProxy ? (
                 <p>
-                  In your first task you will set out what you want and which of
-                  your reasons may be used, and an AI Proxy will negotiate on
-                  your behalf while you watch. You review what it reaches and
-                  decide whether to accept it.
+                  You will set out what you want and which of your reasons may
+                  be used, watch an AI Proxy negotiate for you, and then{" "}
+                  <strong>finish the conversation yourself</strong>.
                 </p>
               ) : (
                 <p>
-                  In your first task you will write the messages yourself and
-                  build up an offer as you go. At the end you decide whether to
-                  accept where things landed.
+                  You will write the messages yourself and build up an offer as
+                  you go, until the two of you{" "}
+                  <strong>agree on all three terms</strong>.
                 </p>
               )}
             </Callout>

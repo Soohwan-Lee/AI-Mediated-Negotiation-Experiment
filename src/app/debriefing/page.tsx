@@ -80,7 +80,7 @@ export default function DebriefingPage() {
         </div>
 
         <div className="prose-study mb-8">
-          <h2>The other party was not another participant</h2>
+          <h2>🤖 The other party was not another participant</h2>
           <p>
             You were told you were negotiating with another person taking part
             in the study. In fact, <strong>there was no other participant</strong>
@@ -95,7 +95,7 @@ export default function DebriefingPage() {
             the package came from the same system.
           </p>
 
-          <h2>The reward decision was part of the scenario only</h2>
+          <h2>💵 The reward decision was part of the scenario only</h2>
           {isMember ? (
             <p>
               After each task you were shown a bonus presented as the
@@ -121,7 +121,7 @@ export default function DebriefingPage() {
             </p>
           )}
 
-          <h2>The two tasks were different on purpose</h2>
+          <h2>🔀 The two tasks were different on purpose</h2>
           <p>
             The two tasks were labelled only &ldquo;Task 1&rdquo; and &ldquo;Task
             2&rdquo;, and the instructions described both interface types as
@@ -155,7 +155,7 @@ export default function DebriefingPage() {
             approval.
           </p>
 
-          <h2>Why we could not tell you in advance</h2>
+          <h2>❓ Why we could not tell you in advance</h2>
           <p>
             This study looks at how people raise requirements that are
             legitimate but awkward to say out loud, and whether having an AI
@@ -170,7 +170,7 @@ export default function DebriefingPage() {
             conditions rather than who they happened to be paired with.
           </p>
 
-          <h2>If any of this troubles you</h2>
+          <h2>💬 If any of this troubles you</h2>
           <p>
             Some people find it uncomfortable to learn that an interaction was
             simulated, or to think back on a reward decision that felt real at
