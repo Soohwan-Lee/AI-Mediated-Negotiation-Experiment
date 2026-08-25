@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:units": "node --import ./tests/ts-register.mjs --test \"tests/**/*.test.mjs\""
+    "test:units": "node --import ./tests/ts-register.mjs --test \"tests/**/*.test.mjs\"",
+    "simulate": "node --import ./tests/ts-register.mjs scripts/simulate-negotiation.mjs"
   },
   "dependencies": {
     "next": "16.3.0",
