@@ -49,7 +49,7 @@ import {
 } from "@/lib/negotiation/machine";
 import {
   BriefingPanel,
-  ReasonBox,
+  IssueReasonGroups,
   TaskCover,
   type CoverScene,
   TaskHeader,
@@ -723,11 +723,13 @@ export function ReasonPicker({
 
       {open ? (
         <div className="mt-3">
-          <ReasonBox
-            title="Work reasons"
-            cards={cards.filter((c) => c.layer === "work")}
-          >
-            {(card) => (
+          {/* The same issue-block structure as the briefing and the mandate
+              screen (Design §7): each term's work reason and sensitive
+              background, three blocks rendered identically. */}
+          <IssueReasonGroups
+            task={task}
+            role={role}
+            renderCard={(card) => (
               <ReasonChoice
                 card={card}
                 checked={value === card.id}
@@ -737,24 +739,7 @@ export function ReasonPicker({
                 }
               />
             )}
-          </ReasonBox>
-          <ReasonBox
-            title="Sensitive background"
-            note={task.roleBriefs[role].disclosureRisk}
-            sensitive
-            cards={cards.filter((c) => c.layer === "sensitive")}
-          >
-            {(card) => (
-              <ReasonChoice
-                card={card}
-                checked={value === card.id}
-                voiced={alreadyVoiced.includes(card.id)}
-                onToggle={() =>
-                  onChange(value === card.id ? null : card.id)
-                }
-              />
-            )}
-          </ReasonBox>
+          />
           <p className="mt-2 text-[0.75rem] text-[var(--private-ink)]">
             You write the message yourself — this only records which of your
             reasons you brought up.

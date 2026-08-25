@@ -51,7 +51,7 @@ import {
 } from "@/components/negotiation";
 import {
   BriefingPanel,
-  ReasonBox,
+  IssueReasonGroups,
   TaskCover,
   TaskHeader,
   TaskLayout,
@@ -1136,11 +1136,6 @@ function ReasonMandateSection({
   mandate: Mandate;
   onToggle: (cardId: string) => void;
 }) {
-  const cards = task.roleBriefs[role].reasonCards;
-  const workCards = cards.filter((c) => c.layer === "work");
-  const sensitiveCards = cards.filter((c) => c.layer === "sensitive");
-  const requirement = requirementIssue(task, role);
-
   const row = (card: { id: string; text: string }) => (
     <label className="flex cursor-pointer gap-2.5 rounded-[var(--radius)] p-1.5 hover:bg-[var(--surface)]/60">
       <input
@@ -1167,47 +1162,30 @@ function ReasonMandateSection({
         </Callout>
       </div>
 
-      {/* THE HINT NAMES THE REQUIREMENT TERM, and that is allowed — but it is
-          the closest this screen comes to §5 principle 4, so the reasoning is
-          worth stating.
+      {/* ONE BLOCK PER TERM, ALL THREE RENDERED IDENTICALLY (ver.2.5). The
+          cards sit on all three issues now, so the earlier heading that named
+          the requirement term is gone: with reasons attached to every term,
+          naming one of them here would tell the participant which term the
+          study is about (§5 principle 4, pilot gate 6). This is a validity
+          constraint, not styling — do not "tidy" one block into prominence.
 
-          What principle 4 forbids is the UI singling out one of the three
-          terms where the LEVELS are chosen: no extra control, no highlight, no
-          separate heading, because that would tell the participant which term
-          the study is about. The three term cards above are identical and stay
-          identical.
-
-          These six cards, though, exist only for the requirement term — and
-          the briefing already presents them under a heading that names it
-          ("Why protected focus afternoons matters to you", open by default,
-          `BriefingPanel`). The participant has therefore already read this
-          pairing before reaching this screen. A deliberately vague heading
-          here would not restore neutrality; it would just make the control
-          harder to understand while telling them nothing they had not been
-          told, which is the worst of both. */}
+          The defaults do the quiet work: work reasons arrive ticked (and at
+          least one must stay ticked), sensitive backgrounds arrive unticked
+          and are never required. Nothing on this screen may suggest that
+          ticking more is the better answer — how many they tick, and on which
+          terms, IS the measure (REASON-SCOPE). */}
       <Card tone="private" className="text-[var(--private-ink)]">
-        <CardTitle
-          hint={`Tick the ones your AI Proxy may use when it argues for ${requirement.label.toLowerCase()}.`}
-        >
+        <CardTitle hint="Each term has a work reason and a piece of sensitive background. Tick what your AI Proxy may say; it uses judgement about when.">
           💬 What it may say about why
         </CardTitle>
 
-        <ReasonBox
-          title="Work reasons"
-          note="Nothing awkward about saying these. Tick at least one."
-          cards={workCards}
-        >
-          {row}
-        </ReasonBox>
+        <p className="mb-3 max-w-prose text-[0.8125rem] leading-relaxed">
+          Keep at least one work reason ticked.{" "}
+          {task.roleBriefs[role].disclosureRisk} The sensitive backgrounds are
+          yours to keep — leaving them all unticked is a normal choice.
+        </p>
 
-        <ReasonBox
-          title="Sensitive background"
-          note={`${task.roleBriefs[role].disclosureRisk} These are yours to keep — leaving them all unticked is a normal choice.`}
-          cards={sensitiveCards}
-          sensitive
-        >
-          {row}
-        </ReasonBox>
+        <IssueReasonGroups task={task} role={role} renderCard={row} />
       </Card>
     </>
   );

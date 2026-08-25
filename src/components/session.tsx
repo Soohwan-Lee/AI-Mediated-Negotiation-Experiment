@@ -19,7 +19,6 @@ import { useState, type ReactNode } from "react";
 import { IssueValueTable } from "./issues";
 import { ActionBar } from "./study-chrome";
 import { Card, CardTitle, Page, PrivateTag, cx } from "./ui";
-import { requirementIssue } from "@/lib/tasks";
 import type { NegotiationTask, Role } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -343,11 +342,6 @@ export function BriefingPanel({
   defaultOpen?: boolean;
 }) {
   const brief = task.roleBriefs[role];
-  const requirement = requirementIssue(task, role);
-  const workCards = brief.reasonCards.filter((c) => c.layer === "work");
-  const sensitiveCards = brief.reasonCards.filter(
-    (c) => c.layer === "sensitive",
-  );
 
   return (
     <Card tone="private" className="text-[var(--private-ink)]">
@@ -391,33 +385,32 @@ export function BriefingPanel({
         </ul>
       </Fold>
 
-      {/* The six reason cards, in their two boxes. Open by default: rule 5
-          names them as something the participant is expected to negotiate
-          from, and rule 6's whole measure is which box they are willing to
+      {/* The six reason cards, one issue block at a time (ver.2.5: each term
+          has a work reason and a sensitive background). Open by default: rule
+          5 names them as something the participant is expected to negotiate
+          from, and rule 6's whole measure is which layer they are willing to
           draw from — a decision that has to be visible to be made. The visual
-          separation is a design requirement, not a preference (Design §7 UI
-          규칙): if the two read as one list that decision stops being
-          legible. */}
+          separation of the two layers is a design requirement, not a
+          preference (Design §7 UI 규칙): if the two read as one list that
+          decision stops being legible.
+
+          THE HEADING NAMES NO TERM. With cards on the requirement issue only,
+          a heading naming it repeated what the story had already said; with
+          cards on all three issues, singling one term out here would tell the
+          participant which term the study is about (§5 principle 4). The
+          three blocks are rendered identically for the same reason. */}
       {brief.reasonCards.length ? (
-        <Fold
-          title={`💬 Why ${requirement.label.toLowerCase()} matters to you`}
-          defaultOpen
-        >
+        <Fold title="💬 Your reasons, term by term" defaultOpen>
           <p className="mb-3 max-w-prose rounded-[var(--radius)] border border-[var(--private-line)] bg-[#fff9ef] p-3 text-[0.8125rem] leading-relaxed">
             {brief.requirementNote}
           </p>
-
-          <ReasonBox
-            title="Work reasons"
-            note="Nothing awkward about saying these."
-            cards={workCards}
-          />
-          <ReasonBox
-            title="Sensitive background"
-            note={brief.disclosureRisk}
-            cards={sensitiveCards}
-            sensitive
-          />
+          <p className="mb-3 max-w-prose text-[0.8125rem] leading-relaxed">
+            Each term comes with a <strong>work reason</strong> — nothing
+            awkward about saying it — and a piece of{" "}
+            <strong>sensitive background</strong> that is yours to keep.{" "}
+            {brief.disclosureRisk}
+          </p>
+          <IssueReasonGroups task={task} role={role} />
         </Fold>
       ) : null}
 
@@ -537,6 +530,59 @@ export function ReasonBox({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * The six reason cards, one identically-rendered block per issue (Design §7
+ * ver.2.5 "issue 블록 단위"): the issue's name, its work reason, its sensitive
+ * background. Shared by the briefing panel, the mandate screen, and the
+ * Baseline reason picker so the three surfaces present the same structure.
+ *
+ * THE THREE BLOCKS MUST STAY VISUALLY IDENTICAL — same heading treatment,
+ * same two boxes, same order. Cards sit on all three issues now, so any
+ * decoration that singled one block out would tell the participant which
+ * term the study is about (§5 principle 4), which pilot gate 6 exists to
+ * catch.
+ */
+export function IssueReasonGroups({
+  task,
+  role,
+  renderCard,
+}: {
+  task: NegotiationTask;
+  role: Role;
+  /** Per-card control, when the blocks are interactive (mandate, picker). */
+  renderCard?: (card: { id: string; text: string }) => ReactNode;
+}) {
+  const cards = task.roleBriefs[role].reasonCards;
+  return (
+    <div>
+      {task.issues.map((issue) => {
+        const onIssue = cards.filter((c) => c.issueId === issue.id);
+        if (!onIssue.length) return null;
+        return (
+          <div key={issue.id} className="mb-4 last:mb-0">
+            <p className="mb-1.5 text-[0.75rem] font-semibold text-[var(--ink-2)]">
+              {issue.label}
+            </p>
+            <ReasonBox
+              title="Work reason"
+              cards={onIssue.filter((c) => c.layer === "work")}
+            >
+              {renderCard}
+            </ReasonBox>
+            <ReasonBox
+              title="Sensitive background"
+              cards={onIssue.filter((c) => c.layer === "sensitive")}
+              sensitive
+            >
+              {renderCard}
+            </ReasonBox>
+          </div>
+        );
+      })}
     </div>
   );
 }
