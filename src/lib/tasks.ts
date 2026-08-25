@@ -1,5 +1,5 @@
 /**
- * The two negotiation scenarios, from Experimental Design Ver.2.4 §5-§7.
+ * The two negotiation scenarios, from Experimental Design Ver.2.5 §5-§7.
  *
  * Both tasks share one latent payoff structure and differ only on the surface,
  * so Task A and Task B are interchangeable within a participant. Three issues,
@@ -22,6 +22,17 @@
  * could be given up as a sensible low-priority concession, which is exactly
  * what this study has to distinguish from withdrawal under evaluative
  * pressure, so both are expensive on purpose.
+ *
+ * PER-ISSUE REASON CARDS ARE THE ver.2.5 CHANGE. Each role now holds one
+ * Working Reason (WR) and one Sensitive Background (SB) per issue — six cards
+ * spanning all three terms, coded `{task}-I{n}-{WR|SB}-{L|M}` in the design
+ * and `a_i1_wr_l`-style ids here — instead of six cards about the requirement
+ * issue alone. The three SBs per role are three facets of ONE backstory
+ * (Leader: past fault / competence gap / over-promise · Member: evaluation
+ * anxiety / fatigue-caused fault / unreported state), and the role story
+ * weaves all three in so no card arrives out of nowhere. Everything that
+ * reads a card — the reason-linked acceptance rule, the per-issue reason
+ * budget, REASON-SCOPE — now keys on the card's `issueId`.
  *
  * The numbers are working values pending pilot (Design §12); the shapes are
  * stable, so changing a number needs no UI change.
@@ -90,16 +101,17 @@ export const RESERVATION_POINTS = 2500;
  */
 const REQUIREMENT_THRESHOLD_INDEX = 1;
 
-function work(id: string, text: string): ReasonCard {
-  return { id, layer: "work", text };
+function work(id: string, issueId: string, text: string): ReasonCard {
+  return { id, issueId, layer: "work", text };
 }
 
 function sensitive(
   id: string,
-  phase: "incident" | "undisclosed" | "worry",
+  issueId: string,
+  facet: NonNullable<ReasonCard["facet"]>,
   text: string,
 ): ReasonCard {
-  return { id, layer: "sensitive", phase, text };
+  return { id, issueId, layer: "sensitive", facet, text };
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +127,7 @@ const TASK_A: NegotiationTask = {
     member: "focus_afternoons",
   },
   publicBrief:
-    "Your company is trialling an AI tool that answers customer questions, with a limited group of real customers. The Leader is responsible for approving the pilot and for its schedule. The Member is responsible for testing the tool and fixing what it gets wrong. Rush the pilot and wrong answers reach customers; delay it and the team misses the date promised to senior management. The two of you have to agree on all three terms — neither of you can set them alone.",
+    "Your company is trialling an AI tool that answers customer questions, with a limited group of real customers. The Leader is responsible for approving the pilot and for its schedule. The Member is responsible for setting the tool up and testing it. Rush the pilot and wrong answers reach customers; delay it and the team misses the date reported to senior management. The two of you have to agree on all three terms — neither of you can set them alone.",
   standardizedChallenge: {
     // Sent BY the Member TO the Leader, so it names the Leader's requirement.
     leader:
@@ -140,8 +152,9 @@ const TASK_A: NegotiationTask = {
       ),
       rationale: {
         leader:
-          "Fewer reviews means more of the responsibility for a customer-facing error lands on you.",
-        member: "Each review costs you about half a day of retesting and fixes.",
+          "Every review dropped raises the risk of a repeat of the last incident — and the responsibility for a customer-facing error lands on you.",
+        member:
+          "Each review fewer saves you half a day of retesting — and one less room where mistakes get pointed out.",
       },
     },
     {
@@ -158,9 +171,9 @@ const TASK_A: NegotiationTask = {
       ),
       rationale: {
         leader:
-          "Someone has to field the urgent questions that arrive during those hours, and it would be you.",
+          "Fewer focus afternoons means fewer of those urgent questions land on you — and less risk of your limits showing.",
         member:
-          "Uninterrupted time is when the testing actually gets done, and when you stop missing things.",
+          "The less protected time you have, the more likely the tired mistake happens again.",
       },
     },
     {
@@ -175,9 +188,9 @@ const TASK_A: NegotiationTask = {
       ),
       rationale: {
         leader:
-          "The later this starts, the more the promise you made to management is at risk.",
+          "The later this starts, the more the date you floated to management — and the quarter's expansion case — is at risk.",
         member:
-          "The earlier this starts, the less time you have to test — which means evening work.",
+          "The later this starts, the more time you have to test — and to clear the backlog you have not reported.",
       },
     },
   ],
@@ -188,7 +201,7 @@ const TASK_A: NegotiationTask = {
       organizationalPosition:
         "You run the customer-support improvement programme. You are accountable for approving this eight-week AI pilot and for its schedule, and when the pilot ends you decide the Member's project rating and bonus.",
       roleStory:
-        "There is something you have not told the team. Last time, you approved a small rollout in a hurry, and a bug you skipped over went out to some customers. As far as the team knows it was just \"an update that shipped too fast\" — that it was your approval call is something only you know. Senior management is watching this pilot, and if it happens again the responsibility lands on you. So this time you want at least three quality reviews before anything reaches a customer. The difficulty is that pushing hard for reviews — and especially explaining why — could make you look like a leader who lacks judgement, or who does not trust the Member.",
+        "There is something you have not told the team. Last time, you approved a small rollout in a hurry, and a bug you skipped over went out to some customers. As far as the team knows it was just \"an update that shipped too fast\" — that it was your approval call is something only you know. Senior management is watching this pilot, and if it happens again the responsibility lands on you. So this time you want at least three quality reviews before anything reaches a customer.\n\nTwo more things weigh on you. You have already told senior management that a Week 4 start should be possible — miss it, and the last incident could get dug up all over again. And when the Member blocks out focus time, the technical questions from those hours land on you — the truth is you cannot handle them the way the Member can.\n\nThe difficulty is that letting any of this show could make you look like a leader who lacks judgement, falls short, or does not trust the Member. Now the three terms — review rounds, focus afternoons, and the start date — are yours to negotiate with the Member.",
       objectives: [
         "Hold at least three review checkpoints before launch.",
         "Start the pilot early enough to keep the promise you made to management.",
@@ -197,34 +210,40 @@ const TASK_A: NegotiationTask = {
       requirementNote:
         "At least 3 review checkpoints (Options 1–2) is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a leader who lacks judgement, or who does not trust the Member.",
+        "Explaining the real reasons could make you look like a leader who lacks judgement, falls short, or does not trust the Member.",
       reasonCards: [
         work(
-          "a_l_w1",
-          "Catching errors before answers reach customers is what protects the pilot's credibility.",
+          "a_i1_wr_l",
+          "quality_reviews",
+          "Catching errors before answers reach customers is the surest way to protect the pilot's credibility.",
+        ),
+        sensitive(
+          "a_i1_sb_l",
+          "quality_reviews",
+          "fault",
+          "Last time you cut the checks short and approved a rollout in a hurry — and a bug you missed went out to some customers. That your approval call caused it is something only you know.",
         ),
         work(
-          "a_l_w2",
-          "Regular reviews surface problems early, when they are still cheap to fix.",
+          "a_i2_wr_l",
+          "focus_afternoons",
+          "The urgent questions that arrive while the Member is heads down land on you instead, so the cover gap has to stay manageable.",
+        ),
+        sensitive(
+          "a_i2_sb_l",
+          "focus_afternoons",
+          "competence_gap",
+          "The truth is you cannot handle the technical questions from those hours the way the Member can. The more focus time, the more you worry that limit shows — to the team, and to customers.",
         ),
         work(
-          "a_l_w3",
-          "A documented review record makes the expansion decision easier to explain to management.",
+          "a_i3_wr_l",
+          "pilot_start",
+          "The later the start, the later the results come in — and the thinner the evidence for the expansion decision this quarter.",
         ),
         sensitive(
-          "a_l_s1",
-          "incident",
-          "Last time you approved a small rollout in a hurry, and a bug you missed went out to some customers.",
-        ),
-        sensitive(
-          "a_l_s2",
-          "undisclosed",
-          "The team only knows it as \"an update that shipped too fast\" — that your approval call caused it is something only you know.",
-        ),
-        sensitive(
-          "a_l_s3",
-          "worry",
-          "Senior management is watching this pilot, and you know that if it happens again the responsibility lands on you.",
+          "a_i3_sb_l",
+          "pilot_start",
+          "overpromise",
+          "You have already told senior management a Week 4 start should be possible. Miss it, and you are afraid the last incident gets dug up all over again.",
         ),
       ],
       batnaSummary:
@@ -236,7 +255,7 @@ const TASK_A: NegotiationTask = {
       organizationalPosition:
         "You do the hands-on work on the customer-support team. You are setting up and testing the tool for this AI pilot. The Leader you are negotiating with decides your project rating and bonus when the pilot ends.",
       roleStory:
-        "The last few weeks have been relentless — constant messages, constant interruptions, and evenings spent catching up on what you could not finish during the day. You are running on empty. And there is something you have not told anyone: a while back, in that state, you missed two testing errors. You caught them before launch and fixed them quietly, but you know it was the exhaustion that caused it. You have worked out that two protected afternoons a week would stop it happening again. The difficulty is that explaining why could make you look like someone who cannot handle pressure.",
+        "The last few weeks have been relentless — constant messages, constant interruptions, and evenings spent catching up on what you could not finish during the day. You are running on empty. And there is something you have not told anyone: a while back, in that state, you missed two testing errors. You caught them before launch and fixed them quietly, but you know it was the exhaustion that caused it. You have worked out that two protected afternoons a week would stop it happening again.\n\nTwo more things weigh on you. At a past review, a mistake of yours was called out in front of the room — so more review meetings is a prospect you quietly dread. And there is a backlog of fixes you have not reported yet; an early start would bring it out first.\n\nThe difficulty is that letting any of this show could make you look like someone who cannot handle pressure, or who hides problems. Now the three terms — review rounds, focus afternoons, and the start date — are yours to negotiate with the Leader.",
       objectives: [
         "Protect at least two focus afternoons a week.",
         "Do not end up owning a pilot you cannot test properly.",
@@ -245,34 +264,40 @@ const TASK_A: NegotiationTask = {
       requirementNote:
         "At least 2 protected afternoons per week (Options 1–2) is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like someone who cannot handle pressure, or who is hard to rely on.",
+        "Explaining the real reasons could make you look like someone who cannot handle pressure, or who hides problems.",
       reasonCards: [
         work(
-          "a_m_w1",
+          "a_i1_wr_m",
+          "quality_reviews",
+          "Each review costs about half a day of retesting and fixes, so every added round takes that much out of actual testing time.",
+        ),
+        sensitive(
+          "a_i1_sb_m",
+          "quality_reviews",
+          "evaluation_anxiety",
+          "At a past review, a mistake of yours was called out in front of the room. Honestly, more review meetings is a prospect you dread.",
+        ),
+        work(
+          "a_i2_wr_m",
+          "focus_afternoons",
           "Setup and testing go faster, with fewer errors, in uninterrupted time.",
         ),
+        sensitive(
+          "a_i2_sb_m",
+          "focus_afternoons",
+          "fatigue_fault",
+          "A while back, testing while worn out, you missed two errors. You caught them before launch and fixed them quietly — that exhaustion was the cause is something only you know.",
+        ),
         work(
-          "a_m_w2",
-          "Batching questions into set hours cuts the cost of switching between tasks.",
-        ),
-        work(
-          "a_m_w3",
-          "Predictable focus time is what keeps the schedule without evening catch-up.",
+          "a_i3_wr_m",
+          "pilot_start",
+          "The earlier the start, the less time there is to test — not enough to cover the full verification scope.",
         ),
         sensitive(
-          "a_m_s1",
-          "incident",
-          "The last few weeks of constant messages and evening catch-up have left you badly worn down.",
-        ),
-        sensitive(
-          "a_m_s2",
-          "undisclosed",
-          "In that state you missed two testing errors. You caught them before launch and fixed them quietly — that exhaustion was the cause is something only you know.",
-        ),
-        sensitive(
-          "a_m_s3",
-          "worry",
-          "Without protected time, you are afraid the same mistake will happen again.",
+          "a_i3_sb_m",
+          "pilot_start",
+          "unreported",
+          "There is a backlog of fixes you have not reported yet. Start early, and that is the first thing that will surface.",
         ),
       ],
       batnaSummary:
@@ -294,7 +319,7 @@ const TASK_B: NegotiationTask = {
     member: "evening_shifts",
   },
   publicBrief:
-    "Your company is launching a new service for a major client whose contract is up for renewal. The Leader is responsible for the client relationship and for how the launch goes. The Member is responsible for setting the service up and supporting it in the early weeks. The two of you have to agree on all three terms — neither of you can set them alone.",
+    "Your company is launching a new service for a major client whose contract is up for renewal. The Leader is responsible for the client relationship and for how the launch goes. The Member is responsible for setting the service up and supporting it in the early weeks, including evening standby. Rush the launch and under-prepared mistakes happen in front of the client; delay it and there is nothing to show before the renewal conversation. The two of you have to agree on all three terms — neither of you can set them alone.",
   standardizedChallenge: {
     leader:
       "Four full rehearsals is a lot of everyone's time for one demo. Could we cut that to two, and I'll give you room somewhere else?",
@@ -317,8 +342,9 @@ const TASK_B: NegotiationTask = {
       ),
       rationale: {
         leader:
-          "With fewer rehearsals you are less prepared for the client's questions and for a demo that goes wrong.",
-        member: "Each round costs you about two hours of demo work and fixes.",
+          "Every rehearsal dropped raises the risk of a repeat of the last client-meeting failure.",
+        member:
+          "Each rehearsal fewer saves you two hours of preparation — and one less room where mistakes are exposed.",
       },
     },
     {
@@ -335,9 +361,9 @@ const TASK_B: NegotiationTask = {
       ),
       rationale: {
         leader:
-          "With fewer evenings covered, you either take the standby yourself or find someone else.",
+          "More evenings covered means fewer gaps you have to fill yourself — and less risk of your limits showing.",
         member:
-          "More evenings means accumulating fatigue, and that shows up in the next day's setup work.",
+          "More evenings means accumulating fatigue — and a repeat of the tired mistake gets more likely.",
       },
     },
     {
@@ -352,9 +378,9 @@ const TASK_B: NegotiationTask = {
       ),
       rationale: {
         leader:
-          "The later this goes live, the more the client commitment and the renewal are at risk.",
+          "The later this goes live, the more the date you hinted to the client — and the pre-renewal results — are at risk.",
         member:
-          "The earlier this goes live, the less preparation time you have — which means evening work.",
+          "The later this goes live, the more preparation time you have — and the unreported delay stays out of sight.",
       },
     },
   ],
@@ -365,7 +391,7 @@ const TASK_B: NegotiationTask = {
       organizationalPosition:
         "You lead this major client project. You are accountable for how the launch of the new service goes, and after the launch you decide the Member's project rating and bonus.",
       roleStory:
-        "There is something you have not told the team. At a previous client meeting you were underprepared and could not answer an important question. You had to explain yourself to your own manager afterwards, and that conversation was never shared with the team. With the contract renewal riding on this launch, another slip like that would do real damage to your standing. So this time you want at least three rehearsals before the client demo. The difficulty is that pushing hard for rehearsals — and especially explaining why — could make you look like a leader who lacks confidence, or who micromanages.",
+        "There is something you have not told the team. At a previous client meeting you were underprepared and could not answer an important question. You had to explain yourself to your own manager afterwards, and that conversation was never shared with the team. With the contract renewal riding on this launch, another slip like that would do real damage to your standing. So this time you want at least three rehearsals before the client demo.\n\nTwo more things weigh on you. You have already hinted to the client that the launch will land before the renewal meeting — if it slips, your word carries less weight. And when evening cover falls short, the standby falls to you — the truth is this service's technical questions are beyond what you can handle live.\n\nThe difficulty is that letting any of this show could make you look like a leader who lacks confidence, falls short, or micromanages. Now the three terms — rehearsal rounds, evening cover, and the launch date — are yours to negotiate with the Member.",
       objectives: [
         "Hold at least three rehearsal rounds before the client demo.",
         "Launch early enough to protect the renewal conversation.",
@@ -374,34 +400,40 @@ const TASK_B: NegotiationTask = {
       requirementNote:
         "At least 3 rehearsal rounds (Options 1–2) is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a leader who lacks confidence, or who micromanages.",
+        "Explaining the real reasons could make you look like a leader who lacks confidence, falls short, or micromanages.",
       reasonCards: [
         work(
-          "b_l_w1",
-          "Rehearsals surface the questions the client will actually ask.",
+          "b_i1_wr_l",
+          "rehearsal_rounds",
+          "Rehearsals surface the questions the client will actually ask, which lowers the risk of a failed demo on the day.",
+        ),
+        sensitive(
+          "b_i1_sb_l",
+          "rehearsal_rounds",
+          "fault",
+          "At a previous client meeting you were underprepared and could not answer an important question — you had to explain yourself to your own manager afterwards. The team never heard about it.",
         ),
         work(
-          "b_l_w2",
-          "Every rehearsal round lowers the chance of a visible failure on launch day.",
+          "b_i2_wr_l",
+          "evening_shifts",
+          "A gap in evening cover lands straight on the trust of a client heading into renewal.",
+        ),
+        sensitive(
+          "b_i2_sb_l",
+          "evening_shifts",
+          "competence_gap",
+          "You could take the standby yourself — except that, in truth, this service's technical questions are beyond what you can handle live. What worries you is that showing in front of the client.",
         ),
         work(
-          "b_l_w3",
-          "A launch that goes well is what protects the renewal conversation.",
+          "b_i3_wr_l",
+          "client_launch",
+          "The later the launch, the less chance there is to show results before the renewal conversation.",
         ),
         sensitive(
-          "b_l_s1",
-          "incident",
-          "At a previous client meeting you were underprepared and could not answer an important question.",
-        ),
-        sensitive(
-          "b_l_s2",
-          "undisclosed",
-          "You had to explain yourself to your own manager afterwards, and that conversation was never shared with the team.",
-        ),
-        sensitive(
-          "b_l_s3",
-          "worry",
-          "With the contract renewal riding on this launch, you know another slip would do real damage to your standing.",
+          "b_i3_sb_l",
+          "client_launch",
+          "overpromise",
+          "You have already hinted to the client that the launch will land before the renewal meeting. If it slips, your word carries less weight.",
         ),
       ],
       batnaSummary:
@@ -413,7 +445,7 @@ const TASK_B: NegotiationTask = {
       organizationalPosition:
         "You are setting up the new service and handling support in the early weeks. The Leader you are negotiating with decides your project rating and bonus after the launch.",
       roleStory:
-        "You have been covering evenings back to back lately, and the tiredness has not lifted. There is something you have not told anyone: in that state you missed an important handover. It passed without real damage, but you know what caused it — the run of consecutive nights. You have worked out that keeping evening standby to two nights a week or fewer is what will stop it happening in front of the client this time. The difficulty is that explaining why could make you look like someone who cannot handle pressure, or who is not safe with an important client.",
+        "You have been covering evenings back to back lately, and the tiredness has not lifted. There is something you have not told anyone: in that state you missed an important handover. It passed without real damage, but you know what caused it — the run of consecutive nights. You have worked out that keeping evening standby to two nights a week or fewer is what will stop it happening in front of the client this time.\n\nTwo more things weigh on you. During the last demo preparation, a setup mistake of yours was pointed out in front of everyone — so more rehearsals is a prospect you quietly dread. And you know that at the current pace the preparation will not be done in time, though you have not told anyone yet.\n\nThe difficulty is that letting any of this show could make you look like someone who cannot handle pressure, or who is not safe with an important client. Now the three terms — rehearsal rounds, evening cover, and the launch date — are yours to negotiate with the Leader.",
       objectives: [
         "Keep evening standby to two nights a week or fewer.",
         "Do not end up supporting a launch you are too tired to support.",
@@ -422,34 +454,40 @@ const TASK_B: NegotiationTask = {
       requirementNote:
         "No more than 2 evening shifts per week (Options 1–2) is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like someone who cannot handle pressure, or who is not safe with an important client.",
+        "Explaining the real reasons could make you look like someone who cannot handle pressure, or who is not safe with an important client.",
       reasonCards: [
         work(
-          "b_m_w1",
+          "b_i1_wr_m",
+          "rehearsal_rounds",
+          "Each rehearsal costs about two hours of demo preparation and follow-up fixes, which comes straight out of setup time.",
+        ),
+        sensitive(
+          "b_i1_sb_m",
+          "rehearsal_rounds",
+          "evaluation_anxiety",
+          "During the last demo preparation, a setup mistake of yours was pointed out in front of everyone. More rehearsals means more chances of that scene repeating.",
+        ),
+        work(
+          "b_i2_wr_m",
+          "evening_shifts",
           "Well-rested support makes fewer setup errors the following day.",
         ),
+        sensitive(
+          "b_i2_sb_m",
+          "evening_shifts",
+          "fatigue_fault",
+          "After a run of consecutive evenings you once missed an important handover. It passed without damage — that fatigue was the cause is something only you know.",
+        ),
         work(
-          "b_m_w2",
-          "A predictable evening schedule keeps support quality steady through the launch period.",
-        ),
-        work(
-          "b_m_w3",
-          "Limiting evening standby is what preserves capacity for urgent daytime fixes.",
+          "b_i3_wr_m",
+          "client_launch",
+          "Pulling the launch forward compresses setup and verification, which raises the risk of early failures.",
         ),
         sensitive(
-          "b_m_s1",
-          "incident",
-          "A run of consecutive evening shifts has left you tired in a way that has not lifted.",
-        ),
-        sensitive(
-          "b_m_s2",
-          "undisclosed",
-          "In that state you missed an important handover. It passed without real damage — that the run of nights caused it is something only you know.",
-        ),
-        sensitive(
-          "b_m_s3",
-          "worry",
-          "If evening shifts increase, you are afraid the next mistake will happen in front of the client.",
+          "b_i3_sb_m",
+          "client_launch",
+          "unreported",
+          "You know that at the current pace the preparation will not be done in time — and you have not told anyone yet.",
         ),
       ],
       batnaSummary:
@@ -669,8 +707,11 @@ export function defaultAuthorizedReasonIds(
 }
 
 /**
- * `REASON-SCOPE` (Design §9.3.1) — how much of their own case the participant
- * was willing to hand over.
+ * `REASON-SCOPE` (Design §9.3.1, ver.2.5) — how much of their own case the
+ * participant was willing to hand over, as per-issue delegation width: how
+ * many sensitive cards (0-3), whether the one on their OWN requirement issue
+ * was among them, and the per-issue pattern. Replaces the pre-2.5
+ * `deepestPhase` shape; the two are not comparable in analysis.
  */
 export function reasonScope(
   task: NegotiationTask,
@@ -681,15 +722,23 @@ export function reasonScope(
     authorizedIds.includes(c.id),
   );
   const sensitiveCards = cards.filter((c) => c.layer === "sensitive");
-  const order = ["incident", "undisclosed", "worry"] as const;
-  const deepest = order.filter((p) =>
-    sensitiveCards.some((c) => c.phase === p),
-  );
+  const coreIssueId = task.requirementIssueId[role];
   return {
     totalChecked: cards.length,
     workChecked: cards.length - sensitiveCards.length,
     sensitiveChecked: sensitiveCards.length,
-    deepestPhase: deepest.length ? deepest[deepest.length - 1] : null,
+    coreIssueSensitive: sensitiveCards.some((c) => c.issueId === coreIssueId),
+    byIssue: Object.fromEntries(
+      task.issues.map((issue) => [
+        issue.id,
+        {
+          work: cards.some(
+            (c) => c.issueId === issue.id && c.layer === "work",
+          ),
+          sensitive: sensitiveCards.some((c) => c.issueId === issue.id),
+        },
+      ]),
+    ),
   };
 }
 
@@ -698,8 +747,20 @@ export function reasonScope(
 // ---------------------------------------------------------------------------
 
 /**
+ * One pre-approved argument the Explorer Proxy may add, tagged with the issue
+ * it argues about — or `issueId: null` for the one exchange argument, which
+ * links terms rather than arguing for one (Design §7 ver.2.5 "issue별 재편").
+ */
+export interface PoolReason {
+  issueId: string | null;
+  text: string;
+}
+
+/**
  * The pre-approved arguments an Explorer Proxy may add on top of the cards its
- * principal checked — things anyone in this role could reasonably say.
+ * principal checked — things anyone in this role could reasonably say. Per
+ * role and task: one argument per issue plus one exchange argument, four in
+ * all, so the pool covers every term the per-issue reason budget covers.
  *
  * WHY THIS IS A FIXED LIST AND NOT GENERATED. The Explorer policy is defined
  * by source ambiguity, not by inventiveness: a pool item must be plausible for
@@ -712,39 +773,90 @@ export function reasonScope(
  */
 export const PLAUSIBLE_REASON_POOL: Record<
   TaskId,
-  Record<Role, string[]>
+  Record<Role, PoolReason[]>
 > = {
   task_a: {
     leader: [
-      "Review rounds can act as a safeguard that reduces the cost of fixes after launch.",
-      "With a management report coming up, a documented review record helps.",
-      "Enough verification makes the case for expanding the pilot much sturdier.",
-      "There may be room on the start date or on focus time in exchange for holding the reviews.",
+      {
+        issueId: "quality_reviews",
+        text: "Sufficient review stages are a common safeguard that reduces the cost of fixes after launch.",
+      },
+      {
+        issueId: "focus_afternoons",
+        text: "During a pilot, keeping the customer-inquiry channel continuously covered is a standard requirement.",
+      },
+      {
+        issueId: "pilot_start",
+        text: "The sooner results come in, the more stable the planning for the next phase.",
+      },
+      {
+        issueId: null,
+        text: "There may be room on the other terms in exchange for holding the reviews.",
+      },
     ],
     member: [
-      "In an implementation-heavy phase, blocks of uninterrupted time can reduce errors.",
-      "Gathering questions into set hours makes the schedule more predictable for both sides.",
-      "Protected time lowers the risk of rework after launch.",
-      "There may be room to bring the start date forward in exchange for holding the focus afternoons.",
+      {
+        issueId: "quality_reviews",
+        text: "Balancing review rounds against actual testing time is a standard scheduling consideration.",
+      },
+      {
+        issueId: "focus_afternoons",
+        text: "That uninterrupted blocks of time reduce errors is a widely known principle of operations.",
+      },
+      {
+        issueId: "pilot_start",
+        text: "A full testing window is what reduces the risk of rework after launch.",
+      },
+      {
+        issueId: null,
+        text: "There may be room on the start date in exchange for holding the focus afternoons.",
+      },
     ],
   },
   task_b: {
     leader: [
-      "Rehearsals are a common safeguard against the unpredictability of demo day.",
-      "Testing the client's likely questions in advance raises the quality of the response.",
-      "A well-prepared launch works in favour of the contract conversation.",
-      "There may be room on the launch date or on evening cover in exchange for holding the rehearsals.",
+      {
+        issueId: "rehearsal_rounds",
+        text: "Rehearsals are a common safeguard against the unpredictability of demo day.",
+      },
+      {
+        issueId: "evening_shifts",
+        text: "Right after a launch, evening responsiveness feeds directly into client satisfaction.",
+      },
+      {
+        issueId: "client_launch",
+        text: "Showing results before the renewal conversation works in the contract's favour.",
+      },
+      {
+        issueId: null,
+        text: "There may be room on the other terms in exchange for holding the rehearsals.",
+      },
     ],
     member: [
-      "A schedule that manages fatigue can reduce the risk of errors during the launch period.",
-      "Predictable evening cover is what keeps the quality of daytime work steady.",
-      "Preserved capacity means faster response when something urgent comes up.",
-      "There may be room to bring the launch date forward in exchange for limiting evening cover.",
+      {
+        issueId: "rehearsal_rounds",
+        text: "Balancing rehearsal rounds against setup time is a standard launch-preparation consideration.",
+      },
+      {
+        issueId: "evening_shifts",
+        text: "A schedule that manages fatigue is what reduces the risk of errors during the launch period.",
+      },
+      {
+        issueId: "client_launch",
+        text: "A full preparation window is what protects early support quality.",
+      },
+      {
+        issueId: null,
+        text: "There may be room on the launch date in exchange for limiting evening standby.",
+      },
     ],
   },
 };
 
-export function plausibleReasons(taskId: ScenarioId, role: Role): string[] {
+export function plausibleReasons(
+  taskId: ScenarioId,
+  role: Role,
+): PoolReason[] {
   if (taskId === "practice") return [];
   return PLAUSIBLE_REASON_POOL[taskId][role];
 }

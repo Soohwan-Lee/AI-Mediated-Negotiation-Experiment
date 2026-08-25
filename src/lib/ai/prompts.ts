@@ -23,6 +23,7 @@
  */
 
 import type { Issue, Role, StageId, NegotiationTask } from "../types";
+import type { PoolReason } from "../tasks";
 
 export type AgentKind =
   | "ostensible_human"
@@ -51,8 +52,8 @@ export interface PromptContext {
   authorizedReasons?: Array<{ id: string; text: string }>;
   /** Reason cards the principal left unticked. These may NEVER be said. */
   forbiddenReasons?: Array<{ id: string; text: string }>;
-  /** Explorer only: the pre-approved role-plausible pool. */
-  plausibleReasons?: string[];
+  /** Explorer only: the pre-approved role-plausible pool, tagged by issue. */
+  plausibleReasons?: PoolReason[];
 }
 
 /**
@@ -257,7 +258,12 @@ ${ctx.decidedAction}`;
  */
 function explorerPrompt(ctx: PromptContext): string {
   const pool = ctx.plausibleReasons?.length
-    ? ctx.plausibleReasons.map((r) => `- ${r}`).join("\n")
+    ? ctx.plausibleReasons
+        .map(
+          (r, i) =>
+            `- pool:${i} [${r.issueId ?? "exchange"}] ${r.text}`,
+        )
+        .join("\n")
     : "(none available)";
 
   return `${delegatePrompt(ctx)}

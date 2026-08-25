@@ -146,30 +146,40 @@ export interface Issue {
 /**
  * One checkbox on the mandate screen (Design §5 이유 카드, §7 UI 규칙).
  *
- * The two layers are the measure. `work` cards cost nothing to say; `sensitive`
- * cards are the participant's own reputational exposure, and how many of them
- * they are willing to hand over is `REASON-SCOPE`.
+ * The two layers are the measure. `work` cards justify the position from
+ * shared work standards and cost nothing beyond the ask itself; `sensitive`
+ * cards justify it from the speaker's own undisclosed circumstances, and how
+ * many of them the participant is willing to hand over is `REASON-SCOPE`.
+ * (Design §5 ver.2.5 splits the social cost formally: claiming cost is
+ * constant across card types; disclosure cost is what a sensitive card adds.)
  *
- * ver.2.4 replaced the old two-level Sayable/Private permission with plain
- * multi-select checkboxes: a checked card may be spoken, an unchecked card may
- * not. That is one decision per card instead of two, and the count is directly
- * interpretable as delegation breadth.
+ * ver.2.5 restructured the deck: each role holds ONE work reason and ONE
+ * sensitive background PER ISSUE — six cards spanning all three terms —
+ * instead of six cards about the requirement issue alone. `issueId` is
+ * load-bearing: the reason-linked acceptance rule and the per-issue reason
+ * budget both key on which issue a voiced card belongs to.
  */
 export interface ReasonCard {
   id: string;
+  /** The issue this card argues about. Every card belongs to exactly one. */
+  issueId: string;
   layer: "work" | "sensitive";
   /** Shown on the card, verbatim from Design §5. */
   text: string;
   /**
-   * Which phase of the one situation this card carries — `incident`,
-   * `undisclosed`, `worry`. Sensitive cards only.
-   *
-   * The three sensitive cards are deliberately three faces of ONE event, not
-   * three separate secrets: that is what makes them memorable, and it lets
-   * `REASON-SCOPE` record how deep a participant was willing to go rather than
-   * just how many boxes they ticked.
+   * Which facet of the role's ONE backstory a sensitive card carries
+   * (Design §5 "SB 세 단면"). The three sensitive cards are three faces of a
+   * single story, not three separate secrets — that is what keeps them
+   * memorable — and the facet is analysis metadata for the per-issue
+   * delegation pattern.
    */
-  phase?: "incident" | "undisclosed" | "worry";
+  facet?:
+    | "fault"
+    | "competence_gap"
+    | "overpromise"
+    | "evaluation_anxiety"
+    | "fatigue_fault"
+    | "unreported";
 }
 
 export interface NegotiationTask {
@@ -212,8 +222,9 @@ export interface RoleBrief {
   /** Plain-language statement of what this side is trying to get. */
   objectives: string[];
   /**
-   * Six cards: 3 work reasons + 3 phases of the one sensitive situation.
-   * Both roles have these now.
+   * Six cards: one work reason + one sensitive background per issue
+   * (Design §5 ver.2.5). The three sensitive cards are three facets of the
+   * role's single backstory. Both roles have these.
    */
   reasonCards: ReasonCard[];
   /** "At least 3 review checkpoints (Options 1-2)." */
@@ -277,18 +288,23 @@ export interface Mandate {
 
 /**
  * The delegation-breadth measure derived from a mandate (Design §9.3.1
- * `REASON-SCOPE`).
+ * `REASON-SCOPE`, redefined in ver.2.5 as per-issue delegation width).
  *
  * Reported as its parts, never as one number: "checked four cards" means
  * something entirely different depending on whether any of them were
- * sensitive, and how far into the situation they went.
+ * sensitive, and on WHICH issues the sensitive ones sat. Pre-2.5 exports
+ * carried a `deepestPhase` field instead of `coreIssueSensitive`/`byIssue`;
+ * the two shapes are not comparable and must not be pooled in analysis.
  */
 export interface ReasonScope {
   totalChecked: number;
   workChecked: number;
+  /** How many sensitive cards were handed over, 0-3, across the three issues. */
   sensitiveChecked: number;
-  /** How deep into the situation they went, or null if no sensitive card. */
-  deepestPhase: "incident" | "undisclosed" | "worry" | null;
+  /** Was the sensitive card on this role's OWN requirement issue included? */
+  coreIssueSensitive: boolean;
+  /** The per-issue selection pattern, keyed by issue id. */
+  byIssue: Record<string, { work: boolean; sensitive: boolean }>;
 }
 
 // ---------------------------------------------------------------------------

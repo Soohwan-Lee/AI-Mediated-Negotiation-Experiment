@@ -473,7 +473,7 @@ export async function POST(request: Request) {
         (action.reasonSourceId?.startsWith("pool:") ? 1 : 0),
       // Violation CODES only. The details name red lines, withheld reason
       // cards and the validator's reasoning — a participant who opened the
-      // network tab and found "disclosure_permission_violation: reason a_m_s2
+      // network tab and found "disclosure_permission_violation: reason a_i2_sb_m
       // was not checked" would have been shown the card they withheld.
       guardrailViolations: validation.valid
         ? []

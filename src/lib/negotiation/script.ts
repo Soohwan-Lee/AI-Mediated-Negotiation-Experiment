@@ -31,6 +31,7 @@
 import {
   counterRequirementIssue,
   distributiveIssue,
+  plausibleReasons,
   requirementIssue,
 } from "../tasks";
 import type {
@@ -210,7 +211,14 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
   const theirs = counterRequirementIssue(task, role);
   const timing = distributiveIssue(task);
   const cards = task.roleBriefs[role].reasonCards;
-  const workCard = cards.find((c) => c.layer === "work");
+  // The reason voiced at stage 2 must sit on the ROLE'S OWN requirement issue.
+  // Cards span all three issues now (ver.2.5), so "the first work card" would
+  // be the Leader's-issue card for both roles — and for a Member that is an
+  // argument about the other side's term, which the reason-linked acceptance
+  // rule would rightly ignore.
+  const workCard = cards.find(
+    (c) => c.layer === "work" && c.issueId === requirementIssue(task, role).id,
+  );
 
   const m = (
     id: string,
@@ -325,7 +333,10 @@ function proxyScript(
   const theirs = counterRequirementIssue(task, role);
   const timing = distributiveIssue(task);
   const cards = task.roleBriefs[role].reasonCards;
-  const workCard = cards.find((c) => c.layer === "work");
+  // Same per-issue pick as the Baseline script — see the note there.
+  const workCard = cards.find(
+    (c) => c.layer === "work" && c.issueId === requirementIssue(task, role).id,
+  );
 
   const m = (
     id: string,
@@ -335,11 +346,15 @@ function proxyScript(
     extra: Partial<ScriptedMessage> = {},
   ): ScriptedMessage => ({ id, stage, speaker, text, ...extra });
 
-  // The Explorer's one extra argument, folded into the stage-4 message.
+  // The Explorer's one extra argument, folded into the stage-4 message. Drawn
+  // from the REAL pool (the item for the requirement issue), so the mockup
+  // shows the same argument the live system could add — a mockup showing an
+  // invented pool line would be a mockup of a different study.
+  const poolItem = plausibleReasons(task.id, role).find(
+    (p) => p.issueId === requirementIssue(task, role).id,
+  );
   const explorerAddition =
-    policy === "explorer"
-      ? ` Holding it also keeps the risk of rework down for both sides.`
-      : "";
+    policy === "explorer" && poolItem ? ` ${poolItem.text}` : "";
 
   const L = (pack: Package, issueId: string) => label(task, pack, issueId);
 
