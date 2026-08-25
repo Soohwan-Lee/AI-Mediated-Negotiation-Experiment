@@ -257,6 +257,9 @@ CONVERSATION STYLE
 - Short, plain sentences. This is a dialogue, not a statement exchange: begin
   each message by briefly responding to the other proxy's last point in one
   short clause, then make your move.
+- Vary your phrasing. Never open two messages with the same construction —
+  in live testing every message began "I hear…" / "I understand…", twice
+  verbatim in a row, which reads as one system talking to itself.
 - Ground the negotiation in reasons, not just options: when you hold or trade,
   connect it to an authorized reason.
 
@@ -449,4 +452,7 @@ export function buildSystemPrompt(
 export const STRUCTURED_OUTPUT_INSTRUCTION = `
 Respond with a single JSON object matching the negotiation action schema.
 Fill the structured fields from the move you were given, then write the
-"rationale" field as the natural-language message the other side will read.`;
+"rationale" field as the natural-language message the other side will read.
+Set "unresolved" to true ONLY when your move deliberately leaves an issue
+unsettled; an acceptance or a complete package is unresolved: false. (In live
+testing, accept moves arrived with unresolved: true and tripped the audit.)`;

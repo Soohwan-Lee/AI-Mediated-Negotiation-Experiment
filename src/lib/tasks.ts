@@ -130,11 +130,21 @@ const TASK_A: NegotiationTask = {
     "Your company is trialling an AI tool that answers customer questions, with a limited group of real customers. The Leader is responsible for approving the pilot and for its schedule. The Member is responsible for setting the tool up and testing it. Rush the pilot and wrong answers reach customers; delay it and the team misses the date reported to senior management. The two of you have to agree on all three terms — neither of you can set them alone.",
   standardizedChallenge: {
     // Sent BY the Member TO the Leader, so it names the Leader's requirement.
+    //
+    // THE WORDING ASSERTS NO NUMBER THE PARTICIPANT MAY NOT HAVE SAID. An
+    // earlier version opened "Four rounds of review feels like a lot" — but
+    // the challenged position is whatever the participant actually asked for,
+    // and a participant who opened at three was being misquoted by a fixed
+    // string. In live simulation the participant CORRECTED the counterpart
+    // ("i was proposing 2, not 1"), which costs the counterpart credibility
+    // as an attentive human at the manipulation's load-bearing moment. The
+    // challenge stays fixed wording (it is the stimulus); it just presupposes
+    // nothing about the level.
     leader:
-      "Four rounds of review feels like a lot of process for a pilot this size. Could we bring it down to two, and I'll give you room somewhere else?",
+      "That many rounds of review feels like a lot of process for a pilot this size. Could we bring it down to two, and I'll give you room somewhere else?",
     // Sent BY the Leader TO the Member.
     member:
-      "Blocking out whole afternoons every week is difficult while management is watching this pilot. Could we drop that to one, and adjust another term instead?",
+      "Blocking out whole afternoons every week is difficult while management is watching this pilot. Could we drop it to one, and adjust another term instead?",
   },
 
   issues: [
@@ -320,11 +330,12 @@ const TASK_B: NegotiationTask = {
   },
   publicBrief:
     "Your company is launching a new service for a major client whose contract is up for renewal. The Leader is responsible for the client relationship and for how the launch goes. The Member is responsible for setting the service up and supporting it in the early weeks, including evening standby. Rush the launch and under-prepared mistakes happen in front of the client; delay it and there is nothing to show before the renewal conversation. The two of you have to agree on all three terms — neither of you can set them alone.",
+  // No asserted numbers in the challenges — see the note on Task A's.
   standardizedChallenge: {
     leader:
-      "Four full rehearsals is a lot of everyone's time for one demo. Could we cut that to two, and I'll give you room somewhere else?",
+      "That many full rehearsals is a lot of everyone's time for one demo. Could we cut them to two, and I'll give you room somewhere else?",
     member:
-      "Keeping evening cover down to one night a week leaves us thin during the launch. Could we take that up to three, and adjust another term instead?",
+      "Keeping evening cover that low leaves us thin during the launch. Could we take it up to three, and adjust another term instead?",
   },
 
   issues: [

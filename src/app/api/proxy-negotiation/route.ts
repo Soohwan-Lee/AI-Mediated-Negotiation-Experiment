@@ -259,6 +259,31 @@ function resolveReasonTokens(
   });
 }
 
+/**
+ * A package's levels, written out for a decidedAction.
+ *
+ * EVERY MOVE THAT CARRIES A PACKAGE MUST NAME ITS LEVELS. The model is asked
+ * to say the machine's move in its own words, and a move described only as
+ * "the counterpackage" left it inventing levels: in live testing it offered
+ * its principal's FLOOR on the spent terms ("a Week 7 start") while the
+ * machine's package held Week 5 — so both proxies talked about a package
+ * neither was carrying, and the review screen then showed terms nobody had
+ * said out loud. The mockup scripts solved this by reading labels out of the
+ * package a message carries; this is the live path's version of the same
+ * rule.
+ */
+function packageSentence(
+  task: ReturnType<typeof getTask>,
+  pkg: Package,
+): string {
+  return task.issues
+    .map((issue) => {
+      const label = issue.options.find((o) => o.id === pkg[issue.id])?.label;
+      return `${label ?? "unspecified"} on ${issue.label.toLowerCase()}`;
+    })
+    .join(", ");
+}
+
 /** The issue a candidate reasonSourceId argues about, or null. */
 function reasonIssueOf(
   taskId: TaskId,
@@ -323,7 +348,7 @@ export async function POST(request: Request) {
     switch (stage) {
       case 1:
         proposal = plan.opening;
-        decidedAction = "Open with your principal's preferred package.";
+        decidedAction = `Open with your principal's preferred package, naming these exact levels: ${packageSentence(task, plan.opening)}.`;
         break;
       case 2:
         // No package this turn. The Explorer's extra latitude is over WORDS,
@@ -342,12 +367,11 @@ export async function POST(request: Request) {
         break;
       case 4:
         proposal = plan.counterpackage;
-        decidedAction =
-          "Put the counterpackage forward: hold the priority term, give ground on the others, and say so explicitly as an exchange.";
+        decidedAction = `Put this exact counterpackage forward: ${packageSentence(task, plan.counterpackage)}. Say plainly what is held and what is given in exchange, and name exactly these levels — no others.`;
         break;
       case 5:
         proposal = plan.tentative;
-        decidedAction = "Confirm the package that goes to review.";
+        decidedAction = `Confirm the package that goes to review, naming exactly these levels: ${packageSentence(task, plan.tentative)}.`;
         break;
     }
   } else {
@@ -386,9 +410,14 @@ export async function POST(request: Request) {
     counterpartAction = decision.action;
 
     decidedAction = ((): string => {
+      // Wherever the move carries a package, its exact levels go into the
+      // instruction — see `packageSentence`.
+      const levels = decision.proposal
+        ? packageSentence(task, decision.proposal)
+        : null;
       switch (decision.action) {
         case "open":
-          return "Open with your own best package on all three terms.";
+          return `Open with your own best package on all three terms, naming these exact levels: ${levels}.`;
         case "state_priority":
           return `Say that ${theirRequirement.label.toLowerCase()} is your principal's priority, with one reason about the work. Ask which term matters most to them.`;
         case "challenge":
@@ -400,12 +429,12 @@ export async function POST(request: Request) {
         case "accept":
         case "soft_close":
           return stage >= 5
-            ? "Record the tentative package and ask both principals to review it."
-            : "Say the package they proposed works for your principal.";
+            ? `Record the tentative package — ${levels} — and ask both principals to review it. Name exactly these levels.`
+            : `Say the package they proposed — ${levels} — works for your principal. Name exactly these levels.`;
         case "hold":
-          return `Say most of the package works, but ${yourRequirement.label.toLowerCase()} stays where it is for now.`;
+          return `Say most of the package works, but ${yourRequirement.label.toLowerCase()} stays where it is for now — the package as you accept it is: ${levels}. Name exactly these levels.`;
         case "concede_distributive":
-          return "Give a step on the timing term and put that counteroffer forward.";
+          return `Give a step on the timing term and put this counteroffer forward, naming these exact levels: ${levels}.`;
         case "impasse":
           return "Say you cannot reach agreement on these terms.";
       }
