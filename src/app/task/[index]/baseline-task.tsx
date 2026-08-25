@@ -144,6 +144,21 @@ const STEP_LABELS = [
   "Review",
 ];
 
+/** The cover's glossed step list — see the note in proxy-task.tsx. */
+const COVER_STEPS = [
+  { label: "Your briefing", hint: "Read your side of the project." },
+  { label: "Before you start", hint: "Two quick questions." },
+  {
+    label: "What you want",
+    hint: "Set what you would like, and the least you would take.",
+  },
+  {
+    label: "Negotiate",
+    hint: "Chat with the other participant and settle the three terms.",
+  },
+  { label: "Review", hint: "See where it landed." },
+];
+
 const PHASE_LABELS: Record<Phase, string> = {
   intro: "Start screen",
   brief: "Your briefing",
@@ -524,8 +539,10 @@ export function BaselineTask({
     return (
       <TaskIntro
         taskIndex={taskIndex}
-        steps={STEP_LABELS}
+        steps={COVER_STEPS}
         scene="direct"
+        /* The shorter arm: one conversation. */
+        minutes={12}
         onStart={() => setPhase("brief")}
       />
     );

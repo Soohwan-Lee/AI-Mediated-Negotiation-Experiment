@@ -1015,7 +1015,8 @@ export function dummyAnswer(item: Item): string | number {
     case "select":
       return item.options[0].value;
     case "number":
-      return "10";
+      // BG1 is age, which the background page range-checks (18-100).
+      return item.id === "BG1" ? "34" : "10";
     default:
       // Ids carry a `_t1` / `_t2` suffix on the per-task blocks; the written
       // answer is the same either way.

@@ -156,6 +156,29 @@ const STEP_LABELS = [
   "Review",
 ];
 
+/**
+ * The cover's version of the step list, with the one-line gloss the practice
+ * cover always had. Bare labels were indistinguishable to a first-time reader
+ * ("Check and start" vs "Check with it"), and the cover is exactly the place
+ * that gap costs something.
+ */
+const COVER_STEPS = [
+  { label: "Your briefing", hint: "Read your side of the project." },
+  { label: "Before you start", hint: "Two quick questions." },
+  {
+    label: "Your instructions",
+    hint: "Tell your AI Proxy what you want, and what it may say for you.",
+  },
+  { label: "Check with it", hint: "Ask it anything — optional." },
+  { label: "Check and start", hint: "Read your instructions back, then go." },
+  { label: "Watch", hint: "The two AI Proxies talk. You watch live." },
+  {
+    label: "Talk it through",
+    hint: "You take over and finish the conversation yourself.",
+  },
+  { label: "Review", hint: "See where it landed." },
+];
+
 /** Readable names for the dev panel's phase jumps. */
 const PHASE_LABELS: Record<Phase, string> = {
   intro: "Start screen",
@@ -654,8 +677,10 @@ export function ProxyTask({
     return (
       <TaskIntro
         taskIndex={taskIndex}
-        steps={STEP_LABELS}
+        steps={COVER_STEPS}
         scene="proxy"
+        /* The longer arm: two conversations where Baseline has one. */
+        minutes={15}
         onStart={() => setPhase("brief")}
       />
     );

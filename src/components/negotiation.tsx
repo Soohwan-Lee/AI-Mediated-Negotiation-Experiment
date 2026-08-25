@@ -171,6 +171,15 @@ export function Transcript({
       {messages.map((m) => {
         const own =
           m.speaker === "participant" || m.speaker === "participant_proxy";
+        // The participant's OWN words and their proxy's are different things
+        // to every §9.4 item that asks who said what, so the proxy's bubbles
+        // get an outlined variant of the own-side treatment rather than the
+        // identical fill. Same side, same alignment — it spoke FOR them — but
+        // distinguishable at a glance in the interleaved direct-phase scroll.
+        // This is speaker differentiation, not a visibility surface, so rule
+        // 1 (colour encodes who can see) is untouched: all three bubbles
+        // remain shared-table content.
+        const ownProxy = m.speaker === "participant_proxy";
         if (m.speaker === "system") {
           return (
             <p
@@ -191,9 +200,11 @@ export function Transcript({
             </span>
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-                own
-                  ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
-                  : "border border-[var(--line)] bg-[var(--surface-muted)]"
+                ownProxy
+                  ? "border-2 border-[var(--accent)] bg-[var(--surface)] text-[var(--ink)]"
+                  : own
+                    ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
+                    : "border border-[var(--line)] bg-[var(--surface-muted)]"
               }`}
             >
               {m.text}

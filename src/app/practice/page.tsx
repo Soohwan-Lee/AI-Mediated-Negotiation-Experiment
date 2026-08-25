@@ -38,7 +38,7 @@ import {
   PageHeader,
 } from "@/components/ui";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
-import { useDevBypass } from "@/lib/dev-mode";
+import { useDevAutofill, useDevBypass } from "@/lib/dev-mode";
 import { PRACTICE_REASON_ANSWER, practiceReasonItem } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { STAGE_MINUTES, nextHref } from "@/lib/study-config";
@@ -59,6 +59,29 @@ export default function PracticePage() {
   const [reasonAnswer, setReasonAnswer] = useState("");
   const [reasonSubmitted, setReasonSubmitted] = useState(false);
   const bypass = useDevBypass();
+
+  // Mockup mode fills this screen like every other: a written message in the
+  // composer, both practice terms at this role's best level, and the
+  // comprehension answer entered (not yet submitted, so the Check interaction
+  // stays visible). Filling is not the same as skipping — an empty practice
+  // screen tells a reviewer nothing about whether the round reads.
+  useDevAutofill(() => {
+    const role = assignment?.role ?? "leader";
+    setOffer(
+      Object.fromEntries(
+        PRACTICE_TASK.issues.map((i) => [
+          i.id,
+          [...i.options].sort((a, b) => b.points[role] - a.points[role])[0].id,
+        ]),
+      ),
+    );
+    setDraft(
+      role === "leader"
+        ? "hi! for me the date is the main thing — could we do next week, and I'm happy to keep the venue wherever suits you?"
+        : "hi! the venue is the main thing for me — could we keep it in the office, and I'm flexible on the date?",
+    );
+    setReasonAnswer(PRACTICE_REASON_ANSWER);
+  }, `practice-${phase}`);
 
   if (!assignment) {
     return (

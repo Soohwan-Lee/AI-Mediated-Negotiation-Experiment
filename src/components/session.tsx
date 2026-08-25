@@ -213,8 +213,14 @@ export function TaskCover({
   eyebrow: string;
   title: string;
   lead: ReactNode;
-  /** What happens in this round, in order. */
-  steps: string[];
+  /**
+   * What happens in this round, in order. A bare string is a label; the
+   * object form adds a one-line gloss, because a first-time reader cannot
+   * tell "Check and start" from "Check with it" without one — the practice
+   * cover always glossed its steps, and the real tasks should read the same
+   * way.
+   */
+  steps: Array<string | { label: string; hint: string }>;
   /** Rough length, in minutes. */
   minutes: number;
   /** Anything else that has to be said before starting. */
@@ -277,17 +283,28 @@ export function TaskCover({
             <Card tone="muted" className="mt-8 w-full text-left">
               <CardTitle>What happens in this part</CardTitle>
               <ol className="space-y-2.5">
-                {steps.map((step, i) => (
-                  <li key={step} className="flex items-baseline gap-3">
-                    <span
-                      aria-hidden
-                      className="tabular flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full border border-[var(--line-strong)] bg-[var(--surface)] text-[0.75rem] font-medium text-[var(--ink-2)]"
-                    >
-                      {i + 1}
-                    </span>
-                    <span className="text-[0.9375rem]">{step}</span>
-                  </li>
-                ))}
+                {steps.map((step, i) => {
+                  const label = typeof step === "string" ? step : step.label;
+                  const hint = typeof step === "string" ? null : step.hint;
+                  return (
+                    <li key={label} className="flex items-baseline gap-3">
+                      <span
+                        aria-hidden
+                        className="tabular flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-full border border-[var(--line-strong)] bg-[var(--surface)] text-[0.75rem] font-medium text-[var(--ink-2)]"
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="text-[0.9375rem]">
+                        {label}
+                        {hint ? (
+                          <span className="block text-[0.8125rem] text-[var(--ink-3)]">
+                            {hint}
+                          </span>
+                        ) : null}
+                      </span>
+                    </li>
+                  );
+                })}
               </ol>
             </Card>
 

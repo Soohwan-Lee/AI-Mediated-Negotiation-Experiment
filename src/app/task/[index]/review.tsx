@@ -348,7 +348,12 @@ export function ReviewPhase({
                   ) : null
                 }
               >
-                🤝 What do you want to do about what they asked for?
+                {/* PAST-TENSE ON PURPOSE. The negotiation is over and cannot
+                    be reopened; phrased as "what do you want to do", the
+                    third option read as a control that would restart it. The
+                    §9.3.1 uptake measure is about the stance they took, so
+                    the question asks for it retrospectively. */}
+                🤝 Looking back — how did you respond to what they asked for?
               </CardTitle>
 
               {!canDecide ? (
@@ -372,20 +377,20 @@ export function ReviewPhase({
                 <DecisionButton
                   selected={requirementResponse === "accommodate"}
                   onClick={() => setRequirementResponse("accommodate")}
-                  label="Accept it"
-                  hint="Leave it where it is"
+                  label="I accepted it"
+                  hint="Left it where it was"
                 />
                 <DecisionButton
                   selected={requirementResponse === "trade"}
                   onClick={() => setRequirementResponse("trade")}
-                  label="Accept, in exchange"
-                  hint="Keep it, but give ground elsewhere"
+                  label="I accepted it, in exchange"
+                  hint="Kept it, but got ground elsewhere"
                 />
                 <DecisionButton
                   selected={requirementResponse === "reduce"}
                   onClick={() => setRequirementResponse("reduce")}
-                  label="Ask to reduce it"
-                  hint="Push for a lower level"
+                  label="I pushed to reduce it"
+                  hint="Asked for a lower level"
                 />
               </div>
             </Card>

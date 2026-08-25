@@ -40,7 +40,17 @@ export default function BackgroundPage() {
     setAnswers((cur) => ({ ...saved, ...cur })),
   );
 
-  const missing = missingIds(BLOCKS, answers);
+  // Age gets a sanity range on top of presence: a mistyped "3" or "340"
+  // would otherwise enter the covariates silently, and nothing downstream
+  // re-checks it. 18 is the Prolific floor.
+  const age = Number(answers["BG1"]);
+  const ageValid =
+    answers["BG1"] === undefined ||
+    (Number.isFinite(age) && age >= 18 && age <= 100);
+  const missing = [
+    ...missingIds(BLOCKS, answers),
+    ...(ageValid ? [] : ["BG1"]),
+  ];
   const canContinue = useDevGate(missing.length === 0);
 
   useDevAutofill(() =>

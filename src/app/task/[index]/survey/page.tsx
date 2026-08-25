@@ -115,6 +115,14 @@ export default function TaskSurveyPage({
             There are no right answers. Answer for how it actually went, not how
             you think it should have gone.
           </p>
+          {/* Sets the length expectation up front. This page is the longest
+              single screen in the study; arriving on it blind is where a
+              tired participant starts straight-lining, and knowing the size
+              of the ask is the cheapest thing that helps. */}
+          <p className="mt-2 text-[0.8125rem] text-[var(--ink-3)]">
+            {blocks.reduce((n, b) => n + b.items.length, 0)} questions —
+            usually 4–5 minutes.
+          </p>
         </Card>
 
         {blocks.map((block) => (

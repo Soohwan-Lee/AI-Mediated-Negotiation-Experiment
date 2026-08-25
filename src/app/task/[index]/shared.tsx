@@ -95,10 +95,18 @@ export function TaskIntro({
   taskIndex,
   steps,
   scene,
+  minutes,
   onStart,
 }: {
   taskIndex: 1 | 2;
-  steps: string[];
+  steps: Array<string | { label: string; hint: string }>;
+  /**
+   * Per-arm estimate. The two arms are structurally different lengths — a
+   * Proxy task holds two conversations where Baseline holds one — and one
+   * shared figure was wrong for both. The number describes the interface in
+   * front of the participant, not the condition.
+   */
+  minutes?: number;
   /**
    * Which shape of exchange this task uses.
    *
@@ -152,7 +160,7 @@ export function TaskIntro({
       }
       steps={steps}
       scene={scene}
-      minutes={STAGE_MINUTES.task}
+      minutes={minutes ?? STAGE_MINUTES.task}
       actionLabel={`Start Task ${taskIndex}`}
       onStart={onStart}
     />
@@ -568,7 +576,7 @@ export function RiskForm({
                said otherwise while RISK sat last, and a promise that the next
                button starts the negotiation is one the participant checks
                immediately. */
-            title="First, two quick questions"
+            title="Two quick questions before you begin"
             steps={steps}
             current={stepIndex}
           />
@@ -1218,14 +1226,16 @@ export function DirectNegotiation({
             }
           />
 
-          {/* What the proxies said, kept where it can be re-read. Collapsed by
-              default so it does not push the live conversation off the screen,
-              open on demand — and open by default when there is nothing to
-              show in the live box yet. */}
-          <ProxyTranscriptPanel
-            transcript={proxyTranscript}
-            openByDefault={messages.length === 0}
-          />
+          {/* What the proxies said, kept where it can be re-read — one click
+              away, never behind a navigation. COLLAPSED on arrival, even
+              before the first message: expanded, its ten messages pushed the
+              composer below the fold while the ten-minute clock was already
+              running, which Baseline (whose composer is visible immediately)
+              does not suffer — an arm asymmetry in how fast a participant can
+              start talking under an identical clock. The participant has just
+              WATCHED this exchange; the panel is for re-reading, not first
+              reading. */}
+          <ProxyTranscriptPanel transcript={proxyTranscript} />
 
           {/* The ring goes on the COMPOSER, not on this card. Both carried it
               while the cue was a flat outline and the duplication was merely
