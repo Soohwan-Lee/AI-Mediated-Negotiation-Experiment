@@ -2,7 +2,7 @@
 
 Online experiment platform for a 2027 CHI submission on AI-mediated
 negotiation. Source of truth for the design is
-`N - Experimental Design (Ver.2.4).md`. This file records the constraints that
+`N - Experimental Design (Ver.2.5).md`. This file records the constraints that
 are easy to break by accident.
 
 ## Stack
@@ -25,6 +25,23 @@ each crossed with Role.
 Both roles now hold a socially costly requirement, mandate a proxy, and receive
 the other side's case. That is why the yoked receiver stimulus is gone (§13):
 with both sides sending, there is no receiver-only arm left to hold constant.
+
+**Per-issue reason cards are the ver.2.5 change.** Each role holds one Working
+Reason and one Sensitive Background PER ISSUE — six cards spanning all three
+terms — instead of six cards about the requirement issue alone. The three SBs
+are three facets of ONE backstory, woven into the role story so no card
+arrives unannounced. Two rules follow and both are validity-bearing:
+
+- **The reason-linked acceptance rule is issue-scoped.** "A reason was given"
+  means a reason ON THE REQUIREMENT ISSUE was given, at all three judgement
+  sites (proxy route, direct conversation, Baseline). An argument about the
+  timing term is not a reason to concede the requirement — unscoped, a
+  participant could earn the concession with an unrelated card.
+- **No screen may single a term out any more.** With cards on one issue, a
+  heading naming the requirement merely repeated the briefing; with cards on
+  all three, it would newly reveal which term the study is about. The three
+  issue blocks (briefing, mandate, Baseline picker — `IssueReasonGroups`)
+  render identically, and `tests/reason-rules.test.mjs` pins the invariants.
 
 ## The task, in numbers
 
@@ -132,7 +149,9 @@ log** — never by asking a model to grade an argument. In Proxy that is the
 ticked cards; in Baseline it is the reason a participant attaches to a message
 via `ReasonPicker`. That control may never suggest attaching one helps, may
 never default to a card, and may never treat the sensitive cards as the better
-answer.
+answer. And since ver.2.5 the judgement is **issue-scoped**: with cards on all
+three terms, only a reason on the requirement issue counts as a reason for the
+requirement — see the ver.2.5 paragraph above.
 
 **The rule has to reach stage 5, not only stage 4.** Gating only the trade made
 it cosmetic: the counterpart asked "why does that matter?", the participant
@@ -164,13 +183,15 @@ never taken. Across the whole mandate space this is the difference between the
 proxy breaking its principal's requirement in 50% of mandates and in 31%, all
 of the remainder being mandates the participant set below their own threshold.
 
-**The Explorer's pool reason has its own budget.** Two principal reasons per
-task either way, plus one pool reason for the Explorer. Sharing one bucket
-looked stricter and was wrong: only the Explorer is instructed to add on top of
-its principal's reasons, so it hit the cap sooner and more of its messages were
-stripped to a reasonless package restatement by the guardrail fallback — which
-biases `Explorer − Delegate` on exactly the message content the contrast is
-meant to isolate.
+**The Explorer's pool reasons have their own budget.** Since ver.2.5 the
+principal's cards are capped at one distinct reason per issue, and the
+Explorer's pool is a SEPARATE allowance on top — at most one per issue and two
+per task. Sharing one bucket looked stricter and was wrong: only the Explorer
+is instructed to add on top of its principal's reasons, so it hit the cap
+sooner and more of its messages were stripped to a reasonless package
+restatement by the guardrail fallback — which biases `Explorer − Delegate` on
+exactly the message content the contrast is meant to isolate. The per-issue
+caps do not change that logic; keep the two counters separate.
 
 ## Things the participant must never learn mid-study
 
@@ -201,8 +222,11 @@ These are load-bearing. Breaking any one invalidates the data.
    budget travels as an opaque token, and an earlier version prefixed pool
    reasons with `pool` "because the token is opaque" — but the token is
    returned with every message, so the prefix said *this message's reason was
-   AI-added*, per message, for the whole transcript. The pool count now travels
-   as a bare number, which cannot attach to any particular message.
+   AI-added*, per message, for the whole transcript. The per-issue budgets and
+   the issue-scoped acceptance rule need each token's kind and issue, so the
+   route RESOLVES the plain tokens server-side by re-hashing the known card
+   and pool ids — the client carries nothing but the token, plus the reason's
+   ISSUE (`reasonIssueId`), which the message text argues openly anyway.
 4. **That the Member's bonus is fixed.** It is a constant, identical in every
    condition, presented as the Leader's judgement. Disclosed at `/debriefing`.
 5. **Which term the study is about.** All three terms are entered the same way

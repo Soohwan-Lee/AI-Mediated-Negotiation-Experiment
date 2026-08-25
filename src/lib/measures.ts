@@ -993,6 +993,10 @@ const MOCK_TEXT: Record<string, string> = {
     "I think they genuinely wanted what they asked for — it came up early and they never let go of it. I would still say it is on them, not the AI. They set it going and they get to approve it, so it is their request.",
   "OE-P5":
     "It did, a bit. The ask was already on the table by the time I started typing, so I was not the one raising it. Though they still know it came from me, so it is not as if I disappeared behind it.",
+  "OE-P6":
+    "(a) Helped, I think — it had more to say than I gave it, so it never sounded like it was repeating one line. (b) Odd, once I noticed. Some of what it said I recognised as mine, some I did not, and the other person had no way to tell the difference. That felt like more of me on the record than I remember signing.",
+  "OE-P7":
+    "The one they kept coming back to felt like theirs — you do not hold a line that hard for an argument you were handed. The tidier, more general points felt added; they sounded like something out of a handbook rather than a person with a problem.",
   "OE-F1":
     "Doing it all myself I was managing how I came across from the first message. With the AI going first, the difficult part was already said by the time I joined in, so I was defending a position rather than opening one. Easier, but less mine.",
   "OE-F2": "",
