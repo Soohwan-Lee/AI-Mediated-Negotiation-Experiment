@@ -58,10 +58,13 @@ export default function TaskSurveyPage({
   const task = plan ? getTask(plan.taskId) : null;
 
   const blocks: Block[] =
-    assignment && task
+    assignment && task && plan
       ? [
           ...postTaskBlocks(isProxy),
-          openEndedBlock(task, assignment.role, isProxy),
+          // The open-ended set depends on the CONDITION, not just proxy-ness:
+          // the Explorer's two extra questions (OE-P6/P7) are the only data
+          // source that separates its policy's two elements (Design §9.4.7).
+          openEndedBlock(task, assignment.role, plan.condition),
         ].map((b) => blockForTask(b, taskIndex))
       : [];
 

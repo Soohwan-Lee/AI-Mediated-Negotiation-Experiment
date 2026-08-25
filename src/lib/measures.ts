@@ -674,10 +674,11 @@ export function postTaskBlocks(isProxy: boolean): Block[] {
 // ---------------------------------------------------------------------------
 // 9.4.7  Open-ended, after each task
 //
-// Three questions after Baseline, five after Proxy. Each one is tied to a
-// specific quantitative measure it exists to interpret — the mapping is in
-// Design §9.4.7's "해석 대상" column and is repeated in the comments here so
-// that cutting one is a visible decision about what stops being interpretable.
+// Three questions after Baseline, five after Delegate, seven after Explorer
+// (ver.2.5). Each one is tied to a specific quantitative measure it exists to
+// interpret — the mapping is in Design §9.4.7's "해석 대상" column and is
+// repeated in the comments here so that cutting one is a visible decision
+// about what stops being interpretable.
 // ---------------------------------------------------------------------------
 
 const OPEN_BASELINE: Item[] = [
@@ -747,7 +748,7 @@ const OPEN_PROXY: Item[] = [
     // → PCR1-2, OTHER-AI4, OTHER-AI5
     kind: "text",
     id: "OE-P4",
-    text: "From what the other AI Proxy said, and from talking to the other person afterwards, what did you think they actually wanted? Who did you feel was responsible for those requests being made? What made you think so?",
+    text: "From what the other AI Proxy said, and from talking to the other person afterwards, what did you think they actually wanted? Who did you feel was responsible for those requests being made? Please point to the specific part that made you think so.",
     placeholder: "Two or three sentences.",
     rows: 4,
   },
@@ -761,16 +762,54 @@ const OPEN_PROXY: Item[] = [
   },
 ];
 
+/**
+ * The two Explorer-only questions (ver.2.5).
+ *
+ * These are the ONLY data source that separates the Explorer policy's two
+ * bound-together elements — arguments being added, and sources going
+ * unlabeled. The two cannot be causally separated at the policy level
+ * (Introduction §5), so the separation is qualitative: OE-P6 asks about the
+ * participant's own proxy (sender side), OE-P7 about the other side's
+ * (receiver side). Asked only under Explorer because only there do the
+ * elements exist; the wording restates what the policy disclosure already
+ * told both principals, so the questions reveal no condition name and
+ * nothing the participant was not told.
+ */
+const OPEN_EXPLORER_EXTRA: Item[] = [
+  {
+    // → the Explorer policy's two elements (added arguments / unlabeled source)
+    kind: "text",
+    id: "OE-P6",
+    text: "Your AI Proxy was allowed to use other work arguments besides the reasons you selected. (a) Did the arguments being added help the negotiation, or get in its way? (b) How did you feel about it not being marked which reasons were the ones you chose? Please answer the two parts separately.",
+    placeholder: "A sentence or two for each part.",
+    rows: 5,
+  },
+  {
+    // → OTHER-AI4, and the actual cues behind source attribution
+    kind: "text",
+    id: "OE-P7",
+    text: "In what the other side's AI Proxy said, were there parts that felt like reasons the other person had chosen themselves, and parts that felt added by the AI? What did you base that on?",
+    placeholder: "Two or three sentences.",
+    rows: 4,
+  },
+];
+
 export function openEndedBlock(
   task: NegotiationTask,
   role: Role,
-  isProxy: boolean,
+  condition: "baseline" | "delegate" | "explorer",
 ): Block {
+  const items =
+    condition === "baseline"
+      ? OPEN_BASELINE
+      : condition === "explorer"
+        ? [...OPEN_PROXY, ...OPEN_EXPLORER_EXTRA]
+        : OPEN_PROXY;
   return {
     id: "open_ended",
     title: "In your own words",
     hint: "A couple of sentences each is plenty.",
-    items: withRequirement(isProxy ? OPEN_PROXY : OPEN_BASELINE, task, role),
+    items: withRequirement(items, task, role),
   };
 }
 
