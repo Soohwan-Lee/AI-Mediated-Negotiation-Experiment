@@ -431,11 +431,17 @@ export function ProxyTask({
       // for would make the stop cosmetic.
       setTentative(stopped.current ? null : script.tentative);
       // The scripted exchange voices a work reason at stage 2 — unless it was
-      // stopped before reaching it.
+      // stopped before reaching it. Scoped to the requirement issue, same as
+      // the live path: only a reason on the participant's own requirement
+      // issue satisfies the reason-linked rule.
       setProxyVoicedReason(
         !stopped.current &&
           scripted.some(
-            (m) => m.speaker === "participant_proxy" && m.reasonCardId,
+            (m) =>
+              m.speaker === "participant_proxy" &&
+              m.reasonCardId &&
+              reasonCards.find((c) => c.id === m.reasonCardId)?.issueId ===
+                requirement.id,
           ),
       );
       logEvent(
@@ -484,15 +490,13 @@ export function ProxyTask({
       stage: number;
       optionId: string | null;
     }> = [];
-    // Opaque tokens for the reasons this side has voiced. The budget is a
-    // whole-task limit and the route is stateless, so the count lives here —
-    // but the client is deliberately not told WHICH reasons they were, since
-    // that would name the Explorer's additions.
+    // Opaque tokens for the reasons this side has voiced. The budgets are
+    // whole-task limits and the route is stateless, so the history lives
+    // here — but the client is deliberately not told WHICH reasons they
+    // were, since that would name the Explorer's additions. The server
+    // recovers each token's issue and kind for itself by re-hashing the
+    // known ids.
     const reasonsUsed: string[] = [];
-    // The Explorer's pool allowance, carried as a bare count. See the note on
-    // `reasonToken` in the route: a marked token would name which messages
-    // carried an AI-added reason.
-    let poolReasonsUsed = 0;
 
     try {
       for (let turn = 0; turn < TOTAL_TURNS; turn += 1) {
@@ -510,7 +514,6 @@ export function ProxyTask({
             lastParticipantPackage,
             lastCounterpartPackage,
             reasonsUsed,
-            poolReasonsUsed,
             history: collected.map((m) => ({
               speaker: m.speaker,
               text: m.text,
@@ -530,7 +533,7 @@ export function ProxyTask({
           done: boolean;
           totalTurns?: number;
           reasonToken?: string | null;
-          poolReasonsUsed?: number;
+          reasonIssueId?: string | null;
           decidedAction?: string;
           stage?: number;
           requirementOption?: string | null;
@@ -542,15 +545,19 @@ export function ProxyTask({
         if (data.impasse) proxyImpasse = true;
         if (data.reasonToken) {
           reasonsUsed.push(data.reasonToken);
-          // A token only exists when the proxy actually voiced something, and
-          // a blocked message carries none — which is exactly the case the
-          // hardcoded `true` used to paper over.
-          if (data.message?.speaker === "participant_proxy" && !data.blocked) {
+          // A token only exists when the proxy actually voiced something —
+          // the route returns none for a blocked turn. ISSUE-SCOPED (ver.2.5):
+          // the cards span all three issues now, so only a reason on the
+          // participant's own requirement issue satisfies the reason-linked
+          // rule the direct conversation inherits — a proxy that argued only
+          // the timing term has not justified the requirement.
+          if (
+            data.message?.speaker === "participant_proxy" &&
+            !data.blocked &&
+            data.reasonIssueId === requirement.id
+          ) {
             setProxyVoicedReason(true);
           }
-        }
-        if (typeof data.poolReasonsUsed === "number") {
-          poolReasonsUsed = data.poolReasonsUsed;
         }
         if (
           data.message?.speaker === "participant_proxy" &&

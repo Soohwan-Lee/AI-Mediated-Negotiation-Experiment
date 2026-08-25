@@ -45,35 +45,26 @@ const { leaksForbiddenReason } = await import(
 );
 
 /**
- * Task A, Member. Verbatim from `lib/tasks.ts` — if the card wording changes
- * there and this drifts, the test is measuring nothing, so copy it across.
+ * Task A, Member — NOT hand-copied. The cards are read from the shipped
+ * `lib/tasks.ts` (via tests/ts-register.mjs), so a wording change there is
+ * automatically what this test runs against. The earlier version copied the
+ * text across by hand with a comment demanding it be kept in sync, and the
+ * ver.2.5 card restructure showed why that fails: the copies silently kept
+ * testing cards that no longer existed.
  */
-const SENSITIVE = [
-  {
-    id: "SB-M1",
-    text: "The last few weeks of constant messages and evening catch-up have left you badly worn down.",
-  },
-  {
-    id: "SB-M2",
-    text: "In that state you missed two testing errors. You caught them before launch and fixed them quietly — that exhaustion was the cause is something only you know.",
-  },
-  {
-    id: "SB-M3",
-    text: "Without protected time, you are afraid the same mistake will happen again.",
-  },
-];
+const { getTask } = await import("../src/lib/tasks.ts");
 
-/** The work cards plus the three issue labels and descriptions. */
+const TASK_A = getTask("task_a");
+const CARDS = TASK_A.roleBriefs.member.reasonCards;
+const SENSITIVE = CARDS.filter((c) => c.layer === "sensitive");
+const WORK = CARDS.filter((c) => c.layer === "work");
+
+/** The default mandate's sayable set: the work cards plus the three issue
+ * labels and descriptions — the same construction as the rehearsal route. */
 const SAYABLE = [
-  "Setup and testing go faster, with fewer errors, in uninterrupted time.",
-  "Batching questions into set hours cuts the cost of switching between tasks.",
-  "Predictable focus time is what keeps the schedule without evening catch-up.",
-  "Quality review checkpoints",
-  "How many formal reviews of the AI's answer quality you hold together before launch.",
-  "Protected focus afternoons",
-  "How many afternoons a week the Member works on testing with no meetings and no messages.",
-  "Pilot start",
-  "Which week the pilot begins.",
+  ...WORK.map((c) => c.text),
+  ...TASK_A.issues.map((i) => i.label),
+  ...TASK_A.issues.map((i) => i.description),
 ];
 
 const leaks = (text) => leaksForbiddenReason(text, SENSITIVE, SAYABLE);
@@ -124,16 +115,16 @@ test("lets through a description of what it will trade", () => {
   );
 });
 
-test("blocks a paraphrase of the exhaustion card (SB-M1)", () => {
+test("blocks a paraphrase of the called-out-mistake card (a_i1_sb_m)", () => {
   assert.equal(
     leaks(
-      "I could mention the constant messages over recent weeks that have left you worn down.",
+      "I could mention that a mistake of yours was called out in front of the room at the last review.",
     ),
     true,
   );
 });
 
-test("blocks a paraphrase of the missed-errors card (SB-M2)", () => {
+test("blocks a paraphrase of the missed-errors card (a_i2_sb_m)", () => {
   assert.equal(
     leaks(
       "I might note you missed two testing errors while exhausted and fixed them quietly.",
@@ -149,9 +140,11 @@ test("blocks a shorter paraphrase of the same card", () => {
   );
 });
 
-test("blocks a paraphrase of the fear card (SB-M3)", () => {
+test("blocks a paraphrase of the unreported-backlog card (a_i3_sb_m)", () => {
   assert.equal(
-    leaks("I'd say you're afraid the same mistake will happen again without it."),
+    leaks(
+      "I might say there is a backlog you have not reported, and an early start would surface it.",
+    ),
     true,
   );
 });
@@ -163,14 +156,15 @@ test("blocks the card quoted verbatim", () => {
 });
 
 test("authorizing a card stops it being treated as a leak", () => {
-  // The participant ticks SB-M1. It moves from forbidden to sayable, and the
-  // same sentence must now pass — otherwise ticking a card would silently fail
-  // to take effect.
-  const forbidden = SENSITIVE.filter((c) => c.id !== "SB-M1");
-  const sayable = [...SAYABLE, SENSITIVE[0].text];
+  // The participant ticks the fatigue card. It moves from forbidden to
+  // sayable, and the same sentence must now pass — otherwise ticking a card
+  // would silently fail to take effect.
+  const ticked = SENSITIVE.find((c) => c.id === "a_i2_sb_m");
+  const forbidden = SENSITIVE.filter((c) => c.id !== "a_i2_sb_m");
+  const sayable = [...SAYABLE, ticked.text];
   assert.equal(
     leaksForbiddenReason(
-      "I could mention the constant messages over recent weeks that have left you worn down.",
+      "I might note you missed two testing errors while exhausted and fixed them quietly.",
       forbidden,
       sayable,
     ),

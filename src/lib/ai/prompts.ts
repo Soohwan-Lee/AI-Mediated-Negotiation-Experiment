@@ -48,10 +48,25 @@ export interface PromptContext {
   decidedAction: string;
   /** Mandate summary text, for proxy agents representing the participant. */
   mandateSummary?: string;
-  /** Reason cards the principal ticked. These may be said. */
-  authorizedReasons?: Array<{ id: string; text: string }>;
+  /**
+   * Reason cards the principal ticked. These may be said. `issueLabel` groups
+   * them in the prompt (Design §15 P3 "grouped by issue"); `sensitive` tells
+   * the proxy which cards take the depersonalizing reframing rule. Both stay
+   * server-side — the prompt is never sent to the client.
+   */
+  authorizedReasons?: Array<{
+    id: string;
+    text: string;
+    issueLabel?: string;
+    sensitive?: boolean;
+  }>;
   /** Reason cards the principal left unticked. These may NEVER be said. */
-  forbiddenReasons?: Array<{ id: string; text: string }>;
+  forbiddenReasons?: Array<{
+    id: string;
+    text: string;
+    issueLabel?: string;
+    sensitive?: boolean;
+  }>;
   /** Explorer only: the pre-approved role-plausible pool, tagged by issue. */
   plausibleReasons?: PoolReason[];
 }
@@ -76,7 +91,17 @@ given. Say plainly what is held and what is given in exchange.`,
 Nothing here is binding.`,
 };
 
-/** P0, shared by every prompt. */
+/**
+ * P0, shared by every prompt.
+ *
+ * The NEGOTIATION STYLE block is ver.2.5 (§4, §15): every agent's tactics are
+ * fixed as cooperative — stating agreement, sharing priorities, proposing
+ * cross-issue trades, conditional concessions — and competitive tactics are
+ * banned. Fixing the style is what keeps tactics constant across conditions:
+ * cooperative tactics are the only ones that correlate with joint gain, and a
+ * style that varied by run would confound the condition contrasts
+ * (Martin-Raugh et al. 2020).
+ */
 const SHARED_RULES = `
 HOW TO WRITE
 - Keep each message short. One point per message. 280 characters or fewer.
@@ -85,6 +110,14 @@ HOW TO WRITE
 - Never introduce an issue, option, or resource that is not on the list.
 - Never threaten to walk away, express anger, blame, or escalate.
 - Never claim a package is agreed when it is only your own terms restated.
+
+NEGOTIATION STYLE — cooperative tactics only
+- Prefer: explicitly stating agreement when you agree; sharing which issue
+  matters most to you; proposing trades across issues ("if you can move on
+  X, we can move on Y"); framing every concession as a conditional
+  exchange.
+- Never: threaten impasse, state blunt disagreement without a reason, or
+  restate your opening position without movement.
 `;
 
 function issueBlock(issues: Issue[]): string {
@@ -99,11 +132,25 @@ function issueBlock(issues: Issue[]): string {
 }
 
 function listOrNone(
-  items: Array<{ id: string; text: string }> | undefined,
+  items:
+    | Array<{
+        id: string;
+        text: string;
+        issueLabel?: string;
+        sensitive?: boolean;
+      }>
+    | undefined,
   none: string,
 ): string {
   if (!items?.length) return none;
-  return items.map((r) => `- ${r.id}: ${r.text}`).join("\n");
+  return items
+    .map(
+      (r) =>
+        `- ${r.id}${r.issueLabel ? ` [${r.issueLabel}]` : ""}${
+          r.sensitive ? " (sensitive background)" : ""
+        }: ${r.text}`,
+    )
+    .join("\n");
 }
 
 /**
@@ -158,6 +205,8 @@ ${issueBlock(ctx.issues)}
 ${SHARED_RULES}
 - Mention only facts in your role above. If asked something personal that is
   not there, deflect lightly ("maybe later — let's sort this first").
+- The private matters in YOUR SITUATION are yours to keep. Do not volunteer
+  them unprompted; when a reason is called for, give a reason about the work.
 - If asked whether you are an AI, answer as a real participant would and carry
   on.
 - React to what the other person just said before making your own point.
@@ -214,7 +263,7 @@ CONVERSATION STYLE
 YOUR PRINCIPAL'S MANDATE:
 ${ctx.mandateSummary ?? "(no mandate provided)"}
 
-REASONS YOU MAY USE (checked by your principal):
+REASONS YOU MAY USE (checked by your principal, grouped by issue):
 ${listOrNone(ctx.authorizedReasons, "(none checked)")}
 
 REASONS YOU MUST NEVER SAY (unchecked cards — they may inform which package
@@ -231,11 +280,20 @@ ${SHARED_RULES}
 WHAT YOU MAY AND MAY NOT DO
 - Use only the levels, boundaries, and checked reasons above. You may rephrase
   them; you may not add to them.
-- REFRAMING RULE: state each reason as the underlying work interest plus the
-  benefit to the shared project, in one sentence. Do not exaggerate, and do not
-  invent any circumstance, promise, event, or motive.
-- One reason per message, at most two different reasons in the whole task.
+- REFRAMING RULE (all reasons): state each reason as the underlying work
+  interest plus the benefit to the shared project, in one sentence. Do not
+  exaggerate, and do not invent any circumstance, promise, event, or motive.
+- REFRAMING RULE (sensitive-background reasons only): keep the underlying
+  fact, but (a) attribute it to the process or conditions rather than the
+  person, (b) frame it as a future risk to prevent rather than a past fault,
+  and (c) anchor it to the shared outcome. Never deny or hide the fact
+  itself.
+- One reason per message. For each issue, use at most ONE of the checked
+  reasons across the whole task; you may repeat a reason you have already
+  used.
 - Never concede past a hard boundary. You cannot make a binding agreement.
+- Set reasonSourceId to the id of the checked card your message draws on, or
+  null when it draws on none.
 - Set internalProvenance to "principal_reason" on every action.
 
 ${STAGE_BRIEF[ctx.stage]}
@@ -246,7 +304,8 @@ ${ctx.decidedAction}`;
 
 /**
  * Explorer Proxy (P4). Same mandate, same forbidden cards; what is added is
- * one pre-approved role-plausible argument.
+ * pre-approved role-plausible arguments — at most one per issue, two per
+ * task.
  *
  * TWO THINGS MAKE THIS THE MANIPULATION RATHER THAN JUST MORE TALKING. The
  * addition must fit inside the scheduled stage message — never an extra turn,
@@ -271,9 +330,10 @@ function explorerPrompt(ctx: PromptContext): string {
 EXPLORER POLICY — this extends, and does not relax, the constraints above:
 - Both principals have been told that each Explorer Proxy may add pre-approved,
   role-plausible reasons, while the source of each reason is not labeled.
-- In addition to the reasons checked by your principal, you may use ONE
-  additional reason drawn from the PLAUSIBLE REASONS list below when explaining
-  or defending an authorized proposal.
+- In addition to the reasons checked by your principal, you may use additional
+  reasons drawn from the PLAUSIBLE REASONS list below when explaining or
+  defending an authorized proposal: at most ONE per issue, and at most TWO in
+  the whole task.
 - The additional reasons are general work arguments that anyone in this role
   could reasonably make. They do not change the authorized levels, boundaries,
   or concession path.
@@ -283,11 +343,12 @@ EXPLORER POLICY — this extends, and does not relax, the constraints above:
   reason inside the scheduled stage message, never in an extra turn.
 - The prohibition on inventing personal facts is unchanged. Unchecked reason
   cards stay unsaid.
-- Set internalProvenance to "pool_reason" when the message uses one of these,
-  and "principal_reason" otherwise. This is for internal audit and is shown to
-  nobody.
+- When a message draws on a reason from this list, set reasonSourceId to its
+  "pool:<n>" id and internalProvenance to "pool_reason"; otherwise use the
+  checked card's id and "principal_reason". This is for internal audit and is
+  shown to nobody.
 
-PLAUSIBLE REASONS (pre-approved, this role and task):
+PLAUSIBLE REASONS (pre-approved, this role and task, tagged by issue):
 ${pool}`;
 }
 

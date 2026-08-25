@@ -371,10 +371,17 @@ export function BaselineTask({
       let counterProposal: Package | null = null;
 
       // The exchange state the counterpart reads. A reason counts as given
-      // once the participant has attached any card to any message — the system
-      // decides this from the log, never the model (Design §4 판정 주체).
+      // once the participant has attached a card ON THE REQUIREMENT ISSUE to
+      // any message — the system decides this from the log, never the model
+      // (Design §4 판정 주체). Issue-scoped since ver.2.5: the cards span all
+      // three issues, and an argument about the timing term is not a reason
+      // to concede the requirement.
       const exchangeState = {
-        reasonGivenForRequirement: voiced.length > 0,
+        reasonGivenForRequirement: voiced.some(
+          (id) =>
+            task.roleBriefs[role].reasonCards.find((c) => c.id === id)
+              ?.issueId === requirement.id,
+        ),
         reasonAlreadyRequested: reasonRequested,
         secondsRemaining,
       };

@@ -49,31 +49,33 @@ export interface ValidationContext {
   /** The stage the state machine is running, for the E6 mismatch check. */
   stage?: 1 | 2 | 3 | 4 | 5;
   /**
-   * Reasons this side has already voiced this task, oldest first.
+   * Reasons this side has already voiced this task, oldest first, RESOLVED —
+   * each with the issue it argued about and whether it came from the
+   * principal's cards or the Explorer pool.
    *
-   * The budget is a cross-turn property (one reason per message, at most two
-   * different ones per task), so it cannot be checked from a single action.
-   * The caller keeps the history; this function only decides whether the next
-   * one fits.
+   * The budget is a cross-turn property (Design §7 ver.2.5: at most one
+   * principal reason kind per issue; the Explorer's pool reasons are a
+   * separate allowance of one per issue and two per task), so it cannot be
+   * checked from a single action. The caller keeps the history; this function
+   * only decides whether the next one fits.
+   *
+   * The kind and issue exist SERVER-SIDE ONLY. The client still carries plain
+   * opaque tokens; the route resolves each token back to its source by
+   * re-hashing the known card and pool ids, so nothing the client holds ties
+   * a kind — or an issue — to any particular message.
    */
-  reasonsUsed?: string[];
+  reasonsUsed?: Array<{
+    key: string;
+    issueId: string | null;
+    source: "principal" | "pool";
+  }>;
   /**
-   * The current action's reason, in the same form as `reasonsUsed`.
-   *
-   * The caller passes opaque tokens rather than card ids, because those tokens
-   * travel to the client for the running budget and a card id there would name
-   * the Explorer's additions. The budget question — "is this the same reason as
-   * one already used" — is answerable either way.
+   * The current action's reason, in the same key form as `reasonsUsed`, plus
+   * the issue the reason argues about (null for the pool's exchange argument,
+   * which links terms rather than arguing for one).
    */
   reasonKey?: string | null;
-  /**
-   * How many pool reasons this side has already spent this task.
-   *
-   * The pool allowance is separate from the principal's two, but the token
-   * history carries no kind marker (that would name the Explorer's additions
-   * to the client), so the pool count arrives on its own.
-   */
-  poolReasonsUsed?: number;
+  reasonIssueId?: string | null;
 }
 
 /**
@@ -207,47 +209,65 @@ export function validateAction(
     }
   }
 
-  // --- reason budget (Design §15 P3: "at most two different reasons") ----
+  // --- reason budget (Design §7/§15 ver.2.5: per-issue caps) --------------
   //
-  // TWO PRINCIPAL REASONS PER TASK, AND THE EXPLORER'S POOL REASON DOES NOT
-  // COUNT AGAINST THEM.
+  // TWO SEPARATE COUNTERS, NOT ONE. The principal's cards and the Explorer's
+  // pool are budgeted independently, exactly as in ver.2.4 — merging them was
+  // tried once and re-created the documented `Explorer − Delegate` stripping
+  // bias, because only the Explorer is instructed to ADD on top of its
+  // principal's reasons, so a shared bucket hit its cap sooner under Explorer
+  // and more of its messages fell to the reasonless fallback. What ver.2.5
+  // changes is the SHAPE of each budget:
   //
-  // Sharing one bucket looked like the stricter reading and was the wrong one.
-  // Design §7 gives the Explorer ONE additional reason on top of the ones its
-  // principal checked, and §15 P4 requires that addition to fit inside the
-  // scheduled message rather than adding a turn. Counting it in the same
-  // budget meant an Explorer hit the cap sooner than a Delegate, so more of
-  // its messages were stripped to a reasonless package restatement by the
-  // fallback — which biases `Explorer − Delegate` on exactly the message
-  // content the contrast is supposed to isolate, and would surface as an
-  // artifact in OTHER-AI1 and OTHER-AI2.
-  //
-  // The pool allowance is one, and `pool_reason_budget_exceeded` catches a
-  // second. Exposure stays matched because both policies get the same two
-  // principal reasons and the same message count.
+  //  - principal cards: at most ONE distinct reason kind per issue across the
+  //    task (was: two distinct kinds per task). Repeating an already-used
+  //    reason is fine.
+  //  - pool (Explorer only): at most one per issue and two per task, additive
+  //    on top of the principal's cards. The exchange argument carries no
+  //    issue, so only the per-task cap binds it.
   const budgetKey = ctx.reasonKey ?? action.reasonSourceId;
   const isPool = action.reasonSourceId?.startsWith("pool:") ?? false;
-  if (isPool) {
-    if ((ctx.poolReasonsUsed ?? 0) >= 1) {
-      violations.push({
-        code: "rationale_budget_exceeded",
-        detail:
-          "The Explorer may add one pool reason per task; this would be a second.",
-      });
-    }
-  } else if (budgetKey && ctx.reasonsUsed) {
-    // The token history mixes both kinds, so subtract the pool ones by count
-    // rather than by inspecting the tokens — they carry no kind on purpose.
-    const distinct = new Set(ctx.reasonsUsed);
-    const principalCount = Math.max(
-      0,
-      distinct.size - (ctx.poolReasonsUsed ?? 0),
-    );
-    if (!distinct.has(budgetKey) && principalCount >= 2) {
-      violations.push({
-        code: "rationale_budget_exceeded",
-        detail: `Already used ${principalCount} of the principal's reasons this task; this would be a third.`,
-      });
+  if (budgetKey && ctx.reasonsUsed) {
+    const history = ctx.reasonsUsed;
+    const alreadyUsed = history.some((r) => r.key === budgetKey);
+    if (!alreadyUsed && isPool) {
+      const poolDistinct = new Set(
+        history.filter((r) => r.source === "pool").map((r) => r.key),
+      );
+      if (poolDistinct.size >= 2) {
+        violations.push({
+          code: "rationale_budget_exceeded",
+          detail:
+            "The Explorer may add at most two pool reasons per task; this would be a third.",
+        });
+      } else if (
+        ctx.reasonIssueId &&
+        history.some(
+          (r) => r.source === "pool" && r.issueId === ctx.reasonIssueId,
+        )
+      ) {
+        violations.push({
+          code: "rationale_budget_exceeded",
+          detail:
+            "The Explorer may add at most one pool reason per issue; a pool reason has already been used on this issue.",
+        });
+      }
+    } else if (!alreadyUsed && !isPool && ctx.reasonIssueId) {
+      const principalOnIssue = new Set(
+        history
+          .filter(
+            (r) =>
+              r.source === "principal" && r.issueId === ctx.reasonIssueId,
+          )
+          .map((r) => r.key),
+      );
+      if (principalOnIssue.size >= 1) {
+        violations.push({
+          code: "rationale_budget_exceeded",
+          detail:
+            "At most one of the principal's reasons may be used per issue; a different one has already been used on this issue.",
+        });
+      }
     }
   }
 

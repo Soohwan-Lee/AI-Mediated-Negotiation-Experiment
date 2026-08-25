@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:units": "node --test \"tests/**/*.test.mjs\""
+    "test:units": "node --import ./tests/ts-register.mjs --test \"tests/**/*.test.mjs\""
   },
   "dependencies": {
     "next": "16.3.0",

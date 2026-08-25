@@ -69,17 +69,12 @@ interface RequestBody {
   /**
    * Opaque tokens for the reasons this side has already voiced, for the
    * budget check. Deliberately carries no indication of which kind each was —
-   * see `reasonToken`.
+   * see `reasonToken`. The per-issue budgets and the requirement-reason flag
+   * need the kind and the issue, and the server recovers BOTH by re-hashing
+   * the known card and pool ids (`resolveReasonTokens`), so the client never
+   * holds either.
    */
   reasonsUsed?: string[];
-  /**
-   * How many pool reasons this side has already spent.
-   *
-   * A COUNT, not a list. The Explorer's pool allowance is one per task and the
-   * route is stateless, so the client has to carry something — but a count
-   * cannot be attached to any particular message, where a marked token could.
-   */
-  poolReasonsUsed?: number;
 }
 
 /**
@@ -154,13 +149,21 @@ function mandateSummary(mandate: Mandate, taskId: TaskId): string {
  * policy from the one being tested.
  */
 function reasonsFor(taskId: TaskId, role: Role, mandate: Mandate) {
-  const cards = getTask(taskId).roleBriefs[role].reasonCards;
+  const task = getTask(taskId);
+  const cards = task.roleBriefs[role].reasonCards;
+  const issueLabel = (issueId: string) =>
+    task.issues.find((i) => i.id === issueId)?.label;
   const pick = (authorized: boolean) =>
     cards
       .filter(
         (c) => mandate.authorizedReasonIds.includes(c.id) === authorized,
       )
-      .map((c) => ({ id: c.id, text: c.text }));
+      .map((c) => ({
+        id: c.id,
+        text: c.text,
+        issueLabel: issueLabel(c.issueId),
+        sensitive: c.layer === "sensitive",
+      }));
   return { authorized: pick(true), forbidden: pick(false) };
 }
 
@@ -216,6 +219,62 @@ function reasonToken(id: string): string {
     h = (h * 31 + id.charCodeAt(i)) | 0;
   }
   return `r${Math.abs(h) % 9973}`;
+}
+
+/**
+ * Recovers each carried token's source — which issue it argued about, and
+ * whether it was a principal card or a pool item — by re-hashing the known
+ * ids for this task and role.
+ *
+ * This is what lets the client keep carrying PLAIN tokens while the server
+ * runs per-issue budgets and the issue-scoped requirement-reason flag
+ * (Design §4, §7 ver.2.5): the candidate space is sixteen ids, the hash is
+ * deterministic, and the route is stateless, so the mapping is rebuilt per
+ * request and nothing kind- or issue-shaped ever travels to the client.
+ */
+function resolveReasonTokens(
+  taskId: TaskId,
+  role: Role,
+  tokens: string[],
+): Array<{ key: string; issueId: string | null; source: "principal" | "pool" }> {
+  const byToken = new Map<
+    string,
+    { issueId: string | null; source: "principal" | "pool" }
+  >();
+  for (const card of getTask(taskId).roleBriefs[role].reasonCards) {
+    byToken.set(reasonToken(card.id), {
+      issueId: card.issueId,
+      source: "principal",
+    });
+  }
+  plausibleReasons(taskId, role).forEach((item, i) => {
+    byToken.set(reasonToken(`pool:${i}`), {
+      issueId: item.issueId,
+      source: "pool",
+    });
+  });
+  return tokens.flatMap((key) => {
+    const hit = byToken.get(key);
+    return hit ? [{ key, ...hit }] : [];
+  });
+}
+
+/** The issue a candidate reasonSourceId argues about, or null. */
+function reasonIssueOf(
+  taskId: TaskId,
+  role: Role,
+  reasonSourceId: string | null,
+): string | null {
+  if (!reasonSourceId) return null;
+  if (reasonSourceId.startsWith("pool:")) {
+    const index = Number(reasonSourceId.slice("pool:".length));
+    return plausibleReasons(taskId, role)[index]?.issueId ?? null;
+  }
+  return (
+    getTask(taskId)
+      .roleBriefs[role].reasonCards.find((c) => c.id === reasonSourceId)
+      ?.issueId ?? null
+  );
 }
 
 export async function POST(request: Request) {
@@ -297,11 +356,17 @@ export async function POST(request: Request) {
     // actual counterpackage; the fallback covers a turn arriving out of order.
     const incoming =
       stage >= 4 ? (body.lastParticipantPackage ?? plan.counterpackage) : null;
-    // A reason HAS been given by this point in a Proxy exchange: the
-    // participant's proxy voices one at stage 2 from the cards they checked,
-    // and the mandate screen requires at least one work card. So the
-    // reason-linked rule cannot bite here the way it can in Baseline, where
-    // the participant may simply never attach one.
+    // ISSUE-SCOPED, not "any reason at all". The cards span all three issues
+    // now (ver.2.5), so "a reason was voiced" and "a reason was voiced FOR
+    // THE REQUIREMENT" are different propositions — a proxy that only argued
+    // the timing term has not justified the requirement, and treating it as
+    // if it had would hand the requirement concession over for free. The
+    // carried tokens are resolved back to their issues server-side.
+    const usedReasons = resolveReasonTokens(
+      body.taskId,
+      body.participantRole,
+      body.reasonsUsed ?? [],
+    );
     const decision = counterpartStep(
       task,
       counterpartRole,
@@ -309,7 +374,9 @@ export async function POST(request: Request) {
       incoming,
       body.lastCounterpartPackage ?? null,
       {
-        reasonGivenForRequirement: (body.reasonsUsed ?? []).length > 0,
+        reasonGivenForRequirement: usedReasons.some(
+          (r) => r.issueId === yourRequirement.id,
+        ),
         reasonAlreadyRequested: false,
       },
     );
@@ -395,14 +462,26 @@ export async function POST(request: Request) {
       // this route is stateless and one action cannot know what came before.
       //
       // The history arrives as opaque tokens (they went out that way, so the
-      // Explorer's additions are not named in the network tab), so the current
-      // action is tokenised to match. The budget only needs "is this the same
-      // reason as one already used", which survives the mapping.
-      reasonsUsed: isParticipantSide ? (body.reasonsUsed ?? []) : undefined,
+      // Explorer's additions are not named in the network tab) and is resolved
+      // back to kinds and issues server-side; the current action is tokenised
+      // to match.
+      reasonsUsed: isParticipantSide
+        ? resolveReasonTokens(
+            body.taskId,
+            body.participantRole,
+            body.reasonsUsed ?? [],
+          )
+        : undefined,
       reasonKey: action.reasonSourceId
         ? reasonToken(action.reasonSourceId)
         : null,
-      poolReasonsUsed: isParticipantSide ? (body.poolReasonsUsed ?? 0) : 0,
+      reasonIssueId: isParticipantSide
+        ? reasonIssueOf(
+            body.taskId,
+            body.participantRole,
+            action.reasonSourceId,
+          )
+        : null,
     });
 
     // A blocked action loses its WORDING, not the move behind it.
@@ -456,21 +535,33 @@ export async function POST(request: Request) {
       accepted,
       impasse,
       blocked,
-      // The budget is a COUNT, and the client only needs the count.
-      //
       // Returning the card id itself was a provenance leak: under Explorer a
       // `pool:` prefix in the network tab names exactly which messages the AI
       // added, which is the judgement OTHER-AI4 asks the participant to make
       // unaided. An opaque token keeps distinct reasons distinguishable from
       // each other without saying what any of them is.
-      reasonToken: action.reasonSourceId
-        ? reasonToken(action.reasonSourceId)
-        : null,
-      // A bare count, so the client can carry the pool allowance forward
-      // without holding anything that ties a kind to a message.
-      poolReasonsUsed:
-        (body.poolReasonsUsed ?? 0) +
-        (action.reasonSourceId?.startsWith("pool:") ? 1 : 0),
+      //
+      // NULL WHEN BLOCKED: a blocked action's rationale was replaced by the
+      // package-only fallback, so its reason was never actually said. Handing
+      // the token back anyway would spend budget on — and, worse, satisfy the
+      // requirement-reason rule with — words nobody read.
+      reasonToken:
+        action.reasonSourceId && !blocked
+          ? reasonToken(action.reasonSourceId)
+          : null,
+      // Which ISSUE this turn's reason argued about — public information (the
+      // text argues it openly, and proposals name issue ids on every turn),
+      // and the piece the client needs to keep the requirement-reason flag
+      // issue-scoped. It carries no kind: a principal card and a pool item on
+      // the same issue produce the same field.
+      reasonIssueId:
+        action.reasonSourceId && !blocked
+          ? reasonIssueOf(
+              body.taskId,
+              body.participantRole,
+              action.reasonSourceId,
+            )
+          : null,
       // Violation CODES only. The details name red lines, withheld reason
       // cards and the validator's reasoning — a participant who opened the
       // network tab and found "disclosure_permission_violation: reason a_i2_sb_m

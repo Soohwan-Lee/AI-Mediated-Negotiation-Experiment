@@ -1056,6 +1056,16 @@ export function DirectNegotiation({
       : voicedReasonIds;
     setVoicedReasonIds(voiced);
     setAttachedReasonId(null);
+    // ISSUE-SCOPED (ver.2.5): the cards span all three issues, so only a
+    // reason attached ON THE REQUIREMENT ISSUE justifies the requirement —
+    // an argument about the timing term is not a reason to concede this one.
+    const requirementReasonGiven =
+      reasonAlreadyVoiced ||
+      voiced.some(
+        (id) =>
+          task.roleBriefs[role].reasonCards.find((c) => c.id === id)
+            ?.issueId === requirement.id,
+      );
 
     logEvent(
       "message_sent",
@@ -1099,11 +1109,11 @@ export function DirectNegotiation({
         offer,
         lastCounterpartPackage,
         {
-          // Either the proxy voiced a reason on the participant's behalf, or
-          // the participant has attached one themselves since taking over.
-          // Both count, and the ReasonPicker below is a real control because
-          // of it.
-          reasonGivenForRequirement: reasonAlreadyVoiced || voiced.length > 0,
+          // Either the proxy voiced a requirement-issue reason on the
+          // participant's behalf, or the participant has attached one
+          // themselves since taking over. Both count, and the ReasonPicker
+          // below is a real control because of it.
+          reasonGivenForRequirement: requirementReasonGiven,
           reasonAlreadyRequested: reasonRequested,
           secondsRemaining,
         },
@@ -1124,7 +1134,7 @@ export function DirectNegotiation({
             stage: stageNow,
             incoming: offer,
             lastCounterpartPackage,
-            reasonGiven: reasonAlreadyVoiced || voiced.length > 0,
+            reasonGiven: requirementReasonGiven,
             reasonAlreadyRequested: reasonRequested,
             secondsRemaining,
             afterProxy: true,
