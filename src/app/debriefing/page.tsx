@@ -96,18 +96,22 @@ export default function DebriefingPage() {
           </p>
 
           <h2>💵 The reward decision was part of the scenario only</h2>
+          {/* The Member is never shown a bonus figure during the study, so
+              there is no number to explain away — but they DID wait twice
+              while "the Leader decided", and that screen implies a decision
+              was made about them. Saying plainly that none was is the whole
+              disclosure. */}
           {isMember ? (
             <p>
-              After each task you were shown a bonus presented as the
-              Leader&apos;s judgment of how you had handled it.{" "}
+              After each task you waited while the other side decided a bonus
+              for you.{" "}
               <strong>
-                Those decisions were not made by any person, and they did not
-                depend on anything you did.
+                No such decision was ever made about you, by anyone — there was
+                no other participant to make one.
               </strong>{" "}
-              Every Member saw the same number after both tasks. It has no
-              effect whatsoever on your payment — you will receive the full
-              amount advertised on Prolific, exactly as described in the consent
-              form, and the bonus is paid in full.
+              Nothing you did in either task affected your payment. You will
+              receive the full amount advertised on Prolific, exactly as
+              described in the consent form, and the bonus is paid in full.
             </p>
           ) : (
             <p>

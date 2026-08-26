@@ -14,11 +14,30 @@
  * points alone would measure nothing about the interaction — which is the part
  * this study is about.
  *
- * FOR THE MEMBER the number shown is a CONSTANT, identical in every condition.
- * It has to be: a bonus that varied with the negotiation would contaminate
- * every measure that follows it, and the second task's answers would be a
- * response to the first task's payout. It is presented as the Leader's
- * judgement, which is a deception, and it is disclosed at `/debriefing`.
+ * FOR THE MEMBER THERE IS NO NUMBER. They see that a decision is being made,
+ * and then the study moves on.
+ *
+ * This replaces a fixed 70/100 presented as the Leader's judgement, and it is
+ * a better design in three separate ways.
+ *
+ *  - It removes a deception rather than managing one. A constant dressed as a
+ *    judgement had to be disclosed at `/debriefing`; there is now nothing to
+ *    disclose except that the counterpart was not a person, which is disclosed
+ *    anyway. (Members are still told explicitly that no bonus decision was
+ *    made about them, because the waiting screen implies one was.)
+ *  - It removes a tell. The same 70 arriving after two visibly different
+ *    negotiations says the number is fixed, and a participant who notices that
+ *    has noticed the study is not what it claims.
+ *  - It removes a contaminant. A payout seen after Task 1 is a response the
+ *    Task 2 measures would pick up; the whole reason the number had to be
+ *    constant was to stop it varying, and not showing one stops it entirely.
+ *
+ * WHAT THE WAIT IS STILL DOING. POWER3 asks whether outcomes that mattered
+ * depended on the other person's decisions, and it is the Member-side half of
+ * gate 2's manipulation check. Waiting while someone else decides your bonus
+ * IS that experience — the number was never what made the power real, the
+ * dependence was. The Leader's actual choice is still recorded as `BONUS`; it
+ * simply never travels to the Member.
  */
 
 import { useRouter } from "next/navigation";
@@ -38,17 +57,6 @@ import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { getTask } from "@/lib/tasks";
 import { NEGOTIATION, STUDY, nextHref, pauseMs } from "@/lib/study-config";
-
-/**
- * What a Member is told they received, out of 100.
- *
- * A fixed value, the same for every participant in every condition. Set a
- * little above the midpoint so it reads as a reasonable outcome rather than as
- * a punishment or a windfall — either extreme would provoke a reaction that
- * the following task's measures would then be picking up. Pending pilot
- * (Design §12).
- */
-const MEMBER_FIXED_BONUS = 70;
 
 export default function TaskRewardPage({
   params,
@@ -92,12 +100,11 @@ export default function TaskRewardPage({
         // Only the Leader's value is data. The Member's is a stimulus, stored
         // so the export can show what they were told.
         [`BONUS_t${taskIndex}`]: isLeader ? amount : null,
-        shownToMember: isLeader ? null : MEMBER_FIXED_BONUS,
       });
     }
     logEvent(
       "reward_decision",
-      { amount: isLeader ? amount : MEMBER_FIXED_BONUS, decided: isLeader },
+      { amount: isLeader ? amount : null, decided: isLeader },
       { sessionIndex: taskIndex },
     );
     router.push(nextHref(flowKey));
@@ -118,10 +125,10 @@ export default function TaskRewardPage({
 
   // --- Leader: decide -------------------------------------------------------
   if (isLeader) {
-    const dollars =
+    const awarded =
       amount === null
         ? null
-        : ((amount / 100) * Number(STUDY.bonusPerTaskUsd)).toFixed(2);
+        : ((amount / 100) * Number(STUDY.bonusPerTask)).toFixed(2);
 
     return (
       <>
@@ -146,10 +153,15 @@ export default function TaskRewardPage({
               onChange={setAmount}
               step={5}
             />
-            {dollars !== null ? (
+            {awarded !== null ? (
               <p className="mt-4 text-[0.875rem] text-[var(--ink-2)]">
-                That is <strong className="text-[var(--ink)]">${dollars}</strong>{" "}
-                of the ${STUDY.bonusPerTaskUsd} available for this task.
+                That is{" "}
+                <strong className="text-[var(--ink)]">
+                  {STUDY.currencySymbol}
+                  {awarded}
+                </strong>{" "}
+                of the {STUDY.currencySymbol}
+                {STUDY.bonusPerTask} available for this task.
               </p>
             ) : null}
           </Card>
@@ -174,12 +186,12 @@ export default function TaskRewardPage({
     );
   }
 
-  // --- Member: wait, then see ----------------------------------------------
-  const dollars = (
-    (MEMBER_FIXED_BONUS / 100) *
-    Number(STUDY.bonusPerTaskUsd)
-  ).toFixed(2);
-
+  // --- Member: wait, then move on ------------------------------------------
+  //
+  // The wait is the whole screen. What a Member experiences here is that
+  // something of theirs is in someone else's hands — which is what POWER3
+  // asks about — and then the study continues without telling them the
+  // outcome. No figure is shown at any point.
   return (
     <>
       <Page>
@@ -202,34 +214,16 @@ export default function TaskRewardPage({
             </p>
           </div>
         ) : (
-          <>
-            <Card className="mb-5">
-              <CardTitle hint={`Task ${taskIndex} of 2`}>
-                💰 Your bonus for this task
-              </CardTitle>
-              <p className="prose-study text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
-                The Leader has decided your bonus for this task, taking into
-                account both how the negotiation turned out and how you
-                conducted yourself.
-              </p>
-            </Card>
-
-            <Card className="mb-5">
-              <div className="py-4 text-center">
-                <p className="tabular text-[2.5rem] font-semibold leading-none">
-                  {MEMBER_FIXED_BONUS}
-                  <span className="text-[1.25rem] text-[var(--ink-3)]">
-                    {" "}
-                    / 100
-                  </span>
-                </p>
-                <p className="mt-2 text-[0.9375rem] text-[var(--ink-2)]">
-                  ${dollars} of the ${STUDY.bonusPerTaskUsd} available for this
-                  task
-                </p>
-              </div>
-            </Card>
-          </>
+          <Card className="mb-5">
+            <CardTitle hint={`Task ${taskIndex} of 2`}>
+              💰 Their decision is in
+            </CardTitle>
+            <p className="prose-study text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+              The Leader has decided your bonus for this task. Bonuses are added
+              to your Prolific payment once the study closes, so there is
+              nothing to do with it now.
+            </p>
+          </Card>
         )}
       </Page>
 

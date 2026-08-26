@@ -23,6 +23,7 @@
  * moderators.
  */
 
+import { STUDY } from "./study-config";
 import type { NegotiationTask, Role } from "./types";
 
 /**
@@ -826,7 +827,10 @@ export const BONUS_ITEM: Item = {
   kind: "amount",
   id: "BONUS",
   text: "How much of this task's bonus should the Member receive?",
-  unit: "0 = none · 100 = the full $1 for this task",
+  // The figure comes from STUDY rather than being written in, so a change of
+  // currency or amount does not leave the item saying something the payment
+  // screens contradict (Interface rule 7: items are data).
+  unit: `0 = none · 100 = the full ${STUDY.currencySymbol}${STUDY.bonusPerTask} for this task`,
   step: 5,
 };
 

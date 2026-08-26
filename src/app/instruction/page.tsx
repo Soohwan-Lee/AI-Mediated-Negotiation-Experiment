@@ -415,17 +415,24 @@ export default function InstructionPage() {
             {isLeader ? (
               <p>
                 As the Leader, you decide the other participant&apos;s bonus for
-                that task — up to ${STUDY.bonusPerTaskUsd} each time, $
-                {STUDY.bonusTotalUsd} across both. You are asked to weigh up
-                both how the negotiation turned out and how they conducted
+                that task — up to {STUDY.currencySymbol}
+                {STUDY.bonusPerTask} each time, {STUDY.currencySymbol}
+                {STUDY.bonusTotal} across both. You are asked to weigh up both
+                how the negotiation turned out and how they conducted
                 themselves.
               </p>
             ) : (
+              /* WHAT THIS MAY NOT PROMISE. It used to say the Leader decides
+                 "your bonus … up to £1 each time", and then the Member was
+                 shown a number. They are no longer shown one at all, so a
+                 figure here would be a consent-time promise the study does
+                 not keep. It says what is true: the decision happens, and it
+                 reaches them through their Prolific payment. */
               <p>
-                The Leader decides your bonus for that task — up to $
-                {STUDY.bonusPerTaskUsd} each time, ${STUDY.bonusTotalUsd} across
-                both. They are asked to weigh up both how the negotiation turned
-                out and how you conducted yourself.
+                The Leader decides a bonus for you after each task, weighing up
+                both how the negotiation turned out and how you conducted
+                yourself. Any bonus is paid with your Prolific payment once the
+                study closes.
               </p>
             )}
           </Callout>

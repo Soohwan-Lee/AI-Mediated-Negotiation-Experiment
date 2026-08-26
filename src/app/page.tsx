@@ -105,8 +105,8 @@ export default function ConsentPage() {
         <Card className="mb-5" tone="muted">
           <dl className="grid grid-cols-3 gap-4">
             <Fact icon={<ClockIcon />} label="Takes about" value={`${STUDY.estimatedMinutes} min`} />
-            <Fact icon={<CoinIcon />} label="You are paid" value={`$${STUDY.compensationUsd}`} />
-            <Fact icon={<RateIcon />} label="Equivalent to" value={`$${STUDY.hourlyEquivalentUsd}/hr`} />
+            <Fact icon={<CoinIcon />} label="You are paid" value={`${STUDY.currencySymbol}${STUDY.compensation}`} />
+            <Fact icon={<RateIcon />} label="Equivalent to" value={`${STUDY.currencySymbol}${STUDY.hourlyEquivalent}/hr`} />
           </dl>
         </Card>
 

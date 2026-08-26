@@ -11,15 +11,28 @@ export const STUDY = {
   shortTitle: "Workplace Negotiation Study",
   /** Shown on the consent page. Design §2: "약 1시간 기준". */
   estimatedMinutes: 55,
-  compensationUsd: "9.00", // TBD after pilot; must clear Prolific fair rate
-  hourlyEquivalentUsd: "9.80",
   /**
-   * The performance bonus (Design §2, §8). Up to $1 per task, $2 across both.
-   * For a Leader this is the amount they are deciding; for a Member it is what
-   * they can receive.
+   * Payment, in GBP because that is the currency Prolific pays in — quoting
+   * dollars to a worker who is paid pounds advertises a figure the study does
+   * not pay. The symbol is a field rather than a literal in the copy, so a
+   * currency change stays one edit and cannot leave one screen behind.
+   *
+   * Working values, TBD after pilot; must clear Prolific's fair-pay rate.
    */
-  bonusPerTaskUsd: "1.00",
-  bonusTotalUsd: "2.00",
+  currencySymbol: "£",
+  compensation: "7.50",
+  hourlyEquivalent: "8.20",
+  /**
+   * The performance bonus (Design §2, §8). Up to £1 per task, £2 across both.
+   *
+   * FOR A LEADER this is the budget they are dividing — the slider sets how
+   * much of that task's £1 the Member receives, and the choice is a
+   * behavioural outcome (`BONUS`).
+   *
+   * A MEMBER IS NEVER SHOWN A NUMBER. See the reward page for why.
+   */
+  bonusPerTask: "1.00",
+  bonusTotal: "2.00",
   irb: {
     protocolNumber: "TBD-IRB-0000",
     institution: "UNIST",
