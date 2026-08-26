@@ -24,3 +24,19 @@ screen does. The counterpart is never given a name.
 These are IDEAL trajectories — the logroll lands, both requirements hold, the
 counterpart accepts at stage 4. They are for reading the flow, not for
 exercising the failure branches.
+
+## The annotated visualisation
+
+`viz/reason-to-speech-en.html` and `viz/reason-to-speech-ko.html` take one
+Explorer run and mark it up: which clause of the proxy's utterance came from
+the participant's work reason, which from their sensitive background, and
+which the AI added from the pool — with the original card text and the
+transformation shown beneath each one. Rebuild with:
+
+    python3 scripts/build-transcript-viz.py
+
+Both languages are generated from one structure in that script, so the
+argument cannot drift between them. The colour coding exists ONLY in this
+document: on a participant's screen nothing distinguishes a pool argument
+from the participant's own reason, and that indistinguishability is the
+manipulation being tested.

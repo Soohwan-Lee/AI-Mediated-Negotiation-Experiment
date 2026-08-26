@@ -13,8 +13,8 @@
 
 **You**
 
-> i’ve reviewed it and can confirm the tentative package works for me: 4 reviews, 3 protected afternoons, and a Week 5 start.
+> reviewed it and i can agree to the tentative package: 4 quality reviews, 3 protected focus afternoons per week, and a Week 5 start.
 
 **Other Participant** · stage 4
 
-> thanks, that package works for me too: 4 reviews, 3 protected afternoons, and a Week 5 start.
+> thanks, that package works for me: 4 reviews, 3 protected afternoons, and a Week 5 start.

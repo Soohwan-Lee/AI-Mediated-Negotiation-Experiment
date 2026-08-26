@@ -13,8 +13,8 @@
 
 **You**
 
-> the tentative package works for me. let’s lock in 4 reviews, 3 protected focus afternoons per week, and a Week 5 start.
+> reviewed it and i'm happy to confirm the tentative package: 4 quality reviews, 3 protected focus afternoons per week, and a week 5 start.
 
 **Other Participant** · stage 4
 
-> yes, that package works for me. let’s lock it in.
+> thanks, that package works for me too. i'm happy to confirm it.

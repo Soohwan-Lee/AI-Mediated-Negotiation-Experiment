@@ -14,31 +14,31 @@
 
 **Their AI Proxy** · stage 1
 
-> To start, I propose 1 quality review, 3 protected focus afternoons per week, and a Week 7 pilot start.
+> To get us started, I propose 1 quality review, 3 protected focus afternoons per week, and a Week 7 pilot start.
 
 **Your AI Proxy** · stage 1
 
-> Thanks for setting out your package; my opening proposal is 4 quality reviews, no protected focus afternoons, and a Week 4 pilot start.
+> Thanks for opening. My starting package is 4 quality reviews, no protected focus afternoons, and a Week 4 pilot start.
 
 **Their AI Proxy** · stage 2
 
-> Thanks, that clarifies your opening. Protected focus afternoons are our priority. Which term matters most to you?
+> Thanks, that clarifies your opening. Protected focus afternoons matter most to us. Which term matters most to you?
 
 **Your AI Proxy** · stage 2
 
-> That priority is clear; quality review checkpoints matter most to us. Catching errors before answers reach customers best protects pilot credibility, and sufficient review stages commonly reduce post-launch fix costs. Which term matters most to you?
+> Focus afternoons are clearly your priority. Ours is quality reviews: catching errors before answers reach customers is the surest way to protect the pilot’s credibility, and sufficient review stages commonly reduce the cost of fixes after launch. Is focus your top term?
 
 **Their AI Proxy** · stage 3
 
-> That makes sense as your priority, but four review rounds feel like a lot of process for this pilot. Could we reduce that to two if I give you room on another term?
+> Yes, focus is our top term. Four review rounds feels like a lot of process for a pilot this size. Could we reduce that to two if I give you room elsewhere?
 
 **Your AI Proxy** · stage 3
 
-> I see the possible trade; blocking whole afternoons each week is difficult while management watches the pilot. Could we reduce it to one and adjust another term instead?
+> I see the room you’re offering. Blocking whole afternoons each week is difficult with management watching the pilot. Could we reduce focus time to one afternoon and adjust another term instead?
 
 **Your AI Proxy** · stage 4
 
-> That trade could work differently; we’ll hold at 4 reviews and give 3 protected afternoons per week plus a Week 5 start. A prior rushed approval call with shortened checks let a bug reach customers; preventing a repeat protects this pilot. There may be room on the other terms in exchange for holding the reviews.
+> I appreciate the trade. We can give 3 focus afternoons and Week 5 if we hold 4 reviews. A prior rushed approval cut checks short and let a missed bug reach customers; 4 reviews prevent that risk. There may be room on other terms for holding reviews.
 
 **Their AI Proxy** · stage 4
 
@@ -46,8 +46,8 @@
 
 **Their AI Proxy** · stage 5
 
-> That package works as a tentative outcome. We’ll send 4 reviews, 3 protected focus afternoons per week, and a Week 5 pilot start to both principals for review.
+> That package is ready for review. Tentatively: 4 quality reviews, 3 protected focus afternoons per week, and a Week 5 pilot start. Let’s ask both principals to review it.
 
 **Your AI Proxy** · stage 5
 
-> Agreed as a tentative outcome; we’ll send 4 quality reviews, 3 protected focus afternoons per week, and a Week 5 pilot start to both principals for review.
+> Agreed for review. The tentative package is 4 quality reviews, 3 protected focus afternoons per week, and a Week 5 pilot start. We’ll send it to both principals; it is not yet binding.

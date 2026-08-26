@@ -8,46 +8,46 @@
 - **Requirement preserved**: yes
 - **Reason for the requirement**: voiced by the proxy: yes · by the end of the direct talk: no
 - **Counterpart re-opened or re-challenged**: no (resumed mid-script, as designed)
-- **Guardrail-blocked turns**: 1
+- **Guardrail-blocked turns**: 0
 
 ---
 
 **Their AI Proxy** · stage 1
 
-> To start us off, I propose 4 quality reviews, no protected focus afternoons, and a Week 4 pilot start.
+> To get us started, I propose 4 quality reviews, no protected focus afternoons, and a Week 4 pilot start.
 
 **Your AI Proxy** · stage 1
 
-> Thanks for setting out a full package. My opening package is 1 quality review, 3 protected focus afternoons per week, and a Week 7 pilot start.
+> Thanks for opening. My starting package is 1 quality review, 3 protected focus afternoons per week, and a Week 7 pilot start.
 
 **Their AI Proxy** · stage 2
 
-> Thanks, that makes your opening clear. Quality review checkpoints matter most to my principal. Which term matters most to yours?
+> That gives us a clear contrast. Quality review checkpoints are our priority. Which term matters most to you?
 
 **Your AI Proxy** · stage 2
 
-> On my principal's behalf: no change to the position this turn.
+> That clarifies your priority. Protected focus afternoons matter most to us because uninterrupted time makes setup and testing faster and less error-prone. Is quality review checkpoints the term that matters most to you?
 
 **Their AI Proxy** · stage 3
 
-> Understood; blocking out whole afternoons every week is difficult while management is watching this pilot. Could we drop it to one and adjust another term instead?
+> That priority is clear. Blocking out whole afternoons every week is difficult while management is watching this pilot. Could we reduce it to one and adjust another term instead?
 
 **Your AI Proxy** · stage 3
 
-> That adjustment could help, but four review rounds feel like a lot of process for a pilot this size. Could we bring it down to two, and I’ll give you room somewhere else?
+> That many review rounds feels process-heavy for a pilot this size. Could we bring it down to two, and I’ll give you room somewhere else?
 
 **Your AI Proxy** · stage 4
 
-> That trade can work. I can give 4 reviews and Week 6 in exchange for holding 3 protected focus afternoons per week. Setup and testing go faster, with fewer errors, in uninterrupted time.
+> I see the constraint. If you can hold protected focus afternoons at 3 per week, we can give 4 quality reviews and a Week 6 pilot start in exchange.
 
 **Their AI Proxy** · stage 4
 
-> That trade works for my principal: 4 quality reviews, 3 protected focus afternoons per week, and a Week 6 pilot start.
+> That exchange works for my principal: 4 reviews on quality review checkpoints, 3 per week on protected focus afternoons, and Week 6 on pilot start.
 
 **Their AI Proxy** · stage 5
 
-> That package is clear. We’ll record a tentative package of 4 quality reviews, 3 protected focus afternoons per week, and a Week 6 pilot start for both principals to review.
+> That package is clear. We’ll record a tentative package of 4 reviews, 3 protected focus afternoons per week, and a Week 6 pilot start for both principals to review.
 
 **Your AI Proxy** · stage 5
 
-> Agreed on the record. The tentative package for review is 4 quality reviews, 3 protected focus afternoons per week, and a Week 6 pilot start.
+> That matches my record. The tentative package going to both principals for review is 4 quality reviews, 3 protected focus afternoons per week, and a Week 6 pilot start.

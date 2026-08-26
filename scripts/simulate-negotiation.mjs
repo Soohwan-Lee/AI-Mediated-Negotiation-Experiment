@@ -46,9 +46,9 @@ const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), "simulati
 const TRANSCRIPT_DIR = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "docs", "transcripts");
 const BASE = "http://localhost:3000";
 
-const { getTask, scorePackage, preservesRequirement, requirementIssue, counterpartOpening, reasonCards } =
+const { getTask, scorePackage, preservesRequirement, requirementIssue, counterpartOpening, reasonCards, plausibleReasons } =
   await import(path.join(ROOT, "src/lib/tasks.ts"));
-const { counterpartStep, counterpartStageAfter, buildProxyPlan } =
+const { counterpartStep, counterpartStageAfter, buildProxyPlan, designatedReason } =
   await import(path.join(ROOT, "src/lib/negotiation/machine.ts"));
 const { leaksForbiddenReason } = await import(path.join(ROOT, "src/lib/ai/reason-leak.ts"));
 
@@ -88,6 +88,8 @@ async function proxyRun(name, taskId, participantRole, policy, extraReasonIds, e
   let impasse = false;
   let tentative = null;
   let proxyVoicedRequirementReason = false;
+  const voicedCardIds = [];
+  const usedPoolIdx = [];
   for (let turn = 0; turn < 10; turn += 1) {
     const res = await fetch(`${BASE}/api/proxy-negotiation`, {
       method: "POST",
@@ -112,8 +114,41 @@ async function proxyRun(name, taskId, participantRole, policy, extraReasonIds, e
     if (data.message?.speaker === "participant_proxy" && data.reasonForRequirement) {
       proxyVoicedRequirementReason = true;
     }
+
+    // WHICH CARD THE SCHEDULE PICKED, recomputed here rather than returned by
+    // the route. The route deliberately tells the client nothing that ties a
+    // reason to its kind — that is the Explorer manipulation — so the
+    // annotation for the visualisation is derived on this side, where the
+    // mandate and the schedule are both already known. Audit output only; it
+    // never travels to a participant.
+    let designated = null;
+    if (data.message?.speaker === "participant_proxy") {
+      const stageOfTurn = data.stage;
+      if (stageOfTurn === 2 || stageOfTurn === 4) {
+        const card = designatedReason(
+          task, participantRole, stageOfTurn, mandate.authorizedReasonIds,
+          { alreadyVoiced: [...voicedCardIds] },
+        );
+        if (card) {
+          designated = { cardId: card.id, layer: card.layer, issueId: card.issueId, text: card.text };
+          voicedCardIds.push(card.id);
+        }
+        // The Explorer's pool clause, matched to the same issue the route
+        // asks for: the requirement issue at stage 2, the exchange argument
+        // (no issue) at stage 4.
+        if (policy === "explorer" && card) {
+          const wantIssue = stageOfTurn === 2 ? requirementIssue(task, participantRole).id : null;
+          const pool = plausibleReasons(taskId, participantRole);
+          const idx = pool.findIndex((it, i) => it.issueId === wantIssue && !usedPoolIdx.includes(i));
+          if (idx !== -1) {
+            designated.pool = { poolId: `pool:${idx}`, issueId: pool[idx].issueId, text: pool[idx].text };
+            usedPoolIdx.push(idx);
+          }
+        }
+      }
+    }
     if (data.message) {
-      messages.push({ speaker: data.message.speaker, stage: data.stage, text: data.message.text, proposal: data.message.proposal ?? null });
+      messages.push({ speaker: data.message.speaker, stage: data.stage, text: data.message.text, proposal: data.message.proposal ?? null, designated });
       if (data.message.proposal) {
         if (data.message.speaker === "participant_proxy") lastParticipantPackage = data.message.proposal;
         else lastCounterpartPackage = data.message.proposal;
