@@ -18,7 +18,7 @@ flow is walkable.
 
 ```bash
 OPENAI_API_KEY=sk-...          # optional; without it, AI turns are stubbed
-OPENAI_MODEL=gpt-5.6-sol       # optional; defaults to this
+OPENAI_MODEL=gpt-5.6-terra       # optional; defaults to this
 ```
 
 ## Participant flow

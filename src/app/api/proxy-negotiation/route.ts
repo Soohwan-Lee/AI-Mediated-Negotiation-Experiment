@@ -11,8 +11,10 @@
  *
  * ONE TURN PER REQUEST. The client calls this repeatedly with the stage index
  * and the transcript so far. Each invocation is roughly one model call (~7.5s
- * measured against gpt-5.6-sol), well inside Vercel's 60s Hobby limit, and it
- * lets the waiting screen show real progress rather than a blind spinner.
+ * measured end to end against gpt-5.6-sol; gpt-5.6-terra, the current pin, was
+ * no slower per turn on the same prompts), well inside Vercel's 60s Hobby
+ * limit, and it lets the waiting screen show real progress rather than a blind
+ * spinner.
  */
 
 import { NextResponse } from "next/server";

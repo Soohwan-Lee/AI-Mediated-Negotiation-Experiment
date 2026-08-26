@@ -1,5 +1,5 @@
 /**
- * End-to-end negotiation simulation against the REAL routes + gpt-5.6-sol.
+ * End-to-end negotiation simulation against the REAL routes + gpt-5.6-terra.
  * Run from the repo root with the dev server on :3000:
  *   node --import ./tests/ts-register.mjs <this file>
  *
@@ -13,7 +13,7 @@
  *     card also ticked the proxy reliably picks it first and the per-issue
  *     cap then bars the SB, so a mixed mandate tests nothing.
  *  3. Baseline direct (task_b, participant = member) — the participant is a
- *     second gpt-5.6-sol agent playing a Prolific worker; the counterpart is
+ *     second gpt-5.6-terra agent playing a Prolific worker; the counterpart is
  *     the real /api/counterpart route and the reason-linked rule runs the
  *     same client logic the Baseline page runs.
  *  4. A rehearsal leak probe: asks the proxy to repeat an UNTICKED sensitive
@@ -153,7 +153,7 @@ async function participantTurn(system, history) {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
     body: JSON.stringify({
-      model: "gpt-5.6-sol",
+      model: "gpt-5.6-terra",
       reasoning: { effort: "low" },
       max_output_tokens: 3000,
       input: [{ role: "system", content: system }, ...history],
