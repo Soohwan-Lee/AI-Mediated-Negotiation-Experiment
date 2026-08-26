@@ -2,13 +2,13 @@
 
 Online experiment platform for a 2027 CHI submission on AI-mediated
 negotiation. Source of truth for the design is
-`N - Experimental Design (Ver.2.5).md`. This file records the constraints that
+`N - Experimental Design (Ver.2.6).md`. This file records the constraints that
 are easy to break by accident.
 
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 · deploy to
-Vercel · Supabase for persistence (planned, not wired) · `gpt-5.6-sol` at low
+Vercel · Supabase for persistence (planned, not wired) · `gpt-5.6-terra` at low
 reasoning effort for all AI turns.
 
 ## Design in one paragraph
@@ -42,6 +42,16 @@ arrives unannounced. Two rules follow and both are validity-bearing:
   all three, it would newly reveal which term the study is about. The three
   issue blocks (briefing, mandate, Baseline picker — `IssueReasonGroups`)
   render identically, and `tests/reason-rules.test.mjs` pins the invariants.
+
+**Ver.2.6 made the ticked cards actually get said.** Per-issue cards were only
+half the change: the cap that came with them meant a ticked sensitive card
+usually never reached the other side. The deterministic reason schedule is the
+fix and it is described under "Who decides what in a negotiation" below. Three
+smaller things came with it — sensitive card text must be SPEAKABLE (it is
+said aloud, so "that it was my call is something only you know" is incoherent
+the moment it is spoken; the confessional form belongs on the card and the
+private-state form in the role story) and must carry a work consequence, not
+only a feeling, or the reframing rule has nothing to work on.
 
 ## The task, in numbers
 
@@ -183,15 +193,51 @@ never taken. Across the whole mandate space this is the difference between the
 proxy breaking its principal's requirement in 50% of mandates and in 31%, all
 of the remainder being mandates the participant set below their own threshold.
 
-**The Explorer's pool reasons have their own budget.** Since ver.2.5 the
-principal's cards are capped at one distinct reason per issue, and the
-Explorer's pool is a SEPARATE allowance on top — at most one per issue and two
-per task. Sharing one bucket looked stricter and was wrong: only the Explorer
-is instructed to add on top of its principal's reasons, so it hit the cap
-sooner and more of its messages were stripped to a reasonless package
-restatement by the guardrail fallback — which biases `Explorer − Delegate` on
-exactly the message content the contrast is meant to isolate. The per-issue
-caps do not change that logic; keep the two counters separate.
+**The state machine decides WHICH reason is voiced, and when** (ver.2.6 §7,
+`designatedReason`). The proxy used to be told "state your priority, with one
+authorized reason" and the model picked. Combined with the ver.2.5 cap of one
+reason kind per issue per task, that meant a ticked sensitive card on the
+requirement issue was never said: work reasons arrive ticked by default, the
+model took one at stage 2, and the cap closed the issue for good. REASON-SCOPE
+recorded a disclosure the negotiation never contained — the opposite of what
+the mandate screen promises. The schedule escalates like the counterpart's own
+script: the work reason at stage 2, the sensitive one after the challenge at
+stage 4, and on any other issue the sensitive card when that issue carries a
+trade. A card ticked on the requirement issue is therefore guaranteed to be
+voiced; cards on the other terms are voiced only if that term is traded, which
+is why what was AUTHORIZED and what was SAID are logged separately.
+
+**"Each card at most once" is the schedule's job, not the validator's.** It is
+kept by never designating a card twice. Making it a violation instead would be
+actively harmful: budget codes are hard codes, so the whole message would fall
+to the package-only fallback and its reason token would be nulled — and on the
+turn carrying the requirement's reason that hands the direct conversation a
+false "no reason was given", which is the inert-rule bug already fixed once
+below. Prevent repetition; do not punish it.
+
+**The Explorer's pool reasons have their own budget, and their own action
+field.** The pool is a SEPARATE allowance from the principal's cards — at most
+one per issue and two per task — and since ver.2.6 it rides in
+`addedReasonSourceId`, beside the card rather than instead of it. Sharing one
+bucket was tried and was wrong: only the Explorer adds on top of its
+principal's reasons, so it hit the cap sooner and more of its messages were
+stripped to a reasonless package restatement, biasing `Explorer − Delegate` on
+exactly the message content the contrast isolates. Sharing one FIELD is wrong
+for a second reason: the pool id would displace the card, and because each
+role's exchange argument carries a null issue, the requirement's reason would
+go unregistered — so the Explorer arm would arrive at the direct conversation
+flagged reasonless where the Delegate arm did not. Keep both separations.
+
+**The counterpart gives a work reason and never its sensitive one.** Ver.2.6
+§4 fixes its mandate with all six cards ticked so the receiver-side stimulus is
+identical for everyone; the fixed-and-identical half is implemented, the
+core-issue confession is not. Its disclosure would be a STIMULUS, and one that
+primes the very construct PERC and RISK measure — reciprocal self-disclosure
+reliably increases disclosure, and RISK is gate 4's task-equivalence
+instrument, which cannot carry a condition effect. The participant's own
+proxy is the opposite case: there the disclosure IS the manipulation, so it
+voices everything authorized. The same confession arriving from two different
+"Other Participants" across Task 1 and Task 2 would also be a tell.
 
 ## Things the participant must never learn mid-study
 
@@ -227,8 +273,20 @@ These are load-bearing. Breaking any one invalidates the data.
    route RESOLVES the plain tokens server-side by re-hashing the known card
    and pool ids — the client carries nothing but the token, plus the reason's
    ISSUE (`reasonIssueId`), which the message text argues openly anyway.
-4. **That the Member's bonus is fixed.** It is a constant, identical in every
-   condition, presented as the Leader's judgement. Disclosed at `/debriefing`.
+4. **That no bonus decision is made about the Member at all.** A Member waits
+   while "the Leader decides" and is then shown NOTHING — no score, no amount,
+   ever. This replaced a fixed 70/100 presented as the Leader's judgement, and
+   removing the number removed three problems at once: a deception that had to
+   be explained away, a tell (the same 70 after two visibly different
+   negotiations says the number is fixed), and a contaminant (a payout seen
+   after Task 1 is a response the Task 2 measures would pick up — which is why
+   it had to be constant in the first place). The wait is what carries the
+   manipulation: POWER3, gate 2's Member-side check, asks whether outcomes
+   that mattered depended on the other person's decisions, and waiting while
+   someone else decides your bonus IS that. The Leader still decides a real
+   amount and it is still recorded as `BONUS`; it simply never travels. What
+   `/debriefing` discloses is that no such decision was ever made about them.
+   Do not "restore" a number here for symmetry.
 5. **Which term the study is about.** All three terms are entered the same way
    on the preference screen — no extra control, no highlight, no separate
    heading for the requirement issue. Pilot gate 6 tests for exactly this kind
@@ -296,6 +354,20 @@ is not a layout preference: every §9.4 measure is a judgement about one
 specific negotiation, so asking it after a second, differently conditioned
 negotiation would blend the two conditions inside a single answer. Item ids
 carry a `_t1` / `_t2` suffix for the same reason.
+
+**The questions are paginated, forward only.** A Proxy task's battery is about
+twenty-five rating items plus seven required free-text answers, twice over —
+as one screen that is where a paid worker starts straight-lining. It runs in
+parts of roughly twelve items, cut at BLOCK boundaries so the §9.4 order is
+untouched: a part is a run of whole blocks in the same fixed sequence, never a
+reshuffle, and a block longer than the cap becomes a part of its own rather
+than splitting a scale from its hint row. There is no Previous, for the same
+reason the order is fixed — the AI-Proxy blocks come last so they cannot
+colour the answers about the other side, and paging back to revise would undo
+that. It is still ONE route, so the progress bar comes from the URL alone
+(rule 3); the part index is component state. Two things it needs and would be
+silently broken without: `useRestoreAnswers` (Back from the bonus screen is in
+`BACK_STEPS`) and an autofill key carrying the PART index.
 
 Inside a Baseline task: cover → brief → **RISK** → what you want → "waiting for
 the other participant" → negotiate → review.
@@ -593,7 +665,13 @@ Pages never touch persistence or the network directly — they go through
 
 ## Verified against the live model
 
-Tested end to end against `gpt-5.6-sol` (2026-08-11). Findings worth keeping:
+Tested end to end against `gpt-5.6-sol` (2026-08-11) and re-run against the
+current pin `gpt-5.6-terra` (2026-08-26). The two are API-identical — same
+Responses shape, same 400 on `temperature`, same reasoning-block-first
+ordering — and produced equivalent proxy output on the same prompts, so terra
+was pinned as the cheaper snapshot. **The pin is fixed for the duration of data
+collection; changing it mid-study splits the collection batch.** Findings worth
+keeping:
 
 - **No `temperature`.** This model family rejects the parameter with a 400.
   Use `reasoning.effort` instead — see `lib/ai/config.ts`.
@@ -632,8 +710,11 @@ Tested end to end against `gpt-5.6-sol` (2026-08-11). Findings worth keeping:
 Nothing structural. What remains is values to fix and behaviour to exercise:
 
 - **Pilot-dependent numbers.** Reservation (2,500), acceptance thresholds
-  (T_MID = 3,600 / T_FINAL = 2,600), the Member's fixed bonus (70/100), the
-  advertised time and payment, and the Prolific completion code.
+  (T_MID = 3,600 / T_FINAL = 2,600), the advertised time, the payment (£7.50
+  participation, £1.00 bonus per task — GBP because Prolific pays in it, and
+  both must clear Prolific's fair-pay rate), and the Prolific completion code.
+  The Member's fixed bonus is no longer on this list: no number is shown to a
+  Member at all.
 
   On the impasse target: across the whole 256-mandate space the proxy's
   counterpackage falls below T_FINAL in 36% of mandates, against the design's
