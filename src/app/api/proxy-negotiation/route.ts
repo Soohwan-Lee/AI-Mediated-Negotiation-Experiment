@@ -440,6 +440,24 @@ export async function POST(request: Request) {
   /** The Explorer's added clause for this turn, when the schedule places one. */
   let designatedPoolItem: { id: string; text: string } | null = null;
   /**
+   * The ids the schedule actually chose, used in preference to whatever the
+   * model reports back.
+   *
+   * WHY THE MODEL'S OWN ANSWER IS NOT THE RECORD. Ver.2.6 §7 moves the choice
+   * of reason to the state machine, so the model returning a DIFFERENT card
+   * id — or none where one was designated — is a reporting error, not a
+   * decision. Budgeting and the requirement-reason flag off the reported id
+   * would let that error spend the wrong budget or, worse, leave the voiced
+   * reason unrecorded and hand the direct conversation a false "no reason was
+   * given". The designation is what was put in the instruction, so it is what
+   * is recorded; the reported id is kept only for the gate-9 audit, where a
+   * mismatch is exactly the thing worth seeing.
+   */
+  const designatedIds = () => ({
+    reason: designatedCard?.id ?? null,
+    pool: designatedPoolItem?.id ?? null,
+  });
+  /**
    * The pool is spent only where the principal already has something to say,
    * and only under Explorer — a Delegate never reaches this.
    */
@@ -643,6 +661,15 @@ export async function POST(request: Request) {
       history,
     });
 
+    // On the participant side the schedule is the record; see `designatedIds`.
+    const scheduled = designatedIds();
+    const voicedReasonId = isParticipantSide
+      ? scheduled.reason
+      : action.reasonSourceId;
+    const voicedPoolId = isParticipantSide
+      ? scheduled.pool
+      : action.addedReasonSourceId;
+
     const validation = validateAction(action, {
       issues: task.issues,
       mandate: isParticipantSide ? body.mandate : undefined,
@@ -663,25 +690,16 @@ export async function POST(request: Request) {
             body.reasonsUsed ?? [],
           )
         : undefined,
-      reasonKey: action.reasonSourceId
-        ? reasonToken(action.reasonSourceId)
-        : null,
+      // The SCHEDULE's ids on the participant side, where there is one; the
+      // counterpart proxy is not scheduled this way, so its reported id
+      // stands.
+      reasonKey: voicedReasonId ? reasonToken(voicedReasonId) : null,
       reasonIssueId: isParticipantSide
-        ? reasonIssueOf(
-            body.taskId,
-            body.participantRole,
-            action.reasonSourceId,
-          )
+        ? reasonIssueOf(body.taskId, body.participantRole, voicedReasonId)
         : null,
-      addedReasonKey: action.addedReasonSourceId
-        ? reasonToken(action.addedReasonSourceId)
-        : null,
+      addedReasonKey: voicedPoolId ? reasonToken(voicedPoolId) : null,
       addedReasonIssueId: isParticipantSide
-        ? reasonIssueOf(
-            body.taskId,
-            body.participantRole,
-            action.addedReasonSourceId,
-          )
+        ? reasonIssueOf(body.taskId, body.participantRole, voicedPoolId)
         : null,
     });
 
@@ -747,21 +765,15 @@ export async function POST(request: Request) {
       // the token back anyway would spend budget on — and, worse, satisfy the
       // requirement-reason rule with — words nobody read.
       reasonToken:
-        action.reasonSourceId && !blocked
-          ? reasonToken(action.reasonSourceId)
-          : null,
+        voicedReasonId && !blocked ? reasonToken(voicedReasonId) : null,
       // Which ISSUE this turn's reason argued about — public information (the
       // text argues it openly, and proposals name issue ids on every turn),
       // and the piece the client needs to keep the requirement-reason flag
       // issue-scoped. It carries no kind: a principal card and a pool item on
       // the same issue produce the same field.
       reasonIssueId:
-        action.reasonSourceId && !blocked
-          ? reasonIssueOf(
-              body.taskId,
-              body.participantRole,
-              action.reasonSourceId,
-            )
+        voicedReasonId && !blocked
+          ? reasonIssueOf(body.taskId, body.participantRole, voicedReasonId)
           : null,
       // The Explorer's added pool clause, in the SAME opaque form and joining
       // the same flat list on the client. It has to come back or the per-issue
@@ -772,9 +784,7 @@ export async function POST(request: Request) {
       // token is opaque"; the token travels with every message, so that
       // prefix announced which messages the AI had added.
       addedReasonToken:
-        action.addedReasonSourceId && !blocked
-          ? reasonToken(action.addedReasonSourceId)
-          : null,
+        voicedPoolId && !blocked ? reasonToken(voicedPoolId) : null,
       // Violation CODES only. The details name red lines, withheld reason
       // cards and the validator's reasoning — a participant who opened the
       // network tab and found "disclosure_permission_violation: reason a_i2_sb_m
