@@ -105,6 +105,30 @@ function work(id: string, issueId: string, text: string): ReasonCard {
   return { id, issueId, layer: "work", text };
 }
 
+/**
+ * A sensitive background card.
+ *
+ * TWO WRITING RULES ADDED IN VER.2.6 (§5), both easy to undo by "tidying" the
+ * wording, and both of which broke real cards before they were added:
+ *
+ *  - SPEAKABILITY. The text is what the proxy says ALOUD to the other side, so
+ *    it has to be a first-person disclosure that works as speech. Five cards
+ *    ended "that it was my call is something only you know" — a description of
+ *    the fact being private, which is incoherent the moment it is spoken to
+ *    someone. The private-state framing belongs in the role STORY, where it is
+ *    narration and still reads correctly; the card takes the confessional form
+ *    ("something you have never told anyone"). Both phrasings survive in this
+ *    file for exactly that reason — the backstory keeps "only you know", the
+ *    cards do not.
+ *
+ *  - ARGUMENT LINK. Disclosing an SB has to function as a work argument for
+ *    the requirement on its own: incident → risk of recurrence → the ask. A
+ *    card that is only a feeling ("more review meetings is a prospect you
+ *    dread") gives the proxy nothing to reframe into an interest, so the
+ *    depersonalisation rule has nothing to bite on and the guardrail strips
+ *    the message. The two evaluation-anxiety cards therefore carry the
+ *    consequence for the work as well as the feeling.
+ */
 function sensitive(
   id: string,
   issueId: string,
@@ -231,7 +255,7 @@ const TASK_A: NegotiationTask = {
           "a_i1_sb_l",
           "quality_reviews",
           "fault",
-          "Last time you cut the checks short and approved a rollout in a hurry — and a bug you missed went out to some customers. That your approval call caused it is something only you know.",
+          "Last time you cut the checks short and approved a rollout in a hurry — and a bug you missed went out to some customers. That your approval call caused it is something you have never told anyone.",
         ),
         work(
           "a_i2_wr_l",
@@ -285,7 +309,7 @@ const TASK_A: NegotiationTask = {
           "a_i1_sb_m",
           "quality_reviews",
           "evaluation_anxiety",
-          "At a past review, a mistake of yours was called out in front of the room. Honestly, more review meetings is a prospect you dread.",
+          "At a past review, a mistake of yours was called out in front of the room. Honestly, more review meetings is a prospect you dread — and under that tension you do not work at your best either.",
         ),
         work(
           "a_i2_wr_m",
@@ -296,7 +320,7 @@ const TASK_A: NegotiationTask = {
           "a_i2_sb_m",
           "focus_afternoons",
           "fatigue_fault",
-          "A while back, testing while worn out, you missed two errors. You caught them before launch and fixed them quietly — that exhaustion was the cause is something only you know.",
+          "A while back, testing while worn out, you missed two errors. You caught them before launch and fixed them quietly — that exhaustion was the cause is something you have not been able to tell anyone yet.",
         ),
         work(
           "a_i3_wr_m",
@@ -476,7 +500,7 @@ const TASK_B: NegotiationTask = {
           "b_i1_sb_m",
           "rehearsal_rounds",
           "evaluation_anxiety",
-          "During the last demo preparation, a setup mistake of yours was pointed out in front of everyone. More rehearsals means more chances of that scene repeating.",
+          "During the last demo preparation, a setup mistake of yours was pointed out in front of everyone. More rehearsals means more chances of that scene repeating — and carrying that, the quality of your preparation drops too.",
         ),
         work(
           "b_i2_wr_m",
@@ -487,7 +511,7 @@ const TASK_B: NegotiationTask = {
           "b_i2_sb_m",
           "evening_shifts",
           "fatigue_fault",
-          "After a run of consecutive evenings you once missed an important handover. It passed without damage — that fatigue was the cause is something only you know.",
+          "After a run of consecutive evenings you once missed an important handover. It passed without damage — that fatigue was the cause is something you have not been able to tell anyone yet.",
         ),
         work(
           "b_i3_wr_m",

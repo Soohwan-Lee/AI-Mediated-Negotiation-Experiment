@@ -336,3 +336,32 @@ for (const taskId of TASKS) {
     });
   }
 }
+
+// ---------------------------------------------------------------------------
+// 5. Ver.2.6 §5 card-writing rules: speakability and the argument link
+// ---------------------------------------------------------------------------
+//
+// Both are properties of the CARD TEXT, which is the string the proxy says out
+// loud. They are pinned here because the failure is silent: a card that
+// describes its own privacy still renders, still passes the guardrail, and
+// only reads as wrong in a transcript nobody re-reads.
+
+for (const taskId of TASKS) {
+  for (const role of ROLES) {
+    test(`${taskId}/${role}: sensitive cards are speakable aloud`, () => {
+      const cards = reasonCards(getTask(taskId), role).filter(
+        (c) => c.layer === "sensitive",
+      );
+      assert.ok(cards.length > 0);
+      for (const card of cards) {
+        // "only you know" / "no one else knows" describe the fact as private.
+        // Spoken to the other side they contradict the act of speaking them.
+        assert.doesNotMatch(
+          card.text,
+          /only you know|no one else knows|nobody else knows/i,
+          `${card.id} states its own privacy; use the confessional form instead`,
+        );
+      }
+    });
+  }
+}
