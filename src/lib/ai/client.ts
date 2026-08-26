@@ -44,6 +44,7 @@ function stubAction(ctx: PromptContext): NegotiationAction {
     stage: ctx.stage,
     requirementStatus: "not_addressed",
     reasonSourceId: null,
+    addedReasonSourceId: null,
     rationale:
       "[SCAFFOLD] No model configured. This is placeholder counterpart text so the interface can be reviewed end to end.",
     unresolved: false,

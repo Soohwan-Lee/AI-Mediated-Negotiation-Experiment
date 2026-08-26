@@ -53,11 +53,12 @@ export interface ValidationContext {
    * each with the issue it argued about and whether it came from the
    * principal's cards or the Explorer pool.
    *
-   * The budget is a cross-turn property (Design §7 ver.2.5: at most one
-   * principal reason kind per issue; the Explorer's pool reasons are a
-   * separate allowance of one per issue and two per task), so it cannot be
-   * checked from a single action. The caller keeps the history; this function
-   * only decides whether the next one fits.
+   * The budget is a cross-turn property (Design §7 ver.2.6: the Explorer's
+   * pool reasons are capped at one per issue and two per task; the
+   * principal's own cards are no longer rationed here at all — the schedule
+   * in machine.ts spends each at most once), so it cannot be checked from a
+   * single action. The caller keeps the history; this function only decides
+   * whether the next one fits.
    *
    * The kind and issue exist SERVER-SIDE ONLY. The client still carries plain
    * opaque tokens; the route resolves each token back to its source by
@@ -76,6 +77,13 @@ export interface ValidationContext {
    */
   reasonKey?: string | null;
   reasonIssueId?: string | null;
+  /**
+   * The Explorer's added pool reason for this action, budgeted separately from
+   * the principal's card so the two do not compete for one slot. Null on every
+   * Delegate turn and on any Explorer turn the schedule did not designate one.
+   */
+  addedReasonKey?: string | null;
+  addedReasonIssueId?: string | null;
 }
 
 /**
@@ -209,28 +217,43 @@ export function validateAction(
     }
   }
 
-  // --- reason budget (Design §7/§15 ver.2.5: per-issue caps) --------------
+  // --- reason budget (Design §7/§15 ver.2.6) ------------------------------
   //
-  // TWO SEPARATE COUNTERS, NOT ONE. The principal's cards and the Explorer's
-  // pool are budgeted independently, exactly as in ver.2.4 — merging them was
-  // tried once and re-created the documented `Explorer − Delegate` stripping
-  // bias, because only the Explorer is instructed to ADD on top of its
-  // principal's reasons, so a shared bucket hit its cap sooner under Explorer
-  // and more of its messages fell to the reasonless fallback. What ver.2.5
-  // changes is the SHAPE of each budget:
+  // WHAT THIS DOES **NOT** DO ANY MORE: ration the principal's own cards.
   //
-  //  - principal cards: at most ONE distinct reason kind per issue across the
-  //    task (was: two distinct kinds per task). Repeating an already-used
-  //    reason is fine.
-  //  - pool (Explorer only): at most one per issue and two per task, additive
-  //    on top of the principal's cards. The exchange argument carries no
-  //    issue, so only the per-task cap binds it.
-  const budgetKey = ctx.reasonKey ?? action.reasonSourceId;
-  const isPool = action.reasonSourceId?.startsWith("pool:") ?? false;
-  if (budgetKey && ctx.reasonsUsed) {
+  // Ver.2.5 capped them at one distinct kind per issue for the whole task, and
+  // that cap is what suppressed the disclosure the study exists to measure. A
+  // participant who ticked the sensitive background on their requirement issue
+  // got a proxy that spent the issue's single allowance on the work reason at
+  // stage 2 — work reasons are ticked by default — and could then never say
+  // the sensitive one. REASON-SCOPE recorded an authorization the negotiation
+  // never contained.
+  //
+  // Ver.2.6 replaces it with "one reason per message, each card at most once
+  // per task", and that is enforced by the SCHEDULE in machine.ts
+  // (`designatedReason` never designates a card twice), not here. The
+  // distinction is load-bearing: `rationale_budget_exceeded` is a hard code,
+  // so making a repeat a violation would replace the whole message with the
+  // package-only fallback and null its reason token — and on the turn
+  // carrying the requirement's reason, that hands the direct conversation a
+  // false "no reason was given" and re-creates the inert-rule bug CLAUDE.md
+  // records as already fixed once. Repetition is prevented, not punished.
+  //
+  // WHAT REMAINS: the Explorer's pool allowance, which is a real cap on a real
+  // manipulation — at most one per issue and two per task. It is budgeted on
+  // `addedReasonSourceId`, a SEPARATE field from the principal's card, so the
+  // pool clause is additive rather than competing with it. Keeping the two
+  // counters apart is the same precaution as before: only the Explorer is
+  // instructed to add on top of its principal's reasons, so a shared bucket
+  // binds sooner under Explorer, strips more of its messages to the reasonless
+  // fallback, and puts a mechanical difference into `Explorer − Delegate` on
+  // exactly the message content that contrast is meant to isolate.
+  //
+  // The exchange argument carries no issue, so only the per-task cap binds it.
+  const addedKey = ctx.addedReasonKey ?? action.addedReasonSourceId;
+  if (addedKey && ctx.reasonsUsed) {
     const history = ctx.reasonsUsed;
-    const alreadyUsed = history.some((r) => r.key === budgetKey);
-    if (!alreadyUsed && isPool) {
+    if (!history.some((r) => r.key === addedKey)) {
       const poolDistinct = new Set(
         history.filter((r) => r.source === "pool").map((r) => r.key),
       );
@@ -241,31 +264,15 @@ export function validateAction(
             "The Explorer may add at most two pool reasons per task; this would be a third.",
         });
       } else if (
-        ctx.reasonIssueId &&
+        ctx.addedReasonIssueId &&
         history.some(
-          (r) => r.source === "pool" && r.issueId === ctx.reasonIssueId,
+          (r) => r.source === "pool" && r.issueId === ctx.addedReasonIssueId,
         )
       ) {
         violations.push({
           code: "rationale_budget_exceeded",
           detail:
             "The Explorer may add at most one pool reason per issue; a pool reason has already been used on this issue.",
-        });
-      }
-    } else if (!alreadyUsed && !isPool && ctx.reasonIssueId) {
-      const principalOnIssue = new Set(
-        history
-          .filter(
-            (r) =>
-              r.source === "principal" && r.issueId === ctx.reasonIssueId,
-          )
-          .map((r) => r.key),
-      );
-      if (principalOnIssue.size >= 1) {
-        violations.push({
-          code: "rationale_budget_exceeded",
-          detail:
-            "At most one of the principal's reasons may be used per issue; a different one has already been used on this issue.",
         });
       }
     }
@@ -283,13 +290,30 @@ export function validateAction(
   // A reason drawn from the pre-approved role-plausible pool is marked with a
   // `pool:` prefix. It is the thing that distinguishes the two policies, so a
   // Delegate using one would erase the difference between the conditions.
+  // Both slots are checked: since ver.2.6 the pool clause normally arrives in
+  // `addedReasonSourceId`, and a Delegate filling EITHER field with a pool id
+  // would erase the difference between the conditions just as completely.
   if (
-    action.reasonSourceId?.startsWith("pool:") &&
+    (action.reasonSourceId?.startsWith("pool:") ||
+      action.addedReasonSourceId?.startsWith("pool:")) &&
     ctx.policy !== "explorer"
   ) {
     violations.push({
       code: "provenance_policy_violation",
       detail: "Pool reasons are available to the Explorer only.",
+    });
+  }
+
+  // The added slot is for the pool alone. A principal's card there would
+  // escape the disclosure-permission check above, which reads the first slot.
+  if (
+    action.addedReasonSourceId &&
+    !action.addedReasonSourceId.startsWith("pool:")
+  ) {
+    violations.push({
+      code: "provenance_policy_violation",
+      detail:
+        "addedReasonSourceId carries the Explorer's pool clause only; the principal's card belongs in reasonSourceId.",
     });
   }
 

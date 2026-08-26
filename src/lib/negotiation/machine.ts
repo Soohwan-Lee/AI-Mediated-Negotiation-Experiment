@@ -25,9 +25,16 @@ import {
   optionIndex,
   distributiveIssue,
   preservesRequirement,
+  reasonCards,
   scorePackage,
 } from "../tasks";
-import type { NegotiationTask, Package, Role, StageId } from "../types";
+import type {
+  NegotiationTask,
+  Package,
+  ReasonCard,
+  Role,
+  StageId,
+} from "../types";
 
 /**
  * Counterpart acceptance thresholds (Design §4 "이유 연동 수락 규칙").
@@ -390,6 +397,78 @@ export interface ProxyPlan {
   opening: Package;
   counterpackage: Package;
   tentative: Package;
+}
+
+/**
+ * Which authorized card the proxy voices at a given stage (Design §7 ver.2.6
+ * "발화 이유 선택 규칙").
+ *
+ * WHY THIS IS NOT THE MODEL'S CHOICE ANY MORE. Until ver.2.6 the instruction
+ * read "state your priority, with one authorized reason" and the model picked
+ * which. That broke the measure in a way nothing in the transcript showed: the
+ * work reasons arrive ticked by default, so a model asked to choose almost
+ * always chose one, and the OLD cap — at most one reason kind per issue for
+ * the whole task — then made that first pick permanent. A participant who
+ * deliberately ticked a sensitive background on their requirement issue got a
+ * proxy that never said it. REASON-SCOPE recorded a disclosure the negotiation
+ * never contained, and the whole point of the mandate screen is that ticking a
+ * sensitive card IS the disclosure decision.
+ *
+ * So the schedule is fixed here, and it escalates — the general argument
+ * first, the costly one after the challenge:
+ *
+ *  - stage 2, own requirement issue: the WR (the SB only if the WR is
+ *    unticked, since something must be said).
+ *  - stage 4, after the challenge: the SB if it is ticked, otherwise the WR
+ *    again in different words.
+ *  - any other issue, when it is used as grounds for a trade: that issue's SB
+ *    if ticked, otherwise its WR.
+ *
+ * This mirrors the counterpart's own script, so both sides escalate at the
+ * same point and the two arms stay comparable.
+ *
+ * A ticked card on the requirement issue is therefore GUARANTEED to be voiced.
+ * Cards on the other two issues are voiced only when that issue carries a
+ * trade, which is why the log of what was actually said is reported separately
+ * from what was authorized.
+ *
+ * "EACH CARD AT MOST ONCE" IS THIS FUNCTION'S JOB, NOT THE VALIDATOR'S. The
+ * cap is expressed by never designating a card that has already been voiced —
+ * pass `alreadyVoiced` and it falls through to the other layer, or to nothing.
+ * Making it a validator rejection instead would be actively harmful: a budget
+ * violation is a hard code, so the whole message would be replaced by the
+ * package-only fallback and its reason token nulled. On the turn that carried
+ * the requirement's reason that sets `reasonAlreadyVoiced` false for the
+ * direct conversation, and the counterpart then demands a reason for a
+ * requirement its own proxy has already argued — the exact inert-rule bug
+ * CLAUDE.md records as fixed once already. A schedule that simply does not
+ * repeat itself needs no punishment for repeating itself.
+ */
+export function designatedReason(
+  task: NegotiationTask,
+  participantRole: Role,
+  stage: StageId,
+  authorizedReasonIds: readonly string[],
+  options: { issueId?: string; alreadyVoiced?: readonly string[] } = {},
+): ReasonCard | null {
+  const { issueId, alreadyVoiced = [] } = options;
+  const requirement = requirementIssue(task, participantRole);
+  const target = issueId ?? requirement.id;
+  const cards = reasonCards(task, participantRole).filter(
+    (c) =>
+      c.issueId === target &&
+      authorizedReasonIds.includes(c.id) &&
+      !alreadyVoiced.includes(c.id),
+  );
+  const work = cards.find((c) => c.layer === "work") ?? null;
+  const sensitive = cards.find((c) => c.layer === "sensitive") ?? null;
+
+  // Stage 2 opens with the general argument; the sensitive one is held back
+  // unless it is the only thing authorized on this issue.
+  if (stage <= 2 && target === requirement.id) return work ?? sensitive;
+
+  // From the challenge onward the costly reason is spent, on any issue.
+  return sensitive ?? work;
 }
 
 /**

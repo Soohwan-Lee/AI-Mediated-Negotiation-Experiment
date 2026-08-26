@@ -20,7 +20,12 @@
 import { NextResponse } from "next/server";
 import { generateAction } from "@/lib/ai/client";
 import { validateAction } from "@/lib/ai/validator";
-import { buildProxyPlan, counterpartStep, STAGES } from "@/lib/negotiation/machine";
+import {
+  buildProxyPlan,
+  counterpartStep,
+  designatedReason,
+  STAGES,
+} from "@/lib/negotiation/machine";
 import {
   counterRequirementIssue,
   getTask,
@@ -30,6 +35,7 @@ import {
 import type {
   Mandate,
   Package,
+  ReasonCard,
   Role,
   Speaker,
   StageId,
@@ -238,19 +244,26 @@ function resolveReasonTokens(
   taskId: TaskId,
   role: Role,
   tokens: string[],
-): Array<{ key: string; issueId: string | null; source: "principal" | "pool" }> {
+): Array<{
+  key: string;
+  sourceId: string;
+  issueId: string | null;
+  source: "principal" | "pool";
+}> {
   const byToken = new Map<
     string,
-    { issueId: string | null; source: "principal" | "pool" }
+    { sourceId: string; issueId: string | null; source: "principal" | "pool" }
   >();
   for (const card of getTask(taskId).roleBriefs[role].reasonCards) {
     byToken.set(reasonToken(card.id), {
+      sourceId: card.id,
       issueId: card.issueId,
       source: "principal",
     });
   }
   plausibleReasons(taskId, role).forEach((item, i) => {
     byToken.set(reasonToken(`pool:${i}`), {
+      sourceId: `pool:${i}`,
       issueId: item.issueId,
       source: "pool",
     });
@@ -259,6 +272,66 @@ function resolveReasonTokens(
     const hit = byToken.get(key);
     return hit ? [{ key, ...hit }] : [];
   });
+}
+
+/**
+ * How a designated card enters a stage-2 instruction — inline, because that
+ * turn carries no package and has room for it.
+ *
+ * A designated card is the NORMAL case; null means the schedule found nothing
+ * left to say on this issue (every authorized card already voiced, or the
+ * participant unticked everything they could). The instruction then simply
+ * omits the reason rather than inviting the model to supply one, which is the
+ * whole point of moving the choice out of the model (Design §7 ver.2.6).
+ */
+function reasonClause(card: ReasonCard | null): string {
+  if (!card) return "";
+  return `, giving exactly this authorized reason and no other: "${card.text}"`;
+}
+
+/**
+ * The same designation as its own sentence, for the turns whose instruction is
+ * already carrying a package and three exact levels.
+ */
+function reasonSentence(card: ReasonCard | null): string {
+  if (!card) return "";
+  return ` Then give exactly this authorized reason for holding your requirement, and no other: "${card.text}"`;
+}
+
+/**
+ * The pool item the Explorer adds this turn, and the instruction clause that
+ * carries it (Design §7 ver.2.6: "삽입 여부·시점은 state machine이 지정").
+ *
+ * SCHEDULED, NOT VOLUNTEERED. Left to the model, the pool was used whenever a
+ * message felt thin, which makes the Explorer's extra latitude a property of
+ * the model's mood rather than of the condition. The schedule places it on the
+ * two turns where the principal is arguing for something — stage 2 and stage
+ * 4 — and matches it to that turn's issue so the per-issue cap is satisfied by
+ * construction rather than enforced after the fact.
+ *
+ * It is chosen only when the turn already has a principal card to sit beside,
+ * because §7 makes it additive: a pool clause alone would be an Explorer
+ * message whose whole reason came from the pool, which is a different
+ * manipulation from the one specified.
+ */
+function designatedPool(
+  taskId: TaskId,
+  role: Role,
+  issueId: string,
+  alreadyUsed: readonly string[],
+): { id: string; text: string } | null {
+  const pool = plausibleReasons(taskId, role);
+  const index = pool.findIndex(
+    (item, i) => item.issueId === issueId && !alreadyUsed.includes(`pool:${i}`),
+  );
+  return index === -1
+    ? null
+    : { id: `pool:${index}`, text: pool[index].text };
+}
+
+function poolClause(item: { text: string } | null): string {
+  if (!item) return "";
+  return ` In the same message, add this one further argument as a short clause: "${item.text}"`;
 }
 
 /**
@@ -341,6 +414,47 @@ export async function POST(request: Request) {
 
   let proposal: Package | null = null;
   let decidedAction: string;
+  /**
+   * The card the state machine has told this turn to voice (Design §7
+   * ver.2.6). Recorded beside the sentence like the move itself, because the
+   * audit question is now "did it say the designated reason", not "did it say
+   * a permitted one".
+   */
+  let designatedCard: ReasonCard | null = null;
+  /**
+   * The principal's cards already voiced this task, recovered from the carried
+   * tokens. This is how "each card at most once" is kept — the schedule skips
+   * what has been said rather than the validator rejecting a repeat.
+   */
+  const resolvedHistory = resolveReasonTokens(
+    body.taskId,
+    body.participantRole,
+    body.reasonsUsed ?? [],
+  );
+  const voicedCardIds = resolvedHistory
+    .filter((r) => r.source === "principal")
+    .map((r) => r.sourceId);
+  const usedPoolIds = resolvedHistory
+    .filter((r) => r.source === "pool")
+    .map((r) => r.sourceId);
+  /** The Explorer's added clause for this turn, when the schedule places one. */
+  let designatedPoolItem: { id: string; text: string } | null = null;
+  /**
+   * The pool is spent only where the principal already has something to say,
+   * and only under Explorer — a Delegate never reaches this.
+   */
+  const addPool = (issueId: string) => {
+    if (!isParticipantSide || body.policy !== "explorer" || !designatedCard) {
+      return "";
+    }
+    designatedPoolItem = designatedPool(
+      body.taskId,
+      body.participantRole,
+      issueId,
+      usedPoolIds,
+    );
+    return poolClause(designatedPoolItem);
+  };
   let accepted = false;
   let impasse = false;
   /** The machine's move, stored beside the sentence for the gate-9 audit. */
@@ -359,7 +473,14 @@ export async function POST(request: Request) {
         // put on the table, and could flip the acceptance test between
         // conditions for identical mandates.
         proposal = null;
-        decidedAction = `Say that ${yourRequirement.label.toLowerCase()} is your principal's priority, with one authorized reason. Ask which term matters most to them.`;
+        designatedCard = designatedReason(
+          task,
+          body.participantRole,
+          2,
+          body.mandate.authorizedReasonIds,
+          { alreadyVoiced: voicedCardIds },
+        );
+        decidedAction = `Say that ${yourRequirement.label.toLowerCase()} is your principal's priority${reasonClause(designatedCard)}.${addPool(yourRequirement.id)} Ask which term matters most to them.`;
         break;
       case 3:
         // Both sides challenge, once each (Design §4 stage 3). The
@@ -369,7 +490,21 @@ export async function POST(request: Request) {
         break;
       case 4:
         proposal = plan.counterpackage;
-        decidedAction = `Put this exact counterpackage forward: ${packageSentence(task, plan.counterpackage)}. Say plainly what is held and what is given in exchange, and name exactly these levels — no others.`;
+        // The escalation turn (Design §7 ver.2.6): after the challenge, the
+        // costly reason is spent. The reason gets its OWN sentence rather
+        // than being folded into the package instruction — this turn already
+        // carries three exact levels plus what is held and given, and it is
+        // the turn the counterpart evaluates against T_MID immediately after,
+        // so a blocked message here costs the package sentence and the reason
+        // together.
+        designatedCard = designatedReason(
+          task,
+          body.participantRole,
+          4,
+          body.mandate.authorizedReasonIds,
+          { alreadyVoiced: voicedCardIds },
+        );
+        decidedAction = `Put this exact counterpackage forward: ${packageSentence(task, plan.counterpackage)}. Say plainly what is held and what is given in exchange, and name exactly these levels — no others.${reasonSentence(designatedCard)}${addPool(yourRequirement.id)}`;
         break;
       case 5:
         proposal = plan.tentative;
@@ -421,7 +556,32 @@ export async function POST(request: Request) {
         case "open":
           return `Open with your own best package on all three terms, naming these exact levels: ${levels}.`;
         case "state_priority":
-          return `Say that ${theirRequirement.label.toLowerCase()} is your principal's priority, with one reason about the work. Ask which term matters most to them.`;
+          // THE COUNTERPART GIVES A WORK REASON AND NEVER ITS SENSITIVE ONE.
+          //
+          // Ver.2.6 §4 fixes the counterpart's mandate with all six cards
+          // ticked, so that every participant meets the same reasons and the
+          // receiver-side measures have a stimulus that does not vary. The
+          // first half of that is kept here — its reason is fixed and
+          // identical for everyone. The core-issue sensitive card is NOT,
+          // and the asymmetry with the participant's own proxy is deliberate.
+          //
+          // The two disclosures are different objects. The proxy's is the
+          // MANIPULATION: REASON-SCOPE is the participant's own authorization,
+          // and the ver.2.6 schedule exists precisely so a ticked card is
+          // really said. The counterpart's would be a STIMULUS — and a
+          // stimulus that primes the construct being measured is a confound,
+          // not a control. Reciprocal self-disclosure reliably increases
+          // disclosure, so a counterpart confessing at stage 4 of every task
+          // would push PERC ("explaining my reasons could damage how I came
+          // across") and RISK the same way in BOTH arms — and RISK is gate
+          // 4's task-equivalence instrument, which cannot carry an effect.
+          // It would also compress Task 2's REASON-SCOPE against the very
+          // floor-and-ceiling band gate 12 checks for.
+          //
+          // A third reason is simpler: the same confession arriving from two
+          // different "Other Participants" in Task 1 and Task 2 is a tell
+          // that the counterpart is not a person.
+          return `Say that ${theirRequirement.label.toLowerCase()} is your principal's priority, with one reason about the work — never a personal or private one. Ask which term matters most to them.`;
         case "challenge":
           // The mirror of the participant proxy's stage-3 move: this one is
           // aimed at the PARTICIPANT'S requirement.
@@ -513,6 +673,16 @@ export async function POST(request: Request) {
             action.reasonSourceId,
           )
         : null,
+      addedReasonKey: action.addedReasonSourceId
+        ? reasonToken(action.addedReasonSourceId)
+        : null,
+      addedReasonIssueId: isParticipantSide
+        ? reasonIssueOf(
+            body.taskId,
+            body.participantRole,
+            action.addedReasonSourceId,
+          )
+        : null,
     });
 
     // A blocked action loses its WORDING, not the move behind it.
@@ -592,6 +762,18 @@ export async function POST(request: Request) {
               body.participantRole,
               action.reasonSourceId,
             )
+          : null,
+      // The Explorer's added pool clause, in the SAME opaque form and joining
+      // the same flat list on the client. It has to come back or the per-issue
+      // and per-task pool caps never bind across turns — but it must not come
+      // back as anything the client could tell apart from the token above,
+      // which is the whole reason both are hashes of an id and nothing else.
+      // An earlier version prefixed pool tokens with `pool:` "because the
+      // token is opaque"; the token travels with every message, so that
+      // prefix announced which messages the AI had added.
+      addedReasonToken:
+        action.addedReasonSourceId && !blocked
+          ? reasonToken(action.addedReasonSourceId)
           : null,
       // Violation CODES only. The details name red lines, withheld reason
       // cards and the validator's reasoning — a participant who opened the

@@ -557,6 +557,7 @@ export function ProxyTask({
           totalTurns?: number;
           reasonToken?: string | null;
           reasonIssueId?: string | null;
+          addedReasonToken?: string | null;
           decidedAction?: string;
           stage?: number;
           requirementOption?: string | null;
@@ -582,6 +583,11 @@ export function ProxyTask({
             setProxyVoicedReason(true);
           }
         }
+        // The Explorer's added clause rides in the same list. It never sets
+        // `proxyVoicedReason`: a pool argument is not the principal's reason,
+        // and letting one satisfy the requirement rule would mean an Explorer
+        // participant who authorized nothing still got the concession.
+        if (data.addedReasonToken) reasonsUsed.push(data.addedReasonToken);
         if (
           data.message?.speaker === "participant_proxy" &&
           data.stage !== undefined

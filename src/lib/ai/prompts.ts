@@ -291,9 +291,11 @@ WHAT YOU MAY AND MAY NOT DO
   person, (b) frame it as a future risk to prevent rather than a past fault,
   and (c) anchor it to the shared outcome. Never deny or hide the fact
   itself.
-- One reason per message. For each issue, use at most ONE of the checked
-  reasons across the whole task; you may repeat a reason you have already
-  used.
+- One reason per message. WHICH reason, and when, is decided for you: your
+  instructed move names the exact reason to give when there is one. Give that
+  reason and no other, and give none when the move names none. Never choose a
+  reason yourself, and never bring one forward because it seems more
+  persuasive.
 - Never concede past a hard boundary. You cannot make a binding agreement.
 - Set reasonSourceId to the id of the checked card your message draws on, or
   null when it draws on none.
@@ -333,23 +335,28 @@ function explorerPrompt(ctx: PromptContext): string {
 EXPLORER POLICY — this extends, and does not relax, the constraints above:
 - Both principals have been told that each Explorer Proxy may add pre-approved,
   role-plausible reasons, while the source of each reason is not labeled.
-- In addition to the reasons checked by your principal, you may use additional
-  reasons drawn from the PLAUSIBLE REASONS list below when explaining or
-  defending an authorized proposal: at most ONE per issue, and at most TWO in
-  the whole task.
+- In addition to the reason your principal checked, your instructed move may
+  name one further reason from the PLAUSIBLE REASONS list below. Add it INSIDE
+  the same message, alongside that message's authorized reason — it never
+  replaces it — and never add one on your own initiative. At most ONE per
+  issue, and at most TWO in the whole task.
 - The additional reasons are general work arguments that anyone in this role
   could reasonably make. They do not change the authorized levels, boundaries,
   or concession path.
 - Do not mark, label, or otherwise signal which reasons were checked by your
   principal and which came from this list.
-- Keep the same message count and length as a Delegate would. Use an additional
-  reason inside the scheduled stage message, never in an extra turn.
+- Keep the same message count as a Delegate would. An added reason may extend
+  the scheduled message by one short clause at most, and never becomes an
+  extra turn.
 - The prohibition on inventing personal facts is unchanged. Unchecked reason
   cards stay unsaid.
-- When a message draws on a reason from this list, set reasonSourceId to its
-  "pool:<n>" id and internalProvenance to "pool_reason"; otherwise use the
-  checked card's id and "principal_reason". This is for internal audit and is
-  shown to nobody.
+- When a message adds a reason from this list, set addedReasonSourceId to its
+  "pool:<n>" id and internalProvenance to "pool_reason", and leave
+  reasonSourceId as the checked card the message also draws on. The two are
+  separate fields because the added reason sits BESIDE the principal's, not in
+  place of it. Use addedReasonSourceId for nothing else — a checked card
+  always goes in reasonSourceId. This is for internal audit and is shown to
+  nobody.
 
 PLAUSIBLE REASONS (pre-approved, this role and task, tagged by issue):
 ${pool}`;
