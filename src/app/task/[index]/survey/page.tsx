@@ -95,14 +95,18 @@ export default function TaskSurveyPage({
   const router = useRouter();
   const { assignment, participantKey, logEvent } = useParticipant();
   const [answers, setAnswers] = useState<Answers>({});
-  const [part, setPart] = useState(0);
+  // `null` until the participant (or a restore) settles on one — see the note
+  // where it is resolved.
+  const [part, setPart] = useState<number | null>(null);
+  const [returning, setReturning] = useState(false);
 
   // Reachable again via Back from the bonus screen (BACK_STEPS), and every
   // answer is component state — without this the return trip lands on an empty
   // form and silently discards a five-minute battery (Interface rule 4).
-  useRestoreAnswers(`post_task_t${taskIndex}`, (saved) =>
-    setAnswers((cur) => ({ ...saved, ...cur })),
-  );
+  useRestoreAnswers(`post_task_t${taskIndex}`, (saved) => {
+    setAnswers((cur) => ({ ...saved, ...cur }));
+    setReturning(true);
+  });
 
   const plan = assignment ? sessionPlan(assignment, taskIndex) : null;
   const isProxy = plan ? isProxyCondition(plan.condition) : false;
@@ -122,8 +126,24 @@ export default function TaskSurveyPage({
   // Whole blocks, in the §9.4 order, cut into runs of at most this many items.
   // Splitting inside a block would separate a scale from its own hint row.
   const parts = groupIntoParts(blocks, 12);
-  const current = parts[Math.min(part, parts.length - 1)] ?? [];
-  const isLastPart = part >= parts.length - 1;
+
+  // COMING BACK LANDS ON THE LAST PART, not the first. Back from the bonus
+  // screen remounts this page, so a part index starting at 0 would put the
+  // participant on "Part 1 of 3" with every answer restored, a full form and a
+  // "Next" button — three screens of already-answered questions to click
+  // through to get out. Some would re-read and re-answer, which is the one
+  // thing this page cannot allow: those re-answers happen AFTER the bonus
+  // screen, so a §9.4 item specified as a judgement about the negotiation
+  // alone would pick up the reward as well.
+  //
+  // Derived during render rather than set from an effect: the landing part is
+  // a function of "did we restore answers" and how many parts there are, and
+  // an effect that set it would cascade a second render on every arrival.
+  const activePart =
+    part ?? (returning && parts.length > 0 ? parts.length - 1 : 0);
+
+  const current = parts[Math.min(activePart, parts.length - 1)] ?? [];
+  const isLastPart = activePart >= parts.length - 1;
 
   const required = current.flatMap(requiredIds);
 
@@ -136,7 +156,7 @@ export default function TaskSurveyPage({
       for (const item of block.items) filled[item.id] = dummyAnswer(item);
     }
     setAnswers((prev) => ({ ...prev, ...filled }));
-  }, `task-survey-${taskIndex}-${part}`);
+  }, `task-survey-${taskIndex}-${activePart}`);
 
   const missing = required.filter((id) => answers[id] === undefined);
   const canContinue = useDevGate(missing.length === 0);
@@ -156,7 +176,7 @@ export default function TaskSurveyPage({
     }
 
     if (!isLastPart) {
-      setPart((p) => p + 1);
+      setPart(activePart + 1);
       window.scrollTo({ top: 0 });
       return;
     }
@@ -182,7 +202,7 @@ export default function TaskSurveyPage({
           <CardTitle
             hint={
               parts.length > 1
-                ? `Part ${part + 1} of ${parts.length}`
+                ? `Part ${activePart + 1} of ${parts.length}`
                 : "These are about the negotiation you just finished — not about the study as a whole."
             }
           >

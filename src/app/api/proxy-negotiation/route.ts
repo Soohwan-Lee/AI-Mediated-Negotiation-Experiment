@@ -317,7 +317,7 @@ function reasonSentence(card: ReasonCard | null): string {
 function designatedPool(
   taskId: TaskId,
   role: Role,
-  issueId: string,
+  issueId: string | null,
   alreadyUsed: readonly string[],
 ): { id: string; text: string } | null {
   const pool = plausibleReasons(taskId, role);
@@ -461,7 +461,7 @@ export async function POST(request: Request) {
    * The pool is spent only where the principal already has something to say,
    * and only under Explorer — a Delegate never reaches this.
    */
-  const addPool = (issueId: string) => {
+  const addPool = (issueId: string | null) => {
     if (!isParticipantSide || body.policy !== "explorer" || !designatedCard) {
       return "";
     }
@@ -522,7 +522,15 @@ export async function POST(request: Request) {
           body.mandate.authorizedReasonIds,
           { alreadyVoiced: voicedCardIds },
         );
-        decidedAction = `Put this exact counterpackage forward: ${packageSentence(task, plan.counterpackage)}. Say plainly what is held and what is given in exchange, and name exactly these levels — no others.${reasonSentence(designatedCard)}${addPool(yourRequirement.id)}`;
+        // THE EXCHANGE ARGUMENT, not the requirement issue's pool item. Stage
+        // 2 already spent that one, and each role's pool holds exactly one
+        // item per issue — so asking for the same issue again returns nothing
+        // and the Explorer would add ONE clause per task where §7 allows two,
+        // manipulating every Explorer participant at half the specified dose
+        // with nothing in the logs to show it. The pool's fourth item carries
+        // no issue precisely because it argues the TRADE rather than a term,
+        // which is this stage's move.
+        decidedAction = `Put this exact counterpackage forward: ${packageSentence(task, plan.counterpackage)}. Say plainly what is held and what is given in exchange, and name exactly these levels — no others.${reasonSentence(designatedCard)}${addPool(null)}`;
         break;
       case 5:
         proposal = plan.tentative;
@@ -760,31 +768,56 @@ export async function POST(request: Request) {
       // unaided. An opaque token keeps distinct reasons distinguishable from
       // each other without saying what any of them is.
       //
-      // NULL WHEN BLOCKED: a blocked action's rationale was replaced by the
-      // package-only fallback, so its reason was never actually said. Handing
-      // the token back anyway would spend budget on — and, worse, satisfy the
-      // requirement-reason rule with — words nobody read.
-      reasonToken:
-        voicedReasonId && !blocked ? reasonToken(voicedReasonId) : null,
-      // Which ISSUE this turn's reason argued about — public information (the
-      // text argues it openly, and proposals name issue ids on every turn),
-      // and the piece the client needs to keep the requirement-reason flag
-      // issue-scoped. It carries no kind: a principal card and a pool item on
-      // the same issue produce the same field.
-      reasonIssueId:
-        voicedReasonId && !blocked
-          ? reasonIssueOf(body.taskId, body.participantRole, voicedReasonId)
-          : null,
-      // The Explorer's added pool clause, in the SAME opaque form and joining
-      // the same flat list on the client. It has to come back or the per-issue
-      // and per-task pool caps never bind across turns — but it must not come
-      // back as anything the client could tell apart from the token above,
-      // which is the whole reason both are hashes of an id and nothing else.
-      // An earlier version prefixed pool tokens with `pool:` "because the
-      // token is opaque"; the token travels with every message, so that
-      // prefix announced which messages the AI had added.
-      addedReasonToken:
-        voicedPoolId && !blocked ? reasonToken(voicedPoolId) : null,
+      // FIXED WIDTH, ALWAYS TWO. The shape leaks as surely as the content
+      // does, and this field has now been got wrong twice in the same way.
+      // A separate `addedReasonToken` field is populated only under Explorer,
+      // so its PRESENCE names the AI-added messages. Collapsing the two into
+      // one variable-length array moves the same signal into the LENGTH: two
+      // entries occur only under Explorer, only on a turn that carried a pool
+      // clause. So every turn of every policy returns exactly two opaque
+      // hashes, with a per-turn decoy in any slot that has no real reason.
+      // `resolveReasonTokens` drops anything that does not re-hash to a known
+      // id, so a decoy is inert — it spends no budget and satisfies no rule.
+      //
+      // DECOYS WHEN BLOCKED, not an empty array: a blocked turn's rationale
+      // was replaced by the package-only fallback, so no reason was said and
+      // no real token may be returned — but an empty array would be its own
+      // one-bit tell that a guardrail fired.
+      //
+      // PARTICIPANT SIDE ONLY carries real tokens. The budget and the
+      // requirement rule are about the PARTICIPANT's reasons; a counterpart
+      // token in the same list would be counted against them. Card ids are
+      // role-suffixed so a counterpart card cannot resolve against the
+      // participant's map anyway — but `pool:<n>` ids are not, so a
+      // counterpart turn reporting one would hash to a token that resolves to
+      // the participant's own pool item, and on the requirement issue it would
+      // satisfy the reason rule with an argument the OTHER side made.
+      reasonTokens: [
+        isParticipantSide && !blocked && voicedReasonId
+          ? reasonToken(voicedReasonId)
+          : reasonToken(`nil:a:${turn}`),
+        isParticipantSide && !blocked && voicedPoolId
+          ? reasonToken(voicedPoolId)
+          : reasonToken(`nil:b:${turn}`),
+      ],
+      // WHETHER THE PRINCIPAL ARGUED THEIR OWN REQUIREMENT — decided here,
+      // from the principal's CARD alone, and handed over as one boolean.
+      //
+      // The client used to derive this by pairing a token with `reasonIssueId`,
+      // which worked only because of which issue ids the two designation sites
+      // happened to pass. That is a coincidence, not a guarantee, and the
+      // guarantee is load-bearing: a pool argument is not the principal's
+      // reason, so letting one satisfy the rule would hand an Explorer
+      // participant who authorized nothing the requirement concession — 3,200
+      // against 1,200, in one arm only, on the primary outcome.
+      //
+      // As a boolean it also leaks nothing: it is true under Delegate too,
+      // whenever the principal's reason argued their requirement.
+      reasonForRequirement:
+        !blocked &&
+        isParticipantSide &&
+        reasonIssueOf(body.taskId, body.participantRole, voicedReasonId) ===
+          yourRequirement.id,
       // Violation CODES only. The details name red lines, withheld reason
       // cards and the validator's reasoning — a participant who opened the
       // network tab and found "disclosure_permission_violation: reason a_i2_sb_m

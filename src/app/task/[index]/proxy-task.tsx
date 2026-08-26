@@ -555,9 +555,8 @@ export function ProxyTask({
           };
           done: boolean;
           totalTurns?: number;
-          reasonToken?: string | null;
-          reasonIssueId?: string | null;
-          addedReasonToken?: string | null;
+          reasonTokens?: string[];
+          reasonForRequirement?: boolean;
           decidedAction?: string;
           stage?: number;
           requirementOption?: string | null;
@@ -567,27 +566,24 @@ export function ProxyTask({
         };
 
         if (data.impasse) proxyImpasse = true;
-        if (data.reasonToken) {
-          reasonsUsed.push(data.reasonToken);
-          // A token only exists when the proxy actually voiced something —
-          // the route returns none for a blocked turn. ISSUE-SCOPED (ver.2.5):
-          // the cards span all three issues now, so only a reason on the
-          // participant's own requirement issue satisfies the reason-linked
-          // rule the direct conversation inherits — a proxy that argued only
-          // the timing term has not justified the requirement.
-          if (
-            data.message?.speaker === "participant_proxy" &&
-            !data.blocked &&
-            data.reasonIssueId === requirement.id
-          ) {
-            setProxyVoicedReason(true);
-          }
+        // A fixed-width pair of opaque hashes every turn, carrying nothing
+        // that says which is which — or whether either is real. Decoys are
+        // dropped server-side, so pushing all of them is correct.
+        if (data.reasonTokens?.length) reasonsUsed.push(...data.reasonTokens);
+
+        // THE SERVER DECIDES THIS, not the client. Whether the proxy argued
+        // the participant's own requirement is issue-scoped and must depend on
+        // the principal's CARD alone — never on a pool argument, which is not
+        // the principal's reason. Re-deriving it here from a token and an
+        // issue id was only accidentally correct, and the direct conversation
+        // inherits the answer, so a wrong one changes the primary outcome.
+        if (
+          data.message?.speaker === "participant_proxy" &&
+          data.reasonForRequirement
+        ) {
+          setProxyVoicedReason(true);
         }
-        // The Explorer's added clause rides in the same list. It never sets
-        // `proxyVoicedReason`: a pool argument is not the principal's reason,
-        // and letting one satisfy the requirement rule would mean an Explorer
-        // participant who authorized nothing still got the concession.
-        if (data.addedReasonToken) reasonsUsed.push(data.addedReasonToken);
+
         if (
           data.message?.speaker === "participant_proxy" &&
           data.stage !== undefined

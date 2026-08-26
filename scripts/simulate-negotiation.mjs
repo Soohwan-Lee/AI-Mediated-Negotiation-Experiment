@@ -90,10 +90,11 @@ async function proxyRun(name, taskId, participantRole, policy, extraReasonIds, e
     });
     if (!res.ok) { events.push({ turn, error: `${res.status} ${await res.text()}` }); break; }
     const data = await res.json();
-    if (data.reasonToken) reasonsUsed.push(data.reasonToken);
-    // The Explorer's added pool clause budgets separately and must be carried
-    // back too, or the one-per-issue and two-per-task caps never bind.
-    if (data.addedReasonToken) reasonsUsed.push(data.addedReasonToken);
+    // A fixed-width pair every turn. Real tokens must be carried back or the
+    // pool caps never bind across turns; the decoys that pad the pair are
+    // dropped server-side by `resolveReasonTokens`, so pushing all of them is
+    // correct and costs no budget.
+    if (data.reasonTokens?.length) reasonsUsed.push(...data.reasonTokens);
     if (data.message) {
       messages.push({ speaker: data.message.speaker, stage: data.stage, text: data.message.text, proposal: data.message.proposal ?? null });
       if (data.message.proposal) {
@@ -103,7 +104,7 @@ async function proxyRun(name, taskId, participantRole, policy, extraReasonIds, e
     }
     events.push({
       turn, stage: data.stage, blocked: data.blocked, guardrailViolations: data.guardrailViolations,
-      reasonIssueId: data.reasonIssueId ?? null, accepted: data.accepted, impasse: data.impasse,
+      reasonForRequirement: data.reasonForRequirement ?? null, accepted: data.accepted, impasse: data.impasse,
       decidedAction: data.decidedAction ?? null,
     });
     if (data.accepted) { accepted = true; tentative = data.message?.proposal ?? lastParticipantPackage; }

@@ -228,6 +228,35 @@ role's exchange argument carries a null issue, the requirement's reason would
 go unregistered — so the Explorer arm would arrive at the direct conversation
 flagged reasonless where the Delegate arm did not. Keep both separations.
 
+**The two pool clauses land on different issues, and must.** Stage 2 spends
+the requirement issue's pool item; stage 4 spends the EXCHANGE argument, the
+one pool entry carrying no issue, because that stage's move is the trade.
+Pointing both at the requirement issue looks harmless and silently halves the
+manipulation: each role's pool holds exactly one item per issue, so the second
+request finds nothing, every Explorer participant gets one added clause where
+§7 allows two, and no log shows it because one clause is a legal outcome.
+
+**What the client receives about reasons must be constant in SHAPE, not just
+opaque in content.** This has been got wrong three times in the same place.
+The `pool:` prefix named the AI-added messages outright; a separate
+`addedReasonToken` field named them by its presence, since only the Explorer
+populates it; collapsing both into one variable-length array named them by its
+length. The response therefore returns EXACTLY TWO opaque hashes on every turn
+of every policy, padding with a per-turn decoy — `resolveReasonTokens` drops
+anything that does not re-hash to a known id, so a decoy spends no budget and
+satisfies no rule. A blocked turn returns decoys too, because an empty array
+is its own one-bit tell that a guardrail fired.
+
+**Whether the proxy argued the requirement is decided server-side, from the
+principal's card alone** (`reasonForRequirement`). The client used to pair a
+token with an issue id to work it out, which was correct only because of which
+issue ids the designation sites happened to pass — and the stage-4 pool fix
+moves exactly those ids. A pool argument is not the principal's reason: if one
+could satisfy the rule, an Explorer participant who authorized nothing would
+still be handed the requirement concession, 3,200 against 1,200, in one arm
+only, on the primary outcome. The boolean leaks nothing, being equally true
+under Delegate.
+
 **The counterpart gives a work reason and never its sensitive one.** Ver.2.6
 §4 fixes its mandate with all six cards ticked so the receiver-side stimulus is
 identical for everyone; the fixed-and-identical half is implemented, the
