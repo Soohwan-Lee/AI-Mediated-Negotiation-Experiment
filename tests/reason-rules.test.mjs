@@ -491,3 +491,22 @@ for (const taskId of TASKS) {
     });
   }
 }
+
+// A guardrail-blocked stage 2 returns no token, so the work reason is never
+// recorded as voiced. Stage 4 must still reach the SENSITIVE card — the
+// disclosure being measured cannot be starved by an unrelated block.
+for (const taskId of TASKS) {
+  for (const role of ROLES) {
+    test(`${taskId}/${role}: a blocked stage 2 still reaches the SB at stage 4`, () => {
+      const t = getTask(taskId);
+      const req = requirementIssue(t, role);
+      const cards = reasonCards(t, role).filter((c) => c.issueId === req.id);
+      const wr = cards.find((c) => c.layer === "work");
+      const sb = cards.find((c) => c.layer === "sensitive");
+      const both = [wr.id, sb.id];
+      // Nothing recorded as voiced, because the stage-2 turn was blocked.
+      const second = designatedReason(t, role, 4, both, { alreadyVoiced: [] });
+      assert.equal(second.id, sb.id);
+    });
+  }
+}

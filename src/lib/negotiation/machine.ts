@@ -465,6 +465,13 @@ export function designatedReason(
 
   // Stage 2 opens with the general argument; the sensitive one is held back
   // unless it is the only thing authorized on this issue.
+  //
+  // A GUARDRAIL-BLOCKED STAGE 2 COSTS THE WORK REASON PERMANENTLY. A blocked
+  // turn returns no token, so `alreadyVoiced` stays empty — but stage 4 asks
+  // for `sensitive ?? work` and takes the sensitive card, never falling back.
+  // That is the right way round: the disclosure being measured is never
+  // starved, and only the general argument is lost. Do not read the
+  // `alreadyVoiced` parameter as making the schedule self-healing.
   if (stage <= 2 && target === requirement.id) return work ?? sensitive;
 
   // From the challenge onward the costly reason is spent, on any issue.
