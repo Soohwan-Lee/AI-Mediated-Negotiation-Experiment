@@ -7,27 +7,34 @@
  *
  * Runs:
  *  1. Delegate proxy-proxy (task_a, participant = member, 3 WR authorized)
- *  2. Explorer proxy-proxy (task_a, participant = leader) with ONLY the
- *     sensitive card authorized on the requirement issue, so the SB
- *     depersonalizing reframing rule is actually exercised — with the work
- *     card also ticked the proxy reliably picks it first and the per-issue
- *     cap then bars the SB, so a mixed mandate tests nothing.
- *  3. Baseline direct (task_b, participant = member) — the participant is a
+ *  2. Delegate with the work reason AND the sensitive card ticked on the
+ *     requirement issue. This is the ver.2.6 case: the schedule voices the WR
+ *     at stage 2 and the SB after the challenge at stage 4. Under the old
+ *     per-issue cap the SB here was never said at all, so this run is the
+ *     evidence that a ticked card actually reaches the other side.
+ *  3. The same mandate under Explorer, which additionally lets a pool clause
+ *     ride inside one of those messages.
+ *  4. Explorer with ONLY the sensitive card authorized on the requirement
+ *     issue — the SB reframing rule with nothing else to fall back on.
+ *  5. Baseline direct (task_b, participant = member) — the participant is a
  *     second gpt-5.6-terra agent playing a Prolific worker; the counterpart is
  *     the real /api/counterpart route and the reason-linked rule runs the
  *     same client logic the Baseline page runs.
- *  4. A rehearsal leak probe: asks the proxy to repeat an UNTICKED sensitive
+ *  6. A rehearsal leak probe: asks the proxy to repeat an UNTICKED sensitive
  *     card and checks the refusal.
  *
  * Read the transcripts, not only the checks: prose-package level agreement,
  * the P1 voice, and the SB reframing clauses are judgement calls a boolean
- * cannot carry. Writes simulation-report.json beside this script (ignored).
+ * cannot carry. Writes simulation-report.json beside this script (ignored)
+ * and readable markdown transcripts to docs/transcripts/ (committed).
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const ROOT = process.cwd();
 const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), "simulation-report.json");
+/** Readable transcripts, committed so a reviewer can read what the model said. */
+const TRANSCRIPT_DIR = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "docs", "transcripts");
 const BASE = "http://localhost:3000";
 
 const { getTask, scorePackage, preservesRequirement, requirementIssue, counterpartOpening, reasonCards } =
@@ -84,6 +91,9 @@ async function proxyRun(name, taskId, participantRole, policy, extraReasonIds, e
     if (!res.ok) { events.push({ turn, error: `${res.status} ${await res.text()}` }); break; }
     const data = await res.json();
     if (data.reasonToken) reasonsUsed.push(data.reasonToken);
+    // The Explorer's added pool clause budgets separately and must be carried
+    // back too, or the one-per-issue and two-per-task caps never bind.
+    if (data.addedReasonToken) reasonsUsed.push(data.addedReasonToken);
     if (data.message) {
       messages.push({ speaker: data.message.speaker, stage: data.stage, text: data.message.text, proposal: data.message.proposal ?? null });
       if (data.message.proposal) {
@@ -324,9 +334,79 @@ async function rehearsalProbe() {
   console.log(`[rehearsal] blocked=${data.blocked} text=${(data.text ?? "").slice(0, 90)}...`);
 }
 
+/**
+ * Who is speaking, in the words the participant sees on screen.
+ *
+ * The transcripts are read by people, and "participant_proxy" is not a name
+ * anyone recognises. These are the labels from components/negotiation.tsx, so
+ * a saved transcript reads the way the interface does — including "Other
+ * Participant" for the counterpart, who is never given a name (CLAUDE.md
+ * deception item 1).
+ */
+const SPEAKER_LABEL = {
+  participant: "You",
+  counterpart: "Other Participant",
+  participant_proxy: "Your AI Proxy",
+  counterpart_proxy: "Their AI Proxy",
+  counterpart_principal: "Other Participant",
+};
+
+/** One run as a readable markdown transcript. */
+function transcriptMarkdown(run) {
+  const c = run.checks ?? {};
+  const lines = [
+    `# ${run.name}`,
+    "",
+    `- **Task**: ${run.taskId} · **Participant role**: ${run.participantRole} · **Condition**: ${run.policy}`,
+    `- **Outcome**: ${c.accepted ? "agreement" : c.impasse ? "impasse" : "no acceptance recorded"}`,
+    `- **Messages**: ${run.messages.length}`,
+  ];
+  if (c.participantScore != null) {
+    lines.push(
+      `- **Score**: ${c.participantScore} to the participant` +
+        (c.counterpartScore != null ? ` · ${c.counterpartScore} to the other side` : ""),
+    );
+  }
+  if (c.finalMatchesPlan !== undefined) {
+    lines.push(
+      `- **Final package matches what the state machine planned**: ${c.finalMatchesPlan ? "yes" : "NO — investigate"}`,
+    );
+  }
+  lines.push(`- **Guardrail-blocked turns**: ${c.blockedCount ?? 0}`, "", "---", "");
+
+  for (const m of run.messages) {
+    const who = SPEAKER_LABEL[m.speaker] ?? m.speaker;
+    lines.push(`**${who}**${m.stage ? ` · stage ${m.stage}` : ""}`, "");
+    // `||` is the bubble split the prompts use; render each bubble as its own
+    // line so the transcript reads the way the screen does.
+    for (const bubble of String(m.text).split("||")) {
+      const t = bubble.trim();
+      if (t) lines.push(`> ${t}`, "");
+    }
+  }
+  return lines.join("\n");
+}
+
 await proxyRun("delegate-proxy", "task_a", "member", "delegate", []);
-await proxyRun("explorer-proxy-sb", "task_a", "leader", "explorer", ["a_i1_sb_l"], ["a_i1_wr_l"]);
+// BOTH CARDS TICKED ON THE REQUIREMENT ISSUE — the ver.2.6 case. Under the old
+// per-issue cap the sensitive card here was never voiced; the transcript is
+// the evidence that the work reason lands at stage 2 and the sensitive one
+// after the challenge.
+await proxyRun("delegate-proxy-wr-and-sb", "task_a", "leader", "delegate", ["a_i1_sb_l"]);
+await proxyRun("explorer-proxy-wr-and-sb", "task_a", "leader", "explorer", ["a_i1_sb_l"]);
+await proxyRun("explorer-proxy-sb-only", "task_a", "leader", "explorer", ["a_i1_sb_l"], ["a_i1_wr_l"]);
 await baselineRun();
 await rehearsalProbe();
 writeFileSync(OUT, JSON.stringify(report, null, 2));
 console.log("report written:", OUT);
+
+// The markdown transcripts are the artefact worth keeping: the JSON report
+// answers "did the checks pass", these answer "does it read like a
+// negotiation", which is the thing no assertion covers.
+mkdirSync(TRANSCRIPT_DIR, { recursive: true });
+for (const run of report.runs) {
+  if (!run.messages?.length) continue;
+  const file = `${TRANSCRIPT_DIR}/${run.name}.md`;
+  writeFileSync(file, transcriptMarkdown(run));
+  console.log("transcript written:", file);
+}

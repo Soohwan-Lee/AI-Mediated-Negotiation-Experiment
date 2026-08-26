@@ -1206,7 +1206,15 @@ function ReasonMandateSection({
           ticking more is the better answer — how many they tick, and on which
           terms, IS the measure (REASON-SCOPE). */}
       <Card tone="private" className="text-[var(--private-ink)]">
-        <CardTitle hint="Each term has a work reason and a piece of sensitive background. Tick what your AI Proxy may say; it uses judgement about when.">
+        {/* "Tick what it may say" understated what ticking does, and since
+            ver.2.6 it is simply wrong: the hint used to end "it uses judgement
+            about when", but the schedule now decides that, and anything ticked
+            on this term WILL be said. Ticking is the disclosure decision, not
+            a permission the proxy might not exercise, and the screen has to
+            say so or REASON-SCOPE measures something the participant did not
+            think they were choosing. The wording stays symmetrical across the
+            two boxes — it must not read as encouragement to tick more. */}
+        <CardTitle hint="Each term has a work reason and a piece of sensitive background. Anything you tick here will actually be said on your behalf.">
           💬 What it may say about why
         </CardTitle>
 
