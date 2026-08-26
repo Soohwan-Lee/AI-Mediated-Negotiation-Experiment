@@ -1,28 +1,33 @@
 # baseline-direct
 
 - **Task**: task_b · **Participant role**: member · **Condition**: baseline
-- **Outcome**: no acceptance recorded
+- **Outcome**: agreement
 - **Messages**: 7
 - **Score**: 3200 to the participant · 4100 to the other side
+- **Requirement preserved**: yes
 - **Guardrail-blocked turns**: 0
 
 ---
 
 **Other Participant** · stage 1
 
-> i propose 4 rehearsal rounds, 4 evening shifts a week, and a Week 5 launch. Rehearsal depth matters most to me.
+> i’d propose 4 rehearsal rounds, 4 evening shifts, and a Week 5 launch.
+
+> Rehearsal readiness matters most to me.
 
 **You**
 
-> i can work with 4 rehearsal rounds if that’s the priority, but 4 evening shifts plus week 5 is too tight for a reliable setup. could we keep evening cover to 2 a week and target week 8 instead?
+> that’s too compressed from the setup/support side. four rehearsals also takes a lot of time out of prep and follow-up fixes. i could work with 2 rehearsal rounds, 2 evening shifts a week, and a Week 7 launch.
 
 **Other Participant** · stage 2
 
-> got it. rehearsal rounds matter most to me because we need to avoid mistakes in the client demo. which matters more to you: cover or launch?
+> i hear the prep concern. rehearsal rounds matter most to me because we need to catch mistakes before the client demo.
+
+> which term matters most to you?
 
 **You**
 
-> cover is the bigger concern for me. keeping it at 2 evenings a week is what lets me stay reliable during setup; pulling the launch back also gives us room to verify properly. i can support 4 rehearsal rounds if we hold those two.
+> evening cover is the one i need to keep sustainable — i can do up to 2 a week, but not 4. being rested makes a real difference to avoiding setup errors the next day. since rehearsals are your priority, could we do 3 rounds, 2 evening shifts, and launch in Week 6?
 
 **Other Participant** · stage 3
 
@@ -30,8 +35,8 @@
 
 **You**
 
-> i don’t think 3 evenings is sustainable for me during this stretch. i can keep the 4 rehearsal rounds, but need cover capped at 2. to meet you partway on timing, would week 7 work?
+> i’m not comfortable committing to 3 evenings a week during launch. could meet you on rehearsal coverage instead: 4 rounds, 2 evening shifts, and a Week 7 launch. that gives us the checks without squeezing the setup window too hard.
 
 **Other Participant** · stage 4
 
-> yes, that package works for me: 4 rehearsal rounds, 2 evening shifts, and a week 7 launch.
+> that package works for me: 4 rehearsal rounds, 2 evening shifts, and a Week 7 launch.
