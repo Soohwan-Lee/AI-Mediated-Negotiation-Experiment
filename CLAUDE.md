@@ -2,7 +2,7 @@
 
 Online experiment platform for a 2027 CHI submission on AI-mediated
 negotiation. Source of truth for the design is
-`N - Experimental Design (Ver.2.6).md`. This file records the constraints that
+`N - Experimental Design (Ver.2.11).md`. This file records the constraints that
 are easy to break by accident.
 
 ## Stack
@@ -26,22 +26,28 @@ Both roles now hold a socially costly requirement, mandate a proxy, and receive
 the other side's case. That is why the yoked receiver stimulus is gone (§13):
 with both sides sending, there is no receiver-only arm left to hold constant.
 
-**Per-issue reason cards are the ver.2.5 change.** Each role holds one Working
-Reason and one Sensitive Background PER ISSUE — six cards spanning all three
-terms — instead of six cards about the requirement issue alone. The three SBs
-are three facets of ONE backstory, woven into the role story so no card
-arrives unannounced. Two rules follow and both are validity-bearing:
+**Two reason cards per role per task is the Ver.2.11 shape.** One Working
+Reason and one Sensitive Background, BOTH on that role's own requirement issue.
+The other term is what you SPEND, not what you argue for, so it carries no card
+of your own. Across the two tasks each role's SB is the same backstory at a
+different moment — the manager's staffing exposure, the senior's second job —
+woven into the role story so no card arrives unannounced in whichever task is
+met second. Two rules follow and both are validity-bearing:
 
-- **The reason-linked acceptance rule is issue-scoped.** "A reason was given"
-  means a reason ON THE REQUIREMENT ISSUE was given, at all three judgement
-  sites (proxy route, direct conversation, Baseline). An argument about the
-  timing term is not a reason to concede the requirement — unscoped, a
-  participant could earn the concession with an unrelated card.
-- **No screen may single a term out any more.** With cards on one issue, a
-  heading naming the requirement merely repeated the briefing; with cards on
-  all three, it would newly reveal which term the study is about. The three
-  issue blocks (briefing, mandate, Baseline picker — `IssueReasonGroups`)
-  render identically, and `tests/reason-rules.test.mjs` pins the invariants.
+- **The reason-linked acceptance rule stays issue-scoped**, even though every
+  card now satisfies the check. The call sites read the card's `issueId` rather
+  than assuming it, at all three judgement sites (proxy route, direct
+  conversation, Baseline), so a card added later on the other term cannot
+  silently earn the requirement concession.
+- **No screen may name the requirement issue.** This inverted with the card
+  count. When cards spanned all three terms, a per-issue heading merely
+  repeated the briefing; with cards on ONE issue, that same heading points
+  straight at the term the study is about. `IssueReasonGroups` therefore
+  renders the work and sensitive boxes with no issue heading at all — and for
+  the same reason no badge may mark which issue is this role's priority (design
+  §5 principle 1, "Issue type·핵심 요구 표시는 비표시"). The cards name their own
+  term in their text, which is the participant's own briefing.
+  `tests/reason-rules.test.mjs` pins the invariants.
 
 **Ver.2.6 made the ticked cards actually get said.** Per-issue cards were only
 half the change: the cap that came with them meant a ticked sensitive card
@@ -55,29 +61,43 @@ only a feeling, or the reframing rule has nothing to work on.
 
 ## The task, in numbers
 
-Three terms, four options each. One is the Leader's priority and carries the
-**Leader's requirement**; one is the Member's priority and carries the
-**Member's**; one is constant-sum (timing). Payoffs are in `lib/tasks.ts` and
+**Two terms, four options each, both integrative** (Ver.2.11 §3.2). One is the
+Leader's priority and carries the **Leader's requirement**; one is the Member's
+and carries the **Member's**. There is no third term: the constant-sum timing
+issue is gone, because on it every point conceded was exactly one point gained
+— pure transfer at the worst available rate, which `buildProxyPlan` already
+refused to spend except as a last resort. Payoffs are in `lib/tasks.ts` and
 these properties are load-bearing — if you change a number, recheck all of
 them:
 
-- individual maximum 6,300; joint range 4,800–7,800
-- reservation 2,500 each, so **24 of the 64** packages clear both fallbacks,
-  and **14** of those hold *both* requirements — protecting your requirement,
+- individual maximum 3,900; the most reachable while the counterpart still
+  agrees is 3,000, because every agreement path holds their priority at its
+  best option
+- joint range 1,800–6,000; the full logroll reaches **6,000** and is perfectly
+  symmetric at 3,000 each. That is the number `MAX-JOINT` tests for
+- reservation 600 each, so **12 of the 16** packages clear both fallbacks, and
+  **4** of those hold *both* requirements — protecting your requirement,
   respecting theirs, and reaching agreement are compatible **by construction**
-- exactly **17** clear both fallbacks while holding the Leader's requirement,
-  and 17 while holding the Member's. That symmetry is the design; an asymmetric
+- exactly **6** clear both fallbacks while holding the Leader's requirement,
+  and 6 while holding the Member's. That symmetry is the design; an asymmetric
   count means a payoff was edited on one side only
-- all-middle compromise is joint 5,800; the full logroll reaches 7,800
+- the near-middle compromise is joint 4,600 against the logroll's 6,000, so
+  splitting each term still costs both sides something
 - each requirement's threshold is Options 1–2 on its own issue. O1→O2 keeps it,
   O2→O3 breaks it, which is why the trajectory is reported as transitions and
   never summed
 
+**The acceptance thresholds scale with this table and must be rechecked
+whenever it moves.** T_MID was 3,600 against the old 6,300-point three-issue
+scale; on the two-issue task nothing reachable cleared it, so every cell ran to
+impasse while each component still looked right on its own. T_MID is now 3,000
+— the full logroll exactly — and T_FINAL 2,000.
+
 **A bare point number is not information, so two anchors travel with it.**
-`PointsKey` names the most the task could pay this participant (6,300) and the
-fallback they get with no agreement (2,500); `PackageValue` shows what the
-currently-selected package pays, against that fallback, once all three terms
-have a level. Both are already the participant's own — the fallback is in the
+`PointsKey` names the most the task could pay this participant (3,900) and the
+fallback they get with no agreement (600); `PackageValue` shows what the
+currently-selected package pays, against that fallback, once both terms have a
+level. Both are already the participant's own — the fallback is in the
 briefing and the maximum is the sum of their own best levels — so neither
 discloses anything the design withholds. Neither may ever show the other side's
 numbers, the joint total, or any hint that trading term against term pays
@@ -93,7 +113,7 @@ this study has to distinguish from withdrawal under evaluative pressure.
 ## Who decides what in a negotiation
 
 `lib/negotiation/machine.ts` decides the moves: offer levels, concessions,
-acceptance (T_MID = 3,600 at stage 4, T_FINAL = 2,600 at stage 5), and
+acceptance (T_MID = 3,000 at stage 4, T_FINAL = 2,000 at stage 5), and
 termination. The model only says those moves in the right voice. Keep it that
 way. A counterpart whose judgement is the model's is a different counterpart
 for every participant, and it is why the design does not need to randomize
@@ -160,7 +180,7 @@ ticked cards; in Baseline it is the reason a participant attaches to a message
 via `ReasonPicker`. That control may never suggest attaching one helps, may
 never default to a card, and may never treat the sensitive cards as the better
 answer. And since ver.2.5 the judgement is **issue-scoped**: with cards on all
-three terms, only a reason on the requirement issue counts as a reason for the
+both terms, only a reason on the requirement issue counts as a reason for the
 requirement — see the ver.2.5 paragraph above.
 
 **The rule has to reach stage 5, not only stage 4.** Gating only the trade made
@@ -185,7 +205,7 @@ outcome and only the Proxy arm has code that can abandon it unprompted, so
 that put a mechanical difference straight into `Pooled Proxy − Baseline`.
 
 **Concessions are chosen step by step, not issue by issue.** Ordering whole
-issues by cost ratio spent the distributive term to its floor once picked, and
+issues by cost ratio spent the cheapest term to its floor once picked, and
 on a constant-sum term every point given is exactly one point gained — pure
 transfer, always the worst rate, never the way to close a gap the integrative
 terms could close more cheaply. A step that buys the counterpart nothing is
@@ -316,7 +336,7 @@ These are load-bearing. Breaking any one invalidates the data.
    amount and it is still recorded as `BONUS`; it simply never travels. What
    `/debriefing` discloses is that no such decision was ever made about them.
    Do not "restore" a number here for symmetry.
-5. **Which term the study is about.** All three terms are entered the same way
+5. **Which term the study is about.** Both terms are entered the same way
    on the preference screen — no extra control, no highlight, no separate
    heading for the requirement issue. Pilot gate 6 tests for exactly this kind
    of transparency, which is also why the instructions no longer teach the
@@ -405,7 +425,7 @@ Inside a Proxy task: cover → brief → **RISK** → **mandate (levels + reason
 cards, one screen)** → check with your proxy → confirm → watch the two AI
 Proxies → **handover** → negotiate directly → review.
 
-**The mandate is ONE screen: the levels on all three terms and the reason
+**The mandate is ONE screen: the levels on both terms and the reason
 cards.** They were two screens in sequence, which made them two decisions
 taken in order — the position fixed before the reasons were considered. The
 gap this study is about is precisely that the second half was never asked, so
@@ -734,12 +754,34 @@ keeping:
   rather than assuming every message is model prose. If the rate is high, the
   fix is the prompt's stage block, not the validator.
 
+## Ver.2.11 migration status
+
+The scenario, the payoffs, the issue count and the reason-card deck are
+migrated (see "The task, in numbers"). Deliberately NOT migrated yet, because
+Ver.2.11 §13.2–13.3 still lists them as values and designs to be fixed at
+pilot:
+
+- the **tier-ladder acceptance rule** (§6.2: no reason → 3rd option, WR → 2nd,
+  SB → best). The current code still uses the threshold rule, recalibrated to
+  the new scale, plus the reason-linked gate
+- the **six-stage script** (§6.1). Still five stages
+- the **counterpart's fixed SB disclosure** (§6.3) — it still voices a work
+  reason only, so `PRE-RECIP-SB` / `POST-RECIP-SB` / `MUTUAL-SB` have nothing
+  to record
+- **RECV-EVAL** (§5): a Member still only waits while the Leader decides, and
+  does not yet write an upward evaluation
+- the new outcome measures `UNLOCK`, `CONCEAL-PREMIUM`, `JOINT`, `MAX-JOINT`
+
+Doing any of these means touching `machine.ts`, `script.ts` (both must move
+together — see the mockup-mode note) and `measures.ts`.
+
 ## Still open
 
 Nothing structural. What remains is values to fix and behaviour to exercise:
 
-- **Pilot-dependent numbers.** Reservation (2,500), acceptance thresholds
-  (T_MID = 3,600 / T_FINAL = 2,600), the advertised time, the payment (£7.50
+- **Pilot-dependent numbers.** Reservation (600), acceptance thresholds
+  (T_MID = 3,000 / T_FINAL = 2,000), the outcome ladder (1,000/2,000/3,000),
+  the advertised time, the payment (£7.50
   participation, £1.00 bonus per task — GBP because Prolific pays in it, and
   both must clear Prolific's fair-pay rate), and the Prolific completion code.
   The Member's fixed bonus is no longer on this list: no number is shown to a
@@ -767,11 +809,11 @@ Nothing structural. What remains is values to fix and behaviour to exercise:
   a between-condition control, and any measure that behaves like a word count
   should be read with that in mind. Worth checking against the pilot
   transcripts.
-- **Whether three issues survive the demand-characteristic check.** With only
-  three terms each requirement is salient, and the suspicion probe may show
-  that participants guessed the design. The preregistered fallback is a fourth
-  (distributive) issue, which would mean recomputing every payoff property
-  listed above.
+- **Whether two issues survive the demand-characteristic check.** With only two
+  terms each requirement is highly salient — more so than with three — and the
+  suspicion probe may show that participants guessed the design. Adding a term
+  back would mean recomputing every payoff property listed above and restoring
+  the trade move the counterpart used to have.
 - **The failure branches work but nothing exercises them automatically.**
   Impasse, the emergency stop, the reason-request branch, the reason-withheld
   close and the one revision were all verified by hand — driving the state
