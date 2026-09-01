@@ -58,6 +58,8 @@ import {
 } from "@/components/session";
 import { ActionBar } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Page, cx } from "@/components/ui";
+import { MeasureBlock } from "@/components/measure";
+import { m1Item } from "@/lib/measures";
 import {
   useDevActions,
   useDevAutofill,
@@ -362,6 +364,8 @@ export function ProxyTask({
    */
   const stopped = useRef(false);
   const [showStopped, setShowStopped] = useState(false);
+  /** M1 (§9.3): asked right after the mandate, of non-disclosers only. */
+  const [m1Answer, setM1Answer] = useState<string | null>(null);
 
   const mockAi = useDevMockAi();
   const script = scriptedTask(task, role, policy);
@@ -836,6 +840,18 @@ export function ProxyTask({
       (c) => !mandate.authorizedReasonIds.includes(c.id),
     );
 
+    const sbChecked = reasonCards.some(
+      (c) =>
+        c.layer === "sensitive" && mandate.authorizedReasonIds.includes(c.id),
+    );
+    const m1Block = {
+      id: "m1",
+      title: "One quick question",
+      items: [{ ...m1Item("proxy"), id: `M1_t${taskIndex}` }],
+    };
+    const needsM1 = !sbChecked && m1Answer === null;
+    const confirmReady = !needsM1;
+
     return (
       <>
         <Page width="wide">
@@ -920,14 +936,35 @@ export function ProxyTask({
                 </div>
               ) : null}
             </Card>
+
+            {!sbChecked ? (
+              <div className="mb-6">
+                <MeasureBlock
+                  block={m1Block}
+                  answers={
+                    m1Answer === null
+                      ? {}
+                      : { [`M1_t${taskIndex}`]: m1Answer }
+                  }
+                  onChange={(_, value) => setM1Answer(String(value))}
+                />
+              </div>
+            ) : null}
           </TaskLayout>
         </Page>
 
         <ActionBar
           label="Confirm and Launch Proxy Negotiation"
+          disabled={!confirmReady}
           onClick={async () => {
+            if (!confirmReady) return;
             if (participantKey) {
               await getStore().saveMandate(participantKey, mandate);
+              if (m1Answer !== null) {
+                await getStore().saveResponses(participantKey, `m1_t${taskIndex}`, {
+                  [`M1_t${taskIndex}`]: m1Answer,
+                });
+              }
             }
             // DECISION-LOCK (Ver.2.12 §6.1): the mandate is fixed before
             // anyone has spoken and cannot be revised after hearing the

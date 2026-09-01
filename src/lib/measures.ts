@@ -1,6 +1,6 @@
 /**
  * Every questionnaire item in the study, in one place (Experimental Design
- * Ver.2.4 §9).
+ * Ver.2.12 §9).
  *
  * Items are DATA, not markup. Adding, cutting, or rewording one means editing
  * this file only; nothing in a page component knows what an item says or how
@@ -15,12 +15,16 @@
  * these judgements contaminate each other: asking about the counterpart's AI
  * before asking about the counterpart would tell a participant what to notice.
  *
- * WHAT ver.2.4 CHANGED. The 0-100 attribution scales became 7-point PCR items;
- * the Member-only measurement structure became role-symmetric; the individual
- * difference batteries came BACK as three two-item covariates (§9.1.2), which
- * is a reversal of ver.1.8 and is deliberate — they are there for precision
- * and to answer the reviewer who says "that is just trait X", not as
- * moderators.
+ * WHAT Ver.2.12 CHANGED. PERC split into PERC-F (face) and PERC-I
+ * (evaluation reflection), matching §1.2's two-layer working definition of
+ * social cost 1:1. FNE was replaced by FTS (feelings of threat sensitivity,
+ * White et al. 2004 — trait, where PERC is the state in THIS negotiation).
+ * PCR grew to seven items separating information reading (1–3) from
+ * receiver-side face judgement (4–7), because every participant now HEARS the
+ * counterpart's SB disclosure. OTHER-AI grew to six, splitting generic-source
+ * discrimination (4) from personal-fact provenance inference (5). M1 asks the
+ * non-discloser their main reason. The Member writes RECV-EVAL, an upward
+ * evaluation, as the receiver-side behavioural channel.
  */
 
 import { STUDY } from "./study-config";
@@ -225,12 +229,22 @@ export const BACKGROUND_BLOCKS: Block[] = [
           { value: "yes", label: "Yes" },
         ],
       },
+      {
+        kind: "choice",
+        id: "BG11",
+        text: "Have you ever worked in a service job with scheduled shifts (for example retail, food service, or hospitality)?",
+        columns: 2,
+        options: [
+          { value: "no", label: "No" },
+          { value: "yes", label: "Yes" },
+        ],
+      },
     ],
   },
   // ---------------------------------------------------------------------------
   // 9.1.2  Covariates
   //
-  // Three constructs, two items each, chosen by one criterion: "an individual
+  // Three constructs, chosen by one criterion: "an individual
   // difference a reviewer would raise as the alternative explanation". They go
   // into the model for precision and robustness (§11), never as moderators —
   // at N=120 there is no power to test them as such, and pretending otherwise
@@ -245,16 +259,27 @@ export const BACKGROUND_BLOCKS: Block[] = [
     title: "How you see yourself",
     hint: "1 = Strongly disagree, 7 = Strongly agree. There are no right answers.",
     items: [
+      // FTS (White et al. 2004): the trait sensitivity that predicts
+      // face-threat reactions in negotiation. The original 1–9 scale is
+      // aligned to this study's 7-point response format. Trait, where PERC is
+      // the state in this negotiation — FTS predicting PERC is itself a
+      // convergent-validity check on the manipulation.
       {
         kind: "scale",
-        id: "COV-FNE1",
-        text: "I often worry about what other people think of me.",
+        id: "COV-FTS1",
+        text: "My feelings are easily hurt.",
         ...AGREE,
       },
       {
         kind: "scale",
-        id: "COV-FNE2",
-        text: "I am afraid that other people will disapprove of me.",
+        id: "COV-FTS2",
+        text: "I do not take direct criticism well.",
+        ...AGREE,
+      },
+      {
+        kind: "scale",
+        id: "COV-FTS3",
+        text: "I am rather thin-skinned.",
         ...AGREE,
       },
       {
@@ -342,7 +367,7 @@ export const COMPREHENSION_ANSWERS: Record<string, string> = {
 /** Which instruction to re-show when an answer is wrong. */
 export const COMPREHENSION_REMEDIATION: Record<string, string> = {
   COMP1:
-    "The store manager sets the schedule once it is agreed, and decides the senior staff member's performance bonus after each one.",
+    "The store manager decides the senior staff member's recommended bonus after each negotiation — and the senior staff member writes an upward evaluation of the manager, which goes to the district manager.",
   COMP2:
     "Neither of you can set the schedule alone. Both terms have to be agreed by the two of you, or it falls back to the default rota.",
   COMP3:
@@ -357,15 +382,20 @@ export const COMPREHENSION_REMEDIATION: Record<string, string> = {
  * column will optimize points and ignore the situation, and the situation is
  * what this study is about.
  */
-export function practiceReasonItem(): Item {
+export function practiceReasonItem(role: Role): Item {
+  const leaderSide = role === "leader";
   return {
     kind: "choice",
     id: "PRAC1",
-    text: "You scored highest on holding the offsite in the office. Why is that the better option for you?",
+    text: leaderSide
+      ? "Your best-scoring option is doing the deep clean next week. Why is that the better option for you?"
+      : "Your best-scoring option is keeping the machine behind the counter. Why is that the better option for you?",
     options: [
       {
-        value: "travel",
-        label: "A long journey would eat most of the day",
+        value: "reason",
+        label: leaderSide
+          ? "It gets done before the quarterly inspection"
+          : "It is the one spot you can reach mid-rush",
       },
       { value: "points", label: "Because it is worth the most points" },
       { value: "other_side", label: "Because the other side prefers it" },
@@ -374,7 +404,7 @@ export function practiceReasonItem(): Item {
   };
 }
 
-export const PRACTICE_REASON_ANSWER = "travel";
+export const PRACTICE_REASON_ANSWER = "reason";
 
 // ---------------------------------------------------------------------------
 // 9.2  Immediately before each task — RISK
@@ -391,13 +421,13 @@ const RISK_ITEMS: Item[] = [
   {
     kind: "scale",
     id: "RISK1",
-    text: `Bringing up ${REQUIREMENT_PLACEHOLDER} could put the agreement at risk.`,
+    text: `Pushing hard on ${REQUIREMENT_PLACEHOLDER} could put the agreement at risk.`,
     ...AGREE,
   },
   {
     kind: "scale",
     id: "RISK2",
-    text: `Bringing up ${REQUIREMENT_PLACEHOLDER} could make the other person think worse of me.`,
+    text: `Pushing hard on ${REQUIREMENT_PLACEHOLDER} could make the other person think worse of me.`,
     ...AGREE,
   },
 ];
@@ -415,24 +445,38 @@ export function riskBlock(task: NegotiationTask, role: Role): Block {
 // 9.4  After each task, in this order
 // ---------------------------------------------------------------------------
 
-/** 9.4.1 — evaluation and reputation concern. Everyone. */
+/**
+ * 9.4.1 — the two layers of expected social cost (Ver.2.12 §1.2, §9.4).
+ *
+ * PERC-F is face: looking less capable, a dented professional image. PERC-I
+ * is instrumental: the announced post-negotiation decision (bonus / upward
+ * evaluation) picking the disclosure up. The split matches the working
+ * definition 1:1, and the two halves are analysed as sub-scales, never
+ * pooled by default.
+ */
 const PERC_ITEMS: Item[] = [
   {
     kind: "scale",
-    id: "PERC1",
-    text: "I worried that what I asked for would make the other person think less of me.",
+    id: "PERC-F1",
+    text: "Explaining my reasons made me feel I could look less capable in front of the other person.",
     ...AGREE,
   },
   {
     kind: "scale",
-    id: "PERC2",
-    text: "I felt that explaining my reasons could damage how my ability or commitment came across.",
+    id: "PERC-F2",
+    text: "I felt my professional image could take a hit from what I shared.",
     ...AGREE,
   },
   {
     kind: "scale",
-    id: "PERC3",
-    text: "That worry affected which requests and reasons I voiced or held back.",
+    id: "PERC-I1",
+    text: "I worried that what was said could count against me in the bonus or evaluation afterwards.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "PERC-I2",
+    text: "It felt safer for the later evaluation not to bring certain things up.",
     ...AGREE,
   },
 ];
@@ -440,40 +484,50 @@ const PERC_ITEMS: Item[] = [
 /**
  * 9.4.2 — the counterpart and their requirement. Everyone.
  *
- * PCR1–2 are the attribution pair: did the other side's requirement read as
- * something that person actually wants? This is `attributional leakage` at the
- * proposal level, and it is the measure the Baseline↔Proxy contrast rests on,
- * which is why the wording is identical in every condition. A version that
- * mentioned an assistant would be unanswerable in Baseline and would tell a
- * Baseline participant that one had been involved.
+ * PCR1–3 read information: could the participant tell the other side's
+ * priority, their room to concede, and whether the personal circumstances
+ * they heard read as genuinely the other person's. The wording is identical
+ * in every condition — a version that mentioned an assistant would be
+ * unanswerable in Baseline.
  *
- * PCR3–5 are the interpersonal evaluation: competence, commitment, and whether
- * they would work with this person again.
+ * PCR4–7 are the receiver-side face judgement — competence, independence,
+ * honesty, and wanting to work together — made AFTER hearing the
+ * counterpart's SB disclosure, which every participant now receives (§6.3).
+ * Competence/independence and honesty are deliberately separate: a confession
+ * can lower one while raising the other, and pooling them would hide exactly
+ * that.
  */
 const PCR_ITEMS: Item[] = [
   {
     kind: "scale",
     id: "PCR1",
-    text: "The other side's main requirement looked like a condition they genuinely care about.",
+    text: "I could tell which issue mattered most to the other side.",
     ...AGREE,
   },
   {
     kind: "scale",
     id: "PCR2",
-    text: "Their proposals revealed a lot about what they personally wanted.",
+    text: "I could tell where the other side had room to give ground.",
     ...AGREE,
   },
-  { kind: "scale", id: "PCR3", text: "The other person seemed competent.", ...AGREE },
   {
     kind: "scale",
-    id: "PCR4",
-    text: "The other person seemed committed to this project.",
+    id: "PCR3",
+    text: "The personal circumstances the other side shared seemed genuinely their own.",
     ...AGREE,
   },
+  { kind: "scale", id: "PCR4", text: "The other person seemed competent.", ...AGREE },
   {
     kind: "scale",
     id: "PCR5",
-    text: "I would want to work with this person again on a future project.",
+    text: "The other person seemed able to handle their own responsibilities without help.",
+    ...AGREE,
+  },
+  { kind: "scale", id: "PCR6", text: "The other person seemed honest.", ...AGREE },
+  {
+    kind: "scale",
+    id: "PCR7",
+    text: "I would want to work with this person again.",
     ...AGREE,
   },
 ];
@@ -554,7 +608,7 @@ const OWN_AI_ITEMS: Item[] = [
   {
     kind: "scale",
     id: "OWN-AI3",
-    text: "Being able to review the result and change or reject it gave me enough control.",
+    text: "Being able to close the deal myself afterwards gave me enough control.",
     ...AGREE,
   },
   {
@@ -566,7 +620,7 @@ const OWN_AI_ITEMS: Item[] = [
   {
     kind: "scale",
     id: "OWN-AI5",
-    text: "However this request was received, I felt the responsibility for it was not entirely mine.",
+    text: "However my requests were received, I felt the responsibility was not entirely mine alone.",
     ...AGREE,
   },
 ];
@@ -578,10 +632,16 @@ const OWN_AI_ITEMS: Item[] = [
  * under Explorer, where reasons the participant chose and reasons the pool
  * supplied are deliberately indistinguishable.
  *
- * OTHER-AI5 is the receiver half of the gap, and it is a different judgement
- * from PCR1–2: PCR asks what the other side WANTS, this asks who has to ANSWER
- * for the request. Someone can fail to read the other side's true wishes and
- * still hold them responsible for asking, so the two must not be merged.
+ * OTHER-AI4 and OTHER-AI5 are deliberately different objects (Ver.2.12
+ * §6.7): the Explorer's source ambiguity applies only to GENERIC work
+ * arguments, while a concrete personal fact cannot be invented by a proxy, so
+ * a receiver can rationally infer it was authorized by the principal. AI4
+ * asks the discrimination question, AI5 the provenance inference; merging
+ * them would ask two questions in one item.
+ *
+ * OTHER-AI6 is responsibility attribution — who has to ANSWER for the
+ * requests — which is a different judgement again from what the other side
+ * WANTS (PCR).
  */
 const OTHER_AI_ITEMS: Item[] = [
   {
@@ -605,12 +665,18 @@ const OTHER_AI_ITEMS: Item[] = [
   {
     kind: "scale",
     id: "OTHER-AI4",
-    text: "I could tell which reasons the other person had chosen and which the AI had added.",
+    text: "Among the general work arguments the other AI Proxy made, I could tell which the other person had chosen and which the AI added.",
     ...AGREE,
   },
   {
     kind: "scale",
     id: "OTHER-AI5",
+    text: "The personal circumstances the other AI Proxy shared must have come from the other person themselves.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "OTHER-AI6",
     text: "Responsibility for the requests made, and for how they were made, lies with the other person rather than with the AI.",
     ...AGREE,
   },
@@ -826,12 +892,89 @@ export function openEndedBlock(
 export const BONUS_ITEM: Item = {
   kind: "amount",
   id: "BONUS",
-  text: "How much of this task's bonus should the Member receive?",
+  text: "What performance bonus do you recommend for the Member for this task?",
   // The figure comes from STUDY rather than being written in, so a change of
   // currency or amount does not leave the item saying something the payment
   // screens contradict (Interface rule 7: items are data).
   unit: `0 = none · 100 = the full ${STUDY.currencySymbol}${STUDY.bonusPerTask} for this task`,
   step: 5,
+};
+
+// ---------------------------------------------------------------------------
+// 9.3  M1 — why the sensitive background was held back
+//
+// Asked of NON-disclosers: under Proxy, right after the mandate is confirmed
+// (the decision is fresh and nothing has been negotiated yet); under
+// Baseline, retrospectively in the post-task battery. The four reasons map
+// to the §1.2 working definition — ① face, ② instrumental — plus the two
+// benign alternatives that keep a "3" from being forced into a cost story.
+// ---------------------------------------------------------------------------
+
+export function m1Item(form: "proxy" | "baseline"): Item {
+  return {
+    kind: "choice",
+    id: "M1",
+    text:
+      form === "proxy"
+        ? "You left the sensitive background unticked. What was the biggest reason?"
+        : "If you held the sensitive part of your situation back at any point, what was the biggest reason?",
+    options: [
+      ...(form === "baseline"
+        ? [{ value: "did_share", label: "I did share it" }]
+        : []),
+      { value: "look_bad", label: "It could make me look bad" },
+      { value: "used_against", label: "It could be used against me afterwards" },
+      { value: "not_relevant", label: "It did not seem relevant" },
+      { value: "private", label: "It is a private matter" },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 9.4.9  RECV-EVAL — the Member's upward evaluation, after each task
+//
+// The Member-side behavioural channel (§5): the mirror of the Leader's BONUS.
+// The Member believes it is forwarded to the district manager; it is not, and
+// the debriefing says so. The three axes are exactly the ones the §5②
+// guideline names, so what the participant was told to weigh and what they
+// record are the same thing.
+// ---------------------------------------------------------------------------
+
+export const RECV_EVAL_BLOCK: Block = {
+  id: "recv_eval",
+  title: "Your evaluation of the manager",
+  hint: "1 = Very poor, 7 = Excellent",
+  optional: ["RECV-EVAL-C"],
+  items: [
+    {
+      kind: "scale",
+      id: "RECV-EVAL1",
+      text: "The manager's judgement, as you saw it in this negotiation.",
+      low: "Very poor",
+      high: "Excellent",
+    },
+    {
+      kind: "scale",
+      id: "RECV-EVAL2",
+      text: "The manager's ability to run the store's operations.",
+      low: "Very poor",
+      high: "Excellent",
+    },
+    {
+      kind: "scale",
+      id: "RECV-EVAL3",
+      text: "How the manager worked with you during the negotiation.",
+      low: "Very poor",
+      high: "Excellent",
+    },
+    {
+      kind: "text",
+      id: "RECV-EVAL-C",
+      text: "Anything you would add for the district manager (optional).",
+      placeholder: "Optional — one or two sentences.",
+      rows: 3,
+    },
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -879,6 +1022,12 @@ export const POWER_BLOCK: Block = {
       kind: "scale",
       id: "IMM2",
       text: "The negotiation scenarios felt realistic.",
+      ...AGREE,
+    },
+    {
+      kind: "scale",
+      id: "INCENT1",
+      text: "The bonus amounts involved were meaningful enough that I cared about the decisions around them.",
       ...AGREE,
     },
   ],
@@ -1004,6 +1153,8 @@ const MOCK_TEXT: Record<string, string> = {
   "OE-F1":
     "Doing it all myself I was managing how I came across from the first message. With the AI going first, the difficult part was already said by the time I joined in, so I was defending a position rather than opening one. Easier, but less mine.",
   "OE-F2": "",
+  "RECV-EVAL-C":
+    "Reasonable to work with, though the early insistence on the busiest slots felt like it came from somewhere they were not saying.",
   SUS2:
     "Something about how people ask for things at work, and whether having an AI do the asking changes what they are willing to bring up.",
 };

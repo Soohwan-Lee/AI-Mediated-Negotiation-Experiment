@@ -45,6 +45,7 @@ import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import {
   blockForTask,
   dummyAnswer,
+  m1Item,
   openEndedBlock,
   postTaskBlocks,
   requiredIds,
@@ -120,6 +121,18 @@ export default function TaskSurveyPage({
           // the Explorer's two extra questions (OE-P6/P7) are the only data
           // source that separates its policy's two elements (Design §9.4.7).
           openEndedBlock(task, assignment.role, plan.condition),
+          // Baseline answers M1 retrospectively here (§9.3); a Proxy
+          // participant answered it at the mandate, where the decision was
+          // made.
+          ...(isProxy
+            ? []
+            : [
+                {
+                  id: "m1",
+                  title: "One more question",
+                  items: [m1Item("baseline")],
+                } satisfies Block,
+              ]),
         ].map((b) => blockForTask(b, taskIndex))
       : [];
 

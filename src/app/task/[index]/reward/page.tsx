@@ -50,9 +50,16 @@ import {
   CardTitle,
   Page,
 } from "@/components/ui";
+import { MeasureBlock, type Answers } from "@/components/measure";
 import { sessionPlan } from "@/lib/assignment";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
-import { BONUS_ITEM } from "@/lib/measures";
+import {
+  BONUS_ITEM,
+  RECV_EVAL_BLOCK,
+  blockForTask,
+  dummyAnswer,
+  requiredIds,
+} from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { getTask } from "@/lib/tasks";
@@ -71,25 +78,55 @@ export default function TaskRewardPage({
   const router = useRouter();
   const { assignment, participantKey, logEvent } = useParticipant();
   const [amount, setAmount] = useState<number | null>(null);
+  /** Member: the upward evaluation, then the wait. */
+  const [evalAnswers, setEvalAnswers] = useState<Answers>({});
+  const [evalSubmitted, setEvalSubmitted] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
   const isLeader = assignment?.role === "leader";
   const plan = assignment ? sessionPlan(assignment, taskIndex) : null;
   const task = plan ? getTask(plan.taskId) : null;
 
-  // The Member's wait while "the other participant decides" (Design §8).
+  // The Member's wait starts only after their evaluation is in — the §7
+  // order is RECV-EVAL first, then "the Leader is deciding…".
   useEffect(() => {
-    if (isLeader || !assignment) return;
+    if (isLeader || !assignment || !evalSubmitted) return;
     const id = window.setTimeout(
       () => setRevealed(true),
       pauseMs(NEGOTIATION.matchmakingMs),
     );
     return () => window.clearTimeout(id);
-  }, [isLeader, assignment]);
+  }, [isLeader, assignment, evalSubmitted]);
 
-  useDevAutofill(() => setAmount(70), `reward-${taskIndex}`);
+  const evalBlock = blockForTask(RECV_EVAL_BLOCK, taskIndex);
+  const evalRequired = requiredIds(evalBlock);
+  const evalMissing = evalRequired.filter((id) => evalAnswers[id] === undefined);
+
+  useDevAutofill(() => {
+    setAmount(70);
+    const filled: Answers = {};
+    for (const item of evalBlock.items) filled[item.id] = dummyAnswer(item);
+    setEvalAnswers((prev) => ({ ...prev, ...filled }));
+  }, `reward-${taskIndex}`);
 
   const canContinue = useDevGate(isLeader ? amount !== null : revealed);
+  const canSubmitEval = useDevGate(evalMissing.length === 0);
+
+  async function submitEval() {
+    if (!canSubmitEval) return;
+    if (participantKey) {
+      await getStore().saveResponses(
+        participantKey,
+        `recv_eval_t${taskIndex}`,
+        evalAnswers,
+      );
+    }
+    logEvent("reward_decision", { kind: "recv_eval" }, {
+      sessionIndex: taskIndex,
+    });
+    setEvalSubmitted(true);
+    window.scrollTo({ top: 0 });
+  }
 
   async function save() {
     if (!canContinue) return;
@@ -97,8 +134,8 @@ export default function TaskRewardPage({
       await getStore().saveResponses(participantKey, `reward_t${taskIndex}`, {
         role: assignment?.role ?? null,
         taskId: task?.id ?? null,
-        // Only the Leader's value is data. The Member's is a stimulus, stored
-        // so the export can show what they were told.
+        // Only the Leader's value is data on this screen; the Member's
+        // RECV-EVAL was saved when they submitted it.
         [`BONUS_t${taskIndex}`]: isLeader ? amount : null,
       });
     }
@@ -136,17 +173,20 @@ export default function TaskRewardPage({
           <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/40 via-white to-blue-50/20">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-extrabold text-blue-900 shadow-2xs">
-                👑 Leader Responsibility · Task {taskIndex}
+                👑 Manager Decision · Task {taskIndex}
               </span>
               <span className="text-xs font-bold text-slate-500">
                 Bonus Allocation
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--ink)]">
-              💰 Decide Team Member&apos;s Bonus
+              💰 Decide the Member&apos;s Bonus
             </h1>
             <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-              As the Project Leader, you decide the performance bonus the Team Member receives for this task. Please consider both the negotiated outcome reached and their communication conduct.
+              As the store manager, you decide the recommended performance bonus
+              for the Member for this task. Please consider the negotiation
+              result <strong>together with what you learned during the
+              negotiation about their work reliability and availability</strong>.
             </p>
           </Card>
 
@@ -194,7 +234,49 @@ export default function TaskRewardPage({
     );
   }
 
-  // --- Member: wait, then move on ------------------------------------------
+  // --- Member: evaluate the manager, then wait ------------------------------
+  if (!evalSubmitted) {
+    return (
+      <>
+        <Page>
+          <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/40 via-white to-blue-50/20">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-extrabold text-blue-900 shadow-2xs">
+                📝 Upward Evaluation · Task {taskIndex}
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--ink)]">
+              Evaluate the Manager
+            </h1>
+            <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
+              Please write your evaluation of the manager, considering{" "}
+              <strong>the judgement and operational competence you saw during
+              the negotiation</strong>. It will be passed to the district
+              manager.
+            </p>
+          </Card>
+
+          <MeasureBlock
+            block={evalBlock}
+            answers={evalAnswers}
+            onChange={(id, value) =>
+              setEvalAnswers((prev) => ({ ...prev, [id]: value }))
+            }
+          />
+        </Page>
+
+        <ActionBar
+          label="Submit Evaluation"
+          onClick={submitEval}
+          disabled={!canSubmitEval}
+          remaining={evalMissing.length}
+          firstUnansweredId={evalMissing[0] ?? null}
+          note={evalMissing.length === 0 ? "✓ Ready to submit" : ""}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <Page>
@@ -213,24 +295,27 @@ export default function TaskRewardPage({
               ))}
             </span>
             <p className="text-lg sm:text-xl font-bold text-slate-900">
-              The Project Leader is evaluating your performance bonus…
+              The manager is deciding your performance bonus…
             </p>
             <p className="mt-2 max-w-prose text-xs sm:text-sm text-slate-600">
-              The Leader is reviewing the negotiation outcome and conduct to allocate your bonus.
+              They were asked to consider the negotiation result together with
+              what they learned during the negotiation.
             </p>
           </div>
         ) : (
           <Card className="mb-6 border-slate-200 bg-white">
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-900">
-                ✓ Evaluation Recorded
+                ✓ Recorded
               </span>
             </div>
             <CardTitle hint={`Task ${taskIndex} of 2`}>
-              💰 Bonus Evaluation Submitted
+              Decision Submitted
             </CardTitle>
             <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-              The Project Leader has submitted the bonus evaluation for Task {taskIndex}. Any awarded bonuses are automatically added to your Prolific payment once the entire study concludes.
+              The manager has submitted their bonus decision for Task {taskIndex}.
+              Any awarded bonus is added to your Prolific payment once the whole
+              study concludes.
             </p>
           </Card>
         )}
@@ -240,7 +325,7 @@ export default function TaskRewardPage({
         label="Continue to Next Step"
         onClick={save}
         disabled={!canContinue}
-        note={revealed ? "✓ Ready to proceed" : "Waiting for evaluation submission…"}
+        note={revealed ? "✓ Ready to proceed" : "Waiting for the decision…"}
       />
     </>
   );

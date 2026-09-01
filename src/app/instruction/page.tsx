@@ -256,12 +256,13 @@ export default function InstructionPage() {
                   isLeader
                     ? [
                         "You set the schedule once it is agreed",
-                        "You decide their performance bonus after each schedule",
+                        "You decide their recommended bonus after each schedule",
                         "You answer for how the shop is covered",
                       ]
                     : [
                         "You are the only one who can close the shop alone",
                         "You can refuse a shift pattern, or ask for it to change",
+                        "You write an evaluation of the manager after each schedule — it goes to the district manager",
                       ]
                 }
               />
@@ -277,10 +278,11 @@ export default function InstructionPage() {
                     ? [
                         "They are the only one who can close the shop alone",
                         "They can refuse a shift pattern, or ask for it to change",
+                        "They write an evaluation of you after each schedule — it goes to the district manager",
                       ]
                     : [
                         "They set the schedule once it is agreed",
-                        "They decide your performance bonus after each schedule",
+                        "They decide your recommended bonus after each schedule",
                         "They answer for how the shop is covered",
                       ]
                 }
@@ -288,9 +290,9 @@ export default function InstructionPage() {
             </div>
 
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs sm:text-sm font-semibold leading-relaxed text-slate-800">
-              💡 {isLeader
-                ? "Neither of you can set the schedule alone — it only happens if you both agree."
-                : "The manager decides your bonus after each schedule. And neither of you can set the schedule alone."}
+              💡 Neither of you can set the schedule alone — and you each know
+              the other has been asked to weigh what they learn during the
+              negotiation.
             </div>
           </Card>
 
@@ -352,11 +354,21 @@ export default function InstructionPage() {
           <Callout title="💰 Task Bonus Opportunity" tone="warning">
             {isLeader ? (
               <p className="text-xs sm:text-sm">
-                As the Leader, you allocate the Team Member&apos;s bonus after each task (up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task, {STUDY.currencySymbol}{STUDY.bonusTotal} total) based on outcome and conduct.
+                After each task you decide the Member&apos;s recommended bonus
+                (up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task,{" "}
+                {STUDY.currencySymbol}{STUDY.bonusTotal} total), weighing the
+                result and what you learned during the negotiation — and the
+                Member writes an evaluation of you that goes to the district
+                manager.
               </p>
             ) : (
               <p className="text-xs sm:text-sm">
-The store manager decides a performance bonus for you after each schedule. Any bonus you are awarded is paid automatically when the study ends.
+                After each task the manager decides your recommended bonus (up
+                to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task),
+                weighing the result and what they learned during the
+                negotiation — and you write an evaluation of the manager that
+                goes to the district manager. Any bonus is paid when the study
+                ends.
               </p>
             )}
           </Callout>

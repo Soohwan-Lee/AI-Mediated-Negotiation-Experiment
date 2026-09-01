@@ -75,7 +75,7 @@ export default function PracticePage() {
   const plan = assignment ? sessionPlan(assignment, 1) : null;
   const isProxy = plan ? isProxyCondition(plan.condition) : false;
   const task = PRACTICE_TASK;
-  const prac1 = practiceReasonItem();
+  const prac1 = practiceReasonItem(role);
   const reasonCorrect = reasonAnswer === PRACTICE_REASON_ANSWER;
 
   useDevAutofill(() => {

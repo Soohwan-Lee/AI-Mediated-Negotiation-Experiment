@@ -110,25 +110,29 @@ export default function DebriefingPage() {
             <p className="text-xs sm:text-sm leading-relaxed text-slate-700">
               {isMember ? (
                 <>
-                  After each task you waited while the other side decided a bonus for
-                  you.{" "}
+                  After each task you wrote an upward evaluation of the manager and then
+                  waited while they decided a bonus for you.{" "}
                   <strong className="text-slate-900">
                     No such decision was ever made about you, by anyone — there was no
-                    other participant to make one.
-                  </strong>{" "}
-                  Nothing you did in either task affected your payment. You receive the
-                  full amount advertised on Prolific, exactly as described in the
-                  consent form, and the bonus is paid in full.
+                    other participant to make one — and your evaluation was not passed
+                    to any district manager
+                  </strong>
+                  ; there is none. Both were recorded only as research data. Nothing you
+                  did in either task affected your payment. You receive the full amount
+                  advertised on Prolific, exactly as described in the consent form, and
+                  the bonus is paid in full.
                 </>
               ) : (
                 <>
-                  After each task you decided the other side&apos;s bonus. Because there
-                  was no other participant,{" "}
+                  After each task you decided the other side&apos;s bonus, and were told
+                  they wrote an upward evaluation of you. Because there was no other
+                  participant,{" "}
                   <strong className="text-slate-900">
-                    no one received or lost money as a result of your decision
+                    no one received or lost money as a result of your decision, and no
+                    evaluation of you was ever written or forwarded
                   </strong>{" "}
-                  — it was recorded as research data about how authority is used. Your
-                  own pay is unaffected and is paid in full.
+                  — your choices were recorded as research data about how authority is
+                  used. Your own pay is unaffected and is paid in full.
                 </>
               )}
             </p>
