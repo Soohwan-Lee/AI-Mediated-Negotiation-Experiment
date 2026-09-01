@@ -57,7 +57,7 @@ import {
 } from "@/components/session";
 import { OptionChips, PackageValue, PointsKey } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Cue, Page, cx } from "@/components/ui";
+import { Callout, Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { dummyAnswer, riskBlock } from "@/lib/measures";
 import { useParticipant } from "@/lib/participant-context";
