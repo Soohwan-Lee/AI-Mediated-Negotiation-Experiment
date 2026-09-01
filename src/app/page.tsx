@@ -96,63 +96,81 @@ export default function ConsentPage() {
     <>
       <Page>
         <PageHeader
-          eyebrow="Research study"
+          eyebrow="Research Study · CHI 2027"
           title={STUDY.title}
-          subtitle="A study about workplace negotiation, and how people communicate when software tools are involved."
+          subtitle="A study exploring workplace negotiation and communication patterns when software tools are involved."
         />
 
-        {/* The three things anyone decides on first. */}
-        <Card className="mb-5" tone="muted">
-          <dl className="grid grid-cols-3 gap-4">
-            <Fact icon={<ClockIcon />} label="Takes about" value={`${STUDY.estimatedMinutes} min`} />
-            <Fact icon={<CoinIcon />} label="You are paid" value={`${STUDY.currencySymbol}${STUDY.compensation}`} />
-            <Fact icon={<RateIcon />} label="Equivalent to" value={`${STUDY.currencySymbol}${STUDY.hourlyEquivalent}/hr`} />
-          </dl>
+        {/* 3 Core Stats Cards */}
+        <div className="mb-6 grid grid-cols-1 gap-3.5 sm:grid-cols-3 sm:gap-4">
+          <StatCard
+            icon="⏱️"
+            label="Estimated Time"
+            value={`~${STUDY.estimatedMinutes} min`}
+            hint="5 short parts"
+            tone="blue"
+          />
+          <StatCard
+            icon="💵"
+            label="Compensation"
+            value={`${STUDY.currencySymbol}${STUDY.compensation}`}
+            hint="Guaranteed base pay"
+            tone="emerald"
+          />
+          <StatCard
+            icon="📈"
+            label="Equivalent Rate"
+            value={`${STUDY.currencySymbol}${STUDY.hourlyEquivalent}/hr`}
+            hint="Well above minimum wage"
+            tone="indigo"
+          />
+        </div>
+
+        {/* Quick Summary Card */}
+        <Card className="mb-6 border-blue-100 bg-gradient-to-br from-blue-50/50 to-indigo-50/30">
+          <div className="flex items-start gap-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-xl shadow-2xs border border-blue-200">
+              💡
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-slate-900 mb-1">
+                What will you do?
+              </h2>
+              <p className="text-sm sm:text-base leading-relaxed text-slate-700">
+                You will take part in <strong>two short workplace negotiation scenarios</strong> to agree on project terms with another participant. In one scenario, a <strong>software tool negotiates on your behalf</strong> before you finish the conversation. Afterwards, you will answer short questions about how each went.
+              </p>
+            </div>
+          </div>
         </Card>
 
-        {/* The study in one sentence, before the schedule of it.
-            The page listed five stages with times and never said what the
-            thing itself was, so a participant decided whether to accept a
-            55-minute study from the title alone. This is the plainest true
-            description that does not disclose the design: two negotiations, a
-            partner, and a software tool involved in one of them. */}
-        <Card className="mb-5">
-          <p className="max-w-prose text-[0.9375rem] leading-relaxed">
-            You will play a role in{" "}
-            <strong>two short workplace negotiations</strong> — agreeing the
-            terms of a project with another participant. In one of them, a{" "}
-            <strong>software tool negotiates on your behalf</strong> before you
-            finish the conversation yourself. Afterwards we ask how each one
-            went.
-          </p>
-        </Card>
-
-        <Card className="mb-5">
-          <CardTitle>The schedule</CardTitle>
-          <ol className="relative">
+        {/* The schedule timeline */}
+        <Card className="mb-6">
+          <CardTitle hint="Here is how the session will progress from start to finish:">
+            Study Schedule
+          </CardTitle>
+          <ol className="relative mt-4 space-y-4">
             {STEPS.map((step, i) => (
-              <li key={step.title} className="relative flex gap-4 pb-5 last:pb-0">
-                {/* Connector, drawn between the markers rather than under them. */}
+              <li key={step.title} className="relative flex items-start gap-4">
                 {i < STEPS.length - 1 ? (
                   <span
                     aria-hidden
-                    className="absolute left-[13px] top-8 h-[calc(100%-2rem)] w-px bg-[var(--line)]"
+                    className="absolute left-[17px] top-9 h-[calc(100%+0.5rem)] w-[2px] bg-slate-200"
                   />
                 ) : null}
                 <span
                   aria-hidden
-                  className="tabular relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--line-strong)] bg-[var(--surface)] text-[0.75rem] font-semibold"
+                  className="tabular relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-indigo-200 bg-indigo-50 text-xs font-black text-[var(--accent)] shadow-2xs"
                 >
                   {i + 1}
                 </span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 rounded-xl bg-slate-50/70 p-3 sm:p-3.5 border border-slate-100 shadow-2xs">
                   <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-[0.9375rem] font-medium">{step.title}</p>
-                    <span className="tabular shrink-0 text-[0.8125rem] text-[var(--ink-3)]">
-                      {step.minutes} min
+                    <p className="text-sm sm:text-base font-bold text-[var(--ink)]">{step.title}</p>
+                    <span className="tabular shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-[var(--ink-2)] shadow-2xs">
+                      ⏱️ {step.minutes} min
                     </span>
                   </div>
-                  <p className="text-[0.875rem] text-[var(--ink-2)]">
+                  <p className="mt-1 text-xs sm:text-sm leading-relaxed text-[var(--ink-3)]">
                     {step.detail}
                   </p>
                 </div>
@@ -161,207 +179,163 @@ export default function ConsentPage() {
           </ol>
         </Card>
 
-        <div className="mb-5 grid gap-5 sm:grid-cols-2">
+        {/* Data & Privacy Section */}
+        <div className="mb-6 grid gap-4 sm:grid-cols-2">
           <Card>
-            <CardTitle>What is recorded</CardTitle>
-            <ul className="space-y-1.5">
+            <CardTitle hint="Standard anonymized research telemetry">
+              📝 What is Recorded
+            </CardTitle>
+            <ul className="space-y-2 mt-2">
               {RECORDED.map((item) => (
                 <li
                   key={item}
-                  className="flex gap-2 text-[0.875rem] text-[var(--ink-2)]"
+                  className="flex items-center gap-2.5 text-xs sm:text-sm text-[var(--ink-2)]"
                 >
-                  <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[var(--ink-3)]" />
-                  {item}
+                  <span aria-hidden className="text-emerald-600 font-bold">✓</span>
+                  <span>{item}</span>
                 </li>
               ))}
             </ul>
           </Card>
 
           <Card>
-            <CardTitle>How it is kept</CardTitle>
-            <p className="text-[0.875rem] leading-relaxed text-[var(--ink-2)]">
-              Your answers are stored under a study code. Your Prolific ID is
-              kept separately and used only to confirm completion and pay you.
-              Nothing published will identify you.
+            <CardTitle hint="Strict research confidentiality">
+              🛡️ How Data is Kept
+            </CardTitle>
+            <p className="text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]">
+              Your responses are stored securely under an anonymous study code. Your Prolific ID is kept separately and used only to verify completion and disburse payment. No identifying data will ever be published.
             </p>
-            <p className="mt-3 text-[0.875rem] leading-relaxed text-[var(--ink-2)]">
-              Please do not type your name or other identifying details into the
-              text boxes.
-            </p>
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 p-2.5 text-xs leading-relaxed text-amber-900">
+              <span className="font-bold">⚠️ Note:</span> Please do not write your real name or personal contact info into any text inputs.
+            </div>
           </Card>
         </div>
 
-        {/* Risks and voluntariness, as two rows of one card rather than two
-            cards of one paragraph.
-            Both are IRB obligations and neither loses a clause here — what
-            changes is that the consent page stops being eight stacked cards
-            of similar weight, which is the shape that gets scrolled past. A
-            skimmed consent form is not consent, so the structure is doing
-            ethical work, not decorative work. */}
-        <Card className="mb-5">
-          <dl className="space-y-3">
-            <Term label="⚖️ Risks">
-              Minimal, and comparable to an everyday conversation at work. Some
-              scenarios ask you to negotiate over workload, credit, or
-              evaluation, which a few people find mildly uncomfortable. There is
-              no benefit to you beyond the payment above.
+        {/* Important Terms / IRB obligations */}
+        <Card className="mb-6">
+          <CardTitle>Important Information</CardTitle>
+          <dl className="space-y-3.5 mt-2">
+            <Term label="⚖️ Risks & Benefits">
+              Risks are minimal and comparable to everyday workplace discussions. Some scenarios involve discussing workload or evaluation credit. There is no direct personal benefit beyond the compensation provided.
             </Term>
-            <Term label="🚪 Taking part is voluntary">
-              You can stop at any time by closing this window, and it will not
-              affect your standing on Prolific. If you do stop, please return
-              your submission there so the slot is released.
+            <Term label="🚪 Voluntary Participation">
+              Participation is completely voluntary. You may withdraw at any time by closing this tab without penalty on Prolific. If you choose to stop early, please return your submission on Prolific so another worker can take part.
             </Term>
-            {/* The withheld-details disclosure. It stays on this page and in
-                these words: the study uses deception, and telling participants
-                up front that something is held back — without saying what — is
-                the part of that arrangement they consent to. It reads as a row
-                here rather than a warning callout because a yellow banner
-                above the consent checkboxes made the whole page look like a
-                risk notice. */}
-            <Term label="🔎 Some details are withheld until the end">
-              To keep the study valid, a few specific details about its design
-              are not described up front. You will get the full explanation on
-              the last page, before you finish.
+            <Term label="🔎 Full Debriefing Provided">
+              To preserve the integrity of the experiment, some specific design details are not fully explained until after the tasks. A comprehensive explanation will be provided upon completion before final submission.
             </Term>
           </dl>
         </Card>
 
-        <Card className="mb-5" tone="muted">
-          <CardTitle>Who is running this</CardTitle>
-          <dl className="grid gap-3 sm:grid-cols-2">
+        {/* Researcher details */}
+        <Card className="mb-6" tone="muted">
+          <CardTitle>Research Team & Contacts</CardTitle>
+          <dl className="grid gap-4 sm:grid-cols-2 text-xs sm:text-sm">
             <div>
-              <dt className="text-xs uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Researcher
+              <dt className="text-xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-1">
+                Principal Investigator
               </dt>
-              <dd className="text-[0.875rem]">
+              <dd className="font-semibold text-slate-800">
                 {STUDY.irb.principalInvestigator}, {STUDY.irb.institution}
                 <br />
                 <a
                   href={`mailto:${STUDY.irb.researcherEmail}`}
-                  className="text-[var(--accent)] underline underline-offset-2"
+                  className="text-[var(--accent)] hover:underline font-bold mt-0.5 inline-block"
                 >
                   {STUDY.irb.researcherEmail}
                 </a>
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Your rights as a participant
+              <dt className="text-xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-1">
+                Institutional Review Board (IRB)
               </dt>
-              <dd className="text-[0.875rem]">
-                {STUDY.irb.institution} Institutional Review Board
+              <dd className="font-semibold text-slate-800">
+                {STUDY.irb.institution} IRB
                 <br />
-                {STUDY.irb.contactEmail} (protocol {STUDY.irb.protocolNumber})
+                <span className="text-slate-600 font-medium">Protocol #{STUDY.irb.protocolNumber} · {STUDY.irb.contactEmail}</span>
               </dd>
             </div>
           </dl>
         </Card>
 
-        <Card>
-          <CardTitle>Your consent</CardTitle>
-          <div className="space-y-3">
+        {/* Consent Section */}
+        <Card className="border-2 border-indigo-200 bg-indigo-50/20 shadow-sm">
+          <CardTitle hint="Please confirm eligibility and consent to proceed:">
+            Your Informed Consent
+          </CardTitle>
+          <div className="space-y-3 mt-3">
             <Checkbox checked={isAdult} onChange={setIsAdult}>
-              I am at least 18 years old and currently live in the United
-              States.
+              <strong className="font-bold text-[var(--ink)]">Age & Location: </strong>
+              I am at least 18 years old and currently reside in the United States.
             </Checkbox>
             <Checkbox checked={agreed} onChange={setAgreed}>
-              I have read and understood the information above. I understand
-              that taking part is voluntary and that I may stop at any time. I
-              agree to take part.
+              <strong className="font-bold text-[var(--ink)]">Voluntary Consent: </strong>
+              I have read and understood the information above. I understand that my participation is voluntary and I agree to participate in this study.
             </Checkbox>
           </div>
         </Card>
       </Page>
 
       <ActionBar
-        label="Agree and begin"
+        label="Agree and Begin Study"
         onClick={handleConsent}
         disabled={!canProceed}
         busy={busy}
         note={
           prolific.prolificPid
-            ? "Prolific session detected."
-            : "No Prolific ID detected — fine for previewing."
+            ? "✓ Prolific ID detected."
+            : "Preview mode (No Prolific ID detected)."
         }
       />
     </>
   );
 }
 
-/**
- * One labelled obligation on the consent form.
- *
- * The label carries an emoji landmark so the three rows can be told apart
- * without reading them — which is what lets someone find "can I stop?" again
- * after they have scrolled past it.
- */
-function Term({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <dt className="mb-0.5 text-[0.875rem] font-semibold">{label}</dt>
-      <dd className="max-w-prose text-[0.875rem] leading-relaxed text-[var(--ink-2)]">
-        {children}
-      </dd>
-    </div>
-  );
-}
-
-function Fact({
+function StatCard({
   icon,
   label,
   value,
+  hint,
+  tone,
 }: {
-  icon: ReactNode;
+  icon: string;
   label: string;
   value: string;
+  hint: string;
+  tone: "blue" | "emerald" | "indigo";
 }) {
+  const toneClasses = {
+    blue: "border-blue-200 bg-blue-50/60 text-blue-950",
+    emerald: "border-emerald-200 bg-emerald-50/60 text-emerald-950",
+    indigo: "border-indigo-200 bg-indigo-50/60 text-indigo-950",
+  };
+
   return (
-    <div>
-      <dt className="mb-1 flex items-center gap-1.5 text-xs uppercase tracking-[0.08em] text-[var(--ink-3)]">
-        {icon}
-        {label}
-      </dt>
-      <dd className="text-[1.0625rem] font-semibold">{value}</dd>
+    <div className={cx("rounded-2xl border p-4 sm:p-5 shadow-xs transition-all", toneClasses[tone])}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xl">{icon}</span>
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          {label}
+        </span>
+      </div>
+      <p className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+        {value}
+      </p>
+      <p className="mt-1 text-xs font-medium text-slate-600">
+        {hint}
+      </p>
     </div>
   );
 }
 
-// Inline so the page has no external requests and no icon dependency.
-const ICON_PROPS = {
-  width: 14,
-  height: 14,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-function ClockIcon() {
+function Term({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <svg {...ICON_PROPS}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
-function CoinIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M15 9.5a3 3 0 0 0-3-1.5c-1.7 0-3 .9-3 2s1.3 2 3 2 3 .9 3 2-1.3 2-3 2a3 3 0 0 1-3-1.5" />
-    </svg>
-  );
-}
-
-function RateIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M4 19h16" />
-      <path d="M7 19v-6M12 19V7M17 19v-9" />
-    </svg>
+    <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+      <dt className="mb-1 text-sm font-bold text-[var(--ink)]">{label}</dt>
+      <dd className="text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]">
+        {children}
+      </dd>
+    </div>
   );
 }

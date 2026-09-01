@@ -92,20 +92,22 @@ export default function BackgroundPage() {
     <>
       <Page>
         <PageHeader
-          eyebrow="Before we start"
-          title="A few questions about you"
-          subtitle="These help us describe who took part. There are no right or wrong answers."
+          eyebrow="Step 1 · Demographics & Background"
+          title="A Few Questions About You"
+          subtitle="These questions help us understand participant backgrounds. There are no right or wrong answers."
         />
 
-        {BLOCKS.map((block) => (
-          <MeasureBlock
-            key={block.id}
-            block={block}
-            answers={answers}
-            onChange={answer}
-            flagged={flagged}
-          />
-        ))}
+        <div className="space-y-4">
+          {BLOCKS.map((block) => (
+            <MeasureBlock
+              key={block.id}
+              block={block}
+              answers={answers}
+              onChange={answer}
+              flagged={flagged}
+            />
+          ))}
+        </div>
       </Page>
 
       <ActionBar

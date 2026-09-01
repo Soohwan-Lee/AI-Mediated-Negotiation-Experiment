@@ -136,40 +136,31 @@ export default function PracticePage() {
   if (phase === "intro") {
     return (
       <TaskCover
-        eyebrow="Practice"
-        title="A practice round first"
+        eyebrow="Tutorial · Practice Round"
+        title="Quick Practice Round"
         doesNotCount
         scene="practice"
         lead={
           <>
-            <p>
-              This round works the way the real tasks will, on a small scenario
-              that has nothing to do with either of them. Nothing you do here is
-              recorded as a result.
+            <p className="mb-2">
+              This practice round lets you test the negotiation tools on a simple, neutral scenario before starting the real tasks.
             </p>
-            <p>
-              It is here so that nothing about the tasks that count is a
-              surprise.
+            <p className="text-slate-600">
+              Nothing you do during this practice round will affect your score or recorded outcomes. Feel free to explore!
             </p>
           </>
         }
-        /* The practice round's OWN steps, not the task's. It deliberately does
-           not preview the mandate or the rehearsal: this round teaches the
-           controls common to both arms, and listing a screen only one arm
-           reaches would tell a participant something about their condition
-           before Task 1. */
         steps={[
-          "Read the practice scenario and your private briefing",
-          "Try the message box — a reply comes straight back",
-          "Try choosing a level on each of the terms",
-          "One question about how the point sheet works",
+          { label: "Review the practice scenario & private briefing", hint: "Check the sidebar for your goals and point values" },
+          { label: "Send a sample message", hint: "A simulated automated response will reply instantly" },
+          { label: "Select sample terms", hint: "Test how selecting options builds an offer" },
+          { label: "Answer 1 quick question", hint: "Verify how the point sheet relates to your goals" },
         ]}
         minutes={STAGE_MINUTES.practice}
         note={
-          <Callout>
+          <Callout title="ℹ️ No Time Pressure" tone="neutral">
             <p>
-              Task 1 begins only when you leave the practice screen, so there is
-              no hurry on it.
+              Task 1 only begins when you click &apos;Start Task 1&apos;. Take your time exploring the controls.
             </p>
           </Callout>
         }
@@ -185,51 +176,43 @@ export default function PracticePage() {
       <Page width="wide">
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <PageHeader
-            eyebrow="Practice round"
-            title="Try the interface"
-            subtitle="Nothing here counts. Take a minute to get used to it."
+            eyebrow="Practice Round · Safe Sandbox"
+            title="Try the Negotiation Interface"
+            subtitle="Explore how messaging, offer selection, and your private briefing work together. Nothing here counts."
           />
 
-          <div className="mb-5">
-            <Callout title="🔭 What the real tasks look like">
-              {/* WHAT THESE TWO SENTENCES MAY NOT PROMISE. Both used to end
-                  on the participant deciding "whether to accept" the result.
-                  That screen is gone: there is no ratification in either arm
-                  now, because both end with the participant agreeing a
-                  package in the conversation itself. Promising a decision they
-                  never get to make is how the practice round becomes a
-                  briefing for a different study. */}
+          <div className="mb-6">
+            <Callout title="🔭 About Your Upcoming Real Tasks" tone="neutral">
               {isProxy ? (
                 <p>
-                  You will set out what you want and which of your reasons may
-                  be used, watch an AI Proxy negotiate for you, and then{" "}
-                  <strong>finish the conversation yourself</strong>.
+                  In Task 1, you will configure your initial goals and permitted reasons, observe an <strong>AI Proxy</strong> negotiate on your behalf, and then <strong>take over directly to close the deal</strong>.
                 </p>
               ) : (
                 <p>
-                  You will write the messages yourself and build up an offer as
-                  you go, until the two of you{" "}
-                  <strong>agree on all three terms</strong>.
+                  In Task 1, you will chat directly, send offers, and negotiate until both of you <strong>agree on all project terms</strong>.
                 </p>
               )}
             </Callout>
           </div>
 
-          <Card className="mb-5">
-            <CardTitle>📋 The practice scenario</CardTitle>
-            <p className="max-w-prose text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+          <Card className="mb-6 border-slate-200 bg-white">
+            <CardTitle hint="This neutral scenario is for practice only:">
+              📋 The Practice Scenario
+            </CardTitle>
+            <p className="text-sm sm:text-base leading-relaxed text-[var(--ink-2)]">
               {task.publicBrief}
             </p>
           </Card>
 
-          <Card className="mb-5 flex flex-col" padded={false}>
-            <div className="border-b border-[var(--line)] px-4 py-3">
-              <p className="text-[0.875rem] font-medium">💬 Practice messages</p>
+          <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
+            <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5 flex items-center justify-between">
+              <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">💬 Practice Chatbox</p>
+              <span className="text-xs font-semibold text-slate-500">Interactive Sandbox</span>
             </div>
             <Transcript
               messages={messages}
               pending={pending}
-              emptyHint="Send anything to see how this works."
+              emptyHint="Send a message below to test the chat response!"
             />
             <MessageComposer
               value={draft}
@@ -239,21 +222,21 @@ export default function PracticePage() {
                 void sendPractice(text);
               }}
               disabled={pending}
-              placeholder="Try writing something…"
+              placeholder="Type a test message here…"
             />
           </Card>
 
-          <Card className="mb-5">
-            <CardTitle hint="Choosing a level on each term is how you make an offer.">
-              📦 Practice offer
+          <Card className="mb-6">
+            <CardTitle hint="Selecting an option on each term creates a proposal package:">
+              📦 Practice Offer Builder
             </CardTitle>
-            <div className="space-y-4">
+            <div className="space-y-5 mt-3">
               {task.issues.map((issue) => (
-                <div key={issue.id}>
-                  <p className="mb-1.5 text-[0.8125rem] font-medium">
+                <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+                  <p className="mb-1 text-xs sm:text-sm font-bold text-[var(--ink)]">
                     {issue.label}
                   </p>
-                  <p className="mb-2 max-w-prose text-[0.8125rem] text-[var(--ink-2)]">
+                  <p className="mb-2.5 text-xs text-[var(--ink-3)]">
                     💡 {issue.rationale[role]}
                   </p>
                   <OptionChips
@@ -272,11 +255,11 @@ export default function PracticePage() {
             </div>
           </Card>
 
-          <Card id={`q-${prac1.id}`}>
-            <CardTitle hint="One question, so we know the point sheet and the situation are being read together.">
-              ✅ Before you start
+          <Card id={`q-${prac1.id}`} className={cx(reasonSubmitted && reasonCorrect ? "border-emerald-300 bg-emerald-50/20" : "")}>
+            <CardTitle hint="One quick question to confirm the point sheet and scenario rationale are clear:">
+              ✅ Quick Check Before Task 1
             </CardTitle>
-            <p className="mb-3 max-w-prose text-[0.9375rem] font-medium">
+            <p className="mb-3 text-sm sm:text-base font-bold text-[var(--ink)]">
               {prac1.text}
             </p>
             {prac1.kind === "choice" ? (
@@ -291,12 +274,10 @@ export default function PracticePage() {
               />
             ) : null}
             {reasonSubmitted && !reasonCorrect ? (
-              <div className="mt-3">
-                <Callout title="Not quite" tone="warning">
+              <div className="mt-3.5">
+                <Callout title="💡 Tip" tone="warning">
                   <p>
-                    The points tell you which option is better for you; the
-                    briefing tells you why. Look at what a long journey would
-                    cost you in the practice scenario.
+                    Points indicate which option yields a higher score for your situation; the briefing explains why. Consider what a longer journey would cost in the scenario.
                   </p>
                 </Callout>
               </div>
@@ -311,9 +292,9 @@ export default function PracticePage() {
         disabled={!canContinue && !reasonAnswer}
         note={
           canContinue
-            ? "Practice is not recorded as a result."
+            ? "✓ Ready! Practice data is not recorded as a task result."
             : reasonSubmitted
-              ? "Have another look."
+              ? "⚠️ Please review your selected answer."
               : ""
         }
         secondary={<BackButton from="practice" />}

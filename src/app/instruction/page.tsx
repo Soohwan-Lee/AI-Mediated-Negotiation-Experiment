@@ -93,13 +93,13 @@ function Fact({
   children: ReactNode;
 }) {
   return (
-    <div className="flex gap-3">
-      <span aria-hidden className="mt-0.5 text-[1.125rem] leading-none">
+    <div className="flex items-start gap-3.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 sm:p-4 shadow-2xs">
+      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-lg shadow-2xs border border-slate-200">
         {icon}
       </span>
       <div className="min-w-0">
-        <p className="mb-1 text-[0.9375rem] font-semibold">{title}</p>
-        <p className="max-w-prose text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+        <p className="mb-1 text-sm sm:text-base font-bold text-[var(--ink)]">{title}</p>
+        <p className="text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]">
           {children}
         </p>
       </div>
@@ -107,34 +107,19 @@ function Fact({
   );
 }
 
-/**
- * One line of the opening summary: a label, and the thing itself.
- *
- * A `<dl>` rather than a bulleted list, because each line answers a question
- * the label names — the label is what makes the four lines scannable in the
- * order someone would ask them.
- */
 function Gist({ term, children }: { term: string; children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2 sm:flex-nowrap">
-      <dt className="w-24 shrink-0 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+    <div className="flex flex-wrap items-baseline gap-x-3 sm:flex-nowrap rounded-xl bg-white/80 p-2.5 border border-slate-100 shadow-2xs">
+      <dt className="w-24 shrink-0 text-xs font-extrabold uppercase tracking-wider text-[var(--accent)]">
         {term}
       </dt>
-      <dd className="min-w-0 flex-1 text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+      <dd className="min-w-0 flex-1 text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
         {children}
       </dd>
     </div>
   );
 }
 
-/**
- * One side's standing in the role relation.
- *
- * COLOUR RULE (interface rule 1): neither box may use the sand palette. What
- * is in them is not private information — it is the role relation both sides
- * are told about, and the study's whole colour convention is that sand means
- * "only you can see this". The two are told apart by weight, not by hue.
- */
 function PowerBox({
   title,
   items,
@@ -147,34 +132,25 @@ function PowerBox({
   return (
     <div
       className={cx(
-        "rounded-[var(--radius)] border p-3.5",
-        // The participant's own column reads first: a solid surface and a
-        // darker heading against the other side's muted one. The bullets are
-        // full-strength ink on their side too, because "what they hold" is
-        // the half that has to land — it is the power they are negotiating
-        // against, not background.
+        "rounded-2xl border p-4 sm:p-5 transition-all shadow-2xs",
         tone === "own"
-          ? "border-[var(--line-strong)] bg-[var(--surface)]"
-          : "border-[var(--line)] bg-[var(--surface-muted)]",
+          ? "border-blue-200 bg-blue-50/50 text-blue-950"
+          : "border-slate-200 bg-slate-50/70 text-slate-800",
       )}
     >
-      <p
-        className={cx(
-          "mb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]",
-          tone === "own" ? "text-[var(--ink)]" : "text-[var(--ink-3)]",
-        )}
-      >
-        {title}
-      </p>
-      <ul className="space-y-1.5">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="text-sm">{tone === "own" ? "🧑‍💼" : "👤"}</span>
+        <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--ink)]">
+          {title}
+        </p>
+      </div>
+      <ul className="space-y-2">
         {items.map((item) => (
           <li
             key={item}
-            className="flex gap-2 text-[0.875rem] leading-relaxed text-[var(--ink-2)]"
+            className="flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]"
           >
-            <span aria-hidden className="text-[var(--ink-3)]">
-              •
-            </span>
+            <span aria-hidden className="text-blue-600 font-bold">•</span>
             <span>{item}</span>
           </li>
         ))}
@@ -205,12 +181,8 @@ export default function InstructionPage() {
     setAnswers(Object.fromEntries(CHECKS.map((c) => [c.id, c.correct]))),
   );
 
-  // Dev mode skips the answer-and-retry loop rather than just enabling a
-  // button, so an unanswered check cannot trap a walkthrough.
   const bypass = useDevBypass();
 
-  // Reachable again via Back from the first practice round, so the answers are
-  // stored rather than only logged.
   useRestoreAnswers("instruction_check", (saved) => {
     const restored = Object.fromEntries(
       CHECKS.map((c) => [c.id, saved[c.id]]).filter(
@@ -234,7 +206,6 @@ export default function InstructionPage() {
   }
 
   function retry() {
-    // Clear only the wrong ones, so they re-answer those.
     setAnswers((prev) => {
       const next = { ...prev };
       for (const c of wrong) delete next[c.id];
@@ -254,195 +225,139 @@ export default function InstructionPage() {
       <>
         <Page>
           <PageHeader
-            eyebrow="Part 1 of 2 · Instructions"
-            title="Your role, and how this works"
-            subtitle="Read this carefully — you will be asked a few questions about it next."
+            eyebrow="Tutorial · Instructions (Part 1/2)"
+            title="Your Role and Study Instructions"
+            subtitle="Please read these instructions carefully. A 3-question comprehension check follows on the next screen."
           />
 
-          {/* THE WHOLE STUDY IN FOUR LINES, before any of the detail.
-              This card is new because the page it opens had a real failure:
-              every fact was present and correct, and a participant could still
-              finish the page unable to say what they were about to do. The
-              detail below answers "how does this work"; nothing answered "what
-              is this". Four lines, in the order someone actually asks them —
-              who am I, who are they, what has to happen, what do I get. Every
-              one of them is repeated in full further down, so this card can be
-              skipped by anyone who would rather read the detail. */}
-          <Card className="mb-5" tone="muted">
-            <dl className="space-y-2.5">
-              <Gist term="You are">
-                a <strong>{isLeader ? "Project Leader" : "Team Member"}</strong>{" "}
-                on a work project.
+          {/* Quick Gist card */}
+          <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/40 to-blue-50/20">
+            <CardTitle hint="At a glance:">
+              🎯 Study Overview in 4 Lines
+            </CardTitle>
+            <dl className="space-y-2.5 mt-3">
+              <Gist term="Your Role">
+                You are assigned as a <strong>{isLeader ? "Project Leader 👑" : "Team Member 🛠️"}</strong> on a workplace project.
               </Gist>
-              <Gist term="With you">
-                one other participant, holding the other role.
+              <Gist term="Partner">
+                You will negotiate with one other participant playing the opposite role.
               </Gist>
-              <Gist term="The job">
-                agree on <strong>three terms</strong> of the project. Neither of
-                you can decide them alone.
+              <Gist term="The Task">
+                Reach agreement on <strong>3 project terms</strong>. Neither person can decide terms alone.
               </Gist>
-              <Gist term="The catch">
-                you each want different things, and{" "}
-                <strong>only you can see what each option is worth to you</strong>
-                .
+              <Gist term="The Catch">
+                You each have different goals, and <strong>only you can see your private point payoffs</strong>.
               </Gist>
             </dl>
           </Card>
 
-          {/* The role, as two columns of what each side holds.
-              The power asymmetry (Design §6) is the point of this card, and as
-              two paragraphs it had to be held in the head to be compared. Side
-              by side, the asymmetry is the layout: what you hold, what they
-              hold, and neither list is enough on its own. The wording of each
-              item is unchanged — this is the same claim, arranged so it can be
-              seen rather than assembled. */}
-          <Card className="mb-5">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
-              You have been assigned the role of
-            </p>
-            <p className="mb-5 text-2xl font-semibold tracking-[-0.02em]">
-              {isLeader ? "Project Leader" : "Team Member"}
-            </p>
+          {/* Role & Power Asymmetry Card */}
+          <Card className="mb-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--accent)]">
+                  Your Assigned Role
+                </p>
+                <h2 className="text-2xl font-black tracking-tight text-[var(--ink)] sm:text-3xl">
+                  {isLeader ? "👑 Project Leader" : "🛠️ Team Member"}
+                </h2>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900 shadow-2xs">
+                Role Confirmed
+              </span>
+            </div>
 
-            {/* `items-start` so the shorter column ends where its content
-                ends. Stretched to equal height, the side with fewer items
-                showed a panel of empty space, which reads as something
-                missing rather than as a shorter list. */}
-            <div className="grid items-start gap-3 sm:grid-cols-2">
+            <div className="grid items-start gap-4 sm:grid-cols-2">
               <PowerBox
-                title="What you hold"
+                title="What You Hold (Your Authority & Power)"
                 tone="own"
                 items={
                   isLeader
                     ? [
-                        "Formal authority over the project",
-                        "You approve work assignments",
-                        "You write the performance evaluation that feeds into bonus decisions",
-                        "You recommend who is staffed on future high-visibility projects",
+                        "Formal authority over the overall project",
+                        "Approval power over final work assignments",
+                        "You write the evaluation that directly feeds into bonus payments",
+                        "You recommend who gets staffed on future high-visibility projects",
                       ]
                     : [
-                        "The specialist expertise the project depends on",
-                        "You may decline extra participation, or accept it on conditions",
+                        "Specialist domain expertise that the project critically depends on",
+                        "Autonomy to decline extra tasks or accept them with conditions",
                       ]
                 }
               />
               <PowerBox
                 title={
                   isLeader
-                    ? "What the Team Member holds"
-                    : "What the Project Leader holds"
+                    ? "What the Team Member Holds"
+                    : "What the Project Leader Holds"
                 }
                 tone="theirs"
                 items={
                   isLeader
                     ? [
-                        "The specialist expertise the project depends on",
-                        "Their willingness to take part — you cannot simply issue instructions and get the outcome you want",
+                        "Specialist expertise the project depends on",
+                        "Willingness to execute — you cannot force high-quality work by simple decree",
                       ]
                     : [
-                        "Formal authority over the project",
-                        "They approve work assignments",
-                        "They write the performance evaluation that feeds into bonus decisions",
-                        "They recommend who is staffed on future high-visibility projects",
+                        "Formal authority over the overall project",
+                        "Approval power over work assignments",
+                        "Writes the performance evaluation for your bonus",
+                        "Recommends staffing on future high-visibility projects",
                       ]
                 }
               />
             </div>
 
-            <p className="mt-4 max-w-prose text-[0.9375rem] font-medium">
-              {isLeader
-                ? "Neither side can settle everything alone. You need an agreement."
-                : "Your evaluation and future opportunities depend on their assessment — and neither side can settle everything alone. You both have to negotiate."}
-            </p>
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs sm:text-sm font-semibold leading-relaxed text-slate-800">
+              💡 {isLeader
+                ? "Neither side can settle everything alone. You need to negotiate a mutually acceptable agreement."
+                : "Your evaluation and bonus depend on the Leader's assessment — and neither side can settle alone. You must negotiate."}
+            </div>
           </Card>
 
-          {/* Short blocks, not paragraphs.
-              This was one card of continuous prose, and it is the densest
-              reading in the study. Each fact sits under a heading that names
-              it, so the card can be scanned first and read second.
-
-              FOUR, NOT SIX. Two of the six earned their way out rather than
-              being trimmed for length. "Then questions, then the bonus" said
-              what the callout directly beneath it says with the actual dollar
-              figures, so it was the same fact told twice, weaker first. And
-              the two AI-Proxy blocks were one thing split in half — how a
-              proxy task runs, and what happens at the end of it — which made
-              the arm that needs the clearest explanation read as two separate
-              rules to remember. Everything either said is still here. */}
-          <Card className="mb-5">
-            <CardTitle>How the tasks work</CardTitle>
-            <div className="space-y-4">
-              <Fact icon="🗂" title="Two tasks, two different scenarios">
-                Each negotiation has a <strong>ten-minute limit</strong> — a
-                cap, not a target, so you may finish sooner. A short practice
-                round comes first.
+          {/* 4 Core Rules */}
+          <Card className="mb-6">
+            <CardTitle hint="Keep these four principles in mind during every session:">
+              How the Negotiation Works
+            </CardTitle>
+            <div className="space-y-3 mt-3">
+              <Fact icon="🗂️" title="Two Negotiation Tasks">
+                Each negotiation has a <strong>10-minute time limit</strong> (you can finish earlier if you agree). A quick practice round comes first.
               </Fact>
 
-              <Fact icon="📊" title="Three terms, four options each">
-                You both have to land on the same option for all three. If you
-                do not, the project falls back to a limited plan and you each
-                take your fallback score.
+              <Fact icon="📊" title="Three Terms, Four Options Each">
+                Both sides must agree on the same option for all three terms. If you fail to agree before time runs out, the project falls back to a minimal plan and you receive your fallback score.
               </Fact>
 
-              <Fact icon="🔒" title="Your briefing is private">
-                Your situation, what each option is worth to you, and what
-                happens if there is no agreement. The other person has a
-                different one and cannot see yours. Explain why a term matters
-                and ask what matters to them — but{" "}
-                <strong>never show them your points or say the numbers</strong>.
+              <Fact icon="🔒" title="Your Payoff Sheet is Strictly Private">
+                Your situation, what each option pays you, and your fallback score are completely confidential. <strong>Never reveal your exact points or numbers to the other party</strong>. Explain why an issue is important in terms of workplace reasons instead!
               </Fact>
 
-              {/* The two arms in one block, and the ending stated for both.
-                  An earlier version promised a review step where the
-                  participant could "accept, ask for one change, or reject" —
-                  that step no longer exists, so the wording would have told
-                  every Proxy participant to expect a screen they never
-                  reach. */}
-              <Fact icon="💬" title="One you do yourself, one through an AI Proxy">
-                In one task you write the messages and make the offers. In the
-                other you set out what you want and which of your reasons may
-                be used, an <strong>AI Proxy</strong> negotiates for you while
-                you watch, and then{" "}
-                <strong>you take over and finish it yourself</strong> with
-                everything it said still on screen. Either way,{" "}
-                <strong>what the two of you agree is the result</strong>. Each
-                is explained when you reach it.
+              <Fact icon="💬" title="Direct Chat vs. AI-Mediated Proxy">
+                In one task, you write messages and make offers directly. In another task, an <strong>AI Proxy</strong> helps negotiate on your behalf using your instructions before you take over and finish the deal.
               </Fact>
             </div>
           </Card>
 
-          <Callout title="💰 After each task" tone="warning">
+          {/* Bonus callout */}
+          <Callout title="💰 Task Bonus Opportunity" tone="warning">
             {isLeader ? (
               <p>
-                As the Leader, you decide the other participant&apos;s bonus for
-                that task — up to {STUDY.currencySymbol}
-                {STUDY.bonusPerTask} each time, {STUDY.currencySymbol}
-                {STUDY.bonusTotal} across both. You are asked to weigh up both
-                how the negotiation turned out and how they conducted
-                themselves.
+                As the Leader, you decide the Team Member&apos;s bonus after each task (up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task, {STUDY.currencySymbol}{STUDY.bonusTotal} total). You will evaluate both the outcome reached and their communication.
               </p>
             ) : (
-              /* WHAT THIS MAY NOT PROMISE. It used to say the Leader decides
-                 "your bonus … up to £1 each time", and then the Member was
-                 shown a number. They are no longer shown one at all, so a
-                 figure here would be a consent-time promise the study does
-                 not keep. It says what is true: the decision happens, and it
-                 reaches them through their Prolific payment. */
               <p>
-                The Leader decides a bonus for you after each task, weighing up
-                both how the negotiation turned out and how you conducted
-                yourself. Any bonus is paid with your Prolific payment once the
-                study closes.
+                The Project Leader evaluates your negotiation conduct and decides a performance bonus for you after each task. Any awarded bonus is added directly to your Prolific payment once the study completes.
               </p>
             )}
           </Callout>
         </Page>
 
         <ActionBar
-          label="I have read this"
+          label="Proceed to Comprehension Check"
           onClick={() => {
             setPart("check");
-            window.scrollTo({ top: 0 });
+            window.scrollTo({ top: 0, behavior: "smooth" });
           }}
           note={`Next: ${CHECKS.length} quick questions`}
           secondary={<BackButton from="instruction" />}
@@ -458,18 +373,41 @@ export default function InstructionPage() {
     <>
       <Page>
         <PageHeader
-          eyebrow="Part 2 of 2 · Instructions"
-          title="A few quick questions"
-          subtitle="These just confirm the setup is clear. If one is wrong you can try again."
+          eyebrow="Comprehension Check · (Part 2/2)"
+          title="Quick Comprehension Check"
+          subtitle="Please answer these 3 questions to ensure the rules and payoff format are clear. If you miss any, you will have a chance to retry."
         />
 
-        <div className="space-y-5">
-          {CHECKS.map((c) => {
+        <div className="space-y-6">
+          {CHECKS.map((c, i) => {
             const answered = answers[c.id];
             const isWrong = submitted && answered && answered !== c.correct;
+            const isRight = submitted && answered && answered === c.correct;
+
             return (
-              <Card key={c.id}>
-                <p className="mb-3 text-[0.9375rem] font-medium">{c.question}</p>
+              <Card
+                key={c.id}
+                className={cx(
+                  "transition-all",
+                  isWrong ? "border-amber-400 bg-amber-50/30" : isRight ? "border-emerald-300 bg-emerald-50/20" : "",
+                )}
+              >
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-0.5 text-xs font-extrabold text-slate-700">
+                    Question {i + 1} of {CHECKS.length}
+                  </span>
+                  {isRight ? (
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                      ✓ Correct
+                    </span>
+                  ) : isWrong ? (
+                    <span className="text-xs font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full">
+                      ⚠️ Needs review
+                    </span>
+                  ) : null}
+                </div>
+
+                <p className="mb-3.5 text-sm sm:text-base font-bold text-[var(--ink)]">{c.question}</p>
                 <ChoiceList
                   name={c.id}
                   value={answered ?? ""}
@@ -479,8 +417,8 @@ export default function InstructionPage() {
                   options={c.options}
                 />
                 {isWrong ? (
-                  <div className="mt-3">
-                    <Callout title="Not quite" tone="warning">
+                  <div className="mt-3.5">
+                    <Callout title="💡 Helpful Review Tip" tone="warning">
                       <p>{c.remediation}</p>
                     </Callout>
                   </div>
@@ -492,14 +430,14 @@ export default function InstructionPage() {
       </Page>
 
       <ActionBar
-        label={canContinue ? "Continue" : submitted ? "Try again" : "Check answers"}
+        label={canContinue ? "Continue to Practice Round" : submitted ? "Retry Missed Questions" : "Check Answers"}
         onClick={canContinue ? goNext : submitted ? retry : check}
         disabled={!canContinue && !submitted && !allAnswered}
         note={
           submitted && !allCorrect
-            ? `${wrong.length} to look at again`
+            ? `⚠️ ${wrong.length} question(s) need another look`
             : submitted && allCorrect
-              ? "All correct."
+              ? "🎉 All answers correct! Ready to proceed."
               : ""
         }
       />
