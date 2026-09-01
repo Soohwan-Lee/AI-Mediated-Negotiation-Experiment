@@ -253,6 +253,8 @@ export function BaselineTask({
   /** SCRIPT-ASKWHY / SCRIPT-NONUM / SCRIPT-CLOSE are each one-shot (§6.2). */
   const [askedWhy, setAskedWhy] = useState(false);
   const [numbersReminded, setNumbersReminded] = useState(false);
+  /** Any participant message so far mentioned score numbers (one-shot pool). */
+  const [numbersEver, setNumbersEver] = useState(false);
   const [softCloseOffered, setSoftCloseOffered] = useState(false);
   /**
    * When the participant first tagged their SB, in counterpart replies.
@@ -424,11 +426,13 @@ export function BaselineTask({
       // 4 (its fixed SB disclosure), then the trade loop.
       const stageNow = counterpartStageAfter(replies + SEEDED_OPENING_STAGES);
 
+      const mentioned = numbersEver || mentionsScoreNumbers(text);
+      if (mentioned !== numbersEver) setNumbersEver(mentioned);
       const decision = counterpartStep(task, counterpartRole, stageNow, sentOffer, {
         tier: tierNow,
         askedWhy,
         numbersReminded,
-        numbersMentionedNow: mentionsScoreNumbers(text),
+        numbersMentionedNow: mentioned,
         secondsRemaining,
         softCloseOffered,
       });

@@ -984,6 +984,8 @@ export function DirectNegotiation({
   /** SCRIPT-ASKWHY / SCRIPT-NONUM / SCRIPT-CLOSE are each one-shot. */
   const [askedWhy, setAskedWhy] = useState(false);
   const [numbersReminded, setNumbersReminded] = useState(false);
+  /** Any participant message so far mentioned score numbers (one-shot pool). */
+  const [numbersEver, setNumbersEver] = useState(false);
   const [softCloseOffered, setSoftCloseOffered] = useState(false);
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(openingPackage);
@@ -1127,11 +1129,13 @@ export function DirectNegotiation({
     setPending(true);
     try {
       const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
+      const mentioned = numbersEver || mentionsScoreNumbers(text);
+      if (mentioned !== numbersEver) setNumbersEver(mentioned);
       const decision = counterpartStep(task, counterpartRole, stageNow, sentOffer, {
         tier: tierNow,
         askedWhy,
         numbersReminded,
-        numbersMentionedNow: mentionsScoreNumbers(text),
+        numbersMentionedNow: mentioned,
         secondsRemaining,
         softCloseOffered,
       });

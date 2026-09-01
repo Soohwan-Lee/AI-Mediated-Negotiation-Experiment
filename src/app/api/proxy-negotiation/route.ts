@@ -361,6 +361,13 @@ export async function POST(request: Request) {
   let impasse = false;
   /** The machine's move, stored beside the sentence for the audit. */
   let counterpartAction: string | null = null;
+  /**
+   * The stage the model is told and validated against. Usually the turn
+   * table's; a closing decision (accept / accept_sb) is stamped stage 6 by
+   * the machine, and telling the model "stage 5" while it performs a close
+   * produced stage_mismatch blocks in live runs.
+   */
+  let effectiveStage: StageId = stage;
 
   const addPool = (issueId: string | null) => {
     if (!isParticipantSide || body.policy !== "explorer") return "";
@@ -456,7 +463,9 @@ export async function POST(request: Request) {
         // question that opens the participant side's reason opportunity.
         const wr = cardOfLayer(task, counterpartRole, "work");
         counterpartAction = "state_priority";
-        decidedAction = `Say that ${theirRequirement.label.toLowerCase()} is your principal's priority, giving exactly this reason: "${wr?.text ?? ""}". Then ask what makes the other side's priority so important to their principal.`;
+        // The card already states the priority — see the note in the
+        // counterpart route about doubled phrasing.
+        decidedAction = `Convey your principal's priority with exactly this, and nothing more: "${wr?.text ?? ""}". Then ask what makes the other side's priority so important to their principal.`;
         break;
       }
       case 4: {
@@ -474,12 +483,13 @@ export async function POST(request: Request) {
         proposal = decision.proposal;
         accepted = decision.accepts;
         counterpartAction = decision.action;
+        effectiveStage = decision.stage;
         const levels = decision.proposal
           ? packageSentence(task, decision.proposal)
           : null;
         switch (decision.action) {
           case "accept_sb":
-            decidedAction = `Say you did not know that was the situation, that this arrangement is better for both sides than forcing it, and accept exactly these levels: ${levels}.`;
+            decidedAction = `Accept exactly these levels: ${levels}. Frame it as: given the situation their principal shared, this arrangement is better for both sides than forcing it.`;
             break;
           case "accept":
             decidedAction = `Say the package they proposed works for your principal, naming exactly these levels: ${levels}.`;
@@ -513,7 +523,7 @@ export async function POST(request: Request) {
         task,
         agentRole: actorRole,
         issues: task.issues,
-        stage,
+        stage: effectiveStage,
         decidedAction,
         mandateSummary: isParticipantSide
           ? mandateSummary(body.mandate, body.taskId)
@@ -551,7 +561,7 @@ export async function POST(request: Request) {
       mandate: isParticipantSide ? body.mandate : undefined,
       policy: body.policy,
       actorRole,
-      stage,
+      stage: effectiveStage,
       reasonsUsed: isParticipantSide ? resolvedHistory : undefined,
       reasonKey: voicedReasonId ? reasonToken(voicedReasonId) : null,
       reasonIssueId: designatedCard?.issueId ?? null,
@@ -574,7 +584,7 @@ export async function POST(request: Request) {
       speaker: isParticipantSide ? "participant_proxy" : "counterpart_proxy",
       text,
       createdAt: new Date().toISOString(),
-      stage,
+      stage: effectiveStage,
       ...(proposal ? { proposal } : {}),
       internalProvenance: action.internalProvenance,
     };
@@ -587,7 +597,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       turn,
-      stage,
+      stage: effectiveStage,
       message: visible,
       requirementOption: proposal?.[yourRequirement.id] ?? null,
       // The decided move, in machine vocabulary, so the client can store it

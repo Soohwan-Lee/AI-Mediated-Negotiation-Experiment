@@ -162,7 +162,8 @@ function listOrNone(
  */
 const HUMAN_CHAT_STYLE = `Write like a real person in a work chat:
 - Very short messages. Split one turn into 1-3 separate bubbles; mark bubble
-  breaks with "||". Each bubble under ~120 characters.
+  breaks with "||". Each bubble under ~120 characters — when a point runs
+  longer, break it across bubbles rather than writing one long bubble.
 - lowercase openings and contractions are fine. brief acknowledgements
   ("got it", "makes sense", "hmm") before your point are natural.
 - React to what the other person just said before making your own point.

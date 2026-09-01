@@ -119,11 +119,13 @@ export async function POST(request: Request) {
     ? body.stage
     : 1;
 
-  // The no-numbers screen runs on the SERVER against the participant's last
-  // message, so the client never carries the judgement.
-  const lastParticipantText =
-    [...(body.history ?? [])].reverse().find((m) => m.role === "user")
-      ?.content ?? "";
+  // The no-numbers screen runs on the SERVER against every participant
+  // message so far: the reminder is one-shot, so what matters is whether an
+  // unreminded mention exists at all — a mention made during the fixed
+  // stages (2/4) is picked up on the first trade-loop turn.
+  const mentionedNumbers = (body.history ?? []).some(
+    (m) => m.role === "user" && mentionsScoreNumbers(m.content),
+  );
 
   const decision = counterpartStep(
     task,
@@ -134,7 +136,7 @@ export async function POST(request: Request) {
       tier: body.tier ?? "none",
       askedWhy: body.askedWhy ?? false,
       numbersReminded: body.numbersReminded ?? false,
-      numbersMentionedNow: mentionsScoreNumbers(lastParticipantText),
+      numbersMentionedNow: mentionedNumbers,
       secondsRemaining: body.secondsRemaining,
       softCloseOffered: body.softCloseOffered ?? false,
     },
@@ -162,7 +164,10 @@ export async function POST(request: Request) {
         // The counterpart's WR — fixed and identical for every participant —
         // plus the question that opens their first reason opportunity.
         const wr = cardOfLayer(task, counterpartRole, "work");
-        return `Say that ${theirRequirement.label.toLowerCase()} is the term that matters most to you, giving exactly this reason: "${wr?.text ?? ""}". Then ask which term matters most to them, and why.`;
+        // The card already states the priority, so the instruction does not
+        // restate it — doubled "matters most to me" phrasing showed up in
+        // live runs when it did.
+        return `Share your own priority by conveying exactly this, and nothing more: "${wr?.text ?? ""}". Then ask which term matters most to them, and why.`;
       }
       case "disclose_sb": {
         // The fixed SB disclosure (§6.3): once, unconditionally, no demand
@@ -177,7 +182,7 @@ export async function POST(request: Request) {
       case "accept":
         return `Say the package they proposed works for you, naming exactly these levels: ${levels}.`;
       case "accept_sb":
-        return `Say you didn't realize that was the situation, that this arrangement beats forcing it on either side, and agree to exactly these levels: ${levels}.`;
+        return `Agree to exactly these levels: ${levels}. Frame it as: given the situation they shared, this arrangement beats forcing it on either side. React to what they said — do not act newly surprised if you have already acknowledged it.`;
       case "propose_max":
         return `Say that given what they've told you, a fuller trade makes more sense — propose exactly these levels and no others: ${levels}. Make clear you're asking for ${theirRequirement.label.toLowerCase()} at your end of it in return.`;
       case "counter_tier":

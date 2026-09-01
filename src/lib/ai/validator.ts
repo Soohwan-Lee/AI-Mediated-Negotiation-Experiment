@@ -347,6 +347,14 @@ export function validateAction(
     });
   }
 
+  // stage_mismatch is deliberately NOT a hard code. The model's stage field
+  // is an echo of what it was told, so a mismatch is a reporting error with
+  // zero information in it — the machine decided the move either way. Making
+  // it hard replaced whole messages with the package-only fallback on
+  // exactly the closing turns (the machine stamps stage 6 on an accept, the
+  // model sometimes echoes the trade stage it was mid-way through), which
+  // cost the participant the model's acceptance wording for nothing. It is
+  // still logged for the audit.
   const hardCodes: ViolationCode[] = [
     "red_line_violation",
     "fabricated_personal_fact",
@@ -354,7 +362,6 @@ export function validateAction(
     "disclosure_permission_violation",
     "provenance_policy_violation",
     "rationale_budget_exceeded",
-    "stage_mismatch",
   ];
   const hasHard = violations.some((v) => hardCodes.includes(v.code));
 
