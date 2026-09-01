@@ -308,8 +308,8 @@ export default function PracticePage() {
 
           {/* Scenario Context Card */}
           <Card className="mb-6 border-slate-200 bg-white">
-            <CardTitle hint="Practice scenario (neutral context):">
-              📋 The Practice Scenario: Team Project Scheduling
+            <CardTitle hint="Practice scenario — nothing here counts:">
+              📋 The Practice Scenario: {task.title.replace(/^Practice — /, "")}
             </CardTitle>
             <p className="text-xs sm:text-sm leading-relaxed text-slate-700 mt-2">
               {task.publicBrief}
