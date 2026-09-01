@@ -155,12 +155,6 @@ export function PackageValue({
   );
 }
 
-function mattersMost(issue: Issue, role: Role): boolean {
-  return role === "member"
-    ? issue.type === "member_priority"
-    : issue.type === "leader_priority";
-}
-
 export function IssueValueTable({
   issues,
   role,
@@ -186,13 +180,17 @@ export function IssueValueTable({
       ) : null}
       {issues.map((issue) => (
         <div key={issue.id} className="rounded-xl border border-[var(--private-line)] bg-white/60 p-4 shadow-2xs">
-          <div className="mb-2 flex items-center justify-between gap-2">
+          {/* No badge marks which issue is this role's priority, and none may
+              be added. Design §5 principle 1 is explicit that issue type and
+              core-requirement marking are not displayed: a star on one issue
+              tells a participant which term the study is about before a word is
+              negotiated, and lets them infer the counterpart sees the same on
+              theirs — which hands over the shape of the logroll. Finding the
+              logroll is the behaviour being observed (pilot gate 6). The points
+              and the one-line rationale below already convey what matters to
+              this role, through the role's own story rather than a label. */}
+          <div className="mb-2">
             <p className="text-sm sm:text-base font-bold text-[var(--ink)]">{issue.label}</p>
-            {mattersMost(issue, role) ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-0.5 text-[0.6875rem] font-extrabold uppercase tracking-wide text-amber-900 shadow-2xs">
-                ⭐ Priority
-              </span>
-            ) : null}
           </div>
           <p className="mb-2 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)]/80">
             {issue.description}
