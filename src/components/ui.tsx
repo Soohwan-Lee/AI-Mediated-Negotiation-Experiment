@@ -223,6 +223,68 @@ export function Divider({ className }: { className?: string }) {
   return <hr className={cx("border-[var(--line)]", className ?? "my-8")} />;
 }
 
+/**
+ * Visual key point item with icon for scanning dense information quickly.
+ */
+export function KeyPoint({
+  icon,
+  title,
+  children,
+  highlight = false,
+}: {
+  icon?: string;
+  title: string;
+  children: ReactNode;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={cx(
+        "flex items-start gap-3 rounded-xl border p-3 sm:p-3.5 transition-all",
+        highlight
+          ? "border-blue-200 bg-blue-50/60 text-blue-950"
+          : "border-slate-100 bg-slate-50/70 text-slate-800",
+      )}
+    >
+      {icon ? (
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white shadow-2xs text-sm">
+          {icon}
+        </span>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+          {title}
+        </p>
+        <div className="mt-0.5 text-xs sm:text-sm text-slate-600 leading-relaxed">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 2-column or 3-column summary grid for quick scanning
+ */
+export function SummaryGrid({
+  children,
+  cols = 2,
+}: {
+  children: ReactNode;
+  cols?: 2 | 3;
+}) {
+  return (
+    <div
+      className={cx(
+        "grid gap-2.5 sm:gap-3",
+        cols === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Buttons
 // ---------------------------------------------------------------------------

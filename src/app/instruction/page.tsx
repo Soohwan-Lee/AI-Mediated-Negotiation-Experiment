@@ -274,14 +274,14 @@ export default function InstructionPage() {
                 items={
                   isLeader
                     ? [
-                        "Formal authority over the overall project",
+                        "Formal authority over overall project scope",
                         "Approval power over final work assignments",
-                        "You write the evaluation that directly feeds into bonus payments",
-                        "You recommend who gets staffed on future high-visibility projects",
+                        "Decides performance evaluation for bonus payment",
+                        "Staffing recommendations for future high-visibility projects",
                       ]
                     : [
-                        "Specialist domain expertise that the project critically depends on",
-                        "Autonomy to decline extra tasks or accept them with conditions",
+                        "Specialist domain expertise vital to the project",
+                        "Autonomy to decline or condition extra tasks",
                       ]
                 }
               />
@@ -295,59 +295,83 @@ export default function InstructionPage() {
                 items={
                   isLeader
                     ? [
-                        "Specialist expertise the project depends on",
-                        "Willingness to execute — you cannot force high-quality work by simple decree",
+                        "Vital specialist expertise",
+                        "Execution effort — high quality cannot be forced by decree",
                       ]
                     : [
-                        "Formal authority over the overall project",
+                        "Formal authority over overall project scope",
                         "Approval power over work assignments",
-                        "Writes the performance evaluation for your bonus",
-                        "Recommends staffing on future high-visibility projects",
+                        "Evaluates performance and decides your bonus",
+                        "Future high-visibility staffing recommendations",
                       ]
                 }
               />
             </div>
 
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs sm:text-sm font-semibold leading-relaxed text-slate-800">
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs sm:text-sm font-semibold leading-relaxed text-slate-800">
               💡 {isLeader
-                ? "Neither side can settle everything alone. You need to negotiate a mutually acceptable agreement."
-                : "Your evaluation and bonus depend on the Leader's assessment — and neither side can settle alone. You must negotiate."}
+                ? "Neither party can decide terms alone. You must reach a mutual agreement."
+                : "Your evaluation and bonus depend on the Leader's assessment. You must reach a mutual agreement."}
             </div>
           </Card>
 
           {/* 4 Core Rules */}
           <Card className="mb-6">
-            <CardTitle hint="Keep these four principles in mind during every session:">
-              How the Negotiation Works
+            <CardTitle hint="Keep these four core principles in mind:">
+              ⚡ 4 Core Rules of the Negotiation
             </CardTitle>
-            <div className="space-y-3 mt-3">
-              <Fact icon="🗂️" title="Two Negotiation Tasks">
-                Each negotiation has a <strong>10-minute time limit</strong> (you can finish earlier if you agree). A quick practice round comes first.
-              </Fact>
+            <div className="grid gap-3 sm:grid-cols-2 mt-3">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 shadow-2xs">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">⏱️</span>
+                  <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">10-Minute Limit per Task</p>
+                </div>
+                <p className="text-xs text-[var(--ink-2)] leading-relaxed">
+                  Conclude whenever you agree. If time expires without agreement, fallback score applies.
+                </p>
+              </div>
 
-              <Fact icon="📊" title="Three Terms, Four Options Each">
-                Both sides must agree on the same option for all three terms. If you fail to agree before time runs out, the project falls back to a minimal plan and you receive your fallback score.
-              </Fact>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 shadow-2xs">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">📦</span>
+                  <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">3 Terms, 4 Options Each</p>
+                </div>
+                <p className="text-xs text-[var(--ink-2)] leading-relaxed">
+                  Both sides must agree on the complete package of 3 terms for a successful outcome.
+                </p>
+              </div>
 
-              <Fact icon="🔒" title="Your Payoff Sheet is Strictly Private">
-                Your situation, what each option pays you, and your fallback score are completely confidential. <strong>Never reveal your exact points or numbers to the other party</strong>. Explain why an issue is important in terms of workplace reasons instead!
-              </Fact>
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3.5 shadow-2xs">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">🔒</span>
+                  <p className="text-xs sm:text-sm font-bold text-amber-950">Payoffs are Strictly Private</p>
+                </div>
+                <p className="text-xs text-amber-900 leading-relaxed">
+                  Never state numeric points. Explain your priorities using workplace reasons instead!
+                </p>
+              </div>
 
-              <Fact icon="💬" title="Direct Chat vs. AI-Mediated Proxy">
-                In one task, you write messages and make offers directly. In another task, an <strong>AI Proxy</strong> helps negotiate on your behalf using your instructions before you take over and finish the deal.
-              </Fact>
+              <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 shadow-2xs">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">🤖</span>
+                  <p className="text-xs sm:text-sm font-bold text-blue-950">Direct vs. AI Proxy Mode</p>
+                </div>
+                <p className="text-xs text-blue-900 leading-relaxed">
+                  One task is direct chat; the other uses an AI Proxy agent using your mandate.
+                </p>
+              </div>
             </div>
           </Card>
 
           {/* Bonus callout */}
           <Callout title="💰 Task Bonus Opportunity" tone="warning">
             {isLeader ? (
-              <p>
-                As the Leader, you decide the Team Member&apos;s bonus after each task (up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task, {STUDY.currencySymbol}{STUDY.bonusTotal} total). You will evaluate both the outcome reached and their communication.
+              <p className="text-xs sm:text-sm">
+                As the Leader, you allocate the Team Member&apos;s bonus after each task (up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task, {STUDY.currencySymbol}{STUDY.bonusTotal} total) based on outcome and conduct.
               </p>
             ) : (
-              <p>
-                The Project Leader evaluates your negotiation conduct and decides a performance bonus for you after each task. Any awarded bonus is added directly to your Prolific payment once the study completes.
+              <p className="text-xs sm:text-sm">
+                The Project Leader decides a performance bonus for you after each task. Awarded bonuses are paid out automatically upon study completion.
               </p>
             )}
           </Callout>

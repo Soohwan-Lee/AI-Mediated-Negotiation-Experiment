@@ -24,7 +24,20 @@
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { ActionBar } from "@/components/study-chrome";
-import { Card, CardTitle, Checkbox, Page, PageHeader, cx } from "@/components/ui";
+import {
+  Callout,
+  Card,
+  CardTitle,
+  Checkbox,
+  ChoiceList,
+  Field,
+  KeyPoint,
+  Page,
+  PageHeader,
+  SummaryGrid,
+  TextInput,
+  cx,
+} from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
 import { STAGE_MINUTES, STUDY, nextHref } from "@/lib/study-config";
@@ -143,14 +156,29 @@ export default function ConsentPage() {
           </div>
         </Card>
 
-        {/* The schedule timeline */}
+        {/* Study Overview Cards */}
+        <div className="mb-6">
+          <SummaryGrid cols={3}>
+            <KeyPoint icon="💬" title="Negotiation Tasks">
+              Participate in 2 simulated project decision scenarios (~10 mins each).
+            </KeyPoint>
+            <KeyPoint icon="🤖" title="AI Assistance">
+              Test direct negotiation vs. delegating to an AI Proxy agent.
+            </KeyPoint>
+            <KeyPoint icon="📝" title="Short Surveys">
+              Share your perspective, feelings, and decision experience.
+            </KeyPoint>
+          </SummaryGrid>
+        </div>
+
+        {/* Study Timeline Steps */}
         <Card className="mb-6">
-          <CardTitle hint="Here is how the session will progress from start to finish:">
-            Study Schedule
+          <CardTitle hint="Standard 4-step sequence (approx. 25–30 minutes total):">
+            🗺️ Study Flow Timeline
           </CardTitle>
-          <ol className="relative mt-4 space-y-4">
+          <ol className="relative mt-4 space-y-3.5">
             {STEPS.map((step, i) => (
-              <li key={step.title} className="relative flex items-start gap-4">
+              <li key={step.title} className="relative flex items-start gap-3.5">
                 {i < STEPS.length - 1 ? (
                   <span
                     aria-hidden
@@ -159,18 +187,18 @@ export default function ConsentPage() {
                 ) : null}
                 <span
                   aria-hidden
-                  className="tabular relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-indigo-200 bg-indigo-50 text-xs font-black text-[var(--accent)] shadow-2xs"
+                  className="tabular relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-indigo-200 bg-indigo-50 text-xs font-black text-[var(--accent)] shadow-2xs"
                 >
                   {i + 1}
                 </span>
-                <div className="min-w-0 flex-1 rounded-xl bg-slate-50/70 p-3 sm:p-3.5 border border-slate-100 shadow-2xs">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-sm sm:text-base font-bold text-[var(--ink)]">{step.title}</p>
-                    <span className="tabular shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-[var(--ink-2)] shadow-2xs">
-                      ⏱️ {step.minutes} min
+                <div className="min-w-0 flex-1 rounded-xl bg-slate-50/70 p-3 border border-slate-100 shadow-2xs">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">{step.title}</p>
+                    <span className="tabular shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-2xs font-bold text-[var(--ink-2)] shadow-2xs">
+                      ⏱️ {step.minutes}m
                     </span>
                   </div>
-                  <p className="mt-1 text-xs sm:text-sm leading-relaxed text-[var(--ink-3)]">
+                  <p className="mt-0.5 text-xs text-[var(--ink-2)] leading-relaxed">
                     {step.detail}
                   </p>
                 </div>
@@ -189,7 +217,7 @@ export default function ConsentPage() {
               {RECORDED.map((item) => (
                 <li
                   key={item}
-                  className="flex items-center gap-2.5 text-xs sm:text-sm text-[var(--ink-2)]"
+                  className="flex items-center gap-2 text-xs sm:text-sm text-[var(--ink-2)]"
                 >
                   <span aria-hidden className="text-emerald-600 font-bold">✓</span>
                   <span>{item}</span>
@@ -203,36 +231,36 @@ export default function ConsentPage() {
               🛡️ How Data is Kept
             </CardTitle>
             <p className="text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]">
-              Your responses are stored securely under an anonymous study code. Your Prolific ID is kept separately and used only to verify completion and disburse payment. No identifying data will ever be published.
+              All responses are strictly anonymized under a research code. Your Prolific ID is used solely for compensation.
             </p>
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 p-2.5 text-xs leading-relaxed text-amber-900">
-              <span className="font-bold">⚠️ Note:</span> Please do not write your real name or personal contact info into any text inputs.
+            <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-2xs sm:text-xs leading-relaxed text-amber-900 font-medium">
+              ⚠️ Please do not enter real names or personal contact info in text boxes.
             </div>
           </Card>
         </div>
 
         {/* Important Terms / IRB obligations */}
         <Card className="mb-6">
-          <CardTitle>Important Information</CardTitle>
-          <dl className="space-y-3.5 mt-2">
-            <Term label="⚖️ Risks & Benefits">
-              Risks are minimal and comparable to everyday workplace discussions. Some scenarios involve discussing workload or evaluation credit. There is no direct personal benefit beyond the compensation provided.
-            </Term>
-            <Term label="🚪 Voluntary Participation">
-              Participation is completely voluntary. You may withdraw at any time by closing this tab without penalty on Prolific. If you choose to stop early, please return your submission on Prolific so another worker can take part.
-            </Term>
-            <Term label="🔎 Full Debriefing Provided">
-              To preserve the integrity of the experiment, some specific design details are not fully explained until after the tasks. A comprehensive explanation will be provided upon completion before final submission.
-            </Term>
-          </dl>
+          <CardTitle>📋 Important Participant Information</CardTitle>
+          <div className="space-y-2.5 mt-3">
+            <KeyPoint icon="⚖️" title="Risks & Benefits">
+              Minimal everyday workplace discussion tasks. No direct benefit beyond advertised compensation.
+            </KeyPoint>
+            <KeyPoint icon="🚪" title="Voluntary Participation">
+              You may withdraw at any time by closing this tab without penalty on Prolific.
+            </KeyPoint>
+            <KeyPoint icon="🔎" title="Full Debriefing">
+              Complete research context and study design details will be provided at the end.
+            </KeyPoint>
+          </div>
         </Card>
 
         {/* Researcher details */}
         <Card className="mb-6" tone="muted">
           <CardTitle>Research Team & Contacts</CardTitle>
-          <dl className="grid gap-4 sm:grid-cols-2 text-xs sm:text-sm">
+          <dl className="grid gap-4 sm:grid-cols-2 text-xs sm:text-sm mt-2">
             <div>
-              <dt className="text-xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-1">
+              <dt className="text-2xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-1">
                 Principal Investigator
               </dt>
               <dd className="font-semibold text-slate-800">
@@ -247,7 +275,7 @@ export default function ConsentPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-1">
+              <dt className="text-2xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-1">
                 Institutional Review Board (IRB)
               </dt>
               <dd className="font-semibold text-slate-800">
