@@ -57,7 +57,7 @@ import {
 } from "@/components/session";
 import { OptionChips, PackageValue, PointsKey } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
+import { Callout, Card, CardTitle, Cue, Page, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { dummyAnswer, riskBlock } from "@/lib/measures";
 import { useParticipant } from "@/lib/participant-context";
@@ -158,8 +158,6 @@ export function TaskBrief({
   steps: string[];
   onContinue: () => void;
 }) {
-  const brief = task.roleBriefs[role];
-
   return (
     <>
       <Page width="wide">
@@ -184,58 +182,28 @@ export function TaskBrief({
           </div>
         </Card>
 
-        {/* Private Role & Mission Instructions */}
-        <Card tone="private" className="mb-6 border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
-          <div className="flex items-center justify-between gap-2 border-b border-amber-200 pb-3 mb-4">
-            <div>
-              <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900">
-                Your Confidential Role Briefing
-              </p>
-              <h2 className="text-lg sm:text-xl font-black text-slate-950">
-                {role === "leader" ? "👑" : "🛠️"} {brief.title}
-              </h2>
-            </div>
-            <PrivateTag />
-          </div>
+        {/* THE WHOLE BRIEFING, EXPANDED, AND ONLY HERE.
+            `defaultOpen` exists for this one screen: it is the phase where the
+            briefing is READ for the first time, and a section folded shut is a
+            section a participant may not know exists at all.
 
-          <div className="space-y-4">
-            <div className="rounded-xl border border-amber-200 bg-white/80 p-3.5 shadow-2xs">
-              <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 mb-1">
-                📄 Your Situation
-              </p>
-              <p className="text-xs sm:text-sm leading-relaxed text-slate-800">
-                {brief.roleStory}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-amber-200 bg-white/80 p-3.5 shadow-2xs">
-              <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 mb-2">
-                🎯 What You Need to Achieve (Your Priorities)
-              </p>
-              <ul className="space-y-1.5 text-xs sm:text-sm text-slate-800">
-                {brief.objectives.map((obj, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-amber-700 font-bold">•</span>
-                    <span>{obj}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-xs sm:text-sm text-blue-950">
-              <p className="font-bold mb-1">💡 Next Step</p>
-              <p className="text-xs text-blue-900 leading-relaxed">
-                On the next screen, you will review the 3 specific terms, check what each option is worth to you, and set up your negotiation goals.
-              </p>
-            </div>
-          </div>
-        </Card>
+            Do not replace this with a hand-built summary. It was once cut down
+            to the role story and the objectives, which dropped the payoff
+            table, the fallback, and every reason card off the screen — and
+            since the sidebar's own folds were collapsed at the time, a
+            participant could reach the mandate screen having never seen their
+            own numbers or their cards anywhere. Interface rule 5: anything a
+            participant is expected to negotiate from belongs in the briefing,
+            and it is never taken away. */}
+        <div className="mb-6">
+          <BriefingPanel task={task} role={role} defaultOpen />
+        </div>
       </Page>
 
       <ActionBar
-        label="Continue to Set Your Negotiation Goals →"
+        label="I have read my briefing"
         onClick={onContinue}
-        note="💡 Your briefing is also always available in the sidebar."
+        note="💡 It stays pinned in the sidebar for the whole task."
       />
     </>
   );
