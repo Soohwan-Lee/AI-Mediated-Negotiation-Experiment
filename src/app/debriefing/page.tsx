@@ -93,13 +93,44 @@ export default function DebriefingPage() {
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-xl">💵</span>
               <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                2. Reward Decisions Were Scenario-Only (Full Pay Guaranteed)
+                {isMember
+                  ? "2. No Bonus Decision Was Made About You (Full Pay Guaranteed)"
+                  : "2. Reward Decisions Were Scenario-Only (Full Pay Guaranteed)"}
               </h2>
             </div>
+            {/* The Member's half of this is the disclosure that closes deception
+                item 4, and it has to RETRACT, not reassure. They waited twice in
+                front of a screen reading "The Project Leader is evaluating your
+                performance bonus…", and that screen implies a decision was made
+                about them. Saying only that no penalty occurred leaves the
+                implication standing — it reads as "a decision happened and it
+                went fine". Saying plainly that no such decision was ever made is
+                the whole disclosure. There is no number to explain away, which
+                is exactly why the sentence has to do the work instead. */}
             <p className="text-xs sm:text-sm leading-relaxed text-slate-700">
-              {isMember
-                ? "No penalty or reduction occurred during the waiting period. You will receive your full advertised base pay and bonus on Prolific."
-                : "Leader bonus choices were recorded strictly as experimental data on authority. No real person had pay altered; your pay is paid in full."}
+              {isMember ? (
+                <>
+                  After each task you waited while the other side decided a bonus for
+                  you.{" "}
+                  <strong className="text-slate-900">
+                    No such decision was ever made about you, by anyone — there was no
+                    other participant to make one.
+                  </strong>{" "}
+                  Nothing you did in either task affected your payment. You receive the
+                  full amount advertised on Prolific, exactly as described in the
+                  consent form, and the bonus is paid in full.
+                </>
+              ) : (
+                <>
+                  After each task you decided the other side&apos;s bonus. Because there
+                  was no other participant,{" "}
+                  <strong className="text-slate-900">
+                    no one received or lost money as a result of your decision
+                  </strong>{" "}
+                  — it was recorded as research data about how authority is used. Your
+                  own pay is unaffected and is paid in full.
+                </>
+              )}
             </p>
           </Card>
 
