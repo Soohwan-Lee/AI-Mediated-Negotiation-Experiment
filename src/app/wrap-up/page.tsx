@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MeasureBlock, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
-import { Card, CardTitle, Page } from "@/components/ui";
+import { Card, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import {
   FINAL_OPEN_BLOCK,

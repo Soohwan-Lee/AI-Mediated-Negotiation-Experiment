@@ -22,20 +22,16 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
 import {
-  Callout,
   Card,
   CardTitle,
   Checkbox,
-  ChoiceList,
-  Field,
   KeyPoint,
   Page,
   PageHeader,
   SummaryGrid,
-  TextInput,
   cx,
 } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
@@ -353,17 +349,6 @@ function StatCard({
       <p className="mt-1 text-xs font-medium text-slate-600">
         {hint}
       </p>
-    </div>
-  );
-}
-
-function Term({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
-      <dt className="mb-1 text-sm font-bold text-[var(--ink)]">{label}</dt>
-      <dd className="text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]">
-        {children}
-      </dd>
     </div>
   );
 }

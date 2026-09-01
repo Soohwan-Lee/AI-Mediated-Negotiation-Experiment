@@ -810,7 +810,7 @@ export function BaselineTask({
       ) : (
         <ActionBar
           note={`${chosen} of ${task.issues.length} terms selected${
-            secondsRemaining <= 0 ? " · time expired" : ""
+            outOfTime ? " · time expired" : ""
           }`}
         />
       )}

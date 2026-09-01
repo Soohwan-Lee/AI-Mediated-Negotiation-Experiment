@@ -83,30 +83,6 @@ const CHECKS: CheckItem[] = COMPREHENSION_BLOCK.items.flatMap((item) =>
  * without re-reading the card. It is `aria-hidden` because the heading beside
  * it already says the same thing in words.
  */
-function Fact({
-  icon,
-  title,
-  children,
-}: {
-  icon: string;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-3.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 sm:p-4 shadow-2xs">
-      <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-lg shadow-2xs border border-slate-200">
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <p className="mb-1 text-sm sm:text-base font-bold text-[var(--ink)]">{title}</p>
-        <p className="text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]">
-          {children}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function Gist({ term, children }: { term: string; children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 sm:flex-nowrap rounded-xl bg-white/80 p-2.5 border border-slate-100 shadow-2xs">
