@@ -42,58 +42,55 @@ export function MeasureBlock({
 }) {
   const optional = new Set(block.optional ?? []);
 
-  // How much of this block is still open. The action bar counts the whole
-  // page; this says where the remainder is, which on a page with more than one
-  // block is the part that is actually hard to see.
   const required = requiredIds(block);
   const left = required.filter(
     (id) => answers[id] === undefined || answers[id] === "",
   ).length;
 
   return (
-    <Card className="mb-5">
+    <Card className="mb-6">
       <CardTitle
         hint={block.hint}
         aside={
           required.length === 0 ? null : left > 0 ? (
-            <Cue>{left} to answer</Cue>
+            <Cue>{left} remaining</Cue>
           ) : (
-            <Cue tone="positive">All answered</Cue>
+            <Cue tone="positive">✓ Complete</Cue>
           )
         }
       >
         {block.title}
       </CardTitle>
-      {pairShortItems(block.items).map((row) =>
-        row.length === 1 ? (
-          <MeasureItem
-            key={row[0].id}
-            item={row[0]}
-            value={answers[row[0].id]}
-            onChange={onChange}
-            optional={optional.has(row[0].id)}
-            flagged={flagged?.has(row[0].id)}
-          />
-        ) : (
-          // Two short answers on one line. `items-start` so a wrapped label on
-          // one side does not drag its neighbour's input down with it.
-          <div
-            key={row.map((i) => i.id).join("+")}
-            className="grid items-start gap-x-5 sm:grid-cols-2"
-          >
-            {row.map((item) => (
-              <MeasureItem
-                key={item.id}
-                item={item}
-                value={answers[item.id]}
-                onChange={onChange}
-                optional={optional.has(item.id)}
-                flagged={flagged?.has(item.id)}
-              />
-            ))}
-          </div>
-        ),
-      )}
+      <div className="space-y-4 pt-1">
+        {pairShortItems(block.items).map((row) =>
+          row.length === 1 ? (
+            <MeasureItem
+              key={row[0].id}
+              item={row[0]}
+              value={answers[row[0].id]}
+              onChange={onChange}
+              optional={optional.has(row[0].id)}
+              flagged={flagged?.has(row[0].id)}
+            />
+          ) : (
+            <div
+              key={row.map((i) => i.id).join("+")}
+              className="grid items-start gap-4 sm:grid-cols-2"
+            >
+              {row.map((item) => (
+                <MeasureItem
+                  key={item.id}
+                  item={item}
+                  value={answers[item.id]}
+                  onChange={onChange}
+                  optional={optional.has(item.id)}
+                  flagged={flagged?.has(item.id)}
+                />
+              ))}
+            </div>
+          ),
+        )}
+      </div>
     </Card>
   );
 }

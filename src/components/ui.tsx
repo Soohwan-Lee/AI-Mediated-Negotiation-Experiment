@@ -46,12 +46,9 @@ export function Page({
 }) {
   return (
     <main
-      // `data-measure` is what the sticky action bar keys off to match this
-      // column's width — see the rule in globals.css. It is a plain attribute
-      // rather than state so the server and client render the same thing.
       data-measure={width}
       className={cx(
-        "mx-auto w-full px-5 pb-32 pt-8 sm:px-6 sm:pt-12 lg:px-8",
+        "mx-auto w-full px-4 pb-36 pt-6 sm:px-6 sm:pt-10 lg:px-8",
         width === "wide" ? "max-w-(--measure-wide)" : "max-w-(--measure-reading)",
       )}
     >
@@ -72,17 +69,16 @@ export function PageHeader({
   return (
     <header className="mb-8">
       {eyebrow ? (
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
+        <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-0.5 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--accent)] shadow-2xs">
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
           {eyebrow}
-        </p>
+        </div>
       ) : null}
-      <h1 className="text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2rem]">
+      <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)] sm:text-3xl lg:text-[2.25rem] lg:leading-tight">
         {title}
       </h1>
       {subtitle ? (
-        // Held to a reading measure: the column is wide for forms and tables,
-        // but a sentence introducing the page is still a sentence.
-        <p className="mt-3 max-w-prose text-[1.0625rem] leading-relaxed text-[var(--ink-2)]">
+        <p className="mt-2.5 max-w-prose text-base leading-relaxed text-[var(--ink-2)] sm:text-lg">
           {subtitle}
         </p>
       ) : null}
@@ -102,14 +98,7 @@ export function Card({
   className?: string;
   tone?: "surface" | "private" | "muted";
   padded?: boolean;
-  /** Anchor target, for the action bar's "go to the first unanswered". */
   id?: string;
-  /**
-   * Marks this card as the one waiting on the participant right now — the
-   * composer when it is their turn, the terms when a message cannot be sent
-   * until they are chosen. An outline only; the surface colour still says who
-   * can see what is on the card. One per screen.
-   */
   cue?: boolean;
 }) {
   return (
@@ -117,14 +106,14 @@ export function Card({
       id={id}
       className={cx(
         id && "scroll-mt-24",
-        "rounded-[var(--radius-lg)] border transition-shadow",
-        padded && "p-5 sm:p-6",
+        "rounded-[var(--radius-lg)] border transition-all duration-200",
+        padded && "p-5 sm:p-7",
         cue && (tone === "private" ? "cue-ring-private" : "cue-ring"),
         tone === "private"
-          ? "border-[var(--private-line)] bg-[var(--private)]"
+          ? "border-[var(--private-line)] bg-[var(--private-surface)] shadow-[var(--shadow-sm)] text-[var(--private-ink)]"
           : tone === "muted"
-            ? "border-[var(--line)] bg-[var(--surface-muted)]"
-            : "border-[var(--line)] bg-[var(--surface)]",
+            ? "border-[var(--line)] bg-[var(--surface-muted)] shadow-[var(--shadow-xs)]"
+            : "border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)]",
         className,
       )}
     >
@@ -146,11 +135,11 @@ export function CardTitle({
   return (
     <div className="mb-4 flex items-start justify-between gap-4">
       <div>
-        <h2 className="text-[0.95rem] font-semibold tracking-[-0.01em]">
+        <h2 className="text-base font-bold tracking-tight text-[var(--ink)] sm:text-lg">
           {children}
         </h2>
         {hint ? (
-          <p className="mt-1 text-sm text-[var(--ink-2)]">{hint}</p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--ink-3)]">{hint}</p>
         ) : null}
       </div>
       {aside}
@@ -169,31 +158,23 @@ export function Callout({
 }) {
   const toneClass =
     tone === "warning"
-      ? "border-[#f0dcc0] bg-[var(--caution-soft)] text-[#6d3d05]"
+      ? "border-[var(--caution-line)] bg-[var(--caution-soft)] text-[#78350f] shadow-xs"
       : tone === "private"
-        ? "border-[var(--private-line)] bg-[var(--private)] text-[var(--private-ink)]"
-        : "border-[var(--line)] bg-[var(--surface-muted)] text-[var(--ink)]";
+        ? "border-[var(--private-line)] bg-[var(--private-surface)] text-[var(--private-ink)] shadow-xs"
+        : "border-[var(--line)] bg-[var(--surface-muted)] text-[var(--ink)] shadow-xs";
 
   return (
-    <div className={cx("rounded-[var(--radius)] border p-4 text-sm", toneClass)}>
-      {title ? <p className="mb-1 font-semibold">{title}</p> : null}
-      {/* A callout is prose, and prose does not want the full width of a wide
-          column — `max-w-prose` holds the line length while the panel itself
-          still spans the card. */}
+    <div className={cx("rounded-[var(--radius)] border p-4 sm:p-5 text-sm leading-relaxed", toneClass)}>
+      {title ? (
+        <p className="mb-1.5 flex items-center gap-2 font-semibold text-[0.95rem]">
+          {title}
+        </p>
+      ) : null}
       <div className="max-w-prose [&>p+p]:mt-2">{children}</div>
     </div>
   );
 }
 
-/**
- * A pill that says what the screen is waiting for: "Your turn", "3 to answer",
- * "Waiting for their reply".
- *
- * `accent` is for something to do now and is the only one that moves; `quiet`
- * is for a state the participant is waiting out; `positive` is for a part that
- * is finished. It says what is expected, never what to say — nothing here may
- * hint at an answer.
- */
 export function Cue({
   children,
   tone = "accent",
@@ -204,23 +185,23 @@ export function Cue({
   return (
     <span
       className={cx(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]",
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] shadow-2xs",
         tone === "accent"
-          ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+          ? "border border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]"
           : tone === "positive"
-            ? "bg-[var(--positive-soft)] text-[var(--positive)]"
-            : "bg-[var(--surface-muted)] text-[var(--ink-2)]",
+            ? "border border-[var(--positive-line)] bg-[var(--positive-soft)] text-[var(--positive)]"
+            : "border border-[var(--line)] bg-[var(--surface-muted)] text-[var(--ink-3)]",
       )}
     >
       <span
         aria-hidden
         className={cx(
-          "h-1.5 w-1.5 rounded-full",
+          "h-2 w-2 rounded-full",
           tone === "accent"
             ? "animate-pulse bg-[var(--accent)]"
             : tone === "positive"
               ? "bg-[var(--positive)]"
-              : "bg-[var(--ink-3)]",
+              : "bg-[var(--ink-4)]",
         )}
       />
       {children}
@@ -231,8 +212,8 @@ export function Cue({
 /** Small caps label used to mark a private zone. */
 export function PrivateTag({ children = "Private to you" }: { children?: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--private-line)] bg-[#fff9ef] px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-[var(--private-strong)]">
-      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--private-strong)]" />
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--private-line)] bg-[var(--private-soft)] px-3 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-[var(--private-strong)] shadow-2xs">
+      <span aria-hidden className="text-xs">🔒</span>
       {children}
     </span>
   );
@@ -247,18 +228,18 @@ export function Divider({ className }: { className?: string }) {
 // ---------------------------------------------------------------------------
 
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-[var(--radius)] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex items-center justify-center gap-2 rounded-[var(--radius)] font-semibold transition-all duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 select-none active:scale-[0.98]";
 
 const BUTTON_SIZE = {
-  sm: "px-3 py-1.5 text-[0.8125rem]",
-  md: "px-5 py-2.5 text-[0.9375rem]",
+  sm: "px-3.5 py-1.5 text-xs shadow-2xs",
+  md: "px-5 py-2.5 text-sm sm:text-[0.9375rem] shadow-xs hover:shadow-sm",
 } as const;
 
 const BUTTON_VARIANT = {
   primary:
-    "bg-[var(--accent)] text-[var(--accent-foreground)] hover:bg-[var(--accent-hover)]",
+    "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] shadow-sm hover:shadow",
   secondary:
-    "border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--surface-muted)]",
+    "border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--surface-muted)] hover:border-[var(--ink-4)]",
   quiet: "text-[var(--ink-2)] hover:bg-[var(--surface-muted)] hover:text-[var(--ink)]",
 } as const;
 
@@ -325,26 +306,25 @@ export function Field({
   hint?: string;
   children: ReactNode;
   required?: boolean;
-  /** Marks an unanswered item after the participant tried to continue. */
   flagged?: boolean;
 }) {
   return (
     <div
       className={cx(
-        "mb-6 last:mb-0",
-        flagged && "-ml-4 border-l-2 border-[var(--caution)] pl-4",
+        "mb-6 last:mb-0 transition-all",
+        flagged && "-ml-4 border-l-4 border-[var(--caution)] pl-4 bg-amber-50/50 py-2 rounded-r-lg",
       )}
     >
-      <label className="mb-1.5 block text-[0.9375rem] font-medium">
+      <label className="mb-1.5 block text-sm sm:text-base font-semibold text-[var(--ink)]">
         {label}
         {required ? (
-          <span className="ml-1 text-[var(--caution)]" aria-hidden>
+          <span className="ml-1.5 text-[var(--caution)] font-bold" aria-hidden>
             *
           </span>
         ) : null}
       </label>
       {hint ? (
-        <p className="mb-2 text-sm text-[var(--ink-2)]">{hint}</p>
+        <p className="mb-2.5 text-sm text-[var(--ink-3)] leading-relaxed">{hint}</p>
       ) : null}
       {children}
     </div>
@@ -352,7 +332,7 @@ export function Field({
 }
 
 const INPUT_CLASS =
-  "w-full rounded-[var(--radius)] border border-[var(--line-strong)] bg-[var(--surface)] px-3.5 py-2.5 text-[0.9375rem] outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-[var(--accent)]";
+  "w-full rounded-[var(--radius)] border border-[var(--line-strong)] bg-[var(--surface)] px-4 py-3 text-sm sm:text-base outline-none transition-all placeholder:text-[var(--ink-4)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--focus-ring)] shadow-2xs";
 
 export function TextInput({
   value,
@@ -416,7 +396,7 @@ export function Select({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={cx(INPUT_CLASS, "cursor-pointer")}
+      className={cx(INPUT_CLASS, "cursor-pointer font-medium")}
     >
       <option value="">{placeholder}</option>
       {options.map((o) => (
@@ -428,7 +408,7 @@ export function Select({
   );
 }
 
-/** Radio options as full-width cards — a larger target than a bare radio. */
+/** Radio options as full-width cards */
 export function ChoiceList({
   name,
   value,
@@ -443,17 +423,17 @@ export function ChoiceList({
   columns?: 1 | 2;
 }) {
   return (
-    <div className={cx("grid gap-2", columns === 2 && "sm:grid-cols-2")}>
+    <div className={cx("grid gap-2.5", columns === 2 && "sm:grid-cols-2")}>
       {options.map((o) => {
         const selected = value === o.value;
         return (
           <label
             key={o.value}
             className={cx(
-              "flex cursor-pointer items-start gap-3 rounded-[var(--radius)] border p-3.5 text-[0.9375rem] transition-colors",
+              "flex cursor-pointer items-start gap-3.5 rounded-[var(--radius)] border p-4 text-sm sm:text-base transition-all duration-150 shadow-2xs select-none",
               selected
-                ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                : "border-[var(--line-strong)] bg-[var(--surface)] hover:border-[var(--ink-3)]",
+                ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-2 ring-[var(--accent-border)] font-medium"
+                : "border-[var(--line-strong)] bg-[var(--surface)] hover:border-[var(--ink-4)] hover:bg-slate-50/70",
             )}
           >
             <input
@@ -461,12 +441,12 @@ export function ChoiceList({
               name={name}
               checked={selected}
               onChange={() => onChange(o.value)}
-              className="mt-1 h-4 w-4 shrink-0 accent-[var(--accent)]"
+              className="mt-0.5 h-4.5 w-4.5 shrink-0 accent-[var(--accent)] cursor-pointer"
             />
-            <span>
-              {o.label}
+            <span className="min-w-0 flex-1">
+              <span className="font-semibold text-[var(--ink)]">{o.label}</span>
               {o.hint ? (
-                <span className="mt-0.5 block text-sm text-[var(--ink-2)]">
+                <span className="mt-1 block text-xs sm:text-sm text-[var(--ink-3)] leading-relaxed">
                   {o.hint}
                 </span>
               ) : null}
@@ -488,14 +468,14 @@ export function Checkbox({
   children: ReactNode;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 text-[0.9375rem] leading-relaxed">
+    <label className="flex cursor-pointer items-start gap-3.5 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3.5 sm:p-4 text-sm sm:text-base leading-relaxed transition-all hover:bg-slate-50 shadow-2xs">
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-1 h-4 w-4 shrink-0 accent-[var(--accent)]"
+        className="mt-0.5 h-5 w-5 shrink-0 rounded accent-[var(--accent)] cursor-pointer"
       />
-      <span>{children}</span>
+      <span className="text-[var(--ink-2)] select-none">{children}</span>
     </label>
   );
 }
@@ -504,14 +484,6 @@ export function Checkbox({
 // Scale
 // ---------------------------------------------------------------------------
 
-/**
- * Discrete rating scale — the only rating control in the study.
- *
- * Deliberately NOT a slider: a slider starts somewhere, and "somewhere" gets
- * submitted by everyone who does not engage. Here nothing is selected until
- * the participant picks a point, so a skipped item stays visibly empty and is
- * counted as unanswered by the action bar.
- */
 export function Scale({
   id,
   statement,
@@ -531,7 +503,6 @@ export function Scale({
   highAnchor?: string;
   points?: number;
   flagged?: boolean;
-  /** Drops the divider — for a scale sitting alone inside a Field. */
   compact?: boolean;
 }) {
   const steps = Array.from({ length: points }, (_, i) => i + 1);
@@ -539,52 +510,30 @@ export function Scale({
   return (
     <fieldset
       className={cx(
-        "scroll-mt-24",
-        !compact && "border-b border-[var(--line)] py-3.5 last:border-b-0",
-        flagged && "-ml-4 border-l-2 border-l-[var(--caution)] pl-4",
+        "scroll-mt-24 transition-all",
+        !compact && "border-b border-[var(--line)] py-4 last:border-b-0",
+        flagged && "-ml-4 border-l-4 border-l-[var(--caution)] pl-4 bg-amber-50/50 rounded-r-xl py-3 my-1",
       )}
       id={`q-${id}`}
     >
-      {/* A rendered <legend> is laid out by the fieldset itself and does not
-          take part in flex, so it cannot sit beside the buttons. It stays as
-          the accessible name for the group, hidden, and the visible statement
-          below is an ordinary flex child. */}
       {statement ? <legend className="sr-only">{statement}</legend> : null}
 
-      {/* The statement sits beside its buttons once there is room for both.
-          Stacked, every item costs two rows, and a battery of eighty of them
-          becomes a long scroll; side by side each item is one row and a block
-          can be taken in at once. Below `lg` it stacks.
-
-          The statement is the part that flexes and the buttons are the part
-          that does not: a fixed statement column plus fixed anchor columns
-          plus fixed buttons added up to more than the session column is wide,
-          and "Strongly agree" ended up outside the card. Nothing here has a
-          minimum width the row cannot give it. */}
       <div className={cx(statement && "lg:flex lg:items-center lg:gap-6")}>
         {statement ? (
           <p
             aria-hidden
-            className="mb-2.5 text-[0.9375rem] leading-snug lg:mb-0 lg:min-w-0 lg:flex-1"
+            className="mb-3 text-sm sm:text-[0.9375rem] font-medium leading-relaxed text-[var(--ink)] lg:mb-0 lg:min-w-0 lg:flex-1"
           >
             {statement}
           </p>
         ) : null}
 
-        {/* ONE anchor placement, not two. The anchors used to flank the row on
-            a wide screen and sit under it on a narrow one, which is two
-            layouts to keep working and the reason the wide one could overflow.
-            Under the row they are the same thing at every width, and they sit
-            directly beneath the end they name. */}
         <div
           className="w-full lg:shrink-0"
-          // Caps the row at a comfortable button size instead of stretching
-          // seven circles across a wide column. Below the cap the buttons
-          // shrink with the container, so the row cannot overflow it.
-          style={{ maxWidth: `calc(${points} * 2.875rem)` }}
+          style={{ maxWidth: `calc(${points} * 3.25rem)` }}
         >
           <div
-            className="grid gap-1.5"
+            className="grid gap-2"
             style={{ gridTemplateColumns: `repeat(${points}, minmax(0, 1fr))` }}
           >
             {steps.map((n) => {
@@ -600,10 +549,10 @@ export function Scale({
                   />
                   <span
                     className={cx(
-                      "flex aspect-square w-full items-center justify-center rounded-full border-2 text-[0.8125rem] font-medium transition-colors",
+                      "flex aspect-square w-full items-center justify-center rounded-xl border-2 text-sm sm:text-base font-bold transition-all duration-150 shadow-2xs",
                       selected
-                        ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-                        : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-3)] group-hover:border-[var(--accent)] group-hover:text-[var(--ink)]",
+                        ? "border-[var(--accent)] bg-[var(--accent)] text-white shadow-sm scale-105"
+                        : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-3)] group-hover:border-[var(--accent)] group-hover:text-[var(--accent)] group-hover:bg-[var(--accent-soft)] group-hover:scale-102",
                     )}
                   >
                     {n}
@@ -613,7 +562,7 @@ export function Scale({
             })}
           </div>
 
-          <div className="mt-1.5 flex items-start justify-between gap-3 text-[0.75rem] leading-tight text-[var(--ink-2)]">
+          <div className="mt-2 flex items-start justify-between gap-3 text-xs font-medium text-[var(--ink-3)]">
             <span className="max-w-[48%]">{lowAnchor}</span>
             <span className="max-w-[48%] text-right">{highAnchor}</span>
           </div>
@@ -623,10 +572,6 @@ export function Scale({
   );
 }
 
-/**
- * Quantity picker in the same visual language as `Scale`, for values that are
- * an amount rather than an opinion. Same reason for having no default.
- */
 export function AmountScale({
   id,
   value,
@@ -646,13 +591,9 @@ export function AmountScale({
 
   return (
     <fieldset id={`q-${id}`} className="scroll-mt-24">
-      {/* A grid rather than a wrapping flex row: with `flex-1` a leftover chip
-          on the last line stretched to the full width and stopped looking like
-          the same control as the ones above it. Columns fit themselves to the
-          container, so this cannot overflow either. */}
       <div
-        className="grid gap-1.5"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(3rem, 1fr))" }}
+        className="grid gap-2"
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(3.25rem, 1fr))" }}
       >
         {steps.map((n) => {
           const selected = value === n;
@@ -667,10 +608,10 @@ export function AmountScale({
               />
               <span
                 className={cx(
-                  "tabular flex h-11 items-center justify-center rounded-[var(--radius)] border-2 text-[0.875rem] transition-colors",
+                  "tabular flex h-12 items-center justify-center rounded-xl border-2 text-sm sm:text-base font-bold transition-all duration-150 shadow-2xs",
                   selected
-                    ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-                    : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-2)] group-hover:border-[var(--accent)] group-hover:text-[var(--ink)]",
+                    ? "border-[var(--accent)] bg-[var(--accent)] text-white shadow-sm scale-105"
+                    : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-2)] group-hover:border-[var(--accent)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] group-hover:scale-102",
                 )}
               >
                 {n}
@@ -680,7 +621,7 @@ export function AmountScale({
         })}
       </div>
       {unit ? (
-        <p className="mt-2 text-xs text-[var(--ink-2)]">{unit}</p>
+        <p className="mt-2.5 text-xs font-medium text-[var(--ink-3)]">{unit}</p>
       ) : null}
     </fieldset>
   );
