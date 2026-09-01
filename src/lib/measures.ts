@@ -302,18 +302,18 @@ export const COMPREHENSION_BLOCK: Block = {
     {
       kind: "choice",
       id: "COMP1",
-      text: "Who can affect the Member's evaluation, bonus, and future work assignments?",
+      text: "Who decides the senior staff member's performance bonus?",
       options: [
-        { value: "leader", label: "The Leader" },
-        { value: "member", label: "The Member" },
-        { value: "both", label: "Both equally" },
-        { value: "neither", label: "Neither" },
+        { value: "leader", label: "The store manager" },
+        { value: "member", label: "The senior staff member" },
+        { value: "both", label: "Both, together" },
+        { value: "neither", label: "Nobody — it is fixed" },
       ],
     },
     {
       kind: "choice",
       id: "COMP2",
-      text: "Can one side settle both terms on its own?",
+      text: "Can one of you set the schedule without the other agreeing?",
       columns: 2,
       options: [
         { value: "no", label: "No" },
@@ -323,7 +323,7 @@ export const COMPREHENSION_BLOCK: Block = {
     {
       kind: "choice",
       id: "COMP3",
-      text: "May you tell the other side the exact numbers on your private point sheet?",
+      text: "May you tell the other person the exact numbers on your point sheet?",
       columns: 2,
       options: [
         { value: "no", label: "No" },
@@ -342,9 +342,9 @@ export const COMPREHENSION_ANSWERS: Record<string, string> = {
 /** Which instruction to re-show when an answer is wrong. */
 export const COMPREHENSION_REMEDIATION: Record<string, string> = {
   COMP1:
-    "The Leader holds formal authority on the project and decides the Member's rating and bonus when it ends.",
+    "The store manager sets the schedule once it is agreed, and decides the senior staff member's performance bonus after each one.",
   COMP2:
-    "Neither side can set the terms alone. All three have to be agreed by both of you, or the project falls back to a limited plan.",
+    "Neither of you can set the schedule alone. Both terms have to be agreed by the two of you, or it falls back to the default rota.",
   COMP3:
     "Your point sheet is private. You can explain why a term matters to you and ask about the other side's situation — but not show the numbers.",
 };

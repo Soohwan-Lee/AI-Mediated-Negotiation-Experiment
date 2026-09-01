@@ -105,10 +105,10 @@ export default function PracticePage() {
     );
     setDraft(
       role === "leader"
-        ? "hi! for me the date is the main thing — could we do next week?"
-        : "hi! the venue is the main thing for me — could we keep it in the office?",
+        ? "hi! the deep-clean week is the main thing for me — could we do next week?"
+        : "hi! where the machine goes is the main thing for me — could we keep it behind the counter?",
     );
-    setProxyDraft("How will you negotiate my preferred date?");
+    setProxyDraft("How will you argue for the week I picked?");
     setReasonAnswer(PRACTICE_REASON_ANSWER);
   }, `practice-${phase}`);
 
@@ -445,7 +445,7 @@ export default function PracticePage() {
                       className="mt-0.5 h-4 w-4 rounded text-blue-600"
                     />
                     <span>
-                      <strong>Authorized Workplace Reason:</strong> &ldquo;I have an urgent project deadline that week.&rdquo; (The proxy will only say reasons you keep checked).
+                      <strong>Authorized Workplace Reason:</strong> &ldquo;The quarterly inspection is right after that week.&rdquo; (The proxy will only say reasons you keep checked).
                     </span>
                   </label>
                 </div>
@@ -460,10 +460,10 @@ export default function PracticePage() {
                   <span className="text-2xs font-bold text-slate-500">Quick Test Prompts:</span>
                   <button
                     type="button"
-                    onClick={() => void sendProxyRehearsal("How will you negotiate my preferred date?")}
+                    onClick={() => void sendProxyRehearsal("How will you argue for the week I picked?")}
                     className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs"
                   >
-                    &ldquo;How will you negotiate my preferred date?&rdquo;
+                    &ldquo;How will you argue for the week I picked?&rdquo;
                   </button>
                   <button
                     type="button"

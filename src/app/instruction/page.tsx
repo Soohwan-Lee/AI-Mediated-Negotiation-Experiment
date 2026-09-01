@@ -212,17 +212,22 @@ export default function InstructionPage() {
               🎯 Study Overview in 4 Lines
             </CardTitle>
             <dl className="space-y-2.5 mt-3">
-              <Gist term="Your Role">
-                You are assigned as a <strong>{isLeader ? "Project Leader 👑" : "Team Member 🛠️"}</strong> on a workplace project.
+              <Gist term="Where you are">
+                A coffee and bakery shop. You are the{" "}
+                <strong>{isLeader ? "store manager 👑" : "senior staff member 🛠️"}</strong>.
               </Gist>
-              <Gist term="Partner">
-                You will negotiate with one other participant playing the opposite role.
+              <Gist term="Who you talk to">
+                One other participant, playing the other role. They want different
+                things from the schedule than you do.
               </Gist>
-              <Gist term="The Task">
-                Reach agreement on <strong>3 project terms</strong>. Neither person can decide terms alone.
+              <Gist term="What you settle">
+                <strong>Two things about the schedule</strong> — and you have to agree
+                on both. Neither of you can set them alone.
               </Gist>
-              <Gist term="The Catch">
-                You each have different goals, and <strong>only you can see your private point payoffs</strong>.
+              <Gist term="Why it is not obvious">
+                You each have a private point sheet, and{" "}
+                <strong>you cannot see theirs</strong>. The only way to find out what
+                they can give you is to talk about it.
               </Gist>
             </dl>
           </Card>
@@ -235,7 +240,7 @@ export default function InstructionPage() {
                   Your Assigned Role
                 </p>
                 <h2 className="text-2xl font-black tracking-tight text-[var(--ink)] sm:text-3xl">
-                  {isLeader ? "👑 Project Leader" : "🛠️ Team Member"}
+                  {isLeader ? "👑 Store Manager" : "🛠️ Senior Staff"}
                 </h2>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900 shadow-2xs">
@@ -245,40 +250,38 @@ export default function InstructionPage() {
 
             <div className="grid items-start gap-4 sm:grid-cols-2">
               <PowerBox
-                title="What You Hold (Your Authority & Power)"
+                title="What you hold"
                 tone="own"
                 items={
                   isLeader
                     ? [
-                        "Formal authority over overall project scope",
-                        "Approval power over final work assignments",
-                        "Decides performance evaluation for bonus payment",
-                        "Staffing recommendations for future high-visibility projects",
+                        "You set the schedule once it is agreed",
+                        "You decide their performance bonus after each schedule",
+                        "You answer for how the shop is covered",
                       ]
                     : [
-                        "Specialist domain expertise vital to the project",
-                        "Autonomy to decline or condition extra tasks",
+                        "You are the only one who can close the shop alone",
+                        "You can refuse a shift pattern, or ask for it to change",
                       ]
                 }
               />
               <PowerBox
                 title={
                   isLeader
-                    ? "What the Team Member Holds"
-                    : "What the Project Leader Holds"
+                    ? "What the senior staff member holds"
+                    : "What the store manager holds"
                 }
                 tone="theirs"
                 items={
                   isLeader
                     ? [
-                        "Vital specialist expertise",
-                        "Execution effort — high quality cannot be forced by decree",
+                        "They are the only one who can close the shop alone",
+                        "They can refuse a shift pattern, or ask for it to change",
                       ]
                     : [
-                        "Formal authority over overall project scope",
-                        "Approval power over work assignments",
-                        "Evaluates performance and decides your bonus",
-                        "Future high-visibility staffing recommendations",
+                        "They set the schedule once it is agreed",
+                        "They decide your performance bonus after each schedule",
+                        "They answer for how the shop is covered",
                       ]
                 }
               />
@@ -286,15 +289,15 @@ export default function InstructionPage() {
 
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs sm:text-sm font-semibold leading-relaxed text-slate-800">
               💡 {isLeader
-                ? "Neither party can decide terms alone. You must reach a mutual agreement."
-                : "Your evaluation and bonus depend on the Leader's assessment. You must reach a mutual agreement."}
+                ? "Neither of you can set the schedule alone — it only happens if you both agree."
+                : "The manager decides your bonus after each schedule. And neither of you can set the schedule alone."}
             </div>
           </Card>
 
           {/* 4 Core Rules */}
           <Card className="mb-6">
-            <CardTitle hint="Keep these four core principles in mind:">
-              ⚡ 4 Core Rules of the Negotiation
+            <CardTitle hint="Four things to keep in mind:">
+              ⚡ How the negotiation works
             </CardTitle>
             <div className="grid gap-3 sm:grid-cols-2 mt-3">
               <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 shadow-2xs">
@@ -303,17 +306,20 @@ export default function InstructionPage() {
                   <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">10-Minute Limit per Task</p>
                 </div>
                 <p className="text-xs text-[var(--ink-2)] leading-relaxed">
-                  Conclude whenever you agree. If time expires without agreement, fallback score applies.
+                  Finish as soon as you both agree — there is no need to use the
+                  time. If it runs out with no agreement, you each get the low
+                  fallback score.
                 </p>
               </div>
 
               <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 shadow-2xs">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-lg">📦</span>
-                  <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">3 Terms, 4 Options Each</p>
+                  <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">Two terms, four options each</p>
                 </div>
                 <p className="text-xs text-[var(--ink-2)] leading-relaxed">
-                  Both sides must agree on the complete package of both terms for a successful outcome.
+                  You agree the two together, as one package. Picking a level on
+                  one term only is not an agreement.
                 </p>
               </div>
 
@@ -323,7 +329,9 @@ export default function InstructionPage() {
                   <p className="text-xs sm:text-sm font-bold text-amber-950">Payoffs are Strictly Private</p>
                 </div>
                 <p className="text-xs text-amber-900 leading-relaxed">
-                  Never state numeric points. Explain your priorities using workplace reasons instead!
+                  Never say a number from your point sheet. Say why the term
+                  matters to you instead — that is what the other person can
+                  actually respond to.
                 </p>
               </div>
 
@@ -333,7 +341,8 @@ export default function InstructionPage() {
                   <p className="text-xs sm:text-sm font-bold text-blue-950">Direct vs. AI Proxy Mode</p>
                 </div>
                 <p className="text-xs text-blue-900 leading-relaxed">
-                  One task is direct chat; the other uses an AI Proxy agent using your mandate.
+                  In one task you talk to the other person yourself. In the other,
+                  an AI Proxy speaks for you first, using instructions you write.
                 </p>
               </div>
             </div>
@@ -347,7 +356,7 @@ export default function InstructionPage() {
               </p>
             ) : (
               <p className="text-xs sm:text-sm">
-                The Project Leader decides a performance bonus for you after each task. Awarded bonuses are paid out automatically upon study completion.
+The store manager decides a performance bonus for you after each schedule. Any bonus you are awarded is paid automatically when the study ends.
               </p>
             )}
           </Callout>

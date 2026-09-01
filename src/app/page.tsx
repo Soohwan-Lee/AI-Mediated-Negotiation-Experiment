@@ -146,7 +146,7 @@ export default function ConsentPage() {
                 What will you do?
               </h2>
               <p className="text-sm sm:text-base leading-relaxed text-slate-700">
-                You will take part in <strong>two short workplace negotiation scenarios</strong> to agree on project terms with another participant. In one scenario, a <strong>software tool negotiates on your behalf</strong> before you finish the conversation. Afterwards, you will answer short questions about how each went.
+                You will take part in <strong>two short workplace negotiation scenarios</strong>, agreeing working arrangements with another participant. In one scenario, a <strong>software tool negotiates on your behalf</strong> before you finish the conversation. Afterwards, you will answer short questions about how each went.
               </p>
             </div>
           </div>
@@ -156,7 +156,7 @@ export default function ConsentPage() {
         <div className="mb-6">
           <SummaryGrid cols={3}>
             <KeyPoint icon="💬" title="Negotiation Tasks">
-              Participate in 2 simulated project decision scenarios (~10 mins each).
+              Take part in 2 simulated workplace scenarios (~10 mins each).
             </KeyPoint>
             <KeyPoint icon="🤖" title="AI Assistance">
               Test direct negotiation vs. delegating to an AI Proxy agent.

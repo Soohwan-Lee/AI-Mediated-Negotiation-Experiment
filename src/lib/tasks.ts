@@ -408,20 +408,20 @@ const TASK_B: NegotiationTask = {
 
 export const PRACTICE_TASK: NegotiationTask = {
   id: "practice",
-  title: "Practice — Team Offsite",
+  title: "Practice — The Staff Room",
   reservationPoints: 200,
   requirementIssueId: { leader: "practice_date", member: "practice_venue" },
   standardizedChallenge: {
-    leader: "Could we push the date back a bit instead?",
-    member: "Could we look at somewhere closer to the office instead?",
+    leader: "Could we do the deep clean a bit later instead?",
+    member: "Could we keep the new machine somewhere easier to reach?",
   },
   publicBrief:
-    "This is a practice round. You and a colleague are planning a one-day team offsite. Nothing here counts towards your results — it is only to get familiar with reading a point sheet and finding a trade.",
+    "This is a practice round at the same coffee shop, on two small things nobody has strong feelings about: when to do the annual deep clean, and where to put the new coffee machine. Nothing here counts towards your results — it is only to get familiar with reading a point sheet and finding a trade.",
   issues: [
     {
       id: "practice_date",
-      label: "Date",
-      description: "Which week the offsite takes place.",
+      label: "Deep clean week",
+      description: "Which week the annual deep clean happens.",
       type: "leader_priority",
       options: [
         { id: "pd1", label: "Next week", points: { leader: 600, member: 0 } },
@@ -430,49 +430,55 @@ export const PRACTICE_TASK: NegotiationTask = {
         { id: "pd4", label: "In a month", points: { leader: 0, member: 300 } },
       ],
       rationale: {
-        leader: "You want it done before the quarter closes.",
-        member: "A later date is easier, but not by much.",
+        leader: "You want it done before the quarterly inspection.",
+        member: "A later week is easier for you, but not by much.",
       },
     },
     {
       id: "practice_venue",
-      label: "Venue",
-      description: "Where the offsite is held.",
+      label: "New machine's spot",
+      description: "Where the new coffee machine goes.",
       type: "member_priority",
       options: [
-        { id: "pv1", label: "In the office", points: { leader: 0, member: 600 } },
-        { id: "pv2", label: "Nearby space", points: { leader: 100, member: 400 } },
-        { id: "pv3", label: "Across town", points: { leader: 200, member: 200 } },
-        { id: "pv4", label: "Out of town", points: { leader: 300, member: 0 } },
+        { id: "pv1", label: "Behind the counter", points: { leader: 0, member: 600 } },
+        { id: "pv2", label: "End of the counter", points: { leader: 100, member: 400 } },
+        { id: "pv3", label: "Side bench", points: { leader: 200, member: 200 } },
+        { id: "pv4", label: "Front window", points: { leader: 300, member: 0 } },
       ],
       rationale: {
-        leader: "Somewhere further away feels more like a real offsite.",
-        member: "A long journey eats the day; you want it close.",
+        leader: "Out front, customers can see it being used.",
+        member: "Behind the counter is the one spot you can reach mid-rush.",
       },
     },
   ],
   roleBriefs: {
     leader: {
-      title: "Organizer",
-      organizationalPosition: "You are coordinating the offsite.",
+      title: "Store Manager",
+      organizationalPosition: "You are sorting out both of these.",
       roleStory:
-        "You would like this settled quickly. The date matters to you far more than the venue does — which is worth noticing, because the other side feels the opposite way.",
-      objectives: ["Get an early date.", "Do not overpay on the venue."],
+        "You would like this settled quickly. The deep-clean week matters to you far more than where the machine goes — which is worth noticing, because the other side feels the opposite way.",
+      objectives: [
+        "Get the deep clean done early.",
+        "Where the machine goes matters less to you — so it is what you can trade.",
+      ],
       requirementNote: "Nothing here counts. Practise reading the point sheet.",
       disclosureRisk: "",
       reasonCards: [],
-      batnaSummary: "If you cannot agree, the offsite is postponed.",
+      batnaSummary: "If you cannot agree, both are left as they are.",
     },
     member: {
-      title: "Attendee",
-      organizationalPosition: "You are attending the offsite.",
+      title: "Senior Staff",
+      organizationalPosition: "You work the counter every day.",
       roleStory:
-        "The venue matters to you far more than the date does — which is worth noticing, because the other side feels the opposite way.",
-      objectives: ["Keep the travel short.", "The date is flexible."],
+        "Where the machine goes matters to you far more than the deep-clean week does — which is worth noticing, because the other side feels the opposite way.",
+      objectives: [
+        "Keep the machine within reach of the counter.",
+        "The deep-clean week matters less to you — so it is what you can trade.",
+      ],
       requirementNote: "Nothing here counts. Practise reading the point sheet.",
       disclosureRisk: "",
       reasonCards: [],
-      batnaSummary: "If you cannot agree, the offsite is postponed.",
+      batnaSummary: "If you cannot agree, both are left as they are.",
     },
   },
 };
