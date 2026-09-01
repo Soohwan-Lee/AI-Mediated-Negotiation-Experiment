@@ -339,9 +339,15 @@ export function BriefingPanel({
                 difference in disclosure could be the warning rather than the
                 delegation. Design Ver.2.11 §5 makes the same requirement of its
                 own guidance text — "전 조건에서 동일하게 적용함". */}
+            {/* "You have a work reason and a sensitive background" — NOT "each
+                term carries" one. The cards sit on one issue now, so a sentence
+                promising a pair per term is contradicted by the screen below
+                it, and the contradiction tells the participant which term the
+                study is about just as surely as a heading would. Say what they
+                hold, not where it sits. */}
             <p className="mb-2.5 max-w-prose text-xs leading-relaxed text-[var(--private-ink)]/80">
-              Each term carries a <strong>work reason</strong> — nothing awkward
-              about saying it — and a piece of{" "}
+              You hold a <strong>work reason</strong> — nothing awkward about
+              saying it — and a piece of{" "}
               <strong>sensitive background</strong> that is yours to keep.{" "}
               {brief.disclosureRisk}
             </p>

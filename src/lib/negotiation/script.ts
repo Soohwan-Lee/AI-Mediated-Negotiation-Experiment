@@ -263,13 +263,13 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b3p",
         3,
         "participant",
-        `I hear you. || that's the one I really can't move on though — it's the whole reason this works for me. happy to look at the other two.`,
+        `I hear you. || that's the one I really can't move on though — it's the whole reason this works for me. happy to look at the other one.`,
       ),
       m(
         "b4c",
         4,
         "counterpart",
-        `ok, that's fair. || so if I get ${L(trade, mine.id)} on ${mine.label.toLowerCase()}, I can live with ${L(trade, theirs.id)} on yours. does that work?`,
+        `ok, that's fair. || so if I get ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()}, I can live with ${L(trade, mine.id)} on yours. does that work?`,
         { proposal: trade },
       ),
       m(
@@ -283,7 +283,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b5c",
         5,
         "counterpart",
-        `great — that's the three then. || sending it through as it stands.`,
+        `great — that's both of them then. || sending it through as it stands.`,
         { proposal: trade },
       ),
       m("b5p", 5, "participant", `agreed. good to get it settled.`, {
@@ -409,7 +409,7 @@ function proxyScript(
         "p4c",
         4,
         "counterpart_proxy",
-        `That works for my principal. ${theirs.label} in full is what they needed, and holding ${L(trade, mine.id)} is what mine needed.`,
+        `That works for my principal. ${theirs.label} in full is what they needed, and I understand ${mine.label.toLowerCase()} is what yours could not move on.`,
         { proposal: trade },
       ),
       m(

@@ -830,13 +830,26 @@ export function OutcomeValue({
             : `⚠️ Below your fallback score of ${task.reservationPoints.toLocaleString()} pts.`
           : `⚠️ No agreement reached — fallback score of ${task.reservationPoints.toLocaleString()} pts applies.`}
       </p>
+      {/* THE REQUIREMENT ISSUE IS NOT NAMED HERE. This line used to read
+          "{requirement.label}: ✓ At or above your required threshold", which
+          with three terms singled out one of three and with two terms is a
+          straight binary disclosure of which term the study is about — shown
+          at the end of Task 1, before its questionnaire and before Task 2.
+          Design §5 principle 1 again, and the same leak the reason-card
+          heading was stripped to prevent.
+
+          The participant already knows which term they needed: it is in their
+          own briefing, in their objectives, and on the card they were choosing
+          whether to voice. What the interface must not do is CONFIRM it as the
+          study's variable by labelling it. So the line still reports whether
+          they held what they needed — which is the outcome they care about —
+          without naming the term back to them. */}
       {terms ? (
         <div className="mt-3 border-t border-amber-200/80 pt-3 text-xs sm:text-sm font-semibold text-amber-900">
-          <span>{requirement.label}: </span>
           <span className={held ? "text-emerald-700" : "text-amber-800"}>
             {held
-              ? "✓ At or above your required threshold."
-              : "⚠️ Below your required threshold."}
+              ? "✓ You held the level you said you needed."
+              : "⚠️ You ended below the level you said you needed."}
           </span>
         </div>
       ) : null}

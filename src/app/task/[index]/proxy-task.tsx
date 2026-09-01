@@ -1156,7 +1156,7 @@ function ReasonMandateSection({
       </div>
 
       <Card tone="private" className="border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
-        <CardTitle hint="Each term has a work reason and confidential background details. Select what may be said on your behalf:">
+        <CardTitle hint="You hold a work reason and a piece of confidential background. Select what may be said on your behalf:">
           💬 Permitted Reasons Mandate
         </CardTitle>
 
