@@ -262,10 +262,35 @@ export function counterpartStep(
     !state.reasonGivenForRequirement &&
     asksForRequirementConcession(task, participantRole, incoming, held);
 
-  /** The same package with the participant's requirement left where it is. */
-  const withHeldRequirement = incoming
-    ? { ...incoming, [requirement.id]: held[requirement.id] }
-    : held;
+  /**
+   * The same package with the participant's requirement pulled back to the
+   * level an unargued requirement earns.
+   *
+   * NOT the counterpart's own opening. `held` starts at the counterpart's best
+   * package and only moves as it concedes, and with the timing term gone there
+   * is nothing else for it to spend first — so holding at `held` left the
+   * participant on 0, below their own 600 fallback, and a rational participant
+   * would walk. That turns a WITHHELD CONCESSION into a punishment worse than
+   * impasse, which is not what Design §4 asks for: the concession is withheld,
+   * the agreement is not.
+   *
+   * Ver.2.11 §3.3 names the level directly. Without a reason the counterpart
+   * comes to the THIRD option on the participant's requirement issue, which
+   * pays the participant 1,000 against the 3,000 a reason earns — a real
+   * agreement, clearly worse, and clearly better than no deal. (§3.3's middle
+   * rung, the second option for a work reason, arrives with the tier ladder;
+   * this keeps the two ends correct in the meantime.)
+   */
+  const unarguedLevel = (() => {
+    const ranked = [...requirement.options].sort(
+      (a, b) => b.points[participantRole] - a.points[participantRole],
+    );
+    return ranked[Math.min(2, ranked.length - 1)].id;
+  })();
+  const withHeldRequirement = {
+    ...(incoming ?? held),
+    [requirement.id]: unarguedLevel,
+  };
 
   // "Late" means the clock is running out, in both arms. When no clock is
   // supplied — the mockup path, and any caller that does not track it — the

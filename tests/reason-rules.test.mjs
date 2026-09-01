@@ -109,12 +109,23 @@ for (const taskId of TASKS) {
         reasonAlreadyRequested: true,
       });
       // The concession is withheld, not the agreement: the package is taken
-      // with the requirement left where the counterpart stands.
+      // with the requirement pulled back to the level an unargued requirement
+      // earns — Ver.2.11 §3.3's "no reason" rung, the third option.
       assert.equal(second.action, "hold");
       assert.equal(second.accepts, true);
       const requirementIssueId = task.requirementIssueId[role];
-      assert.equal(second.proposal[requirementIssueId], held[requirementIssueId]);
       assert.notEqual(second.proposal[requirementIssueId], ask[requirementIssueId]);
+
+      // AND IT MUST STILL BEAT THE FALLBACK. Holding at the counterpart's own
+      // opening would pay the participant 0 against a 600 fallback, so walking
+      // away would dominate — that turns a withheld concession into a
+      // punishment worse than impasse, which is not what the rule is for.
+      const heldScore = scorePackage(task, second.proposal, role);
+      assert.ok(
+        heldScore > task.reservationPoints,
+        `unargued outcome ${heldScore} must beat the ${task.reservationPoints} fallback`,
+      );
+      assert.equal(heldScore, 1000);
     });
 
     test(`${taskId}/${role}: reason given preserves the requirement, withheld loses it`, () => {
@@ -143,9 +154,14 @@ for (const taskId of TASKS) {
       // Both are agreements — what the rule withholds is the concession, not
       // the deal — and the gap is symmetric across all four cells. An
       // asymmetric gap means a payoff was edited on one side only.
+      // Ver.2.11 §3.3's ladder ends: 3,000 with a reason, 1,000 without, in
+      // every cell. Both clear the 600 fallback, so both are deals a
+      // participant would rationally take.
       const gained = scorePackage(task, withReason.proposal, role);
       const lost = scorePackage(task, withheld.proposal, role);
-      assert.equal(gained - lost, 3000);
+      assert.equal(gained, 3000);
+      assert.equal(lost, 1000);
+      assert.equal(gained - lost, 2000);
     });
   }
 }
