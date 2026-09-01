@@ -481,41 +481,114 @@ export function RiskForm({
 // ---------------------------------------------------------------------------
 
 export function Matchmaking({ onReady }: { onReady: () => void }) {
-  const [ready, setReady] = useState(false);
+  const [stage, setStage] = useState<"searching" | "found" | "syncing">("searching");
 
   useEffect(() => {
-    const wait = pauseMs(NEGOTIATION.matchmakingMs);
-    const id = window.setTimeout(() => {
-      setReady(true);
+    const totalWait = pauseMs(NEGOTIATION.matchmakingMs);
+    const t1 = window.setTimeout(() => setStage("found"), Math.max(800, totalWait * 0.45));
+    const t2 = window.setTimeout(() => setStage("syncing"), Math.max(1600, totalWait * 0.8));
+    const t3 = window.setTimeout(() => {
       onReady();
-    }, wait);
-    return () => window.clearTimeout(id);
-  }, []);
+    }, totalWait);
+
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
+  }, [onReady]);
 
   return (
     <Page>
-      <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
-        <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 border border-blue-200 text-2xl shadow-sm">
-          {ready ? "🤝" : "📡"}
+      <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+        {/* Radar / Peer Avatar Graphic */}
+        <div className="relative mb-8 flex items-center justify-center">
+          <div className="absolute h-36 w-36 sm:h-44 sm:w-44 rounded-full border border-blue-200 bg-blue-50/40 animate-ping opacity-75" />
+          <div className="absolute h-28 w-28 sm:h-32 sm:w-32 rounded-full border-2 border-blue-300/60 bg-blue-100/30 animate-pulse" />
+          
+          <div className="relative z-10 flex items-center gap-4 sm:gap-6 rounded-2xl bg-white border border-slate-200 p-4 sm:p-5 shadow-md">
+            <div className="flex flex-col items-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-2xl border border-blue-200 shadow-2xs">
+                🧑‍💼
+              </span>
+              <span className="mt-1.5 text-2xs font-bold text-slate-700">You (Ready)</span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <span className="text-xs font-mono font-bold text-blue-600 animate-pulse">
+                {stage === "searching" ? "•••••" : "──✓──"}
+              </span>
+              <span className="text-2xs font-semibold text-slate-400">
+                {stage === "searching" ? "Searching" : "Paired"}
+              </span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <span className={cx(
+                "flex h-12 w-12 items-center justify-center rounded-xl text-2xl transition-all duration-300 shadow-2xs",
+                stage === "searching"
+                  ? "bg-slate-100 text-slate-400 border border-dashed border-slate-300 animate-pulse"
+                  : "bg-emerald-50 text-emerald-700 border border-emerald-300 scale-105",
+              )}>
+                {stage === "searching" ? "👤" : "🤝"}
+              </span>
+              <span className="mt-1.5 text-2xs font-bold text-slate-700">
+                {stage === "searching" ? "Partner (Waiting…)" : "Partner Connected"}
+              </span>
+            </div>
+          </div>
         </div>
-        <span
-          aria-hidden
-          className="mb-4 inline-flex gap-2"
-        >
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="h-2.5 w-2.5 animate-bounce rounded-full bg-[var(--accent)]"
-              style={{ animationDelay: `${i * 0.15}s` }}
-            />
-          ))}
-        </span>
-        <p className="text-lg sm:text-xl font-bold text-slate-900">
-          {ready ? "Connected! Starting session…" : "Connecting with the other participant…"}
-        </p>
-        <p className="mt-2 max-w-prose text-xs sm:text-sm text-slate-600">
-          Both participants are entering the live workspace. This takes just a few seconds.
-        </p>
+
+        {/* Status texts */}
+        <div className="max-w-md space-y-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-1 text-xs font-extrabold text-blue-900 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+            <span>
+              {stage === "searching"
+                ? "Connecting with Counterpart…"
+                : stage === "found"
+                  ? "Partner Found · Joining Room…"
+                  : "Both Ready · Initializing Negotiation…"}
+            </span>
+          </div>
+
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+            {stage === "searching"
+              ? "Waiting for the other participant…"
+              : "Participant connected!"}
+          </h1>
+
+          <p className="text-xs sm:text-sm leading-relaxed text-slate-600">
+            {stage === "searching"
+              ? "You are being paired with another participant who has just completed the setup. Please stay on this screen — negotiations begin automatically as soon as both are synced."
+              : "Both parties are now synchronized in the workspace. Entering the live session room now…"}
+          </p>
+        </div>
+
+        {/* Live system queue checklist */}
+        <div className="mt-8 w-full max-w-sm rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-left shadow-2xs">
+          <p className="text-2xs font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+            Session Synchronization
+          </p>
+          <ul className="space-y-1.5 text-xs">
+            <li className="flex items-center gap-2 text-emerald-700 font-semibold">
+              <span>✓</span> Your mandate instructions locked
+            </li>
+            <li className={cx(
+              "flex items-center gap-2 font-semibold transition-colors",
+              stage !== "searching" ? "text-emerald-700" : "text-blue-700 animate-pulse",
+            )}>
+              <span>{stage !== "searching" ? "✓" : "⏳"}</span>
+              <span>{stage !== "searching" ? "Counterpart participant joined" : "Matching active participant from queue…"}</span>
+            </li>
+            <li className={cx(
+              "flex items-center gap-2 font-semibold transition-colors",
+              stage === "syncing" ? "text-emerald-700" : "text-slate-400",
+            )}>
+              <span>{stage === "syncing" ? "✓" : "○"}</span> Live room state synchronized
+            </li>
+          </ul>
+        </div>
       </div>
     </Page>
   );
