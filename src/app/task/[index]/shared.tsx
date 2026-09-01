@@ -297,10 +297,10 @@ export function PreferenceForm({
 
           <div className="mb-6">
             <Callout tone="private" title="🔒 Strictly Confidential (Only You See This)">
-              <p>
+              <p className="text-xs sm:text-sm leading-relaxed">
                 {isProxy
-                  ? "These bounds define the operating limits for your AI Proxy. It will open asking for your preferred options and will not compromise beyond your minimum acceptable level."
-                  : "Nobody else sees these ratings. They help us understand your original goals compared to the final negotiated outcome."}
+                  ? "Define the operating limits for your AI Proxy. It opens asking for your Ideal Target and will never compromise below your Reservation Floor."
+                  : "These ratings record your private starting priorities to compare against the final agreement. The other party never sees them."}
               </p>
               <PointsKey
                 issues={task.issues}
@@ -311,18 +311,18 @@ export function PreferenceForm({
             </Callout>
           </div>
 
-          <div className="space-y-5">
+          <div className="space-y-4">
             {task.issues.map((issue) => (
-              <Card key={issue.id} id={`q-pref-${issue.id}`} className="transition-all">
+              <Card key={issue.id} id={`q-pref-${issue.id}`} className="border-slate-200 bg-white">
                 <CardTitle hint={issue.description}>{issue.label}</CardTitle>
 
-                <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs sm:text-sm leading-relaxed text-indigo-950">
+                <div className="mb-3.5 rounded-xl border border-indigo-100 bg-indigo-50/50 p-2.5 text-xs text-indigo-950 font-medium">
                   💡 <strong>Your Context:</strong> {issue.rationale[role]}
                 </div>
 
-                <div className="mb-4">
-                  <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-emerald-700">
-                    🏆 What you would like (Ideal Target)
+                <div className="mb-3.5">
+                  <p className="mb-1.5 text-xs font-extrabold uppercase tracking-wider text-emerald-700">
+                    🏆 Ideal Target (What you want)
                   </p>
                   <OptionChips
                     issue={issue}
@@ -336,8 +336,8 @@ export function PreferenceForm({
                 </div>
 
                 <div id={`q-min-${issue.id}`}>
-                  <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-amber-700">
-                    🛡️ Least you would accept (Reservation Floor)
+                  <p className="mb-1.5 text-xs font-extrabold uppercase tracking-wider text-amber-700">
+                    🛡️ Reservation Floor (Minimum acceptable)
                   </p>
                   <OptionChips
                     issue={issue}
