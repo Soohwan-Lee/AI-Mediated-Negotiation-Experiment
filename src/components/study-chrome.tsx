@@ -117,7 +117,19 @@ export function ActionBar({
         className="mx-auto flex min-h-[var(--actionbar-h)] w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8"
         style={{ maxWidth: "var(--measure-page, var(--measure-reading))" }}
       >
-        <div className="text-sm text-[var(--ink-2)] min-w-0">
+        {/* The hint hides below `sm`. On a phone the note and the buttons cannot
+            both fit on one row — the button group is `shrink-0`, so the row
+            overflowed the bar by ~80px and the primary action ran off the
+            screen edge. The note is a hint ("Ready to proceed", "Next: 3 quick
+            questions"); the button is the thing that has to be reachable. The
+            unanswered-count branch is NOT hidden, because that one is telling
+            the participant why the button will not work. */}
+        <div
+          className={cx(
+            "text-sm text-[var(--ink-2)] min-w-0",
+            remaining > 0 ? "block" : "hidden sm:block",
+          )}
+        >
           {remaining > 0 ? (
             <div className="inline-flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-800 shadow-2xs animate-pulse">
@@ -141,7 +153,7 @@ export function ActionBar({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
           {secondary}
           {label && onClick ? (
             <button

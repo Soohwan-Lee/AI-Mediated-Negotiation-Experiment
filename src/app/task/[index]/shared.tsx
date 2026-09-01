@@ -112,25 +112,52 @@ export function TaskIntro({
       eyebrow={`Study Phase · Task ${taskIndex} of 2`}
       title={first ? "Task 1 Starts Here" : "Task 2 (Final Task)"}
       lead={
-        first ? (
-          <>
-            <p className="mb-2 text-slate-800 font-medium">
-              The practice round is over — this one is the real negotiation task. You will be working on a workplace project with another participant who holds the other role.
-            </p>
-            <p className="text-slate-600 text-sm">
-              Your private briefing stays pinned in the sidebar for the entire task. Neither party can decide anything alone.
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="mb-2 text-slate-800 font-medium">
-              This is the second and final negotiation task with a brand new scenario and project briefing.
-            </p>
-            <p className="text-slate-600 text-sm">
-              You are paired with a different participant, and nothing carries over from Task 1.
-            </p>
-          </>
-        )
+        <>
+          <p className="mb-2 text-slate-800 font-medium">
+            {first
+              ? "The practice round is over — this one counts. You are settling a schedule with another participant who holds the other role."
+              : "This is the second and final task. New situation, new briefing, and a different participant — nothing carries over from Task 1."}
+          </p>
+
+          {/* WHAT AN AI PROXY IS, ON THE FIRST SCREEN THAT MENTIONS ONE.
+              This used to arrive on the mandate screen, under the levels a
+              participant had already been asked to set — so the first time they
+              met the idea, they were mid-decision about it. The cover is the
+              orientation screen; this is where it belongs.
+
+              Keyed off `scene`, which the interface already varies, so it names
+              no condition (deception item 2). Both arms get the same amount of
+              orientation, which is also what keeps the two covers matched. */}
+          {scene === "proxy" ? (
+            <div className="mb-2 rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-sm leading-relaxed text-blue-950">
+              <p className="mb-1.5 font-bold">🤖 In this task, an AI Proxy speaks first</p>
+              <p className="mb-2 text-blue-900">
+                You do not talk to the other participant straight away. You write
+                instructions for an AI Proxy — what to aim for, how far it may go,
+                and which of your reasons it may say out loud — and it puts your
+                case for you while you watch.
+              </p>
+              <p className="text-blue-900">
+                The other participant has one too. When the two proxies finish,{" "}
+                <strong>you take over and settle it yourself</strong>, with their
+                whole conversation on screen. Nothing is agreed until you agree it.
+              </p>
+            </div>
+          ) : (
+            <div className="mb-2 rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-sm leading-relaxed text-blue-950">
+              <p className="mb-1.5 font-bold">💬 In this task, you negotiate directly</p>
+              <p className="text-blue-900">
+                You write to the other participant yourself, in a live chat, and
+                the two of you settle both terms between you.
+              </p>
+            </div>
+          )}
+
+          <p className="text-slate-600 text-sm">
+            Your private briefing stays pinned in the sidebar the whole time.
+            Neither of you can settle anything alone.
+          </p>
+        </>
       }
       steps={steps}
       scene={scene}

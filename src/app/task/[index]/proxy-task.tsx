@@ -228,11 +228,24 @@ const TOTAL_TURNS = 10;
  * meaningfully answer OTHER-AI4 about telling the sources apart. What stays
  * hidden is which individual reason came from where.
  */
+/**
+ * Design §7 requires the POLICY to be disclosed to both principals — it is what
+ * makes OTHER-AI4 answerable — while the CONDITION NAME never is.
+ *
+ * The two strings are deliberately matched in length and shape. If one arm read
+ * as a longer or more careful explanation than the other, the disclosure itself
+ * would become a cue about which arm a participant is in, on the contrast
+ * (`Explorer − Delegate`) it exists to support.
+ *
+ * The Explorer sentence used to end "Which is which will not be marked" — a
+ * fragment whose referent a first-time reader has to reconstruct. It now says
+ * what is not marked, in the same breath as what may be added.
+ */
 const POLICY_DISCLOSURE: Record<"delegate" | "explorer", string> = {
   delegate:
-    "Both AI Proxies in this task use only the reasons their own person selected. Nothing else will be said on your behalf.",
+    "Both AI Proxies in this task say only the reasons their own person ticked. Nothing else is added, on either side.",
   explorer:
-    "Both AI Proxies in this task may use the reasons their own person selected, plus general work arguments that anyone in that role could reasonably make. Which is which will not be marked.",
+    "Both AI Proxies in this task may add general work points anyone in that role could make, on top of the reasons their own person ticked. Neither proxy marks which is which.",
 };
 
 function emptyMandate(
@@ -1147,10 +1160,31 @@ function ReasonMandateSection({
   return (
     <>
       <div className="mb-6">
-        <Callout title="🤖 How this AI Proxy Works" tone="neutral">
+        <Callout title="🤖 What your AI Proxy will do with this" tone="neutral">
+          {/* The policy disclosure alone assumed the participant already knew
+              what a proxy does with a mandate. §7 requires the POLICY to be
+              stated; it does not forbid saying plainly what happens next, and a
+              participant who has to infer the mechanics is guessing at the
+              thing the study asks them to decide about. The three steps are
+              the interface's own sequence, so they name no condition. */}
+          <ol className="mb-2.5 space-y-1 text-xs sm:text-sm leading-relaxed text-slate-800">
+            <li>
+              <strong>1.</strong> It opens by asking for your best goal, and never
+              agrees to less than your walkaway limit.
+            </li>
+            <li>
+              <strong>2.</strong> When the other side pushes back, it argues using
+              the reasons you tick below — and only those.
+            </li>
+            <li>
+              <strong>3.</strong> You watch the whole exchange, then finish the
+              conversation yourself.
+            </li>
+          </ol>
           <p className="text-xs sm:text-sm leading-relaxed text-slate-800">{POLICY_DISCLOSURE[policy]}</p>
           <p className="mt-2 text-xs text-slate-600">
-            It can phrase arguments naturally in conversation. It will never state reasons you leave unticked.
+            It puts things in its own words, but it will never state a reason you
+            leave unticked.
           </p>
         </Callout>
       </div>

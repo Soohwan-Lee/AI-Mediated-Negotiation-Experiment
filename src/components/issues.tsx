@@ -90,12 +90,29 @@ export function PointsKey({
       <p className="mb-2 text-xs sm:text-[0.8125rem]">
         Points indicate how much a term is worth <strong>to you</strong> (higher is better).
       </p>
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-100/70 px-2.5 py-1 font-semibold text-amber-900 shadow-2xs">
-          🏆 Best possible ({termCount}): <strong className="tabular text-sm">{best.toLocaleString()} pts</strong>
+      {/* Label above value, not beside it. These pills live in the ~355px
+          briefing rail as well as the wide task column, and as one inline row
+          the label and the number wrapped INSIDE the pill — "Best possible
+          (both terms):" on one line and "3,900 pts" on the next, which reads
+          as a broken badge rather than a stacked one. Stacking deliberately
+          gives the same shape at both widths, and `min-w-0` lets the pills
+          shrink instead of pushing the rail wider. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+        <span className="min-w-0 rounded-lg border border-amber-300 bg-amber-100/70 px-2.5 py-1.5 font-semibold text-amber-900 shadow-2xs">
+          <span className="block text-[0.6875rem] leading-tight opacity-90">
+            🏆 Best possible ({termCount})
+          </span>
+          <strong className="tabular block text-sm leading-tight">
+            {best.toLocaleString()} pts
+          </strong>
         </span>
-        <span className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white/80 px-2.5 py-1 font-semibold text-slate-800 shadow-2xs">
-          🛡️ No-agreement fallback: <strong className="tabular text-sm">{reservationPoints.toLocaleString()} pts</strong>
+        <span className="min-w-0 rounded-lg border border-slate-300 bg-white/80 px-2.5 py-1.5 font-semibold text-slate-800 shadow-2xs">
+          <span className="block text-[0.6875rem] leading-tight opacity-90">
+            🛡️ No-agreement fallback
+          </span>
+          <strong className="tabular block text-sm leading-tight">
+            {reservationPoints.toLocaleString()} pts
+          </strong>
         </span>
       </div>
     </div>
