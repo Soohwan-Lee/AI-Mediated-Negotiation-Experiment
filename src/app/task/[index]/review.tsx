@@ -230,91 +230,79 @@ export function ReviewPhase({
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <TaskHeader
             taskIndex={taskIndex}
-            title="Where it landed"
+            title="Negotiation Results & Summary"
             steps={steps}
             current={stepIndex}
           />
 
-          {/* This states the result; it does not ask for one. The participant
-              settled these terms themselves a moment ago, so a screen that
-              asked "do you accept this?" would be asking them to re-decide
-              what they have just decided — see the note at the top of the
-              file. */}
-          <div className="mb-5">
+          <div className="mb-6">
             {tentative ? (
-              <Callout title="✅ This is what the two of you agreed">
-                <p>
-                  The negotiation is over and this is where it settled. Below is
-                  what it is worth to you, and everything that was said.
+              <Callout title="✅ Agreement Successfully Reached!">
+                <p className="text-sm leading-relaxed text-emerald-950">
+                  You and the other participant settled on a complete project package. Below is the breakdown of agreed terms, your personal payoff points, and the full exchange transcript.
                 </p>
               </Callout>
             ) : (
-              <Callout title="🤝 You did not reach an agreement" tone="warning">
-                <p>
-                  The negotiation ended without a package, so the project falls
-                  back to the limited plan and you take your fallback score.
+              <Callout title="⚠️ Negotiation Concluded Without Agreement" tone="warning">
+                <p className="text-sm leading-relaxed text-amber-950">
+                  The negotiation ended without settling all terms. The project reverts to the standard fallback plan, and your fallback score applies.
                 </p>
               </Callout>
             )}
           </div>
 
-          <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-            <Card>
-              <CardTitle>📦 Where each term landed</CardTitle>
-              {tentative ? (
-                <TermsList task={task} terms={tentative} />
-              ) : (
-                <Callout tone="warning">
-                  <p>No package was agreed. This is recorded as no agreement.</p>
-                </Callout>
-              )}
+          <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <Card className="border-slate-200 bg-white">
+              <CardTitle hint="Settled option for each term:">📦 Final Agreed Package</CardTitle>
+              <div className="mt-3">
+                {tentative ? (
+                  <TermsList task={task} terms={tentative} />
+                ) : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-center text-xs sm:text-sm font-semibold text-amber-900">
+                    No mutual agreement was reached. Fallback conditions apply.
+                  </div>
+                )}
+              </div>
             </Card>
             <OutcomeValue task={task} terms={tentative} role={role} />
           </div>
 
-          {/* The other participant's one line (Design §4 "잠정안 도출 후").
-              In a Proxy task the counterpart principal is silent throughout the
-              negotiation and speaks exactly once, here — which is what makes
-              them a person who was watching rather than an absence.
-
-              WHICH of the three templates they say is decided by the same
-              threshold everything else uses, not by assumption. Approving
-              unconditionally would have had them accept a package worth less
-              than their own fallback, and staying silent at an impasse would
-              have left the participant with no acknowledgement that anyone was
-              on the other side at all. */}
           {isProxy ? (
-            <Card className="mb-5">
-              <CardTitle>💬 The other participant</CardTitle>
-              <Transcript
-                messages={[
-                  {
-                    id: "principal-close",
-                    speaker: "counterpart_principal",
-                    text: principalLine,
-                  },
-                ]}
-                flow
-              />
+            <Card className="mb-6 border-slate-200 bg-white">
+              <CardTitle hint="Post-negotiation message:">👤 Counterpart Reaction</CardTitle>
+              <div className="mt-2">
+                <Transcript
+                  messages={[
+                    {
+                      id: "principal-close",
+                      speaker: "counterpart_principal",
+                      text: principalLine,
+                    },
+                  ]}
+                  flow
+                />
+              </div>
             </Card>
           ) : null}
 
-          {/* The proxies' exchange, collapsed. Above the participant's own
-              conversation because it came first, and collapsed because the
-              decision below is about the conversation they had themselves. */}
           {proxyTranscript?.length ? (
             <ProxyTranscriptPanel transcript={proxyTranscript} />
           ) : null}
 
-          <Card className="mb-5 flex flex-col" padded={false}>
-            <div className="border-b border-[var(--line)] px-5 py-4">
-              <h2 className="text-[0.95rem] font-semibold">{transcriptTitle}</h2>
-              <p className="mt-1 max-w-prose text-[0.875rem] text-[var(--ink-2)]">
-                {transcriptHint}{" "}
-                {needsRequirementResponse
-                  ? "Read to the end — the question below it opens once you have."
-                  : "Read to the end before you continue."}
-              </p>
+          <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
+            <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-3.5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xs sm:text-sm font-bold text-[var(--ink)]">{transcriptTitle}</h2>
+                <p className="text-xs text-[var(--ink-2)]">
+                  {transcriptHint}{" "}
+                  {needsRequirementResponse
+                    ? "(Please scroll to the end to unlock the reflection question below)"
+                    : ""}
+                </p>
+              </div>
+              <span className="text-2xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
+                {transcript.length} turns
+              </span>
             </div>
             <Transcript
               messages={transcript}
@@ -324,44 +312,28 @@ export function ReviewPhase({
             />
           </Card>
 
-          {/* The response to THE OTHER SIDE'S requirement — the one judgement
-              left on this screen, and the §9.3.1 uptake code. Both roles
-              answer it: ver.2.4 gives each role a requirement, so each is also
-              the receiver of one.
-
-              It carries the cue now that the approve/reject card is gone,
-              which is also why it is inert until the transcript has been read:
-              the question is about how they handled something specific that
-              was said, so answering it without having read to the end would be
-              answering about a conversation they had not looked at. */}
           {theirOption ? (
             <Card
-              className="mb-5"
+              className="mb-6 transition-all"
               id="q-requirement-response"
               cue={canDecide && requirementResponse === null}
             >
               <CardTitle
-                hint={`They ended up at ${theirOption.label.toLowerCase()} on ${theirs.label.toLowerCase()}.`}
+                hint={`They requested ${theirOption.label.toLowerCase()} on ${theirs.label.toLowerCase()}.`}
                 aside={
                   canDecide && requirementResponse === null ? (
-                    <Cue>Choose one</Cue>
+                    <Cue>Required Response</Cue>
                   ) : null
                 }
               >
-                {/* PAST-TENSE ON PURPOSE. The negotiation is over and cannot
-                    be reopened; phrased as "what do you want to do", the
-                    third option read as a control that would restart it. The
-                    §9.3.1 uptake measure is about the stance they took, so
-                    the question asks for it retrospectively. */}
-                🤝 Looking back — how did you respond to what they asked for?
+                🤝 Post-Negotiation Reflection: How did you approach their request?
               </CardTitle>
 
               {!canDecide ? (
-                <div className="mb-4">
-                  <Callout tone="warning">
-                    <p>
-                      Read to the end of the conversation above, then come back
-                      here.
+                <div className="mb-4 mt-2">
+                  <Callout tone="warning" title="Review Transcript First">
+                    <p className="text-xs sm:text-sm">
+                      Please scroll through the conversation above to review how the discussion unfolded before answering.
                     </p>
                   </Callout>
                 </div>
@@ -369,7 +341,7 @@ export function ReviewPhase({
 
               <div
                 className={cx(
-                  "grid gap-2 transition-opacity sm:grid-cols-3",
+                  "grid gap-3 transition-opacity sm:grid-cols-3 mt-3",
                   !canDecide && "pointer-events-none opacity-40",
                 )}
                 aria-disabled={!canDecide}
@@ -377,20 +349,20 @@ export function ReviewPhase({
                 <DecisionButton
                   selected={requirementResponse === "accommodate"}
                   onClick={() => setRequirementResponse("accommodate")}
-                  label="I accepted it"
-                  hint="Left it where it was"
+                  label="I Accepted It Fully"
+                  hint="Conceded on their preferred level without conditions"
                 />
                 <DecisionButton
                   selected={requirementResponse === "trade"}
                   onClick={() => setRequirementResponse("trade")}
-                  label="I accepted it, in exchange"
-                  hint="Kept it, but got ground elsewhere"
+                  label="I Traded in Exchange"
+                  hint="Accepted their request in exchange for concessions on other terms"
                 />
                 <DecisionButton
                   selected={requirementResponse === "reduce"}
                   onClick={() => setRequirementResponse("reduce")}
-                  label="I pushed to reduce it"
-                  hint="Asked for a lower level"
+                  label="I Pushed Back / Reduced"
+                  hint="Negotiated down to a lower level or held my ground"
                 />
               </div>
             </Card>
@@ -399,15 +371,15 @@ export function ReviewPhase({
       </Page>
 
       <ActionBar
-        label="Continue"
+        label="Continue to Post-Task Survey"
         onClick={submit}
         disabled={!canSubmit}
         note={
           !canDecide
-            ? "Read the conversation to the end first."
+            ? "⚠️ Please scroll to the end of the transcript above."
             : canSubmit
-              ? ""
-              : "Answer the question above."
+              ? "✓ Ready to proceed"
+              : "⚠️ Please select your reflection response above."
         }
       />
     </>

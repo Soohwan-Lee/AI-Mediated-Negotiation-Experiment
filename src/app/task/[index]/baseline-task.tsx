@@ -670,18 +670,12 @@ export function BaselineTask({
             steps={STEP_LABELS}
             current={STEP_OF.negotiate}
             aside={
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1 text-[0.8125rem] text-[var(--ink-2)]">
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs">
                 <span aria-hidden>⏱</span>
                 <CountdownTimer
                   seconds={NEGOTIATION_SECONDS}
                   running={!settled}
                   onTick={setSecondsRemaining}
-                  /* Running the clock out is an outcome, not a dead end. A
-                     participant who stops typing at 00:00 used to be left on a
-                     screen with no button and nothing to do — the exchange only
-                     ended inside `send`, so someone who sent nothing was
-                     stranded. Time expiring now closes the exchange the same
-                     way an impasse does. */
                   onExpire={() => {
                     if (settled) return;
                     setTentative(null);
@@ -697,43 +691,32 @@ export function BaselineTask({
             }
           />
 
-          {/* Whose move it is, said in one place.
-              The exchange answers itself several seconds later and the reply
-              arrives at the bottom of a box the participant may have scrolled
-              away from, so "am I waiting or are they" is a real question. The
-              cue sits on whichever card is actually blocking: the composer
-              when they can write, the terms when a first package has to be
-              chosen before they can. */}
-          {/* The ring goes on the COMPOSER inside this card, not on the card
-              itself — see the matching note in `shared.tsx`. Two nested glows
-              read as a rendering fault, and the composer is the control
-              actually being waited on. */}
-          <Card className="mb-5 flex flex-col" padded={false}>
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
+          <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
               <div>
-                <p className="text-[0.875rem] font-medium">
-                  Messages with the other participant
+                <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
+                  💬 Live Direct Negotiation
                 </p>
-                <p className="text-[0.8125rem] text-[var(--ink-2)]">
+                <p className="text-xs text-[var(--ink-2)]">
                   {settled === "agreed"
-                    ? "You have both settled on a package."
+                    ? "✓ Both parties agreed on a complete package!"
                     : settled === "impasse"
-                      ? "The conversation ended without an agreement."
-                      : "They can see everything you write here. Take as long as you need inside the ten minutes."}
+                      ? "⚠️ The negotiation ended without an agreement."
+                      : "Messages are sent directly to the other participant in real time."}
                 </p>
               </div>
               {settled ? null : pending ? (
-                <Cue tone="quiet">Waiting for their reply</Cue>
+                <Cue tone="quiet">Waiting for reply…</Cue>
               ) : yourTurn ? (
-                <Cue>Your turn</Cue>
+                <Cue>Your Turn</Cue>
               ) : (
-                <Cue tone="quiet">Choose your terms first</Cue>
+                <Cue tone="quiet">Select terms first</Cue>
               )}
             </div>
             <Transcript
               messages={messages}
               pending={pending}
-              emptyHint="They open first. Your reply starts the exchange."
+              emptyHint="The other side opens first. Your reply will start the live exchange."
             />
 
             <ReasonPicker
@@ -753,33 +736,35 @@ export function BaselineTask({
               sendLabel="Send"
               placeholder={
                 settled
-                  ? "This conversation has finished."
+                  ? "This conversation has concluded."
                   : canSend
-                    ? "Write your message…"
-                    : "Choose an option on each term first."
+                    ? "Type your message here…"
+                    : "Please choose an option for all 3 terms below first."
               }
             />
           </Card>
 
-          <Card cue={needsTerms}>
+          <Card cue={needsTerms} className="mb-6">
             <CardTitle
-              hint="This is the package you are proposing. Update it as the conversation moves."
+              hint="Select options below to build or modify your current proposal:"
               aside={
                 needsTerms ? (
-                  <Cue>{task.issues.length - chosen} to choose</Cue>
+                  <Cue>{task.issues.length - chosen} term(s) left</Cue>
                 ) : null
               }
             >
-              📦 Your current offer
+              📦 Your Active Offer Package
             </CardTitle>
-            <div className="space-y-4">
+            <div className="space-y-4 mt-3">
               {task.issues.map((issue) => (
-                <div key={issue.id}>
-                  <p className="mb-1.5 text-[0.8125rem] font-medium">
-                    {issue.label}
+                <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
+                      {issue.label}
+                    </p>
                     {prefs?.minimum[issue.id] ? (
-                      <span className="ml-2 font-normal text-[var(--ink-3)]">
-                        least you would take:{" "}
+                      <span className="text-2xs font-semibold text-slate-500">
+                        Floor:{" "}
                         {
                           issue.options.find(
                             (o) => o.id === prefs.minimum[issue.id],
@@ -787,7 +772,7 @@ export function BaselineTask({
                         }
                       </span>
                     ) : null}
-                  </p>
+                  </div>
                   <OptionChips
                     issue={issue}
                     role={role}
@@ -806,24 +791,26 @@ export function BaselineTask({
         </TaskLayout>
       </Page>
 
-      {/* The bar is where the exchange ends. There is no "finish early"
-          shortcut mid-conversation — the participant either reaches an
-          agreement, hits an impasse, or runs the clock down — but once one of
-          those has happened, keeping them on the screen serves nobody. */}
       {settled ? (
         <ActionBar
-          label="Continue"
-          onClick={() => setPhase("review")}
+          label="Continue to Review"
+          onClick={() => {
+            logEvent("page_complete", undefined, {
+              page: `task-${taskIndex}-negotiate`,
+              sessionIndex: taskIndex,
+            });
+            setPhase("review");
+          }}
           note={
             settled === "agreed"
-              ? "You have a package to review."
-              : "No agreement was reached."
+              ? "✓ Agreement reached! Proceed to review."
+              : "⚠️ Negotiation concluded. Proceed to review."
           }
         />
       ) : (
         <ActionBar
-          note={`${chosen} of ${task.issues.length} terms chosen${
-            outOfTime ? " · time is up" : ""
+          note={`${chosen} of ${task.issues.length} terms selected${
+            secondsRemaining <= 0 ? " · time expired" : ""
           }`}
         />
       )}

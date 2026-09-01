@@ -346,11 +346,6 @@ function Fold({
   children: ReactNode;
   defaultOpen?: boolean;
   last?: boolean;
-}: {
-  title: string;
-  children: ReactNode;
-  defaultOpen?: boolean;
-  last?: boolean;
 }) {
   return (
     <details open={defaultOpen} className={cx("group rounded-xl border border-[var(--private-line)] bg-white/70 overflow-hidden shadow-2xs transition-all", last ? "" : "mb-2.5")}>

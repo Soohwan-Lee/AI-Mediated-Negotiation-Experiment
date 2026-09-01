@@ -57,7 +57,7 @@ import {
   TaskLayout,
 } from "@/components/session";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Page } from "@/components/ui";
+import { Callout, Card, CardTitle, Page, cx } from "@/components/ui";
 import {
   useDevActions,
   useDevAutofill,
@@ -808,35 +808,35 @@ export function ProxyTask({
           <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
             <TaskHeader
               taskIndex={taskIndex}
-              title="Here is what your AI Proxy will do"
+              title="Review AI Proxy Mandate Instructions"
               steps={STEP_LABELS}
               current={STEP_OF.confirm}
             />
 
             {error ? (
-              <div className="mb-5">
-                <Callout tone="warning">
+              <div className="mb-6">
+                <Callout tone="warning" title="Notice">
                   <p>{error}</p>
                 </Callout>
               </div>
             ) : null}
 
-            <Card className="mb-5">
-              <CardTitle hint="Read this back. If it is not what you meant, change it before starting.">
-                🤖 Your instructions, in its words
+            <Card className="mb-6 border-slate-200 bg-white">
+              <CardTitle hint="Verify how your AI Proxy will represent your goals:">
+                🤖 Proxy Position Bounds & Opening Strategy
               </CardTitle>
-              <ul className="space-y-3">
+              <ul className="space-y-3.5 mt-3">
                 {mandate.issues.map((im) => {
                   const issue = task.issues.find((i) => i.id === im.issueId)!;
                   return (
                     <li
                       key={im.issueId}
-                      className="border-b border-[var(--line)] pb-3 last:border-b-0 last:pb-0"
+                      className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5"
                     >
-                      <p className="text-[0.8125rem] font-semibold">
+                      <p className="text-xs sm:text-sm font-bold text-[var(--ink)] mb-1">
                         {issue.label}
                       </p>
-                      <p className="max-w-prose text-[0.9375rem] text-[var(--ink-2)]">
+                      <p className="text-xs sm:text-sm text-[var(--ink-2)] leading-relaxed">
                         {instructionSentence(issue, im)}
                       </p>
                     </li>
@@ -845,37 +845,39 @@ export function ProxyTask({
               </ul>
             </Card>
 
-            <Card tone="private" className="mb-5 text-[var(--private-ink)]">
-              <CardTitle>💬 What it may say about why</CardTitle>
-              <div className="mb-4">
-                <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]">
-                  ✅ It may say these ({checked.length})
+            <Card tone="private" className="mb-6 border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
+              <CardTitle hint="Authorized vs confidential background details:">
+                💬 Permitted Rationale Disclosure
+              </CardTitle>
+              <div className="mb-4 mt-2">
+                <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-emerald-800">
+                  ✅ Permitted to voice ({checked.length})
                 </p>
                 {checked.length ? (
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-2">
                     {checked.map((c) => (
                       <li
                         key={c.id}
-                        className="max-w-prose text-[0.8125rem] leading-relaxed"
+                        className="rounded-lg bg-white/80 border border-emerald-200 p-2.5 text-xs sm:text-sm leading-relaxed text-slate-800"
                       >
                         {c.text}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-[0.8125rem]">Nothing selected.</p>
+                  <p className="text-xs text-slate-500 italic">No reasons selected.</p>
                 )}
               </div>
               {unchecked.length ? (
                 <div>
-                  <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.08em]">
-                    🔒 It will never say these ({unchecked.length})
+                  <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-600">
+                    🔒 Strictly Confidential — Never Voiced ({unchecked.length})
                   </p>
-                  <ul className="space-y-1.5 opacity-70">
+                  <ul className="space-y-1.5 opacity-80">
                     {unchecked.map((c) => (
                       <li
                         key={c.id}
-                        className="max-w-prose text-[0.8125rem] leading-relaxed"
+                        className="rounded-lg bg-white/50 border border-slate-200 p-2 text-xs text-slate-600 leading-relaxed"
                       >
                         {c.text}
                       </li>
@@ -888,7 +890,7 @@ export function ProxyTask({
         </Page>
 
         <ActionBar
-          label="This is right — continue"
+          label="Confirm and Launch Proxy Negotiation"
           onClick={async () => {
             if (participantKey) {
               await getStore().saveMandate(participantKey, mandate);
@@ -897,7 +899,6 @@ export function ProxyTask({
               "mandate_saved",
               {
                 policy,
-                // REASON-SCOPE: how much of their own case they handed over.
                 reasonScope: reasonScope(
                   task,
                   role,
@@ -912,7 +913,7 @@ export function ProxyTask({
             );
             setPhase("matchmaking");
           }}
-          note="Nothing is final until you review the result."
+          note="💡 You will spectate live and take over directly afterwards."
           secondary={
             <button
               type="button"
@@ -926,9 +927,9 @@ export function ProxyTask({
                 });
                 setPhase("mandate");
               }}
-              className="rounded-[var(--radius)] px-3 py-2 text-[0.9375rem] font-medium text-[var(--ink-2)] hover:bg-[var(--surface-muted)]"
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
             >
-              Change something
+              ← Edit Instructions
             </button>
           }
         />
@@ -952,27 +953,23 @@ export function ProxyTask({
               steps={STEP_LABELS}
               current={STEP_OF.watching}
               aside={
-                <span className="shrink-0 tabular text-[0.8125rem] text-[var(--ink-2)]">
-                  {progress.done} / {progress.total} messages
+                <span className="flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900 shadow-2xs">
+                  <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+                  <span>{progress.done} / {progress.total} messages</span>
                 </span>
               }
             />
 
-            <Card className="mb-5 flex flex-col" padded={false}>
+            <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
               <SpectatorBanner />
               <Transcript
                 messages={transcript}
-                /* `showStopped`, not `stopped.current` — a ref does not
-                   trigger a render, so reading it here would leave the typing
-                   indicator running after the participant pressed stop. */
                 pending={!showStopped && progress.done < progress.total}
-                emptyHint="The two AI Proxies are starting."
+                emptyHint="The two AI Proxies are initiating negotiations…"
               />
             </Card>
 
-            {/* Deliberately quiet: it is for the case where something has gone
-                visibly wrong, not a second way to negotiate. */}
-            <p className="text-center">
+            <div className="text-center py-2">
               <button
                 type="button"
                 onClick={() => {
@@ -985,73 +982,59 @@ export function ProxyTask({
                   );
                 }}
                 disabled={showStopped}
-                className="text-[0.8125rem] text-[var(--ink-3)] underline underline-offset-4 hover:text-[var(--ink-2)] disabled:no-underline"
+                className="text-xs text-slate-500 underline underline-offset-4 hover:text-slate-700 transition-colors disabled:no-underline disabled:opacity-50"
               >
-                {showStopped ? "Stopping…" : "Stop this now"}
+                {showStopped ? "Stopping proxy exchange…" : "Emergency: Stop proxy exchange"}
               </button>
-            </p>
-            <p className="mt-1.5 text-center text-[0.75rem] text-[var(--ink-3)]">
-              Only if something looks wrong. You will still review whatever was
-              reached.
-            </p>
+              <p className="mt-1 text-2xs text-slate-400">
+                Only use if something goes wrong. You will proceed to direct handover.
+              </p>
+            </div>
           </TaskLayout>
         </Page>
 
         <ActionBar
-          note={`${POLICY_DISCLOSURE[policy].split(".")[0]}. You take over when they finish.`}
+          note={`${POLICY_DISCLOSURE[policy].split(".")[0]}. You will take over once they conclude.`}
         />
       </>
     );
   }
 
   // --- handover -----------------------------------------------------------
-  //
-  // The screen between watching and talking. It exists because the change of
-  // footing is the whole point of this condition and a silent switch would
-  // waste it: up to here the participant has been a spectator, and from here
-  // they are the one speaking. Naming that, and saying what carries over,
-  // is what makes the direct conversation feel like a continuation rather
-  // than a second unrelated task.
   if (phase === "handover") {
     return (
       <TaskCover
-        eyebrow="Your turn now"
-        title="Now you talk to them directly"
-        /* The handover draws the DIRECT shape, not the proxy one — the proxies
-           have finished and the rest of this task is the two people talking.
-           Repeating the proxy picture here would say the opposite of what the
-           screen exists to announce. */
+        eyebrow="Phase Transition · Direct Handover"
+        title="Take Over and Finish Directly"
         scene="direct"
         lead={
           <>
-            <p>
-              The two AI Proxies have finished.{" "}
+            <p className="mb-2 text-slate-800 font-medium">
+              The AI Proxies have finished their preliminary exchange.{" "}
               {tentative
-                ? "They reached a package, which is on the next screen along with everything they said."
-                : "They did not reach a package. Everything they said is on the next screen."}
+                ? "They reached a tentative package, which is displayed on screen."
+                : "They did not reach agreement. The full exchange history is available for your review."}
             </p>
-            <p>
-              Nothing is settled. You and the other participant now talk
-              directly — you write your own messages from here — and{" "}
-              <strong>what the two of you agree is the result</strong>.
+            <p className="text-slate-600 text-sm">
+              Nothing is finalized yet. You now talk directly with the other participant —{" "}
+              <strong>what you both agree together in direct chat is the final outcome</strong>.
             </p>
           </>
         }
         steps={[
-          "Read what the AI Proxies said — it stays on screen while you talk",
-          "Message the other participant yourself",
-          "Settle the three terms between you, or agree that you cannot",
+          { label: "Review AI Proxy exchange", hint: "Pinned above the chat for full reference" },
+          { label: "Message the other participant", hint: "Direct conversation with your counterpart" },
+          { label: "Settle the three terms", hint: "Agree on the final package together" },
         ]}
         minutes={10}
         note={
-          <Callout title="⏱ Ten minutes">
+          <Callout title="⏱ 10-Minute Negotiation Cap" tone="neutral">
             <p>
-              That is the limit, not a target. Finish sooner if you are both
-              happy.
+              Take as much time as you need up to 10 minutes. You can conclude early once you reach mutual agreement.
             </p>
           </Callout>
         }
-        actionLabel="Start talking to them"
+        actionLabel="Start Direct Negotiation"
         onStart={() => {
           setProxyTranscript(transcript);
           setMessages([]);
@@ -1060,11 +1043,6 @@ export function ProxyTask({
             "negotiation_started",
             {
               phase: "direct",
-              // Whether the proxies handed over a package or an impasse. A
-              // direct conversation that starts from nothing begins from a
-              // harder position than one that starts from an agreed package,
-              // and the two must be separable in the analysis rather than
-              // pooled as "the Proxy arm".
               proxyOutcome: tentative ? "package" : "no_package",
               proxyMessages: transcript.length,
             },
@@ -1109,16 +1087,11 @@ export function ProxyTask({
       steps={STEP_LABELS}
       stepIndex={STEP_OF.review}
       tentative={tentative}
-      // The participant's OWN conversation, not the proxies'. Passing
-      // `transcript` here showed them the AI-AI exchange under a caption
-      // claiming it was theirs — so every item asking them to judge "what was
-      // said" would have been answered against the wrong stimulus, and the
-      // words they actually exchanged would never have been shown back.
       transcript={messages}
       proxyTranscript={proxyTranscript}
       isProxy
-      transcriptTitle="Your conversation"
-      transcriptHint="What you and the other participant said after the AI Proxies finished."
+      transcriptTitle="Your Direct Conversation"
+      transcriptHint="What you and the other participant discussed after taking over from the AI Proxies."
       onDone={() => {
         logEvent("page_complete", undefined, {
           page: `task-${taskIndex}`,
@@ -1134,22 +1107,6 @@ export function ProxyTask({
 // The reason-card screen
 // ---------------------------------------------------------------------------
 
-/**
- * "Which of your reasons may the AI Proxy say?"
- *
- * THIS SCREEN IS THE MEASURE. `REASON-SCOPE` is read straight off it: how many
- * cards, whether any sensitive one, and how far into the situation they went.
- * So the rules from Design §7 are constraints, not styling:
- *
- *  - the two boxes are visually separate, with their own headings;
- *  - work reasons start checked, sensitive ones start unchecked;
- *  - at least one work reason is required, and NO sensitive one ever is;
- *  - nothing on the screen suggests that checking more is the better answer.
- *
- * The last is the easiest to break by accident. A progress meter, a "you have
- * only shared one reason" nudge, or a sensitive box styled as an upsell would
- * all manufacture the disclosure the study is trying to observe.
- */
 function ReasonMandateSection({
   task,
   role,
@@ -1163,61 +1120,48 @@ function ReasonMandateSection({
   mandate: Mandate;
   onToggle: (cardId: string) => void;
 }) {
-  const row = (card: { id: string; text: string }) => (
-    <label className="flex cursor-pointer gap-2.5 rounded-[var(--radius)] p-1.5 hover:bg-[var(--surface)]/60">
-      <input
-        type="checkbox"
-        checked={mandate.authorizedReasonIds.includes(card.id)}
-        onChange={() => onToggle(card.id)}
-        className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
-      />
-      <span className="max-w-prose text-[0.8125rem] leading-relaxed">
-        {card.text}
-      </span>
-    </label>
-  );
+  const row = (card: { id: string; text: string }) => {
+    const checked = mandate.authorizedReasonIds.includes(card.id);
+    return (
+      <label
+        className={cx(
+          "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all shadow-2xs",
+          checked
+            ? "border-blue-500 bg-blue-50/80 text-blue-950 ring-2 ring-blue-500/20"
+            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50",
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onToggle(card.id)}
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 accent-blue-600"
+        />
+        <span className="text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
+          {card.text}
+        </span>
+      </label>
+    );
+  };
 
   return (
     <>
-      <div className="mb-5">
-        <Callout title="🤖 How this AI Proxy works">
-          <p className="max-w-prose">{POLICY_DISCLOSURE[policy]}</p>
-          <p className="mt-2 max-w-prose">
-            It can put your reasons in its own words. It cannot invent a fact
-            about you, and it will never say a reason you leave unticked.
+      <div className="mb-6">
+        <Callout title="🤖 How this AI Proxy Works" tone="neutral">
+          <p className="text-xs sm:text-sm leading-relaxed text-slate-800">{POLICY_DISCLOSURE[policy]}</p>
+          <p className="mt-2 text-xs text-slate-600">
+            It can phrase arguments naturally in conversation. It will never state reasons you leave unticked.
           </p>
         </Callout>
       </div>
 
-      {/* ONE BLOCK PER TERM, ALL THREE RENDERED IDENTICALLY (ver.2.5). The
-          cards sit on all three issues now, so the earlier heading that named
-          the requirement term is gone: with reasons attached to every term,
-          naming one of them here would tell the participant which term the
-          study is about (§5 principle 4, pilot gate 6). This is a validity
-          constraint, not styling — do not "tidy" one block into prominence.
-
-          The defaults do the quiet work: work reasons arrive ticked (and at
-          least one must stay ticked), sensitive backgrounds arrive unticked
-          and are never required. Nothing on this screen may suggest that
-          ticking more is the better answer — how many they tick, and on which
-          terms, IS the measure (REASON-SCOPE). */}
-      <Card tone="private" className="text-[var(--private-ink)]">
-        {/* "Tick what it may say" understated what ticking does, and since
-            ver.2.6 it is simply wrong: the hint used to end "it uses judgement
-            about when", but the schedule now decides that, and anything ticked
-            on this term WILL be said. Ticking is the disclosure decision, not
-            a permission the proxy might not exercise, and the screen has to
-            say so or REASON-SCOPE measures something the participant did not
-            think they were choosing. The wording stays symmetrical across the
-            two boxes — it must not read as encouragement to tick more. */}
-        <CardTitle hint="Each term has a work reason and a piece of sensitive background. Anything you tick here will actually be said on your behalf.">
-          💬 What it may say about why
+      <Card tone="private" className="border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
+        <CardTitle hint="Each term has a work reason and confidential background details. Select what may be said on your behalf:">
+          💬 Permitted Reasons Mandate
         </CardTitle>
 
-        <p className="mb-3 max-w-prose text-[0.8125rem] leading-relaxed">
-          Keep at least one work reason ticked.{" "}
-          {task.roleBriefs[role].disclosureRisk} The sensitive backgrounds are
-          yours to keep — leaving them all unticked is a normal choice.
+        <p className="mb-4 text-xs sm:text-sm leading-relaxed text-amber-950 font-medium">
+          💡 Keep at least one work reason selected. {task.roleBriefs[role].disclosureRisk} Sensitive background details are strictly optional to authorize.
         </p>
 
         <IssueReasonGroups task={task} role={role} renderCard={row} />
@@ -1226,7 +1170,6 @@ function ReasonMandateSection({
   );
 }
 
-/** Design §7: the mandate needs at least one work reason, and never a sensitive one. */
 function hasWorkReason(
   task: ReturnType<typeof getTask>,
   role: Role,

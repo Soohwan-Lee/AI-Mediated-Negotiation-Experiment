@@ -24,7 +24,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { ActionBar } from "@/components/study-chrome";
-import { Card, CardTitle, Checkbox, Page, PageHeader } from "@/components/ui";
+import { Card, CardTitle, Checkbox, Page, PageHeader, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
 import { STAGE_MINUTES, STUDY, nextHref } from "@/lib/study-config";

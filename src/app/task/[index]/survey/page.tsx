@@ -190,7 +190,9 @@ export default function TaskSurveyPage({
   if (!assignment || !task) {
     return (
       <Page>
-        <p className="text-sm text-[var(--ink-2)]">Loading…</p>
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <p className="text-sm font-semibold text-slate-500">Loading survey questions…</p>
+        </div>
       </Page>
     );
   }
@@ -198,52 +200,50 @@ export default function TaskSurveyPage({
   return (
     <>
       <Page>
-        <Card className="mb-6">
-          <CardTitle
-            hint={
-              parts.length > 1
-                ? `Part ${activePart + 1} of ${parts.length}`
-                : "These are about the negotiation you just finished — not about the study as a whole."
-            }
-          >
-            📝 A few questions about Task {taskIndex}
-          </CardTitle>
-          <p className="prose-study text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
-            There are no right answers. Answer for how it actually went, not how
-            you think it should have gone.
+        <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-blue-50/30">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-extrabold text-indigo-900 shadow-2xs">
+              📝 Post-Task Survey · Task {taskIndex}
+            </span>
+            {parts.length > 1 ? (
+              <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">
+                Section {activePart + 1} of {parts.length}
+              </span>
+            ) : null}
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--ink)]">
+            How Did Task {taskIndex} Go?
+          </h1>
+          <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
+            Please share your honest impressions of the negotiation you just concluded. There are no right or wrong answers.
           </p>
-          {/* Sets the length expectation up front, for THIS part rather than
-              the whole battery. Arriving blind on a long form is where a tired
-              participant starts straight-lining, and knowing the size of the
-              ask is the cheapest thing that helps — but quoting the full
-              thirty-odd on part one undoes the reason for splitting it. */}
-          <p className="mt-2 text-[0.8125rem] text-[var(--ink-3)]">
-            {current.reduce((n, b) => n + b.items.length, 0)} questions on this
-            page — about a minute or two.
-          </p>
+          <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span>⏱</span>
+            <span>{current.reduce((n, b) => n + b.items.length, 0)} questions on this screen (~1–2 minutes)</span>
+          </div>
         </Card>
 
-        {current.map((block) => (
-          <MeasureBlock
-            key={block.id}
-            block={block}
-            answers={answers}
-            onChange={(id, value) =>
-              setAnswers((prev) => ({ ...prev, [id]: value }))
-            }
-          />
-        ))}
+        <div className="space-y-5">
+          {current.map((block) => (
+            <MeasureBlock
+              key={block.id}
+              block={block}
+              answers={answers}
+              onChange={(id, value) =>
+                setAnswers((prev) => ({ ...prev, [id]: value }))
+              }
+            />
+          ))}
+        </div>
       </Page>
 
-      {/* No Previous button, deliberately — see the note at the top of the
-          file on why the block order is one-way. */}
       <ActionBar
-        label={isLastPart ? "Continue" : "Next"}
+        label={isLastPart ? "Submit Survey & Continue" : "Next Section →"}
         onClick={save}
         disabled={!canContinue}
         remaining={missing.length}
         firstUnansweredId={missing[0] ?? null}
-        note={missing.length === 0 ? "All answered." : ""}
+        note={missing.length === 0 ? "✓ All questions answered" : ""}
       />
     </>
   );

@@ -133,105 +133,114 @@ export default function TaskRewardPage({
     return (
       <>
         <Page>
-          <Card className="mb-5">
-            <CardTitle hint={`Task ${taskIndex} of 2`}>
-              💰 Your bonus decision
-            </CardTitle>
-            <p className="prose-study text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
-              As the Leader on this project, you decide the bonus the other
-              participant receives for this task. Weigh up not only how the
-              negotiation turned out, but also how they conducted themselves
-              during it.
+          <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/40 via-white to-blue-50/20">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-extrabold text-blue-900 shadow-2xs">
+                👑 Leader Responsibility · Task {taskIndex}
+              </span>
+              <span className="text-xs font-bold text-slate-500">
+                Bonus Allocation
+              </span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--ink)]">
+              💰 Decide Team Member&apos;s Bonus
+            </h1>
+            <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
+              As the Project Leader, you decide the performance bonus the Team Member receives for this task. Please consider both the negotiated outcome reached and their communication conduct.
             </p>
           </Card>
 
-          <Card className="mb-5" id={`q-${BONUS_ITEM.id}`}>
+          <Card className="mb-6 border-slate-200" id={`q-${BONUS_ITEM.id}`}>
             <CardTitle hint={bonusUnit}>{BONUS_ITEM.text}</CardTitle>
-            <AmountScale
-              id={`BONUS_t${taskIndex}`}
-              value={amount}
-              onChange={setAmount}
-              step={5}
-            />
+            <div className="mt-3">
+              <AmountScale
+                id={`BONUS_t${taskIndex}`}
+                value={amount}
+                onChange={setAmount}
+                step={5}
+              />
+            </div>
             {awarded !== null ? (
-              <p className="mt-4 text-[0.875rem] text-[var(--ink-2)]">
-                That is{" "}
-                <strong className="text-[var(--ink)]">
-                  {STUDY.currencySymbol}
-                  {awarded}
-                </strong>{" "}
-                of the {STUDY.currencySymbol}
-                {STUDY.bonusPerTask} available for this task.
-              </p>
+              <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-center">
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                  Allocated Bonus Amount
+                </p>
+                <p className="text-2xl sm:text-3xl font-black text-emerald-950 font-mono my-1">
+                  {STUDY.currencySymbol}{awarded}
+                </p>
+                <p className="text-xs text-emerald-700">
+                  out of {STUDY.currencySymbol}{STUDY.bonusPerTask} maximum available for Task {taskIndex}
+                </p>
+              </div>
             ) : null}
           </Card>
 
-          <Callout>
+          <Callout title="ℹ️ Independent Allocation" tone="neutral">
             <p>
-              This is your decision alone. It is applied to their payment for
-              this task.
+              This is your independent decision as Leader. Awarded bonuses are added directly to the participant&apos;s Prolific compensation.
             </p>
           </Callout>
         </Page>
 
         <ActionBar
-          label="Confirm this bonus"
+          label="Confirm Bonus Allocation"
           onClick={save}
           disabled={!canContinue}
           remaining={amount === null ? 1 : 0}
           firstUnansweredId={amount === null ? `BONUS_t${taskIndex}` : null}
-          note={amount === null ? "Choose an amount." : ""}
+          note={amount === null ? "⚠️ Please select a bonus percentage." : "✓ Ready to confirm"}
         />
       </>
     );
   }
 
   // --- Member: wait, then move on ------------------------------------------
-  //
-  // The wait is the whole screen. What a Member experiences here is that
-  // something of theirs is in someone else's hands — which is what POWER3
-  // asks about — and then the study continues without telling them the
-  // outcome. No figure is shown at any point.
   return (
     <>
       <Page>
         {!revealed ? (
           <div className="flex min-h-[45vh] flex-col items-center justify-center text-center">
-            <span aria-hidden className="mb-5 inline-flex gap-1.5">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200 text-2xl shadow-sm">
+              ⏳
+            </div>
+            <span aria-hidden className="mb-4 inline-flex gap-2">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
-                  className="h-2 w-2 animate-bounce rounded-full bg-[var(--accent)]"
+                  className="h-2.5 w-2.5 animate-bounce rounded-full bg-[var(--accent)]"
                   style={{ animationDelay: `${i * 0.15}s` }}
                 />
               ))}
             </span>
-            <p className="text-[1.0625rem] font-semibold">
-              The other participant is deciding your bonus…
+            <p className="text-lg sm:text-xl font-bold text-slate-900">
+              The Project Leader is evaluating your performance bonus…
             </p>
-            <p className="mt-1.5 max-w-prose text-[0.875rem] text-[var(--ink-2)]">
-              They are the Leader on this project, so this decision is theirs.
+            <p className="mt-2 max-w-prose text-xs sm:text-sm text-slate-600">
+              The Leader is reviewing the negotiation outcome and conduct to allocate your bonus.
             </p>
           </div>
         ) : (
-          <Card className="mb-5">
+          <Card className="mb-6 border-slate-200 bg-white">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-900">
+                ✓ Evaluation Recorded
+              </span>
+            </div>
             <CardTitle hint={`Task ${taskIndex} of 2`}>
-              💰 Their decision is in
+              💰 Bonus Evaluation Submitted
             </CardTitle>
-            <p className="prose-study text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
-              The Leader has decided your bonus for this task. Bonuses are added
-              to your Prolific payment once the study closes, so there is
-              nothing to do with it now.
+            <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
+              The Project Leader has submitted the bonus evaluation for Task {taskIndex}. Any awarded bonuses are automatically added to your Prolific payment once the entire study concludes.
             </p>
           </Card>
         )}
       </Page>
 
       <ActionBar
-        label="Continue"
+        label="Continue to Next Step"
         onClick={save}
         disabled={!canContinue}
-        note={revealed ? "" : "Waiting for their decision."}
+        note={revealed ? "✓ Ready to proceed" : "Waiting for evaluation submission…"}
       />
     </>
   );

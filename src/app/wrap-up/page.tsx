@@ -69,35 +69,41 @@ export default function WrapUpPage() {
   return (
     <>
       <Page>
-        <Card className="mb-6">
-          <CardTitle hint="Last set of questions — then we explain what the study was about.">
-            🏁 Almost done
-          </CardTitle>
-          <p className="prose-study text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
-            These questions are about the two tasks together, rather than about
-            either one on its own.
+        <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-blue-50/30">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-extrabold text-indigo-900 shadow-2xs">
+              🏁 Final Phase · Study Wrap-Up
+            </span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--ink)]">
+            Overall Reflection & Final Questions
+          </h1>
+          <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
+            These final questions reflect on your experience across both tasks as a whole. Afterwards, a full debriefing will explain the research context in detail.
           </p>
         </Card>
 
-        {BLOCKS.map((block) => (
-          <MeasureBlock
-            key={block.id}
-            block={block}
-            answers={answers}
-            onChange={(id, value) =>
-              setAnswers((prev) => ({ ...prev, [id]: value }))
-            }
-          />
-        ))}
+        <div className="space-y-5">
+          {BLOCKS.map((block) => (
+            <MeasureBlock
+              key={block.id}
+              block={block}
+              answers={answers}
+              onChange={(id, value) =>
+                setAnswers((prev) => ({ ...prev, [id]: value }))
+              }
+            />
+          ))}
+        </div>
       </Page>
 
       <ActionBar
-        label="Finish and see the explanation"
+        label="Submit & Proceed to Study Debriefing"
         onClick={save}
         disabled={!canContinue}
         remaining={missing.length}
         firstUnansweredId={missing[0] ?? null}
-        note={missing.length === 0 ? "All answered." : ""}
+        note={missing.length === 0 ? "✓ All questions answered" : ""}
       />
     </>
   );

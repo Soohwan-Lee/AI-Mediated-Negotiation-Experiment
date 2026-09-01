@@ -57,7 +57,7 @@ import {
 } from "@/components/session";
 import { OptionChips, PackageValue, PointsKey } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Cue, Page } from "@/components/ui";
+import { Callout, Card, CardTitle, Cue, Page, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { dummyAnswer, riskBlock } from "@/lib/measures";
 import { useParticipant } from "@/lib/participant-context";
@@ -100,21 +100,7 @@ export function TaskIntro({
 }: {
   taskIndex: 1 | 2;
   steps: Array<string | { label: string; hint: string }>;
-  /**
-   * Per-arm estimate. The two arms are structurally different lengths — a
-   * Proxy task holds two conversations where Baseline holds one — and one
-   * shared figure was wrong for both. The number describes the interface in
-   * front of the participant, not the condition.
-   */
   minutes?: number;
-  /**
-   * Which shape of exchange this task uses.
-   *
-   * The one thing on this cover that differs between the two arms, and it is
-   * allowed to differ because it draws the INTERFACE, not the condition — the
-   * participant is told plainly which of the two they are about to use, and
-   * Delegate and Explorer produce the same picture. See `CoverArt`.
-   */
   scene: CoverScene;
   onStart: () => void;
 }) {
@@ -123,37 +109,25 @@ export function TaskIntro({
   return (
     <TaskCover
       counter={{ index: taskIndex, total: 2 }}
-      eyebrow="Negotiation task"
-      title={first ? "Task 1 starts here" : "Task 2, the last one"}
+      eyebrow={`Study Phase · Task ${taskIndex} of 2`}
+      title={first ? "Task 1 Starts Here" : "Task 2 (Final Task)"}
       lead={
         first ? (
           <>
-            <p>
-              The practice round is over — this one is the real thing. You will
-              be working through a project with{" "}
-              {/* The counterpart is presented as another participant
-                  throughout the study and is disclosed only at the debriefing.
-                  Saying it plainly here is the same claim the rest of the
-                  interface makes, in the place the participant is most likely
-                  to form an expectation about who they are talking to. */}
-              another participant who has the other side of it, and neither of
-              you can settle anything alone.
+            <p className="mb-2 text-slate-800 font-medium">
+              The practice round is over — this one is the real negotiation task. You will be working on a workplace project with another participant who holds the other role.
             </p>
-            <p>
-              Your own briefing is private. It stays on screen for the whole
-              task, so there is nothing to memorise now.
+            <p className="text-slate-600 text-sm">
+              Your private briefing stays pinned in the sidebar for the entire task. Neither party can decide anything alone.
             </p>
           </>
         ) : (
           <>
-            <p>
-              This is the second and last task. It is a different project, with
-              a different briefing, and the way you work through it may not be
-              the way the first task worked.
+            <p className="mb-2 text-slate-800 font-medium">
+              This is the second and final negotiation task with a brand new scenario and project briefing.
             </p>
-            <p>
-              The other side is a different participant, and nothing carries
-              over from the first task.
+            <p className="text-slate-600 text-sm">
+              You are paired with a different participant, and nothing carries over from Task 1.
             </p>
           </>
         )
@@ -194,31 +168,24 @@ export function TaskBrief({
           current={0}
         />
 
-        <Card className="mb-5">
-          <CardTitle>📋 The situation</CardTitle>
-          {/* The scenario is read once and carefully, so it keeps a reading
-              measure even though the task column is wide. */}
-          <p className="max-w-prose text-[0.9375rem] leading-relaxed text-[var(--ink-2)]">
+        <Card className="mb-6 border-slate-200 bg-white">
+          <CardTitle hint="Shared public context:">📋 The Scenario Context</CardTitle>
+          <p className="text-sm sm:text-base leading-relaxed text-[var(--ink-2)]">
             {task.publicBrief}
           </p>
-          <p className="mt-3 text-[0.875rem] text-[var(--ink-3)]">
-            Both sides can see this much. Everything below is yours alone.
-          </p>
+          <div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-600 border border-slate-200">
+            <span>🌐</span>
+            <span>Both sides can see the scenario above. All information below is strictly confidential to you.</span>
+          </div>
         </Card>
 
-        {/* Fully expanded here, and only here. This is the phase where the
-            briefing is READ — it sits in the main column, it is the first
-            time they see it, and a section folded shut is a section they may
-            not know exists. From the next phase on it lives in the rail as
-            something to consult, where the folds are what keep the numbers
-            reachable without scrolling past the story again. */}
         <BriefingPanel task={task} role={role} defaultOpen />
       </Page>
 
       <ActionBar
-        label="I've read my briefing"
+        label="I have read my briefing"
         onClick={onContinue}
-        note="It stays beside you for the whole task."
+        note="💡 It stays pinned in the sidebar throughout the task."
       />
     </>
   );
@@ -229,44 +196,10 @@ export function TaskBrief({
 // ---------------------------------------------------------------------------
 
 export interface Preferences {
-  /** Issue id → the option you would like. */
   preferred: Record<string, string | null>;
-  /** Issue id → the least you would settle for. */
   minimum: Record<string, string | null>;
 }
 
-/**
- * "What do you want, and what is the least you'd take" on every term — and, in
- * the Proxy arm, which of your reasons may be said for you.
- *
- * ALL THREE TERMS ARE ENTERED THE SAME WAY. Design §5 principle 4 is explicit
- * about this, and it is the reason the requirement issue gets no extra
- * control, no highlight, and no separate heading: singling it out would tell
- * the participant which term the study is about, and pilot gate 6 exists to
- * catch exactly that kind of transparency.
- *
- * WHY THE REASONS ARE ON THIS SCREEN. They used to be a screen of their own,
- * after this one. Putting the two together is the point of the study rather
- * than a layout preference: deciding a position and deciding what may be said
- * for it is one act, and the gap in the prior work is precisely that the
- * second half was never asked. Two screens made them two decisions, taken in
- * order, with the position already fixed before the reasons were considered.
- *
- * WHERE THEY SIT, AND WHY NOT UNDER THE TERM THEY BELONG TO. The reason cards
- * exist for one term — the participant's requirement — so the tempting layout
- * is to nest them inside that term's card. That would break §5 principle 4:
- * one of the three cards would be visibly taller and carry a control the
- * others do not, which tells the participant which term the study is about
- * without a word being said. So the reasons are a section BELOW all three
- * cards, addressed to the requirement in their own heading, exactly as the
- * briefing already presents them. The three term cards stay identical.
- *
- * Used by BOTH conditions. In Baseline it is a private plan and there is no
- * reasons section; in Proxy the same two levels per term plus the ticked cards
- * are the mandate the AI Proxy is bound by. Keeping one screen for both is
- * what makes the conditions comparable at the point where the participant
- * decides what they want.
- */
 export function PreferenceForm({
   taskIndex,
   task,
@@ -274,12 +207,7 @@ export function PreferenceForm({
   steps,
   stepIndex,
   isProxy,
-  /**
-   * The mandate's reason section, in the Proxy arm. Rendered below the three
-   * term cards — see the note above on why it is not inside one of them.
-   */
   reasons,
-  /** Whether the reason section's own requirement (≥1 work card) is met. */
   reasonsComplete = true,
   initial,
   onContinue,
@@ -292,19 +220,6 @@ export function PreferenceForm({
   isProxy: boolean;
   reasons?: ReactNode;
   reasonsComplete?: boolean;
-  /**
-   * Levels already chosen, when this screen is being returned to.
-   *
-   * Interface rule 4: anything reachable by Back must restore its saved
-   * answers, "or Back is a trap that blanks the screen". This screen became
-   * reachable again when the rehearsal gained "Change my instructions", and
-   * without this it was exactly that trap — the component remounts, its own
-   * state initialises to null, and a participant who went back to re-tick one
-   * reason card found all six of their level choices gone. The reason cards
-   * survived, because those live in the parent's mandate; the levels did not,
-   * because they lived here. Mockup mode hid it, since autofill re-fills on
-   * every mount.
-   */
   initial?: Preferences;
   onContinue: (prefs: Preferences) => void;
 }) {
@@ -321,9 +236,6 @@ export function PreferenceForm({
   );
 
   useDevAutofill(() => {
-    // Best option for this participant on every term, and a floor one step
-    // past their requirement threshold — a mandate that keeps the requirement
-    // and pays for it elsewhere, which is the trajectory worth reading.
     const best = (issueId: string) => {
       const issue = task.issues.find((i) => i.id === issueId)!;
       return [...issue.options].sort(
@@ -336,7 +248,6 @@ export function PreferenceForm({
         (a, b) => b.points[role] - a.points[role],
       );
       const isRequirement = issueId === task.requirementIssueId[role];
-      // Hold the requirement at the threshold; give the other terms away.
       return isRequirement
         ? ranked[issue.requirementThresholdIndex ?? 1].id
         : ranked[ranked.length - 1].id;
@@ -351,9 +262,6 @@ export function PreferenceForm({
     ...(preferred[i.id] ? [] : [`pref-${i.id}`]),
     ...(minimum[i.id] ? [] : [`min-${i.id}`]),
   ]);
-  // The reason section carries its own requirement (Design §7: at least one
-  // work reason) and it gates the same button, because the two halves of this
-  // screen are one decision.
   const canContinue = useDevGate(missing.length === 0 && reasonsComplete);
 
   async function save() {
@@ -380,50 +288,42 @@ export function PreferenceForm({
             taskIndex={taskIndex}
             title={
               isProxy
-                ? "What you want, and what may be said for you"
-                : "What you want from this"
+                ? "Configure Your Mandate & Permitted Reasons"
+                : "Define Your Initial Preferences"
             }
             steps={steps}
             current={stepIndex}
           />
 
-          <div className="mb-5">
-            <Callout tone="private" title="🔒 Only you see this">
+          <div className="mb-6">
+            <Callout tone="private" title="🔒 Strictly Confidential (Only You See This)">
               <p>
                 {isProxy
-                  ? "These two answers per term are the limits your AI Proxy negotiates inside. It will open at what you want and will not go past the least you would take."
-                  : "Nobody else sees this — not the other side, not later in the task. It is recorded so we can compare what you wanted with how things turned out."}
+                  ? "These bounds define the operating limits for your AI Proxy. It will open asking for your preferred options and will not compromise beyond your minimum acceptable level."
+                  : "Nobody else sees these ratings. They help us understand your original goals compared to the final negotiated outcome."}
               </p>
-              {/* The scale the point numbers are on. This is the screen where
-                  they are acted on rather than read, so the anchors belong
-                  here too — see `PointsKey`. */}
               <PointsKey
                 issues={task.issues}
                 role={role}
                 reservationPoints={task.reservationPoints}
-                className="mt-2"
+                className="mt-3"
               />
             </Callout>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             {task.issues.map((issue) => (
-              <Card key={issue.id} id={`q-pref-${issue.id}`}>
+              <Card key={issue.id} id={`q-pref-${issue.id}`} className="transition-all">
                 <CardTitle hint={issue.description}>{issue.label}</CardTitle>
 
-                {/* The per-issue rationale, beside the score, at every point
-                    the participant chooses a level. Design §5 requires it to
-                    stay next to the number: a participant reading only the
-                    score column optimizes points and ignores the situation,
-                    and the situation is the study. */}
-                <p className="mb-4 max-w-prose rounded-[var(--radius)] bg-[var(--surface-muted)] px-3 py-2 text-[0.8125rem] leading-relaxed text-[var(--ink-2)]">
-                  💡 {issue.rationale[role]}
-                </p>
+                <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs sm:text-sm leading-relaxed text-indigo-950">
+                  💡 <strong>Your Context:</strong> {issue.rationale[role]}
+                </div>
 
-                <p className="mb-1.5 text-[0.75rem] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                  What you would like
-                </p>
                 <div className="mb-4">
+                  <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-emerald-700">
+                    🏆 What you would like (Ideal Target)
+                  </p>
                   <OptionChips
                     issue={issue}
                     role={role}
@@ -436,8 +336,8 @@ export function PreferenceForm({
                 </div>
 
                 <div id={`q-min-${issue.id}`}>
-                  <p className="mb-1.5 text-[0.75rem] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                    The least you would settle for
+                  <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-amber-700">
+                    🛡️ Least you would accept (Reservation Floor)
                   </p>
                   <OptionChips
                     issue={issue}
@@ -453,31 +353,24 @@ export function PreferenceForm({
             ))}
           </div>
 
-          {/* What the two positions add up to, once all three terms have one.
-              A level's number only means something against the package total
-              and the fallback — see `PackageValue`. Both lines are the
-              participant's OWN totals; nothing here says what the other side
-              would get, or that trading terms beats splitting them. */}
-          <div className="mt-4 space-y-1.5 rounded-[var(--radius)] border border-[var(--private-line)] bg-[var(--private)]/40 px-4 py-3">
+          <div className="mt-5 space-y-2 rounded-2xl border border-[var(--private-line)] bg-amber-50/50 p-4 sm:p-5 shadow-2xs">
             <PackageValue
               issues={task.issues}
               role={role}
               reservationPoints={task.reservationPoints}
               selection={preferred}
-              label="What you would like adds up to"
+              label="Ideal target package totals"
             />
             <PackageValue
               issues={task.issues}
               role={role}
               reservationPoints={task.reservationPoints}
               selection={minimum}
-              label="Your least-acceptable set adds up to"
+              label="Minimum acceptable package totals"
             />
           </div>
 
-          {/* The reason half of the mandate, below all three term cards and
-              never inside one of them — see the note on this component. */}
-          {reasons ? <div className="mt-5">{reasons}</div> : null}
+          {reasons ? <div className="mt-6">{reasons}</div> : null}
         </TaskLayout>
       </Page>
 
@@ -491,8 +384,8 @@ export function PreferenceForm({
           missing.length > 0
             ? ""
             : reasonsComplete
-              ? "Ready."
-              : "Tick at least one work reason so it has something to argue with."
+              ? "✓ Ready to proceed"
+              : "⚠️ Please select at least one work reason"
         }
       />
     </>
@@ -503,21 +396,6 @@ export function PreferenceForm({
 // Phase: RISK, straight after the briefing
 // ---------------------------------------------------------------------------
 
-/**
- * The two RISK items (Design §9.2).
- *
- * Its own screen, asked as early as it can be: the situation has been read and
- * nothing about the participant's own position has been decided. It asks what
- * they EXPECT it to cost to raise their requirement, and an expectation stops
- * being one the moment a decision has been taken.
- *
- * It sat after the levels screen until the Proxy arm merged levels and reason
- * cards onto one screen. "After the levels screen" then meant "after the
- * mandate" in that arm and not in Baseline — and RISK is §10 gate 4's
- * task-equivalence instrument, so it cannot carry a condition effect. Asking it
- * here is what keeps the two arms identical on this point. Do not move it back
- * down the flow to group it with the other pre-task screens.
- */
 export function RiskForm({
   taskIndex,
   task,
@@ -571,12 +449,7 @@ export function RiskForm({
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <TaskHeader
             taskIndex={taskIndex}
-            /* NOT "one last thing": the levels screen (and in the Proxy arm
-               the reason cards with it) still comes after this one. The title
-               said otherwise while RISK sat last, and a promise that the next
-               button starts the negotiation is one the participant checks
-               immediately. */
-            title="Two quick questions before you begin"
+            title="Two Quick Questions Before You Begin"
             steps={steps}
             current={stepIndex}
           />
@@ -592,16 +465,12 @@ export function RiskForm({
       </Page>
 
       <ActionBar
-        /* Always "Continue". The prop that used to make this configurable
-           existed so Baseline could say "Start the negotiation" — true when
-           RISK was the last screen before it, and a lie now that the levels
-           screen follows in both arms. */
         label="Continue"
         onClick={save}
         disabled={!canContinue}
         remaining={missing.length}
         firstUnansweredId={missing[0] ?? null}
-        note={missing.length === 0 ? "Ready." : ""}
+        note={missing.length === 0 ? "✓ Ready" : ""}
       />
     </>
   );
@@ -611,16 +480,6 @@ export function RiskForm({
 // Phase: waiting for the other participant
 // ---------------------------------------------------------------------------
 
-/**
- * The four-to-five second "waiting for the other participant" pause (Design §8
- * step 3).
- *
- * It exists to make the counterpart read as a person on the other end of a
- * connection rather than a screen that appears instantly, and the suspicion
- * probe is a pilot gate. Deliberately short and honest about what it says: a
- * fake queue position or a progress bar that pretends to measure something
- * would be a second deception on top of the one the IRB approved.
- */
 export function Matchmaking({ onReady }: { onReady: () => void }) {
   const [ready, setReady] = useState(false);
 
@@ -631,32 +490,31 @@ export function Matchmaking({ onReady }: { onReady: () => void }) {
       onReady();
     }, wait);
     return () => window.clearTimeout(id);
-    // Runs once on mount. `onReady` changes identity every render and would
-    // restart the timer forever if it were a dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <Page>
       <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
+        <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 border border-blue-200 text-2xl shadow-sm">
+          {ready ? "🤝" : "📡"}
+        </div>
         <span
           aria-hidden
-          className="mb-5 inline-flex gap-1.5"
+          className="mb-4 inline-flex gap-2"
         >
           {[0, 1, 2].map((i) => (
             <span
               key={i}
-              className="h-2 w-2 animate-bounce rounded-full bg-[var(--accent)]"
+              className="h-2.5 w-2.5 animate-bounce rounded-full bg-[var(--accent)]"
               style={{ animationDelay: `${i * 0.15}s` }}
             />
           ))}
         </span>
-        <p className="text-[1.0625rem] font-semibold">
-          {ready ? "Connected." : "Waiting for the other participant\u2026"}
+        <p className="text-lg sm:text-xl font-bold text-slate-900">
+          {ready ? "Connected! Starting session…" : "Connecting with the other participant…"}
         </p>
-        <p className="mt-1.5 max-w-prose text-[0.875rem] text-[var(--ink-2)]">
-          They are finishing their own briefing. This usually takes a few
-          seconds.
+        <p className="mt-2 max-w-prose text-xs sm:text-sm text-slate-600">
+          Both participants are entering the live workspace. This takes just a few seconds.
         </p>
       </div>
     </Page>
@@ -667,21 +525,6 @@ export function Matchmaking({ onReady }: { onReady: () => void }) {
 // Reason attachment (Baseline)
 // ---------------------------------------------------------------------------
 
-/**
- * "Attach one of your reasons to this message."
- *
- * WHY THIS EXISTS. Design §4's acceptance rule needs a deterministic answer to
- * "has a reason been given for this requirement", and §4 puts that judgement
- * with the system rather than the model. Free text cannot supply it without
- * asking a model to grade an argument, which is precisely the decision the
- * design refuses to hand back.
- *
- * WHAT IT MUST NOT DO. It may not tell the participant that attaching a reason
- * helps, may not default to one, and may not treat the sensitive cards as the
- * better answer. It presents the same two boxes as the briefing, in the same
- * order, with nothing selected — the choice of which to voice is a measure,
- * and a control that nudges it destroys the thing it records.
- */
 export function ReasonPicker({
   task,
   role,
@@ -702,38 +545,34 @@ export function ReasonPicker({
   const selected = cards.find((c) => c.id === value);
 
   return (
-    <div className="border-t border-[var(--line)] bg-[var(--private)]/40 px-4 py-2.5">
+    <div className="border-t border-slate-200 bg-amber-50/50 px-4 py-3 sm:px-5">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-3 text-left"
+        className="flex w-full items-center justify-between gap-3 text-left transition-colors"
       >
-        <span className="text-[0.8125rem] text-[var(--private-ink)]">
+        <span className="text-xs sm:text-sm text-[var(--private-ink)] font-medium">
           {selected ? (
             <>
-              <span aria-hidden>📎</span> Saying this reason:{" "}
-              <span className="font-medium">
-                {selected.text.slice(0, 60)}
-                {selected.text.length > 60 ? "\u2026" : ""}
+              <span aria-hidden className="mr-1">📎</span> Saying this reason:{" "}
+              <span className="font-bold text-slate-900">
+                &ldquo;{selected.text.slice(0, 50)}
+                {selected.text.length > 50 ? "…" : ""}&rdquo;
               </span>
             </>
           ) : (
             <>
-              <span aria-hidden>📎</span> Say one of your reasons with this
-              message (optional)
+              <span aria-hidden className="mr-1">📎</span> Attach a rationale card to this message (optional)
             </>
           )}
         </span>
-        <span className="shrink-0 text-[0.75rem] font-medium text-[var(--private-strong)]">
-          {open ? "Close" : "Choose"}
+        <span className="shrink-0 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-50">
+          {open ? "▲ Close" : "▼ Choose"}
         </span>
       </button>
 
       {open ? (
-        <div className="mt-3">
-          {/* The same issue-block structure as the briefing and the mandate
-              screen (Design §7): each term's work reason and sensitive
-              background, three blocks rendered identically. */}
+        <div className="mt-3.5 space-y-3">
           <IssueReasonGroups
             task={task}
             role={role}
@@ -748,9 +587,8 @@ export function ReasonPicker({
               />
             )}
           />
-          <p className="mt-2 text-[0.75rem] text-[var(--private-ink)]">
-            You write the message yourself — this only records which of your
-            reasons you brought up.
+          <p className="text-xs text-amber-900/80 font-medium">
+            💡 You write your own message text — selecting a card records which background rationale you voiced.
           </p>
         </div>
       ) : null}
@@ -771,23 +609,24 @@ function ReasonChoice({
 }) {
   return (
     <label
-      className={
+      className={cx(
+        "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all shadow-2xs",
         checked
-          ? "flex cursor-pointer gap-2.5 rounded-[var(--radius)] border-2 border-[var(--accent)] bg-[var(--surface)] p-2.5"
-          : "flex cursor-pointer gap-2.5 rounded-[var(--radius)] border-2 border-transparent p-2.5 hover:bg-[var(--surface)]/60"
-      }
+          ? "border-blue-500 bg-blue-50/80 text-blue-950 ring-2 ring-blue-500/20"
+          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50",
+      )}
     >
       <input
         type="checkbox"
         checked={checked}
         onChange={onToggle}
-        className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+        className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 accent-blue-600"
       />
-      <span className="text-[0.8125rem] leading-relaxed">
+      <span className="text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
         {card.text}
         {voiced ? (
-          <span className="ml-1.5 text-[0.75rem] text-[var(--ink-3)]">
-            (already said)
+          <span className="ml-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-2xs font-bold text-slate-600">
+            already mentioned
           </span>
         ) : null}
       </span>
@@ -856,33 +695,31 @@ export function OutcomeValue({
     : false;
 
   return (
-    <Card tone="private" className="text-[var(--private-ink)]">
+    <Card tone="private" className="text-[var(--private-ink)] border-amber-300 bg-amber-50/60 shadow-2xs">
       <div className="mb-3 flex items-baseline justify-between gap-3">
-        <span className="text-[0.8125rem] font-semibold uppercase tracking-[0.08em]">
-          What this is worth to you
+        <span className="text-xs font-extrabold uppercase tracking-wider text-amber-900">
+          🏆 Your Score & Payoff
         </span>
-        <span className="tabular text-[1.125rem] font-semibold text-[var(--ink)]">
-          {mine.toLocaleString()}
+        <span className="text-xl sm:text-2xl font-black text-amber-950 font-mono">
+          {mine.toLocaleString()} pts
         </span>
       </div>
-      <p className="text-[0.8125rem]">
+      <p className="text-xs sm:text-sm font-medium leading-relaxed">
         {terms
           ? mine >= task.reservationPoints
-            ? `Above your fallback of ${task.reservationPoints.toLocaleString()}.`
-            : `Below your fallback of ${task.reservationPoints.toLocaleString()}.`
-          : `No agreement — you receive your fallback of ${task.reservationPoints.toLocaleString()}.`}
+            ? `✓ Above your fallback score of ${task.reservationPoints.toLocaleString()} pts.`
+            : `⚠️ Below your fallback score of ${task.reservationPoints.toLocaleString()} pts.`
+          : `⚠️ No agreement reached — fallback score of ${task.reservationPoints.toLocaleString()} pts applies.`}
       </p>
-      {/* On an impasse the requirement was not lost — there was simply no
-          package. Saying "below the level you decided you needed" would report
-          a concession that never happened. Both roles see this line now, since
-          both hold a requirement. */}
       {terms ? (
-        <p className="mt-3 border-t border-[var(--private-line)] pt-3 text-[0.8125rem]">
-          {requirement.label}:{" "}
-          {held
-            ? "at or above the level you decided you needed."
-            : "below the level you decided you needed."}
-        </p>
+        <div className="mt-3 border-t border-amber-200/80 pt-3 text-xs sm:text-sm font-semibold text-amber-900">
+          <span>{requirement.label}: </span>
+          <span className={held ? "text-emerald-700" : "text-amber-800"}>
+            {held
+              ? "✓ At or above your required threshold."
+              : "⚠️ Below your required threshold."}
+          </span>
+        </div>
       ) : null}
     </Card>
   );
@@ -903,14 +740,15 @@ export function DecisionButton({
     <button
       type="button"
       onClick={onClick}
-      className={
+      className={cx(
+        "rounded-2xl border-2 p-4 text-left transition-all shadow-2xs",
         selected
-          ? "rounded-[var(--radius)] border-2 border-[var(--accent)] bg-[var(--accent-soft)] p-3.5 text-left"
-          : "rounded-[var(--radius)] border-2 border-[var(--line)] p-3.5 text-left transition-colors hover:border-[var(--ink-3)]"
-      }
+          ? "border-blue-600 bg-blue-50/80 ring-2 ring-blue-500/20"
+          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60",
+      )}
     >
-      <span className="block text-[0.9375rem] font-semibold">{label}</span>
-      <span className="block text-[0.8125rem] text-[var(--ink-2)]">{hint}</span>
+      <span className="block text-sm sm:text-base font-bold text-slate-900">{label}</span>
+      <span className="mt-1 block text-xs sm:text-sm font-medium text-slate-600">{hint}</span>
     </button>
   );
 }
@@ -919,27 +757,6 @@ export function DecisionButton({
 // Phase: the participant negotiates directly (Proxy condition)
 // ---------------------------------------------------------------------------
 
-/**
- * After the two AI Proxies have finished, the participant takes over and
- * negotiates with the other participant themselves.
- *
- * WHY THIS EXISTS. Watching a proxy settle something on your behalf and then
- * being asked how it felt is a different experiment from having to carry the
- * result into a conversation with the person it was settled with. The second
- * is the one this study is about: the AI speaks first, and then the
- * participant has to live with what it said in front of the other side.
- *
- * THE PROXY TRANSCRIPT STAYS ON SCREEN. That is not a convenience. Every
- * measure that follows — whether the other side's requirement read as
- * genuinely theirs, who is answerable for what was asked, whether the AI
- * represented them well — is a judgement about words the participant needs to
- * be able to re-read while they respond to them. Taking the transcript away
- * would make those items a memory test.
- *
- * The counterpart is the same controlled counterpart as in Baseline, at the
- * same thresholds, so the two conditions differ in what came BEFORE the direct
- * conversation rather than in how that conversation is run.
- */
 export function DirectNegotiation({
   taskIndex,
   task,
@@ -948,18 +765,6 @@ export function DirectNegotiation({
   stepIndex,
   proxyTranscript,
   openingPackage,
-  /**
-   * Did the participant's AI Proxy actually voice a reason for the
-   * requirement?
-   *
-   * Passed in rather than assumed. Hardcoding `true` here made the
-   * reason-linked rule inert for every Proxy participant while it changed the
-   * counterpart's move for most packages in Baseline — a mechanical asymmetry
-   * in the primary outcome, along the primary contrast. And the assumption is
-   * not even always true: an emergency stop can end the proxy exchange before
-   * it speaks, and a guardrail block can strip the reason out of the message
-   * that was meant to carry it.
-   */
   reasonAlreadyVoiced,
   messages,
   setMessages,
@@ -972,9 +777,7 @@ export function DirectNegotiation({
   role: Role;
   steps: string[];
   stepIndex: number;
-  /** What the two AI Proxies said. Read-only, always on screen. */
   proxyTranscript: DisplayMessage[];
-  /** The package the proxies reached, if any. Where this conversation starts. */
   openingPackage: Package | null;
   reasonAlreadyVoiced: boolean;
   messages: DisplayMessage[];
@@ -992,18 +795,6 @@ export function DirectNegotiation({
   const [pending, setPending] = useState(false);
   const [replies, setReplies] = useState(0);
   const [settled, setSettled] = useState<"agreed" | "impasse" | null>(null);
-  /**
-   * What this conversation ends with. Seeded from the proxies' package,
-   * because that is what is on the table when the participant takes over.
-   *
-   * BOTH impasse paths must clear it to null — the state machine's impasse and
-   * the timer running out. They do, and it matters more than it looks: the
-   * seed is the PROXIES' package, so an impasse that left it in place would
-   * report `outcome: "agreement"` for a conversation that failed, and only in
-   * the Proxy arm, since Baseline starts from nothing. That is a mechanical
-   * difference in the primary outcome along the primary contrast. `onSettled`
-   * below reads it, and is only reachable once `settled` is set.
-   */
   const [finalPackage, setFinalPackage] = useState<Package | null>(
     openingPackage,
   );
@@ -1016,18 +807,11 @@ export function DirectNegotiation({
 
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const complete = chosen === task.issues.length;
-  // `settled` is OUTSIDE the dev gate on purpose. `useDevGate` exists to let a
-  // walkthrough past an unfilled form, but "the conversation is over" is not a
-  // validation to skip — bypassing it let the send loop keep firing after the
-  // counterpart had accepted, which logged the same ending five times.
   const canSend = useDevGate(complete) && !settled;
   const yourTurn = !pending && canSend && !settled;
 
   useDevAutofill(() => {
     if (settled) return;
-    // Named, so the mockup shows a person defending a specific term rather
-    // than a generic pleasantry — which is the thing worth reading on this
-    // screen: does taking over from your own proxy sound natural?
     setDraft(
       replies === 0
         ? `Thanks for going through all that. || the ${requirement.label.toLowerCase()} is the part I really need to hold — that's the one that changes how the work actually goes for me. happy to stay flexible on the rest.`
@@ -1041,7 +825,8 @@ export function DirectNegotiation({
       speaker: "participant",
       text,
     };
-    setMessages((m) => [...m, own]);
+    const next = [...messages, own];
+    setMessages(next);
     setDraft("");
 
     const voiced = attachedReasonId
@@ -1049,9 +834,6 @@ export function DirectNegotiation({
       : voicedReasonIds;
     setVoicedReasonIds(voiced);
     setAttachedReasonId(null);
-    // ISSUE-SCOPED (ver.2.5): the cards span all three issues, so only a
-    // reason attached ON THE REQUIREMENT ISSUE justifies the requirement —
-    // an argument about the timing term is not a reason to concede this one.
     const requirementReasonGiven =
       reasonAlreadyVoiced ||
       voiced.some(
@@ -1079,9 +861,6 @@ export function DirectNegotiation({
         speaker: "participant",
         text,
         createdAt: new Date().toISOString(),
-        // The counterpart's script position, stored on the direct messages as
-        // it is on every other message. Without it this last segment of the
-        // trajectory is the one with no stage attribution.
         stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET),
         proposal: Object.keys(offer).length > 0 ? offer : undefined,
         reasonCardId: attachedReasonId ?? undefined,
@@ -1090,10 +869,6 @@ export function DirectNegotiation({
 
     setPending(true);
     try {
-      // The proxies already made the case, so the counterpart picks its script
-      // up mid-way rather than opening again — it has already opened, stated
-      // its priority and challenged, through its own proxy. Starting from the
-      // trade stage is what makes this a continuation instead of a rerun.
       const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
       const decision = counterpartStep(
         task,
@@ -1102,10 +877,6 @@ export function DirectNegotiation({
         offer,
         lastCounterpartPackage,
         {
-          // Either the proxy voiced a requirement-issue reason on the
-          // participant's behalf, or the participant has attached one
-          // themselves since taking over. Both count, and the ReasonPicker
-          // below is a real control because of it.
           reasonGivenForRequirement: requirementReasonGiven,
           reasonAlreadyRequested: reasonRequested,
           secondsRemaining,
@@ -1171,8 +942,6 @@ export function DirectNegotiation({
       if (decision.accepts || decision.impasse) {
         setFinalPackage(decision.accepts ? (decision.proposal ?? offer) : null);
         setSettled(decision.accepts ? "agreed" : "impasse");
-        // Every ending logs, not only the timeout one, so the direct
-        // conversation's started event always has a matching ended event.
         logEvent(
           "negotiation_ended",
           {
@@ -1199,18 +968,12 @@ export function DirectNegotiation({
             steps={steps}
             current={stepIndex}
             aside={
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-1 text-[0.8125rem] text-[var(--ink-2)]">
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs">
                 <span aria-hidden>⏱</span>
                 <CountdownTimer
                   seconds={NEGOTIATION_SECONDS}
                   running={!settled}
                   onTick={setSecondsRemaining}
-                  /* Running the clock out is an outcome, not a dead end. A
-                     participant who stops typing at 00:00 used to be left on a
-                     screen with no button and nothing to do — the exchange only
-                     ended inside `send`, so someone who sent nothing was
-                     stranded. Time expiring now closes the exchange the same
-                     way an impasse does. */
                   onExpire={() => {
                     if (settled) return;
                     setFinalPackage(null);
@@ -1226,48 +989,34 @@ export function DirectNegotiation({
             }
           />
 
-          {/* What the proxies said, kept where it can be re-read — one click
-              away, never behind a navigation. COLLAPSED on arrival, even
-              before the first message: expanded, its ten messages pushed the
-              composer below the fold while the ten-minute clock was already
-              running, which Baseline (whose composer is visible immediately)
-              does not suffer — an arm asymmetry in how fast a participant can
-              start talking under an identical clock. The participant has just
-              WATCHED this exchange; the panel is for re-reading, not first
-              reading. */}
           <ProxyTranscriptPanel transcript={proxyTranscript} />
 
-          {/* The ring goes on the COMPOSER, not on this card. Both carried it
-              while the cue was a flat outline and the duplication was merely
-              redundant; as a glow, two nested halos read as a rendering fault.
-              The composer is also the more accurate target — it is the control
-              being waited on, and rule 9 asks the cue to point at one thing. */}
-          <Card className="mb-5 flex flex-col" padded={false}>
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
+          <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
               <div>
-                <p className="text-[0.875rem] font-medium">
-                  💬 You and the other participant
+                <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
+                  💬 Direct Chat with Counterpart
                 </p>
-                <p className="text-[0.8125rem] text-[var(--ink-2)]">
+                <p className="text-xs text-[var(--ink-2)]">
                   {settled === "agreed"
-                    ? "You have both settled on a package."
+                    ? "✓ You have reached a mutual agreement!"
                     : settled === "impasse"
-                      ? "The conversation ended without an agreement."
-                      : "This is you writing, not your AI Proxy."}
+                      ? "⚠️ The negotiation ended without an agreement."
+                      : "You are speaking directly with the other participant."}
                 </p>
               </div>
               {settled ? null : pending ? (
-                <Cue tone="quiet">Waiting for their reply</Cue>
+                <Cue tone="quiet">Waiting for reply…</Cue>
               ) : yourTurn ? (
-                <Cue>Your turn</Cue>
+                <Cue>Your Turn</Cue>
               ) : (
-                <Cue tone="quiet">Choose your terms first</Cue>
+                <Cue tone="quiet">Select terms first</Cue>
               )}
             </div>
             <Transcript
               messages={messages}
               pending={pending}
-              emptyHint="Your AI Proxy has stopped. Anything you say from here is yours."
+              emptyHint="Your AI Proxy has completed its turn. Send a message to take over!"
             />
             <ReasonPicker
               task={task}
@@ -1284,29 +1033,29 @@ export function DirectNegotiation({
               cue={yourTurn}
               placeholder={
                 settled
-                  ? "This conversation has finished."
+                  ? "This conversation has concluded."
                   : canSend
-                    ? "Write your message…"
-                    : "Choose an option on each term first."
+                    ? "Type your message to the other participant…"
+                    : "Please choose an option for each term first."
               }
             />
           </Card>
 
-          <Card cue={!complete}>
+          <Card cue={!complete} className="mb-6">
             <CardTitle
-              hint="Where the AI Proxies left it. Change anything you want to put differently."
+              hint="Proposal package currently on the table. Adjust options as you negotiate:"
               aside={
                 !complete ? (
-                  <Cue>{task.issues.length - chosen} to choose</Cue>
+                  <Cue>{task.issues.length - chosen} term(s) left</Cue>
                 ) : null
               }
             >
-              📦 The package on the table
+              📦 Current Negotiation Package
             </CardTitle>
-            <div className="space-y-4">
+            <div className="space-y-4 mt-3">
               {task.issues.map((issue) => (
-                <div key={issue.id}>
-                  <p className="mb-1.5 text-[0.8125rem] font-medium">
+                <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+                  <p className="mb-2 text-xs sm:text-sm font-bold text-[var(--ink)]">
                     {issue.label}
                   </p>
                   <OptionChips
@@ -1329,25 +1078,18 @@ export function DirectNegotiation({
 
       {settled ? (
         <ActionBar
-          label="Continue"
-          /* `settled === "agreed" ? … : null` rather than `finalPackage`
-             alone. Both impasse paths already clear it, so this changes
-             nothing today — it makes "an impasse hands on no package" true by
-             construction instead of by three call sites agreeing, on the field
-             the primary outcome is coded from. The seed is the PROXIES'
-             package, so a missed clear would report an agreement for a failed
-             conversation, in the Proxy arm only. */
+          label="Continue to Review"
           onClick={() => onSettled(settled === "agreed" ? finalPackage : null)}
           note={
             settled === "agreed"
-              ? "You have a package to review."
-              : "No agreement was reached."
+              ? "✓ Agreement reached! Proceed to review."
+              : "⚠️ Impasse recorded. Proceed to review."
           }
         />
       ) : (
         <ActionBar
-          note={`${chosen} of ${task.issues.length} terms chosen${
-            secondsRemaining <= 0 ? " · time is up" : ""
+          note={`${chosen} of ${task.issues.length} terms selected${
+            secondsRemaining <= 0 ? " · time expired" : ""
           }`}
         />
       )}
@@ -1355,32 +1097,14 @@ export function DirectNegotiation({
   );
 }
 
-/**
- * Where the counterpart's script picks up in the direct conversation.
- *
- * Three, so its first reply is a trade rather than an opening: through its own
- * proxy it has already opened, stated its priority and sent the standardized
- * challenge. Replaying those would make the participant answer a challenge
- * they watched being answered, and would give the Proxy arm two challenges
- * where Baseline has one.
- */
 const DIRECT_STAGE_OFFSET = 3;
 
-/** Counterpart lines for mockup mode. Ideal trajectory, as everywhere else. */
 const DIRECT_MOCK_REPLIES = [
   "yeah, I watched the whole thing. || honestly I think they landed somewhere reasonable — I can live with where it ended up.",
   "that works for me. || shall we call it settled there?",
   "agreed. good to have it sorted.",
 ];
 
-/**
- * The AI Proxies' conversation, kept available during the direct one.
- *
- * Collapsible rather than always expanded: ten messages above a live chat
- * pushes the thing the participant is doing off the screen. Collapsible rather
- * than a link or a modal: every measure that follows asks them to judge what
- * was said, so re-reading it has to cost one click, not a navigation.
- */
 export function ProxyTranscriptPanel({
   transcript,
   openByDefault,
@@ -1392,27 +1116,29 @@ export function ProxyTranscriptPanel({
   if (!transcript.length) return null;
 
   return (
-    <Card className="mb-5" padded={false}>
+    <Card className="mb-6 overflow-hidden border-slate-200" padded={false}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+        className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left bg-slate-50/80 hover:bg-slate-100/70 transition-colors"
       >
-        <span>
-          <span className="block text-[0.9375rem] font-semibold">
-            🤖 What the AI Proxies said
-          </span>
-          <span className="block text-[0.8125rem] text-[var(--ink-2)]">
-            {transcript.length} messages. This is what you are both working
-            from.
+        <span className="flex items-center gap-2.5">
+          <span className="text-lg">🤖</span>
+          <span>
+            <span className="block text-xs sm:text-sm font-bold text-slate-900">
+              AI Proxy Exchange History
+            </span>
+            <span className="block text-xs text-slate-500 font-medium">
+              {transcript.length} messages exchanged between AI Proxies
+            </span>
           </span>
         </span>
-        <span className="shrink-0 text-[0.8125rem] font-medium text-[var(--accent)]">
-          {open ? "Hide" : "Show"}
+        <span className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 shadow-2xs">
+          {open ? "▲ Hide" : "▼ Show"}
         </span>
       </button>
       {open ? (
-        <div className="border-t border-[var(--line)]">
+        <div className="border-t border-slate-200">
           <Transcript messages={transcript} flow />
         </div>
       ) : null}
@@ -1424,34 +1150,6 @@ export function ProxyTranscriptPanel({
 // Phase: rehearsal — questioning your own AI Proxy before it runs
 // ---------------------------------------------------------------------------
 
-/**
- * A short conversation with the participant's OWN AI Proxy, after the mandate
- * is set and before the two proxies negotiate.
- *
- * The participant asks what it will do — what it opens with, where it stops,
- * which of their reasons it may use, what it says when pushed — and can then go
- * back and change the mandate. It is a way of checking instructions you have
- * written, which is exactly what you cannot do with a delegate you never speak
- * to, and it is what a participant reaches for when asked to hand over an
- * argument sight-unseen.
- *
- * WHAT IT IS NOT, and every one of these is enforced rather than intended:
- *
- *  - NOT a negotiation. The counterpart is absent and never spoken for. No
- *    package is proposed, nothing is agreed, and `machine.ts` is not consulted
- *    (see `/api/proxy-rehearsal`).
- *  - NOT a second bite at a finished exchange. That was the deleted post-hoc
- *    revision, which gave the Proxy arm a way to undo an agreement Baseline
- *    could not. This is before anyone has spoken.
- *  - NOT a place an unauthorized reason can be heard. The route screens the
- *    generated text for the cards the participant left unticked, because
- *    hearing a sensitive card read aloud without authorizing it would stage
- *    the disclosure this study measures.
- *
- * OPTIONAL, AND SAID TO BE. A participant who does not want it continues
- * straight past. Making it a required step would spend a minute of everyone's
- * §10 gate 8 budget on a screen half of them did not want.
- */
 export function RehearsalChat({
   taskIndex,
   task,
@@ -1510,8 +1208,6 @@ export function RehearsalChat({
     setPending(true);
     setError(null);
 
-    // Mockup mode answers from a fixed line rather than the model: this screen
-    // exists to be read in a walkthrough, and it must not need an API key.
     if (mockAi) {
       await new Promise((r) => setTimeout(r, 500));
       const reply: DisplayMessage = {
@@ -1534,9 +1230,6 @@ export function RehearsalChat({
           role,
           policy,
           mandate,
-          // The question is the last entry of `history`, not a field of its
-          // own. Sending it twice invites a future reader to append it to the
-          // prompt as well, which would ask it twice in one turn.
           history: history.map((m) => ({
             role: m.speaker === "participant" ? "user" : "assistant",
             content: m.text,
@@ -1573,38 +1266,40 @@ export function RehearsalChat({
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <TaskHeader
             taskIndex={taskIndex}
-            title="Check with your AI Proxy"
+            title="Q&A with Your AI Proxy (Optional)"
             steps={steps}
             current={stepIndex}
           />
 
-          <div className="mb-5">
-            <Callout title="💬 Ask it anything about your instructions">
-              <p className="max-w-prose">
-                It can tell you what it will open with, how far it will go, and
-                which of your reasons it may use. It has not started
-                negotiating, and the other participant cannot see this.
+          <div className="mb-6">
+            <Callout title="💬 Ask Anything About Your Instructions" tone="neutral">
+              <p className="mb-1 text-sm leading-relaxed text-slate-800">
+                You can ask how it plans to open, where it will hold the line, or which reasons it will voice. The other participant cannot see this chat.
               </p>
-              <p className="mt-2 max-w-prose">
-                This step is optional — you can go straight on, or go back and
-                change your instructions.
+              <p className="text-xs text-slate-600">
+                This check is optional — you can proceed immediately or go back to adjust your mandate instructions.
               </p>
             </Callout>
           </div>
 
           {error ? (
-            <div className="mb-5">
-              <Callout tone="warning">
+            <div className="mb-6">
+              <Callout tone="warning" title="Notice">
                 <p>{error}</p>
               </Callout>
             </div>
           ) : null}
 
-          <Card padded={false} className="flex flex-col">
+          <Card padded={false} className="flex flex-col overflow-hidden border-slate-200">
+            <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
+              <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
+                🤖 AI Proxy Strategy Consultation
+              </p>
+            </div>
             <Transcript
               messages={messages}
               pending={pending}
-              emptyHint="Nothing asked yet. Try “what will you open with?” or “what if they push back on my main term?”"
+              emptyHint="Ask a question below, e.g. &ldquo;What will you open with?&rdquo; or &ldquo;How will you defend my main priority?&rdquo;"
             />
             <MessageComposer
               value={draft}
@@ -1614,7 +1309,7 @@ export function RehearsalChat({
                 void ask(text);
               }}
               disabled={pending}
-              placeholder="Ask your AI Proxy…"
+              placeholder="Ask your AI Proxy a question…"
               sendLabel="Ask"
               cue={messages.length === 0 && !pending}
             />
@@ -1623,7 +1318,7 @@ export function RehearsalChat({
       </Page>
 
       <ActionBar
-        label="Continue"
+        label="Continue to Proxy Negotiation"
         onClick={() => {
           logEvent(
             "rehearsal_finished",
@@ -1632,14 +1327,14 @@ export function RehearsalChat({
           );
           onContinue();
         }}
-        note="Your AI Proxy has not started negotiating yet."
+        note="💡 Your AI Proxy has not begun live negotiations yet."
         secondary={
           <button
             type="button"
             onClick={onBackToMandate}
-            className="rounded-[var(--radius)] px-3 py-2 text-[0.9375rem] font-medium text-[var(--ink-2)] hover:bg-[var(--surface-muted)]"
+            className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
           >
-            Change my instructions
+            ← Modify Instructions
           </button>
         }
       />
