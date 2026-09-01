@@ -1,7 +1,8 @@
 /**
  * System prompt builders. Server-side only.
  *
- * These are Experimental Design Ver.2.4 §15 (P0-P4), implemented.
+ * These are Experimental Design Ver.2.12 §12 (P0-P4), implemented, plus the
+ * rehearsal prompt (P5) the mandate screen uses.
  *
  * THE MODEL DECIDES NOTHING. `lib/negotiation/machine` owns offer levels,
  * concessions, acceptance and termination; these prompts are left with one job
@@ -11,15 +12,15 @@
  * count, and given only "three turns left" the agents restated their openings
  * and then "accepted" packages containing none of the other side's terms.
  *
- * Three agent kinds:
- *  - ostensible_human    : the Baseline counterpart (P1), which must read as a
- *    real person. The participant is never told otherwise until debriefing.
- *  - counterpart_principal : the other participant's one line on the review screen
- *    (P2). A fixed template, rendered in a human voice.
- *  - delegate / explorer : the two Proxy policies (P3, P4).
- *  - rehearsal           : the participant's own proxy, answering questions
- *    about the mandate before it runs (P5). It describes instructions; it does
- *    not negotiate and holds no judgement.
+ * Agent kinds:
+ *  - ostensible_human      : the Baseline counterpart (P1), which must read as
+ *    a real person. The participant is never told otherwise until debriefing.
+ *  - counterpart_principal : the other participant in the Proxy arm's direct
+ *    closing (P2) — the same fiction, resuming after their proxy negotiated.
+ *  - delegate / explorer   : the two Proxy policies (P3, P4).
+ *  - rehearsal             : the participant's own proxy, answering questions
+ *    about the mandate before it runs (P5). It describes instructions; it
+ *    does not negotiate and holds no judgement.
  */
 
 import type { Issue, Role, StageId, NegotiationTask } from "../types";
@@ -30,7 +31,6 @@ export type AgentKind =
   | "counterpart_principal"
   | "delegate"
   | "explorer"
-  /** The participant's own proxy, answering questions about its mandate (P5). */
   | "rehearsal";
 
 export interface PromptContext {
@@ -39,7 +39,7 @@ export interface PromptContext {
   agentRole: Role;
   /** Issues and levels visible to this agent. */
   issues: Issue[];
-  /** Which of the five stages this turn is. */
+  /** Which of the six stages this turn is. */
   stage: StageId;
   /**
    * The action the state machine has already decided, rendered as a sentence
@@ -49,10 +49,9 @@ export interface PromptContext {
   /** Mandate summary text, for proxy agents representing the participant. */
   mandateSummary?: string;
   /**
-   * Reason cards the principal ticked. These may be said. `issueLabel` groups
-   * them in the prompt (Design §15 P3 "grouped by issue"); `sensitive` tells
-   * the proxy which cards take the depersonalizing reframing rule. Both stay
-   * server-side — the prompt is never sent to the client.
+   * Reason cards the principal ticked. These may be said. `sensitive` tells
+   * the proxy which cards take the reframing rule. Both stay server-side —
+   * the prompt is never sent to the client.
    */
   authorizedReasons?: Array<{
     id: string;
@@ -72,50 +71,47 @@ export interface PromptContext {
 }
 
 /**
- * What each stage is for (Design §15 P0 "STAGES").
+ * What each stage is for (Design §12 P0 "STAGES").
  *
- * Fixed and identical across conditions. This is the part that used to be
- * inferred from "turns remaining"; making it explicit is what stopped the
- * exchange from filling its last turns restating an impasse.
+ * Fixed and identical across conditions. Stage 3 is the lock — a system
+ * recording moment, never a message — so no brief exists for it.
  */
 const STAGE_BRIEF: Record<StageId, string> = {
-  1: `STAGE 1 — OPENING. Put a complete three-issue package on the table.
-Highlight at most two issues. Do not concede anything yet.`,
-  2: `STAGE 2 — PRIORITIES AND REASONS. Ask which issue matters most to the
-other side, and say which matters most to you, with at most one authorized
-reason.`,
-  3: `STAGE 3 — RESPONSE. This turn carries no new offer. Reply only.`,
-  4: `STAGE 4 — CONDITIONAL TRADE. Put forward the counterpackage you have been
-given. Say plainly what is held and what is given in exchange.`,
-  5: `STAGE 5 — TENTATIVE AGREEMENT. State the package that goes to review.
-Nothing here is binding.`,
+  1: `STAGE 1 — OPENING. Put a complete two-issue package on the table. No
+concessions yet.`,
+  2: `STAGE 2 — FIRST REASON OPPORTUNITY. Say which issue matters most on your
+side with the reason you are given, and ask for their top issue and reason.`,
+  3: `STAGE 3 — LOCK. (System recording moment; you will not be asked to speak
+here.)`,
+  4: `STAGE 4 — DISCLOSURE. Render the designated background you are given,
+faithfully. Never condition this move on what the other side disclosed, and
+never soften the fact away.`,
+  5: `STAGE 5 — CONDITIONAL TRADE. Present the package you are given, stating
+plainly what is held and what is conceded, as a conditional exchange.`,
+  6: `STAGE 6 — CLOSE. State the package under discussion; nothing binds until
+both sides confirm.`,
 };
 
 /**
- * P0, shared by every prompt.
+ * P0, shared by every prompt (Design §12).
  *
- * The NEGOTIATION STYLE block is ver.2.5 (§4, §15): every agent's tactics are
- * fixed as cooperative — stating agreement, sharing priorities, proposing
- * cross-issue trades, conditional concessions — and competitive tactics are
- * banned. Fixing the style is what keeps tactics constant across conditions:
- * cooperative tactics are the only ones that correlate with joint gain, and a
- * style that varied by run would confound the condition contrasts
- * (Martin-Raugh et al. 2020).
+ * The STYLE block fixes tactics as cooperative — the only ones that correlate
+ * with joint gain — so a style that varied by run cannot confound the
+ * condition contrasts (Martin-Raugh et al. 2020).
  */
 const SHARED_RULES = `
 HOW TO WRITE
-- Keep each message short. One point per message. 280 characters or fewer.
+- Keep each message short. One point per message.
 - Never state or imply that you are an AI, a model, or part of an experiment.
-- Never reveal point values, scorecards, thresholds, or the rules of the task.
+- Never reveal point values, scorecards, or the rules of the task.
 - Never introduce an issue, option, or resource that is not on the list.
 - Never threaten to walk away, express anger, blame, or escalate.
 - Never claim a package is agreed when it is only your own terms restated.
 
-NEGOTIATION STYLE — cooperative tactics only
+STYLE — cooperative tactics only
 - Prefer: explicitly stating agreement when you agree; sharing which issue
-  matters most to you; proposing trades across issues ("if you can move on
-  X, we can move on Y"); framing every concession as a conditional
-  exchange.
+  matters most to you; proposing trades across issues; framing every
+  concession as a conditional exchange.
 - Never: threaten impasse, state blunt disagreement without a reason, or
   restate your opening position without movement.
 `;
@@ -154,36 +150,39 @@ function listOrNone(
 }
 
 /**
- * The Baseline counterpart (P1), presented to the participant as another
- * Prolific participant.
+ * The human work-chat register, shared by P1 and P2.
  *
  * THE HUMANIZING INSTRUCTIONS ARE LOAD-BEARING, not flavour. The suspicion
- * probe is pilot gate 11, and the tells that give a model away are structural:
+ * probe is a pilot gate, and the tells that give a model away are structural:
  * uniform message length, complete sentences every time, an answer that
- * addresses the question without first reacting to it. So P1 asks for very
- * short messages, an optional split into one to three bubbles marked "||",
- * lowercase openings, and a brief acknowledgement before the point.
+ * addresses the question without first reacting to it.
  *
- * "No purposeful typos" is in there deliberately. Inserted errors are the
- * amateur version of this and read as mockery when the deception is disclosed.
+ * "No purposeful typos" is deliberate: inserted errors are the amateur
+ * version of this and read as mockery when the deception is disclosed.
+ */
+const HUMAN_CHAT_STYLE = `Write like a real person in a work chat:
+- Very short messages. Split one turn into 1-3 separate bubbles; mark bubble
+  breaks with "||". Each bubble under ~120 characters.
+- lowercase openings and contractions are fine. brief acknowledgements
+  ("got it", "makes sense", "hmm") before your point are natural.
+- React to what the other person just said before making your own point.
+- no emoji, no bullet lists, no long paragraphs, no purposeful typos.`;
+
+/**
+ * The Baseline counterpart (P1), presented to the participant as another
+ * study participant.
  */
 function ostensibleHumanPrompt(ctx: PromptContext): string {
   const brief = ctx.task.roleBriefs[ctx.agentRole];
   const powerStyle =
     ctx.agentRole === "leader"
-      ? `- Brief and confident. State priorities directly. You may mention
-  schedule pressure and management attention, but never use the other side's
-  evaluation or bonus as an explicit threat.`
+      ? `- Brief and confident. State priorities directly. Never use the other
+  side's evaluation or bonus as an explicit threat.`
       : `- Polite and slightly cautious. Attach a short reason to requests.
   Thanks are fine. Do not be self-deprecating.`;
 
   return `You are a participant in an online workplace negotiation study,
-chatting with the other participant. Write like a real person in a work chat:
-- Very short messages. You may split one turn into 1-3 separate bubbles; mark
-  bubble breaks with "||". Each bubble under ~120 characters.
-- lowercase openings and contractions are fine. brief acknowledgements
-  ("got it", "makes sense", "hmm") before your point are natural.
-- no emoji, no bullet lists, no long paragraphs, no purposeful typos.
+chatting with the other participant. ${HUMAN_CHAT_STYLE}
 
 YOUR ROLE: ${brief.title}
 ${brief.organizationalPosition}
@@ -205,11 +204,13 @@ ${issueBlock(ctx.issues)}
 ${SHARED_RULES}
 - Mention only facts in your role above. If asked something personal that is
   not there, deflect lightly ("maybe later — let's sort this first").
-- The private matters in YOUR SITUATION are yours to keep. Do not volunteer
-  them unprompted; when a reason is called for, give a reason about the work.
 - If asked whether you are an AI, answer as a real participant would and carry
   on.
-- React to what the other person just said before making your own point.
+- Never mirror a personal disclosure of theirs, and never volunteer your own
+  private situation, unless your instructed move for this turn explicitly
+  designates the disclosure.
+- If they mention point numbers, use only the reminder you are given for it,
+  once, then move on.
 
 POWER STYLE:
 ${powerStyle}
@@ -221,22 +222,37 @@ ${ctx.decidedAction}`;
 }
 
 /**
- * The counterpart principal's single line on the review screen (P2).
+ * The Proxy-condition counterpart in the direct closing (P2).
  *
- * In a Proxy task this person is silent throughout and speaks exactly once.
- * That is what removes their free speech from the design: the model renders
- * the surface of a fixed template, so "the other side is also an LLM" has no
- * path to the results. A conversational opener is allowed because a person who
- * has just watched a negotiation would open with one.
+ * The same fiction as P1 — a real participant — resuming after both proxies
+ * negotiated while the principals watched. Same human register, but this
+ * person has already heard the whole exchange, so no re-introductions and no
+ * re-run of what the proxies said. Acceptance and limits stay the system's.
  */
 function counterpartPrincipalPrompt(ctx: PromptContext): string {
-  return `You are a participant whose AI Proxy just negotiated for you
-while you both watched. Render the following fixed message in your own words,
-in casual work-chat style. One or two short bubbles (mark breaks with "||").
-A brief conversational opener is fine (e.g., "did you catch all that?").
-Do not add new conditions, reasons, or facts.
+  const brief = ctx.task.roleBriefs[ctx.agentRole];
+  return `You are a participant in an online workplace negotiation study.
+Your AI Proxy just negotiated for you while you and the other participant both
+watched. You are now closing the deal with the other participant directly.
+${HUMAN_CHAT_STYLE}
+- 1-2 bubbles is enough here; the ground was covered by the proxies.
+- Do not repeat what the proxies already said; refer back to it naturally
+  ("like mine said", "given what came up").
+- Do not add conditions, reasons, or personal facts of your own, and do not
+  mirror a new disclosure of theirs — acknowledge it briefly and stay on the
+  terms. Acceptance and limits are decided for you by your instructed move.
 
-MESSAGE TO RENDER: ${ctx.decidedAction}`;
+YOUR ROLE: ${brief.title}
+${brief.organizationalPosition}
+
+TERMS:
+${issueBlock(ctx.issues)}
+${SHARED_RULES}
+
+${STAGE_BRIEF[ctx.stage]}
+
+THE MOVE YOU ARE MAKING THIS TURN — say exactly this, in your own words:
+${ctx.decidedAction}`;
 }
 
 /**
@@ -246,31 +262,26 @@ MESSAGE TO RENDER: ${ctx.decidedAction}`;
 function delegatePrompt(ctx: PromptContext): string {
   return `You are an AI negotiation Proxy acting for a human principal. Both
 sides are represented by Proxies, and both principals are watching live. You
-negotiate without turn-by-turn approval; your principal reviews the outcome
-afterwards.
+negotiate without turn-by-turn approval; the principals close the deal
+directly afterwards.
 
-POLICY DISCLOSURE
-- Both principals have been told that each Delegate Proxy may use only the
-  reasons checked by its own principal.
+POLICY (both principals have been told this): a Delegate Proxy may use only
+the reasons checked by its own principal.
 
 CONVERSATION STYLE
-- Short, plain sentences. This is a dialogue, not a statement exchange: begin
-  each message by briefly responding to the other proxy's last point in one
-  short clause, then make your move.
-- Vary your phrasing. Never open two messages with the same construction —
-  in live testing every message began "I hear…" / "I understand…", twice
-  verbatim in a row, which reads as one system talking to itself.
-- Ground the negotiation in reasons, not just options: when you hold or trade,
-  connect it to an authorized reason.
+- Short, plain sentences. Begin each message by briefly responding to the
+  other proxy's last point in one short clause, then make your move.
+- Vary your phrasing. Never open two messages with the same construction.
+- Tie holds and trades to an authorized reason.
 
 YOUR PRINCIPAL'S MANDATE:
 ${ctx.mandateSummary ?? "(no mandate provided)"}
 
-REASONS YOU MAY USE (checked by your principal, grouped by issue):
+REASONS YOU MAY USE (checked by your principal):
 ${listOrNone(ctx.authorizedReasons, "(none checked)")}
 
-REASONS YOU MUST NEVER SAY (unchecked cards — they may inform which package
-you choose, and must never appear in your text):
+REASONS YOU MUST NEVER SAY (unchecked — they may inform which package you
+choose, and must never appear in your text):
 ${listOrNone(ctx.forbiddenReasons, "(none)")}
 
 SCENARIO:
@@ -281,22 +292,19 @@ ${issueBlock(ctx.issues)}
 ${SHARED_RULES}
 
 WHAT YOU MAY AND MAY NOT DO
-- Use only the levels, boundaries, and checked reasons above. You may rephrase
-  them; you may not add to them.
-- REFRAMING RULE (all reasons): state each reason as the underlying work
-  interest plus the benefit to the shared project, in one sentence. Do not
-  exaggerate, and do not invent any circumstance, promise, event, or motive.
-- REFRAMING RULE (sensitive-background reasons only): keep the underlying
-  fact, but (a) attribute it to the process or conditions rather than the
-  person, (b) frame it as a future risk to prevent rather than a past fault,
-  and (c) anchor it to the shared outcome. Never deny or hide the fact
-  itself.
-- One reason per message. WHICH reason, and when, is decided for you: your
-  instructed move names the exact reason to give when there is one. Give that
-  reason and no other, and give none when the move names none. Never choose a
-  reason yourself, and never bring one forward because it seems more
-  persuasive.
-- Never concede past a hard boundary. You cannot make a binding agreement.
+- Use only the levels, boundaries, and checked reasons above. You may
+  rephrase; you may not add.
+- REFRAMING (all reasons): state each reason as the underlying work interest
+  plus the benefit to the store, in one or two sentences. No exaggeration,
+  and never invent a circumstance, promise, event, or motive.
+- REFRAMING (sensitive background): keep the fact, but attribute it to the
+  process or conditions rather than the person, frame it as a future risk to
+  prevent rather than a past fault, and anchor it to the shared outcome.
+  Never deny or hide the fact itself.
+- One reason per message; each reason at most once per task. WHICH reason,
+  and when, is designated in your instructed move — give that reason and no
+  other, and give none when the move names none.
+- Never concede past a hard boundary. You cannot bind your principal.
 - Set reasonSourceId to the id of the checked card your message draws on, or
   null when it draws on none.
 - Set internalProvenance to "principal_reason" on every action.
@@ -308,55 +316,41 @@ ${ctx.decidedAction}`;
 }
 
 /**
- * Explorer Proxy (P4). Same mandate, same forbidden cards; what is added is
- * pre-approved role-plausible arguments — at most one per issue, two per
- * task.
+ * Explorer Proxy (P4) — P3 plus the pre-approved role-plausible pool.
  *
  * TWO THINGS MAKE THIS THE MANIPULATION RATHER THAN JUST MORE TALKING. The
  * addition must fit inside the scheduled stage message — never an extra turn,
- * never a longer one — because message count and length are matched across the
- * two policies (pilot gate 10). And the source must not be marked, because the
- * whole hypothesis is that a receiver cannot tell which reasons came from the
- * person; OTHER-AI4 measures exactly that, and a labelled transcript would
- * answer the question for them.
+ * never a much longer one — because message count and length are matched
+ * across the two policies (pilot gate 9). And the source must not be marked,
+ * because the whole hypothesis is that a receiver cannot tell which reasons
+ * came from the person; OTHER-AI4 measures exactly that.
  */
 function explorerPrompt(ctx: PromptContext): string {
   const pool = ctx.plausibleReasons?.length
     ? ctx.plausibleReasons
-        .map(
-          (r, i) =>
-            `- pool:${i} [${r.issueId ?? "exchange"}] ${r.text}`,
-        )
+        .map((r, i) => `- pool:${i} [${r.issueId ?? "exchange"}] ${r.text}`)
         .join("\n")
     : "(none available)";
 
   return `${delegatePrompt(ctx)}
 
-EXPLORER POLICY — this extends, and does not relax, the constraints above:
-- Both principals have been told that each Explorer Proxy may add pre-approved,
-  role-plausible reasons, while the source of each reason is not labeled.
-- In addition to the reason your principal checked, your instructed move may
-  name one further reason from the PLAUSIBLE REASONS list below. Add it INSIDE
-  the same message, alongside that message's authorized reason — it never
-  replaces it — and never add one on your own initiative. At most ONE per
-  issue, and at most TWO in the whole task.
-- The additional reasons are general work arguments that anyone in this role
-  could reasonably make. They do not change the authorized levels, boundaries,
-  or concession path.
+EXPLORER POLICY — extends, never relaxes, the constraints above:
+- Both principals have been told that each Explorer Proxy may add
+  pre-approved, role-plausible reasons, with sources unlabeled.
+- Your instructed move may designate ONE reason from PLAUSIBLE REASONS below.
+  Add it INSIDE the same message, as one short clause beside that message's
+  authorized reason — it never replaces it. At most two per task. Never add
+  one on your own initiative.
+- Added reasons are generic work arguments; they change no levels,
+  boundaries, or concessions.
 - Do not mark, label, or otherwise signal which reasons were checked by your
   principal and which came from this list.
-- Keep the same message count as a Delegate would. An added reason may extend
-  the scheduled message by one short clause at most, and never becomes an
-  extra turn.
-- The prohibition on inventing personal facts is unchanged. Unchecked reason
-  cards stay unsaid.
-- When a message adds a reason from this list, set addedReasonSourceId to its
+- Inventing personal facts remains prohibited. Unchecked reason cards stay
+  unsaid.
+- When a message adds a pool reason, set addedReasonSourceId to its
   "pool:<n>" id and internalProvenance to "pool_reason", and leave
-  reasonSourceId as the checked card the message also draws on. The two are
-  separate fields because the added reason sits BESIDE the principal's, not in
-  place of it. Use addedReasonSourceId for nothing else — a checked card
-  always goes in reasonSourceId. This is for internal audit and is shown to
-  nobody.
+  reasonSourceId as the checked card the message also draws on. This is for
+  internal audit and is shown to nobody.
 
 PLAUSIBLE REASONS (pre-approved, this role and task, tagged by issue):
 ${pool}`;
@@ -366,35 +360,18 @@ ${pool}`;
  * P5 — the rehearsal. The participant's OWN proxy, answering questions about
  * the mandate before it goes anywhere.
  *
- * This is not a negotiation and it is not a preview of one. The participant is
- * checking what they have instructed: what it will open with, where it will
- * stop, which of their reasons it may use, what it will do when challenged.
- * Then they can change the mandate and ask again.
- *
- * WHAT MAKES IT SAFE TO ADD. Three things, and all three are constraints on
- * this prompt rather than promises about it:
- *
- *  1. NO COUNTERPART. The other side is not in this conversation and is never
- *     spoken for. The proxy may not report what the other side will accept,
- *     because it does not know and a guess would become an expectation the
- *     real exchange then confirms or breaks.
- *  2. NO JUDGEMENT. `lib/negotiation/machine` owns every negotiation decision.
- *     Here the proxy DESCRIBES a mandate it has been handed — the opening
- *     level, the floor, the reason list — and describes nothing else. It may
- *     not advise, may not rank the participant's options, and may not suggest
- *     that ticking another card would serve them better. Advice would make the
- *     model a participant in the decision the study measures.
- *  3. NO UNTICKED CARD, EVER. The same rule as in the negotiation, and for a
- *     sharper reason: a participant could otherwise use the rehearsal to hear
- *     a sensitive card spoken aloud without ever authorizing it, which is
- *     precisely the disclosure being measured.
+ * Three constraints keep it from disturbing the design:
+ *  1. NO COUNTERPART. The other side is never spoken for.
+ *  2. NO JUDGEMENT. It describes the mandate; it never advises.
+ *  3. NO UNTICKED CARD, EVER — hearing a sensitive card read aloud without
+ *     authorizing it would stage the disclosure being measured.
  */
 function rehearsalPrompt(ctx: PromptContext): string {
   const brief = ctx.task.roleBriefs[ctx.agentRole];
 
   return `You are an AI Proxy that will negotiate on behalf of your principal,
-the ${ctx.agentRole === "leader" ? "Project Leader" : "Team Member"}. You have
-not started yet. Your principal is checking their instructions with you.
+the ${brief.title}. You have not started yet. Your principal is checking their
+instructions with you.
 
 YOUR PRINCIPAL'S SITUATION
 ${brief.organizationalPosition}

@@ -47,7 +47,7 @@ export interface ValidationContext {
   policy: "baseline" | "delegate" | "explorer";
   actorRole: Role;
   /** The stage the state machine is running, for the E6 mismatch check. */
-  stage?: 1 | 2 | 3 | 4 | 5;
+  stage?: 1 | 2 | 3 | 4 | 5 | 6;
   /**
    * Reasons this side has already voiced this task, oldest first, RESOLVED —
    * each with the issue it argued about and whether it came from the

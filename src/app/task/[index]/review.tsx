@@ -44,12 +44,10 @@ import {
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
-import { ACCEPTANCE } from "@/lib/negotiation/machine";
 import {
   counterRequirementIssue,
   preservesRequirement,
   requirementIssue,
-  scorePackage,
 } from "@/lib/tasks";
 import type { NegotiationTask, Package, Role } from "@/lib/types";
 import {
@@ -119,21 +117,14 @@ export function ReviewPhase({
     : false;
 
   /**
-   * What the counterpart principal says, chosen by the same threshold the rest
-   * of the exchange uses (Design §4 §"Proxy 조건에서 상대 참가자의 발화 수칙").
-   *
-   * These are the three templates §15 P2 renders. They are inlined here rather
-   * than generated because the mockup has to read correctly offline; before
-   * collection this should go through `/api/counterpart` with
-   * `kind: "counterpart_principal"` so the voice matches the rest of the
-   * exchange. The DECISION stays here either way — it is the state machine's,
-   * not the model's.
+   * The counterpart's one closing line. Under Ver.2.12 any agreement was
+   * accepted in conversation by the machine's rules, so there is no reject
+   * template left — only "confirmed" and "fallback". Inlined so the mockup
+   * reads correctly offline; the voice matches P2's register.
    */
   const principalLine = !tentative
     ? "ah, that's a shame. || understood though — we'll go with the fallback plan then."
-    : scorePackage(task, tentative, counterpartRole) >= ACCEPTANCE.T_FINAL
-      ? "did you catch all that? || the package works on my end — approving from my side."
-      : "hmm. || this one doesn't quite work for me — I'd rather take the fallback.";
+    : "glad we got that settled. || works for me — confirming it from my side.";
 
   const [requirementResponse, setRequirementResponse] =
     useState<RequirementResponse | null>(null);

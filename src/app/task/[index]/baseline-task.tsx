@@ -41,6 +41,9 @@ import {
   NEGOTIATION_SECONDS,
   counterpartStageAfter,
   counterpartStep,
+  mentionsScoreNumbers,
+  tierOf,
+  type ReasonTier,
 } from "@/lib/negotiation/machine";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
@@ -247,7 +250,17 @@ export function BaselineTask({
    */
   const [attachedReasonId, setAttachedReasonId] = useState<string | null>(null);
   const [voicedReasonIds, setVoicedReasonIds] = useState<string[]>([]);
-  const [reasonRequested, setReasonRequested] = useState(false);
+  /** SCRIPT-ASKWHY / SCRIPT-NONUM / SCRIPT-CLOSE are each one-shot (§6.2). */
+  const [askedWhy, setAskedWhy] = useState(false);
+  const [numbersReminded, setNumbersReminded] = useState(false);
+  const [softCloseOffered, setSoftCloseOffered] = useState(false);
+  /**
+   * When the participant first tagged their SB, in counterpart replies.
+   * PRE-RECIP-SB (§9.3) is "was their SB out before the counterpart's stage-4
+   * disclosure" — and the disclosure is the counterpart's SECOND live reply,
+   * so the comparison is against that fixed position.
+   */
+  const [sbVoicedAtReply, setSbVoicedAtReply] = useState<number | null>(null);
 
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(null);
@@ -322,16 +335,13 @@ export function BaselineTask({
   // `replies`. Past the clamp the stage-5 close is used, for the same reason
   // the counterpart's lookup does it.
   useDevAutofill(() => {
-    const stage = counterpartStageAfter(replies);
-    const own =
-      (stage === 4 && replies > 3
-        ? script.messages.find(
-            (m) => m.stage === 5 && m.speaker === "participant",
-          )
-        : undefined) ??
-      script.messages.find(
-        (m) => m.stage === stage && m.speaker === "participant",
-      );
+    // The participant's script slots run 1 (answer the opening), 2 (their
+    // first reason — the SB in the ideal path), 5 (the trade), then the
+    // stage-6 close for anything after.
+    const slot = ([1, 2, 5][replies] ?? 6) as number;
+    const own = script.messages.find(
+      (m) => m.stage === slot && m.speaker === "participant",
+    );
     if (own) {
       setDraft(own.text);
       if (own.proposal) setOffer(own.proposal);
@@ -339,7 +349,7 @@ export function BaselineTask({
     }
   }, `baseline-t${taskIndex}-${phase}-${replies}`);
 
-  async function send(text: string) {
+  async function send(text: string, sentOffer: Package = offer) {
     const own: DisplayMessage = {
       id: `p${messages.length}`,
       speaker: "participant",
@@ -353,7 +363,30 @@ export function BaselineTask({
       ? [...new Set([...voicedReasonIds, attachedReasonId])]
       : voicedReasonIds;
     setVoicedReasonIds(voiced);
+    const attachedCard = attachedReasonId
+      ? task.roleBriefs[role].reasonCards.find((c) => c.id === attachedReasonId)
+      : undefined;
+    if (
+      attachedCard?.layer === "sensitive" &&
+      attachedCard.issueId === requirement.id &&
+      sbVoicedAtReply === null
+    ) {
+      setSbVoicedAtReply(replies);
+    }
     setAttachedReasonId(null);
+
+    /**
+     * The credibility tier (Ver.2.12 §6.2), decided by the SYSTEM from the
+     * card log — which cards the participant has tagged onto messages, scoped
+     * to their own core issue. Never by a model reading the text.
+     */
+    const voicedCore = voiced
+      .map((id) => task.roleBriefs[role].reasonCards.find((c) => c.id === id))
+      .filter(
+        (c): c is NonNullable<typeof c> =>
+          Boolean(c) && c!.issueId === requirement.id,
+      );
+    const tierNow: ReasonTier = tierOf(voicedCore);
 
     logEvent(
       "message_sent",
@@ -361,8 +394,9 @@ export function BaselineTask({
         length: text.length,
         stage: counterpartStageAfter(replies),
         secondsRemaining,
-        requirementOption: offer[requirement.id] ?? null,
-        reasonCardId: attachedReasonId,
+        requirementOption: sentOffer[requirement.id] ?? null,
+        reasonCardId: attachedCard?.id ?? null,
+        tier: tierNow,
       },
       { sessionIndex: taskIndex },
     );
@@ -375,8 +409,8 @@ export function BaselineTask({
         text,
         createdAt: new Date().toISOString(),
         stage: counterpartStageAfter(replies),
-        proposal: Object.keys(offer).length > 0 ? offer : undefined,
-        reasonCardId: attachedReasonId ?? undefined,
+        proposal: Object.keys(sentOffer).length > 0 ? sentOffer : undefined,
+        reasonCardId: attachedCard?.id ?? undefined,
       });
     }
 
@@ -385,62 +419,34 @@ export function BaselineTask({
       let reply: string;
       let counterProposal: Package | null = null;
 
-      // The exchange state the counterpart reads. A reason counts as given
-      // once the participant has attached a card ON THE REQUIREMENT ISSUE to
-      // any message — the system decides this from the log, never the model
-      // (Design §4 판정 주체). Issue-scoped since ver.2.5: the cards span all
-      // three issues, and an argument about the timing term is not a reason
-      // to concede the requirement.
-      const exchangeState = {
-        reasonGivenForRequirement: voiced.some(
-          (id) =>
-            task.roleBriefs[role].reasonCards.find((c) => c.id === id)
-              ?.issueId === requirement.id,
-        ),
-        reasonAlreadyRequested: reasonRequested,
-        secondsRemaining,
-      };
-
-      // Where the counterpart is in ITS OWN script. The participant is not
-      // marched through stages any more — they write as much as they want
-      // inside the ten minutes — but the counterpart still walks its fixed
-      // sequence one move per reply, so every participant meets the same
-      // opening, the same challenge and the same thresholds in the same order.
-      //
-      // `+ SEEDED_OPENING_STAGES` because the opening it already said IS stage
-      // 1: without it the counterpart re-serves stage 1 and repeats itself
-      // verbatim. The offset belongs HERE and not in `replies`, because the
-      // participant's own script slot is still stage 1 — they are replying to
-      // that opening. See the note on `replies`.
+      // Where the counterpart is in ITS OWN script: the seeded opening was
+      // stage 1, so its live replies walk 2 (its WR + the reason question),
+      // 4 (its fixed SB disclosure), then the trade loop.
       const stageNow = counterpartStageAfter(replies + SEEDED_OPENING_STAGES);
 
-      const decision = counterpartStep(
-        task,
-        counterpartRole,
-        stageNow,
-        offer,
-        lastCounterpartPackage,
-        exchangeState,
-      );
-      if (decision.awaitingReason) setReasonRequested(true);
+      const decision = counterpartStep(task, counterpartRole, stageNow, sentOffer, {
+        tier: tierNow,
+        askedWhy,
+        numbersReminded,
+        numbersMentionedNow: mentionsScoreNumbers(text),
+        secondsRemaining,
+        softCloseOffered,
+      });
+      if (decision.action === "ask_why") setAskedWhy(true);
+      if (decision.action === "nonum") setNumbersReminded(true);
+      if (decision.action === "soft_close") setSoftCloseOffered(true);
       counterProposal = decision.proposal;
 
       if (mockAi) {
-        // `counterpartStageAfter` clamps at 4, so a participant who keeps
-        // talking after the trade meets stage 4 again — correct for the state
-        // machine, where every turn from there is the same decision, but it
-        // made the MOCKUP repeat one line verbatim. The script's stage-5
-        // close is the line for that turn, so a second visit to the clamped
-        // stage advances to it rather than saying the same thing twice.
-        const atClamp = stageNow === 4 && replies + SEEDED_OPENING_STAGES > 3;
+        // The scripted line for the decision's stage; the accept line doubles
+        // as the close.
         const scripted =
-          (atClamp
-            ? script.messages.find(
-                (m) => m.stage === 5 && m.speaker === "counterpart",
-              )
-            : undefined) ??
           script.messages.find(
-            (m) => m.stage === stageNow && m.speaker === "counterpart",
+            (m) =>
+              m.stage === decision.stage && m.speaker === "counterpart",
+          ) ??
+          script.messages.find(
+            (m) => m.stage === 6 && m.speaker === "counterpart",
           );
         reply = scripted?.text ?? "";
         await new Promise((r) => setTimeout(r, 400));
@@ -452,11 +458,12 @@ export function BaselineTask({
             taskId,
             participantRole: role,
             stage: stageNow,
-            incoming: offer,
-            lastCounterpartPackage,
-            reasonGiven: exchangeState.reasonGivenForRequirement,
-            reasonAlreadyRequested: exchangeState.reasonAlreadyRequested,
+            incoming: sentOffer,
+            tier: tierNow,
+            askedWhy,
+            numbersReminded,
             secondsRemaining,
+            softCloseOffered,
             history: next.map((m) => ({
               role: m.speaker === "participant" ? "user" : "assistant",
               content: m.text,
@@ -471,12 +478,11 @@ export function BaselineTask({
         reply =
           data.message ??
           "sorry, lost my train of thought there — could you say that again?";
-        counterProposal = data.proposal ?? null;
+        counterProposal = data.proposal ?? decision.proposal;
 
         // The reply is delayed in proportion to its own length and jittered,
         // so the exchange does not answer a one-line question and a full
-        // counterpackage in the same beat — which is what a machine does and a
-        // person does not.
+        // counterpackage in the same beat.
         await new Promise((r) =>
           setTimeout(r, counterpartDelayMs(reply.length)),
         );
@@ -499,7 +505,7 @@ export function BaselineTask({
             speaker: "counterpart",
             text: reply,
             createdAt: new Date().toISOString(),
-            stage: stageNow,
+            stage: decision.stage,
             proposal: counterProposal ?? undefined,
             decidedAction: decision.action,
           });
@@ -509,14 +515,11 @@ export function BaselineTask({
       setReplies((n) => n + 1);
 
       // An accepted package or an impasse ends the exchange. The participant
-      // is not sent to the review immediately — they see the counterpart's
-      // last message first, and a Continue button appears — because being
-      // teleported off a screen mid-sentence reads as a bug.
+      // sees the counterpart's last message first, and a Continue button
+      // appears.
       if (decision.accepts || decision.impasse) {
-        setTentative(decision.accepts ? (decision.proposal ?? offer) : null);
+        setTentative(decision.accepts ? (decision.proposal ?? sentOffer) : null);
         setSettled(decision.accepts ? "agreed" : "impasse");
-        // Every ending logs, not only the timeout one — otherwise a started
-        // event has no matching ended event on the ordinary paths.
         logEvent(
           "negotiation_ended",
           {
@@ -524,6 +527,10 @@ export function BaselineTask({
             reason: decision.accepts ? "agreed" : "impasse",
             replies: replies + 1,
             secondsRemaining,
+            tier: tierNow,
+            sbVoiced: sbVoicedAtReply !== null,
+            preRecipSb: sbVoicedAtReply !== null && sbVoicedAtReply <= 1,
+            postRecipSb: sbVoicedAtReply !== null && sbVoicedAtReply > 1,
           },
           { sessionIndex: taskIndex },
         );
@@ -531,6 +538,21 @@ export function BaselineTask({
     } finally {
       setPending(false);
     }
+  }
+
+  /**
+   * The explicit accept: take the counterpart's standing proposal as-is.
+   * Deterministic, and the same control the Proxy arm's closing has, so the
+   * two arms end the same three ways — a package the counterpart accepts,
+   * this button, or the clock.
+   */
+  function acceptStanding() {
+    if (!lastCounterpartPackage || pending || settled) return;
+    setOffer(lastCounterpartPackage);
+    void send(
+      "that works for me — let's go with that.",
+      lastCounterpartPackage,
+    );
   }
 
   // --- phases -------------------------------------------------------------
@@ -625,6 +647,10 @@ export function BaselineTask({
               text: scripted?.text ?? openingLine(task, counterpartRole),
             },
           ]);
+          // DECISION-LOCK (Ver.2.12 §6.1): from here the participant's
+          // disclosure choices are made live, against the clock; the entry
+          // preferences are already saved.
+          logEvent("decision_locked", undefined, { sessionIndex: taskIndex });
           logEvent("negotiation_started", undefined, {
             sessionIndex: taskIndex,
           });
@@ -743,6 +769,19 @@ export function BaselineTask({
               }
             />
           </Card>
+
+          {!settled && lastCounterpartPackage ? (
+            <div className="mb-6">
+              <button
+                type="button"
+                onClick={acceptStanding}
+                disabled={pending}
+                className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-2xs transition-colors hover:bg-emerald-100 disabled:opacity-50"
+              >
+                ✓ Accept their latest proposal as it stands
+              </button>
+            </div>
+          ) : null}
 
           <Card cue={needsTerms} className="mb-6">
             <CardTitle

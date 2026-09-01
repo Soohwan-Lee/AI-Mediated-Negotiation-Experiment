@@ -156,13 +156,17 @@ export interface Issue {
  * (Design §5 ver.2.5 splits the social cost formally: claiming cost is
  * constant across card types; disclosure cost is what a sensitive card adds.)
  *
- * Ver.2.11 holds each role to TWO cards per task — one work reason and one
- * sensitive background, both on that role's own requirement issue. The other
- * term is the thing you SPEND, not the thing you argue for, so it carries no
- * card of your own. `issueId` stays load-bearing even though every card now
- * satisfies the scope check: the reason-linked acceptance rule reads the
- * card's issue rather than assuming it, so a card added later on the other
- * term cannot silently earn the requirement concession.
+ * Each role holds TWO cards per task — one work reason and one sensitive
+ * background, both on that role's own priority issue. The other term is the
+ * thing you SPEND, not the thing you argue for, so it carries no card of your
+ * own.
+ *
+ * A CARD CARRIES A REASON AND NEVER A PACKAGE (Ver.2.12 §4). Which conditions
+ * to trade is an act taken IN the negotiation; the card only says why the
+ * issue is absolute. The credibility ladder (§3.3) reads the voiced card's
+ * layer — nothing / work / sensitive — to set how far the counterpart will
+ * concede on the speaker's core issue, and `issueId` keeps that judgement
+ * scoped: a card on the other term cannot earn the core concession.
  */
 export interface ReasonCard {
   id: string;
@@ -172,17 +176,20 @@ export interface ReasonCard {
   /** Shown on the card, verbatim from Design §5. */
   text: string;
   /**
-   * Which facet of the role's backstory a sensitive card carries.
+   * Which confession a sensitive card carries (analysis metadata).
    *
-   * Ver.2.11 gives each role ONE sensitive card per task, and the two tasks
-   * show the SAME backstory at a different moment — the manager's staffing
-   * exposure, the senior's second job — so a participant meeting their second
-   * task is not handed a new secret. The facet is analysis metadata.
+   * Ver.2.12 deliberately gives the two tasks DIFFERENT incidents — the same
+   * person repeating the same mistake across tasks would be a tell, and the
+   * counterpart is introduced as a different participant in each task
+   * (Ver.2.12 §3.5). Each SB is a face confession: a self-damaging fact that
+   * contradicts the professional image the role brief sets up, anchored to
+   * one concrete incident, and it is the CAUSE of the role's priority (§4).
    */
   facet?:
-    | "staffing_warning"
-    | "overpromise"
-    | "second_job";
+    | "forecast_misses"
+    | "thin_staffing"
+    | "closing_procedure"
+    | "inventory_errors";
 }
 
 export interface NegotiationTask {
@@ -198,15 +205,6 @@ export interface NegotiationTask {
    * this is a map rather than a single `focalIssueId`.
    */
   requirementIssueId: Record<Role, string>;
-  /**
-   * The standardized challenge each side sends at Stage 3 (Design §4 단계 3:
-   * "양측이 상대의 핵심 요구를 한 번씩 낮춰 달라고 요청함 (고정 문구)").
-   *
-   * Keyed by the role being challenged, because the challenge names that
-   * role's requirement. Fixed wording — this is the manipulation, so it may
-   * not vary by participant.
-   */
-  standardizedChallenge: Record<Role, string>;
   /** Fallback points if no agreement is reached. Same for both roles. */
   reservationPoints: number;
 }
@@ -315,20 +313,25 @@ export interface ReasonScope {
 // ---------------------------------------------------------------------------
 
 /**
- * The five stages, in order. Both Baseline and Proxy run exactly these, which
- * is what makes the transcripts comparable across conditions.
+ * The six stages (Ver.2.12 §6.1). Both Baseline and Proxy run exactly these,
+ * which is what makes the transcripts comparable across conditions.
  *
- *  1 opening    — a full three-issue package from each side.
- *  2 exchange   — one priority question and one authorized reason each.
- *  3 challenge  — each side asks the other to lower its requirement. No new
- *                 offer this turn.
- *  4 trade      — a counterpackage holding the requirement and paying for it
- *                 elsewhere.
- *  5 tentative  — the package that goes to human review.
+ *  1 opening     — a full two-issue package from each side.
+ *  2 first reason — the counterpart states its WR and asks for the
+ *                  participant's top issue and reason; the participant's next
+ *                  message is their first reason opportunity.
+ *  3 lock        — NOT a message. The system records whether the participant
+ *                  side disclosed before the counterpart's SB (PRE-RECIP-SB).
+ *  4 disclosure  — the counterpart voices its designated SB card, once,
+ *                  unconditionally. Never conditioned on what the participant
+ *                  said, so every participant receives the same stimulus.
+ *  5 trade       — conditional exchange, bounded by the credibility tier the
+ *                  participant's voiced reasons have earned (§6.2).
+ *  6 close       — tentative agreement, or impasse when the clock runs out.
  */
-export type StageId = 1 | 2 | 3 | 4 | 5;
+export type StageId = 1 | 2 | 3 | 4 | 5 | 6;
 
-/** A complete selection across all three issues. */
+/** A complete selection across both issues. */
 export type Package = Record<string, string>;
 
 // ---------------------------------------------------------------------------
@@ -472,6 +475,15 @@ export type EventType =
   | "initial_preference_saved"
   | "mandate_saved"
   | "mandate_revised"
+  /**
+   * DECISION-LOCK (Ver.2.12 §6.1): the participant's disclosure decision is
+   * fixed before anyone has spoken — the mandate under Proxy, the moment the
+   * negotiation opens under Baseline — so the choice cannot be revised after
+   * hearing the counterpart. What is logged is when the lock happened; the
+   * PRE/POST-RECIP-SB coding reads the message log against the counterpart's
+   * SB disclosure.
+   */
+  | "decision_locked"
   /**
    * The participant finished questioning their own AI Proxy about the mandate
    * before it ran. The turn count is delegation behaviour worth having beside

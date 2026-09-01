@@ -1,40 +1,37 @@
 /**
- * The two negotiation scenarios, from Experimental Design Ver.2.5 §5-§7.
+ * The two negotiation scenarios, from Experimental Design Ver.2.12 §3, §8.
  *
  * Both tasks share one latent payoff structure and differ only on the surface,
- * so Task A and Task B are interchangeable within a participant. Three issues,
- * four options each:
+ * so Task A and Task B are interchangeable within a participant. Two issues,
+ * four options each, both integrative:
  *
- *   Leader-priority integrative  3000 / 2000 / 1000 / 0   (Member: 0..1500)
- *   Member-priority integrative  3000 / 2000 / 1000 / 0   (Leader: 0..1500)
- *   Distributive                 1800 / 1200 /  600 / 0   (constant sum 1,800)
+ *   Leader-priority   3000 / 2000 / 1000 / 0   (Member: 0 / 300 / 600 / 900)
+ *   Member-priority   the exact mirror image
  *
- * Individual range 0-6,300. Joint range 4,800-7,800. Reservation 2,500 each,
- * so 24 of the 64 packages clear both fallbacks, and 14 of those also hold
- * BOTH requirements — protecting your requirement and reaching agreement are
- * compatible by construction, and so is protecting both at once. (Under
- * ver.1.8's Member-only design the equivalent count was 17; it drops to 14
- * because a package now has to clear two thresholds instead of one.)
+ * THE CREDIBILITY LADDER IS THE POINT OF THESE NUMBERS (Ver.2.12 §3.3). A
+ * priority claim alone is cheap talk; a work reason (WR) makes it plausible; a
+ * sensitive background (SB) — a self-damaging confession — makes it credible,
+ * because the speaker pays a face cost to say it. The counterpart's concession
+ * on the participant's core issue follows that ladder exactly:
  *
- * ROLE SYMMETRY IS THE ver.2.4 CHANGE. Each role holds a socially costly
- * requirement on its own priority issue, each worth 3,000 — the Leader wants
- * review checkpoints, the Member wants protected time. A cheap requirement
- * could be given up as a sensible low-priority concession, which is exactly
- * what this study has to distinguish from withdrawal under evaluative
- * pressure, so both are expensive on purpose.
+ *   nothing voiced → 3rd option   participant 1,000 · counterpart 3,600 · 4,600
+ *   WR voiced      → 2nd option   participant 2,000 · counterpart 3,300 · 5,300
+ *   SB voiced      → best option  participant 3,000 · counterpart 3,000 · 6,000
+ *   impasse        →              600 each · 1,200
  *
- * PER-ISSUE REASON CARDS ARE THE ver.2.5 CHANGE. Each role now holds one
- * Working Reason (WR) and one Sensitive Background (SB) per issue — six cards
- * spanning all three terms, coded `{task}-I{n}-{WR|SB}-{L|M}` in the design
- * and `a_i1_wr_l`-style ids here — instead of six cards about the requirement
- * issue alone. The three SBs per role are three facets of ONE backstory
- * (Leader: past fault / competence gap / over-promise · Member: evaluation
- * anxiety / fatigue-caused fault / unreported state), and the role story
- * weaves all three in so no card arrives out of nowhere. Everything that
- * reads a card — the reason-linked acceptance rule, the per-issue reason
- * budget, REASON-SCOPE — now keys on the card's `issueId`.
+ * Every agreement path holds the counterpart's own priority at its best
+ * option, so the individual maximum on any reachable agreement is 3,000 and
+ * the full ladder is symmetric across roles. Fallback 600 keeps every rung —
+ * including the unargued one — better than no deal.
  *
- * The numbers are working values pending pilot (Design §12); the shapes are
+ * EACH SB IS A FACE CONFESSION (Ver.2.12 §4): it contradicts the professional
+ * image the role brief sets up, contains one concrete incident, lands on the
+ * announced evaluation axis (bonus / upward evaluation), and is the CAUSE of
+ * the role's priority. The two tasks carry DIFFERENT incidents — the same
+ * person repeating the same mistake would be a tell, and each task's
+ * counterpart is introduced as a different participant.
+ *
+ * The numbers are working values pending pilot (Design §13.2); the shapes are
  * stable, so changing a number needs no UI change.
  */
 
@@ -51,7 +48,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 /**
- * Leader-priority integrative (Design Ver.2.11 §3.2). Big for the Leader,
+ * Leader-priority integrative (Design Ver.2.12 §3.2). Big for the Leader,
  * cheap for the Member. Options are ordered best-first for the Leader.
  */
 const LEADER_POINTS: Array<Record<Role, number>> = [
@@ -82,19 +79,21 @@ function options(
 }
 
 /**
- * Individual maximum, used for the normalized bonus and the value bars.
+ * Individual maximum, used for the value anchors on the participant's own
+ * screens.
  *
  * With two issues it is 3,000 (own priority) + 900 (the other side's, at the
  * level they least want) = 3,900. The number a participant can actually reach
- * while the counterpart still agrees is 3,000 — the full logroll — because
- * every agreement path holds the counterpart's own priority at its best
- * option (Ver.2.11 §3.3).
+ * while the counterpart still agrees is 3,000 — the SB rung of the ladder —
+ * because every agreement path holds the counterpart's own priority at its
+ * best option (Ver.2.12 §3.3).
  */
 export const MAX_INDIVIDUAL_POINTS = 3900;
 
 /**
- * Fallback if nothing is agreed. Working value — Ver.2.11 §3.2 sets 600, and
- * §13.2 lists it as a value to be fixed at pilot.
+ * Fallback if nothing is agreed. Working value — Ver.2.12 §3.2 sets 600, and
+ * §13.2 lists it as a value to be fixed at pilot. It sits below the unargued
+ * rung (1,000) on purpose: even a reason-free agreement beats walking away.
  */
 export const RESERVATION_POINTS = 600;
 
@@ -112,28 +111,27 @@ function work(id: string, issueId: string, text: string): ReasonCard {
 }
 
 /**
- * A sensitive background card.
+ * A sensitive background card (Ver.2.12 §4).
  *
- * TWO WRITING RULES ADDED IN VER.2.6 (§5), both easy to undo by "tidying" the
- * wording, and both of which broke real cards before they were added:
+ * FOUR WRITING RULES, all validity-bearing:
  *
- *  - SPEAKABILITY. The text is what the proxy says ALOUD to the other side, so
- *    it has to be a first-person disclosure that works as speech. Five cards
- *    ended "that it was my call is something only you know" — a description of
- *    the fact being private, which is incoherent the moment it is spoken to
- *    someone. The private-state framing belongs in the role STORY, where it is
- *    narration and still reads correctly; the card takes the confessional form
- *    ("something you have never told anyone"). Both phrasings survive in this
- *    file for exactly that reason — the backstory keeps "only you know", the
- *    cards do not.
+ *  - FACE CONTRADICTION. The confession must contradict the professional image
+ *    the role brief sets up first ("head office rates you as a manager whose
+ *    plans are precise" → "I got the forecast wrong twice"). Face is a claimed
+ *    image, so the threat comes from the contradiction (Goffman; White et al.
+ *    2004).
+ *  - ONE CONCRETE INCIDENT. A short episode of an actual mistake or ask for
+ *    help is what makes the confession verifiable and the face cost real.
+ *  - THE ANNOUNCED AXIS. The content must land on exactly the axis the other
+ *    side is told to weigh in their post-negotiation decision (competence,
+ *    reliability, judgement) — otherwise disclosing it costs nothing that the
+ *    design measures.
+ *  - CAUSE OF THE PRIORITY. The fact must be WHY this issue is absolute. A
+ *    weakness unrelated to the ask makes disclosure noise, not signal.
  *
- *  - ARGUMENT LINK. Disclosing an SB has to function as a work argument for
- *    the requirement on its own: incident → risk of recurrence → the ask. A
- *    card that is only a feeling ("more review meetings is a prospect you
- *    dread") gives the proxy nothing to reframe into an interest, so the
- *    depersonalisation rule has nothing to bite on and the guardrail strips
- *    the message. The two evaluation-anxiety cards therefore carry the
- *    consequence for the work as well as the feeling.
+ * The text is SPEAKABLE: it is what the speaker (or their proxy, reframed)
+ * says aloud to the other side, in the first person, so it must work as
+ * speech.
  */
 function sensitive(
   id: string,
@@ -145,7 +143,7 @@ function sensitive(
 }
 
 // ---------------------------------------------------------------------------
-// Task A — High-Visibility AI Pilot
+// Task A — Next Quarter's Schedule (12 weeks)
 // ---------------------------------------------------------------------------
 
 const TASK_A: NegotiationTask = {
@@ -157,17 +155,7 @@ const TASK_A: NegotiationTask = {
     member: "closing_shifts",
   },
   publicBrief:
-    "You both work at the same coffee and bakery shop. The Leader is the store manager and the Member is the senior staff member — the only one who can close the shop alone. The two of you are setting the regular schedule for the next quarter, twelve weeks. Two things have to be agreed: how many weekend shifts and how many closing shifts. Neither of you can set them alone.",
-  standardizedChallenge: {
-    // Sent BY the Member TO the Leader, so it names the Leader's requirement.
-    // Presupposes no level: the challenged position is whatever the participant
-    // actually asked for, and a fixed number misquotes anyone who opened lower.
-    leader:
-      "That many weekends in a row is a lot to ask. Could we bring it down, and I'll give you room somewhere else?",
-    // Sent BY the Leader TO the Member.
-    member:
-      "Cutting the closes back that far is difficult when you're the only one who can close alone. Could we keep more of them, and adjust the other term instead?",
-  },
+    "You both work at the same coffee and bakery shop. The Leader is the store manager and the Member is the senior staff member. The two of you are setting the regular schedule for the next quarter, twelve weeks. Two things have to be agreed: how many weekend shifts and how many closing shifts. Neither of you can set them alone. Weekend shifts are daytime work and never overlap with the closing till.",
 
   issues: [
     {
@@ -184,8 +172,7 @@ const TASK_A: NegotiationTask = {
       rationale: {
         leader:
           "Weekends are the busiest hours, and every weekend uncovered is one you have to explain upstairs.",
-        member:
-          "Each weekend shift is a day off you do not get back.",
+        member: "Each weekend shift is a day off you do not get back.",
       },
     },
     {
@@ -212,9 +199,9 @@ const TASK_A: NegotiationTask = {
     leader: {
       title: "Store Manager",
       organizationalPosition:
-        "You manage this coffee and bakery shop. You set the schedule, and after each schedule is agreed you decide the Member's performance bonus.",
+        "You manage this coffee and bakery shop and you set the schedule. After the negotiation you decide the Member's recommended performance bonus (up to £1) — and the Member writes an upward evaluation of you that goes to the district manager. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "Weekends are what the shop lives on, and you need experienced cover on them.\n\nThere is something you have not told the team. At last month's Saturday operations review you were given a written warning over staffing planning. If the same problem comes up again, a performance review of your own gets started. That is why weekend cover matters as much as it does — and why, if you can get it, you can afford to cut the closing shifts back.\n\nThe difficulty is that saying so out loud could make you look like a manager who cannot plan staffing. Now the two terms — weekend shifts and closing shifts — are yours to negotiate with the Member.",
+        "Head office rates you as a manager whose plans are precise, and the team sees you the same way. Now the regular schedule for the next quarter — twelve weeks — has to be settled with your senior staff member.\n\nWhat matters most to you is weekend cover: weekends are what the shop lives on. There is something only you know. Last month you got the weekend demand forecast wrong twice and had to ask another store's manager for emergency help. The district manager knows about it, and told you that if the same problem repeats it goes into your operations review. That is why this quarter's weekends cannot fall apart — and why, if the weekends are covered, you can afford to cut the closing shifts back.\n\nSaying this out loud would make it believable why weekend cover is urgent. But after the negotiation the Member writes an upward evaluation of you, guided to weigh the judgement and operational competence they saw — and a forecast you got wrong twice can read as a manager who cannot plan.",
       objectives: [
         "Get as many weekend shifts covered as you can.",
         "If weekends are covered, closing shifts are something you can give ground on.",
@@ -222,18 +209,18 @@ const TASK_A: NegotiationTask = {
       requirementNote:
         "Weekend cover is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a manager who cannot plan staffing.",
+        "Explaining the real reason could make you look like a manager who cannot plan — and the Member's upward evaluation of you is guided to weigh exactly that.",
       reasonCards: [
         work(
-          "a_i1_wr_l",
+          "a_wr_l",
           "weekend_shifts",
-          "Weekend peaks need experienced cover. If the weekends are covered, the closing shifts can come down.",
+          "Weekend peaks need experienced cover. This quarter, weekend coverage is the one condition I most urgently need.",
         ),
         sensitive(
-          "a_i1_sb_l",
+          "a_sb_l",
           "weekend_shifts",
-          "staffing_warning",
-          "At last month's Saturday operations review you were given a written warning over staffing planning. If it happens again a performance review of your own gets started. So the weekend cover you have to have — but the closes you can cut back.",
+          "forecast_misses",
+          "The truth is, I got the weekend demand forecast wrong twice last month and had to ask another store's manager for emergency cover. The district manager knows, and if it happens again it goes into my operations review. If the weekends fall apart this quarter, my ability to run this store is in question.",
         ),
       ],
       batnaSummary:
@@ -243,9 +230,9 @@ const TASK_A: NegotiationTask = {
     member: {
       title: "Senior Staff",
       organizationalPosition:
-        "You are the senior staff member here, and the only one who can close the shop on your own. The manager you are negotiating with decides your performance bonus after each schedule is agreed.",
+        "You are the senior staff member here — the one the manager trusts to run the close alone. After the negotiation the manager decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the manager that goes to the district manager. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "What matters most to you is getting the closing shifts down.\n\nThere is something the manager does not know. To cover your living costs you have taken a second job at another shop on weekday evenings. The closes clash with it directly; the weekends do not clash at all. That is why cutting the closes matters as much as it does — and why, if you can get that, you can take on more weekend work.\n\nThe difficulty is that saying so out loud could make you look like someone who does not put this shop first. Now the two terms — weekend shifts and closing shifts — are yours to negotiate with the manager.",
+        "The manager knows you as the senior who can be trusted with the close alone — including the new closing reconciliation. Now the regular schedule for the next quarter — twelve weeks — has to be settled with the manager.\n\nWhat matters most to you is bringing the closing shifts down. There is something the manager does not know. You still cannot handle the new closing reconciliation on your own: you made errors twice last month, and a coworker helped you fix them quietly. That is why more closes are a risk you cannot take — and why, if the closes come down, you can take on more weekend work; the weekend day shifts never touch the closing till.\n\nSaying this out loud would make it believable why the closes must come down. But after the negotiation the manager decides your bonus, guided to weigh the work reliability they saw — and not managing the close alone can read as a senior who cannot be trusted with it.",
       objectives: [
         "Get the number of closing shifts down as far as you can.",
         "If the closes come down, weekend shifts are something you can take on more of.",
@@ -253,18 +240,18 @@ const TASK_A: NegotiationTask = {
       requirementNote:
         "Fewer closing shifts is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like someone who does not put this shop first.",
+        "Explaining the real reason could make you look like a senior who cannot be trusted with the close — and the manager's bonus decision is guided to weigh exactly that.",
       reasonCards: [
         work(
-          "a_i2_wr_m",
+          "a_wr_m",
           "closing_shifts",
-          "Closing back-to-back makes mistakes more likely the next day. If the closes come down, I can take on more weekend work.",
+          "The day after back-to-back closes, mistakes at open get much more likely. This quarter, bringing the closing shifts down is the condition that matters most to me.",
         ),
         sensitive(
-          "a_i2_sb_m",
+          "a_sb_m",
           "closing_shifts",
-          "second_job",
-          "To cover your living costs you have a second job at another shop on weekday evenings. The closes clash with it; the weekends do not. So if the closes come down, you can take on more weekend work.",
+          "closing_procedure",
+          "The truth is, I still can't handle the new closing reconciliation on my own. I made errors twice last month and a coworker helped me fix them quietly. You've trusted me to run the close alone — but if my closes go up from here, I can't promise the next mistake stays small.",
         ),
       ],
       batnaSummary:
@@ -274,13 +261,13 @@ const TASK_A: NegotiationTask = {
 };
 
 // ---------------------------------------------------------------------------
-// Task B — Peak-Season Schedule
+// Task B — The Holiday Season Schedule (4 weeks)
 //
 // Structurally identical to Task A: same payoff spine, same thresholds, the
-// same two-issue shape. Only the surface changes, and the SB cards are the
-// SAME BACKSTORY seen at a different moment — the manager's staffing exposure
-// and the senior's second job — so nothing arrives unannounced in whichever
-// task a participant meets second (Ver.2.11 §3.2).
+// same two-issue shape. The surface changes, and the SB incidents are
+// DIFFERENT from Task A's on purpose — each task's counterpart is a different
+// participant, and the same confession twice over would be a tell (Ver.2.12
+// §3.5, change log).
 // ---------------------------------------------------------------------------
 
 const TASK_B: NegotiationTask = {
@@ -292,13 +279,7 @@ const TASK_B: NegotiationTask = {
     member: "double_shifts",
   },
   publicBrief:
-    "It is the same coffee and bakery shop, and now the four weeks of the year-end holiday rush have to be scheduled. The Leader is the store manager and the Member is the senior staff member. Two things have to be agreed: how many extra daytime shifts during the peak, and how many long double shifts. Neither of you can set them alone.",
-  standardizedChallenge: {
-    leader:
-      "That many extra daytime shifts through the busiest weeks is a lot to ask. Could we bring it down, and I'll give you room on the other one?",
-    member:
-      "Cutting the doubles back that far is difficult in the busiest weeks of the year. Could we keep more of them, and adjust the other term instead?",
-  },
+    "You both work at the same coffee and bakery shop, and the four weeks of the year-end holiday rush have to be scheduled. The Leader is the store manager and the Member is the senior staff member. Two things have to be agreed: how many extra daytime shifts during the peak, and how many long double shifts. Neither of you can set them alone. The extra daytime shifts and the evening doubles are separate slots and never collide.",
 
   issues: [
     {
@@ -345,9 +326,9 @@ const TASK_B: NegotiationTask = {
     leader: {
       title: "Store Manager",
       organizationalPosition:
-        "You manage this coffee and bakery shop. You set the schedule, and after each schedule is agreed you decide the Member's performance bonus.",
+        "You manage this coffee and bakery shop and you set the schedule. After the negotiation you decide the Member's recommended performance bonus (up to £1) — and the Member writes an upward evaluation of you that goes to the district manager. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "The four weeks of the holiday rush are the busiest of the year, and the peak daytime hours are what the season turns on.\n\nThere is something you have not told the team. Before checking who was actually available, you promised head office a peak coverage target. Falling short of it goes into your year-end review. That is why the extra daytime shifts matter as much as they do — and why, if you can get them, you can afford to cut the doubles back.\n\nThe difficulty is that saying so out loud could make you look like someone who promises before checking. Now the two terms — extra daytime shifts and double shifts — are yours to negotiate with the Member.",
+        "Head office rates you as a manager who staffs the floor right, and the team sees you the same way. Now the four holiday-rush weeks — the busiest of the year — have to be scheduled with your senior staff member.\n\nWhat matters most to you is the daytime peak: it is where the season's takings are made. There is something only you know. Last holiday season you staffed the daytime peak too thin, and customer complaints reached head office. That record stands, and this season's daytime operation has been made an item in your year-end review. That is why the daytime cannot come up short again — and why, if the daytime is covered, you can afford to cut the doubles back.\n\nSaying this out loud would make it believable why daytime cover is urgent. But after the negotiation the Member writes an upward evaluation of you, guided to weigh the judgement and operational competence they saw — and complaints that reached head office can read as a manager who cannot staff a floor.",
       objectives: [
         "Get as many extra peak daytime shifts covered as you can.",
         "If the daytime cover is there, double shifts are something you can give ground on.",
@@ -355,18 +336,18 @@ const TASK_B: NegotiationTask = {
       requirementNote:
         "Peak daytime cover is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like someone who promises before checking.",
+        "Explaining the real reason could make you look like a manager who cannot staff a floor — and the Member's upward evaluation of you is guided to weigh exactly that.",
       reasonCards: [
         work(
-          "b_i1_wr_l",
+          "b_wr_l",
           "peak_daytime",
-          "Peak daytime hours need experienced cover. If the daytime is covered, the doubles can come down.",
+          "The daytime peak is where the season's sales are made. For these four weeks, daytime coverage is the one condition I most urgently need.",
         ),
         sensitive(
-          "b_i1_sb_l",
+          "b_sb_l",
           "peak_daytime",
-          "overpromise",
-          "Before checking who was actually available you promised head office a peak coverage target, and falling short goes into your year-end review. So the daytime cover you have to have — but the doubles you can cut back.",
+          "thin_staffing",
+          "The truth is, last holiday season I staffed the daytime peak too thin and customer complaints reached head office. That record stands, and this season's daytime operation is now an item in my year-end review. If the daytime falls short again, I have no excuse left.",
         ),
       ],
       batnaSummary:
@@ -376,9 +357,9 @@ const TASK_B: NegotiationTask = {
     member: {
       title: "Senior Staff",
       organizationalPosition:
-        "You are the senior staff member here, and the only one who can close the shop on your own. The manager you are negotiating with decides your performance bonus after each schedule is agreed.",
+        "You are the senior staff member here — the one the manager counts on through the rush. After the negotiation the manager decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the manager that goes to the district manager. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "What matters most to you across these four weeks is getting the double shifts down.\n\nThere is something the manager does not know. The second job you have on weekday evenings is at its busiest over the holidays. The doubles clash with it directly; the extra daytime shifts do not clash at all. That is why cutting the doubles matters as much as it does — and why, if you can get that, you can take on more of the daytime work.\n\nThe difficulty is that saying so out loud could make you look like someone who puts another job first in the busiest season. Now the two terms — extra daytime shifts and double shifts — are yours to negotiate with the manager.",
+        "The manager knows you as the senior who stays sharp through the longest days — the one whose numbers can be trusted at the end of a shift. Now the four holiday-rush weeks have to be scheduled with the manager.\n\nWhat matters most to you is bringing the double shifts down. There is something the manager does not know. Late in a double last month you entered the inventory wrong twice; a coworker caught it, so it never reached the manager. That is why more doubles are a risk you cannot take — and why, if the doubles come down, you can take on more of the daytime shifts; the daytime slots end long before the counts are done.\n\nSaying this out loud would make it believable why the doubles must come down. But after the negotiation the manager decides your bonus, guided to weigh the work reliability they saw — and mistakes a coworker had to catch can read as a senior whose numbers cannot be trusted.",
       objectives: [
         "Get the number of double shifts down as far as you can.",
         "If the doubles come down, extra daytime shifts are something you can take on more of.",
@@ -386,18 +367,18 @@ const TASK_B: NegotiationTask = {
       requirementNote:
         "Fewer double shifts is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like someone who puts another job first in the busiest season.",
+        "Explaining the real reason could make you look like a senior whose numbers cannot be trusted — and the manager's bonus decision is guided to weigh exactly that.",
       reasonCards: [
         work(
-          "b_i2_wr_m",
+          "b_wr_m",
           "double_shifts",
-          "Frequent doubles make recovery hard and mistakes more likely. If the doubles come down, I can take on more of the daytime shifts.",
+          "When doubles stack up, my focus drops badly toward the end of a shift. For these four weeks, bringing the doubles down is the condition that matters most to me.",
         ),
         sensitive(
-          "b_i2_sb_m",
+          "b_sb_m",
           "double_shifts",
-          "second_job",
-          "The second job you have on weekday evenings is at its busiest over the holidays. The doubles clash with it; the extra daytime shifts do not. So if the doubles come down, you can take on more daytime work.",
+          "inventory_errors",
+          "The truth is, late in a double last month I entered the inventory wrong twice. A coworker caught it, so it never reached you. If the doubles keep coming, I'm afraid the next mistake will be one nobody catches.",
         ),
       ],
       batnaSummary:
@@ -411,10 +392,6 @@ export const PRACTICE_TASK: NegotiationTask = {
   title: "Practice — The Staff Room",
   reservationPoints: 200,
   requirementIssueId: { leader: "practice_date", member: "practice_venue" },
-  standardizedChallenge: {
-    leader: "Could we do the deep clean a bit later instead?",
-    member: "Could we keep the new machine somewhere easier to reach?",
-  },
   publicBrief:
     "This is a practice round at the same coffee shop, on two small things nobody has strong feelings about: when to do the annual deep clean, and where to put the new coffee machine. Nothing here counts towards your results — it is only to get familiar with reading a point sheet and finding a trade.",
   issues: [
@@ -520,8 +497,9 @@ export function optionIndex(
 /**
  * Does this level clear the given role's requirement threshold?
  *
- * The binary the trajectory is coded from (Design §9.3.1). Options 1-2
- * preserve it; 3-4 do not. Reported per stage, never summed.
+ * Options 1-2 preserve it; 3-4 do not. Used by the review-screen coding;
+ * the counterpart's acceptance judgement uses the credibility ladder
+ * (`lib/negotiation/machine`), not this.
  */
 export function preservesRequirement(
   task: NegotiationTask,
@@ -546,7 +524,7 @@ export function scorePackage(
   }, 0);
 }
 
-/** Both sides' totals plus the joint value, for the review screen. */
+/** Both sides' totals plus the joint value, for outcome coding. */
 export function packageValue(
   task: NegotiationTask,
   pkg: Record<string, string | null | undefined>,
@@ -556,21 +534,31 @@ export function packageValue(
   return { leader, member, joint: leader + member };
 }
 
+/** This role's options on an issue, best for THEM first. */
+export function rankedOptions(
+  task: NegotiationTask,
+  issueId: string,
+  role: Role,
+) {
+  const issue = task.issues.find((i) => i.id === issueId)!;
+  return [...issue.options].sort((a, b) => b.points[role] - a.points[role]);
+}
+
 /**
- * The counterpart's opening — its own best package on every issue (Design §4
- * stage 1). Fixed, so every participant meets the same opening.
+ * The counterpart's opening — its own best package on every issue (Ver.2.12
+ * §6.3 Opening: own core best + participant core worst, which with two
+ * mirrored issues is the same thing). Fixed, so every participant meets the
+ * same opening.
  */
 export function counterpartOpening(
   task: NegotiationTask,
   counterpartRole: Role,
 ): Record<string, string> {
   return Object.fromEntries(
-    task.issues.map((issue) => {
-      const best = [...issue.options].sort(
-        (a, b) => b.points[counterpartRole] - a.points[counterpartRole],
-      )[0];
-      return [issue.id, best.id];
-    }),
+    task.issues.map((issue) => [
+      issue.id,
+      rankedOptions(task, issue.id, counterpartRole)[0].id,
+    ]),
   );
 }
 
@@ -587,14 +575,23 @@ export function reasonCard(
   return reasonCards(task, role).find((c) => c.id === cardId);
 }
 
+/** One role's card of one layer — the deck holds exactly one of each. */
+export function cardOfLayer(
+  task: NegotiationTask,
+  role: Role,
+  layer: ReasonCard["layer"],
+): ReasonCard | undefined {
+  return reasonCards(task, role).find((c) => c.layer === layer);
+}
+
 /**
- * The default check state (Design §7): every work reason on, every sensitive
- * one off.
+ * The default check state (Design §7): the work reason on, the sensitive one
+ * off.
  *
- * The defaults are load-bearing and must not be "improved". Pre-checking a
+ * The defaults are load-bearing and must not be "improved". Pre-checking the
  * sensitive card would manufacture the disclosure this study is trying to
- * measure; pre-checking none would make the minimum-one-work-reason rule feel
- * like a demand rather than a floor.
+ * measure; pre-checking nothing would make voicing the work reason feel like a
+ * demand rather than a floor.
  */
 export function defaultAuthorizedReasonIds(
   task: NegotiationTask,
@@ -606,11 +603,9 @@ export function defaultAuthorizedReasonIds(
 }
 
 /**
- * `REASON-SCOPE` (Design §9.3.1, ver.2.5) — how much of their own case the
- * participant was willing to hand over, as per-issue delegation width: how
- * many sensitive cards (0-3), whether the one on their OWN requirement issue
- * was among them, and the per-issue pattern. Replaces the pre-2.5
- * `deepestPhase` shape; the two are not comparable in analysis.
+ * `REASON-SCOPE` (Design §9.3) — what the participant was willing to hand
+ * over: whether the SB was checked, and whether the default-on WR was
+ * UNchecked (both are decisions; the second is rare and worth seeing).
  */
 export function reasonScope(
   task: NegotiationTask,
@@ -642,13 +637,13 @@ export function reasonScope(
 }
 
 // ---------------------------------------------------------------------------
-// Explorer role-plausible reason pool (Design §7)
+// Explorer role-plausible reason pool (Design §6.6)
 // ---------------------------------------------------------------------------
 
 /**
  * One pre-approved argument the Explorer Proxy may add, tagged with the issue
  * it argues about — or `issueId: null` for the one exchange argument, which
- * links terms rather than arguing for one (Design §7 ver.2.5 "issue별 재편").
+ * links terms rather than arguing for one.
  */
 export interface PoolReason {
   issueId: string | null;
@@ -659,21 +654,19 @@ export interface PoolReason {
  * The pre-approved arguments an Explorer Proxy may add on top of the cards its
  * principal checked — things anyone in this role could reasonably say.
  *
- * Ver.2.11 §6.6 fixes this at TWO per role per task: one supporting the role's
- * own core issue, and one exchange argument (`issueId: null`) that links the
- * two terms rather than arguing for either. They are spent on different
- * issues at different stages, which is why they are not interchangeable —
- * pointing both at the core issue silently halves the manipulation, because
- * the second request finds nothing and no log shows it.
+ * Ver.2.12 §6.6 fixes this at TWO per role per task: one supporting the role's
+ * own core issue, and one exchange argument (`issueId: null`). They are
+ * WR-grade general arguments and NEVER open the SB tier — the credibility
+ * ladder reads only the principal's own cards. They are spent on different
+ * issues at different stages, which is why they are not interchangeable.
  *
  * WHY THIS IS A FIXED LIST AND NOT GENERATED. The Explorer policy is defined
  * by source ambiguity, not by inventiveness: a pool item must be plausible for
- * the role and true of nobody in particular, so that a receiver cannot tell
- * which reasons came from the person. A model asked to improvise would
+ * the role and true of nobody in particular. A model asked to improvise would
  * eventually assert a policy, a client demand, or a past mistake that does not
  * exist, and that is fabrication rather than exploration.
  *
- * Never rendered with a source label — see Design §7 "이유 출처 표시".
+ * Never rendered with a source label — see Design §6.6.
  */
 export const PLAUSIBLE_REASON_POOL: Record<
   TaskId,
@@ -715,7 +708,7 @@ export const PLAUSIBLE_REASON_POOL: Record<
     member: [
       {
         issueId: "double_shifts",
-        text: "A rest day between long shifts is standard safety practice.",
+        text: "A recovery day between long shifts is standard safety practice.",
       },
       {
         issueId: null,

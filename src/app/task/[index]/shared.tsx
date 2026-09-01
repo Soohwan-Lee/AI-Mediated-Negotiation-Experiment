@@ -43,9 +43,13 @@ import {
   type DisplayMessage,
 } from "@/components/negotiation";
 import {
-  NEGOTIATION_SECONDS,
+  CLOSING_SECONDS,
+  DIRECT_STAGE_OFFSET,
   counterpartStageAfter,
   counterpartStep,
+  mentionsScoreNumbers,
+  tierOf,
+  type ReasonTier,
 } from "@/lib/negotiation/machine";
 import {
   BriefingPanel,
@@ -924,7 +928,7 @@ export function DirectNegotiation({
   stepIndex,
   proxyTranscript,
   openingPackage,
-  reasonAlreadyVoiced,
+  proxyVoicedTier,
   messages,
   setMessages,
   offer,
@@ -938,12 +942,29 @@ export function DirectNegotiation({
   stepIndex: number;
   proxyTranscript: DisplayMessage[];
   openingPackage: Package | null;
-  reasonAlreadyVoiced: boolean;
+  /**
+   * The credibility tier the participant's OWN proxy earned in the AI-AI
+   * exchange (Ver.2.12 §6.2) — what was actually VOICED, not what was
+   * authorized: an emergency stop or a guardrail block can leave an
+   * authorized card unsaid, and assuming it was said made the rule inert for
+   * every Proxy participant once before.
+   */
+  proxyVoicedTier: ReasonTier;
   messages: DisplayMessage[];
   setMessages: Dispatch<SetStateAction<DisplayMessage[]>>;
   offer: Package;
   setOffer: Dispatch<SetStateAction<Package>>;
-  onSettled: (finalPackage: Package | null) => void;
+  onSettled: (
+    finalPackage: Package | null,
+    meta: {
+      /** §9.3 RATIFY: what happened to the proxies' tentative package. */
+      ratify: "approved_as_is" | "modified" | "rejected" | null;
+      /** §9.3 SELF-DISCLOSE: the participant tagged their SB in person. */
+      selfDisclosed: boolean;
+      /** §9.3 POST-RECIP-SB: a new SB after the counterpart's disclosure. */
+      postRecipSb: boolean;
+    },
+  ) => void;
 }) {
   const { logEvent, participantKey } = useParticipant();
   const counterpartRole: Role = role === "leader" ? "member" : "leader";
@@ -957,28 +978,95 @@ export function DirectNegotiation({
   const [finalPackage, setFinalPackage] = useState<Package | null>(
     openingPackage,
   );
-  const [secondsRemaining, setSecondsRemaining] = useState(NEGOTIATION_SECONDS);
+  const [secondsRemaining, setSecondsRemaining] = useState(CLOSING_SECONDS);
   const [attachedReasonId, setAttachedReasonId] = useState<string | null>(null);
   const [voicedReasonIds, setVoicedReasonIds] = useState<string[]>([]);
-  const [reasonRequested, setReasonRequested] = useState(false);
+  /** SCRIPT-ASKWHY / SCRIPT-NONUM / SCRIPT-CLOSE are each one-shot. */
+  const [askedWhy, setAskedWhy] = useState(false);
+  const [numbersReminded, setNumbersReminded] = useState(false);
+  const [softCloseOffered, setSoftCloseOffered] = useState(false);
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(openingPackage);
+  /** Two-step guard on "end without agreement". */
+  const [confirmDecline, setConfirmDecline] = useState(false);
 
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const complete = chosen === task.issues.length;
   const canSend = useDevGate(complete) && !settled;
   const yourTurn = !pending && canSend && !settled;
 
+  /**
+   * The credibility ladder carries over from the AI-AI exchange and only
+   * ever rises: the proxy's voiced tier, raised by any card the participant
+   * tags in person on their own core issue.
+   */
+  const personallyVoiced = voicedReasonIds
+    .map((id) => task.roleBriefs[role].reasonCards.find((c) => c.id === id))
+    .filter(
+      (c): c is NonNullable<typeof c> =>
+        Boolean(c) && c!.issueId === requirement.id,
+    );
+  const personalTier = tierOf(personallyVoiced);
+  const tier: ReasonTier =
+    proxyVoicedTier === "sensitive" || personalTier === "sensitive"
+      ? "sensitive"
+      : proxyVoicedTier === "work" || personalTier === "work"
+        ? "work"
+        : "none";
+
+  const selfDisclosed = personallyVoiced.some((c) => c.layer === "sensitive");
+
   useDevAutofill(() => {
     if (settled) return;
     setDraft(
       replies === 0
-        ? `Thanks for going through all that. || the ${requirement.label.toLowerCase()} is the part I really need to hold — that's the one that changes how the work actually goes for me. happy to stay flexible on the rest.`
+        ? `thanks for going through all that. || from my side the package they landed on works — happy to confirm it if you are.`
         : "that works for me. || glad we got there.",
     );
   }, `direct-t${taskIndex}-${replies}`);
 
-  async function send(text: string) {
+  function settle(
+    kind: "agreed" | "impasse",
+    pkg: Package | null,
+    reason: string,
+  ) {
+    setFinalPackage(pkg);
+    setSettled(kind);
+    logEvent(
+      "negotiation_ended",
+      {
+        phase: "direct",
+        reason,
+        replies,
+        secondsRemaining,
+        tier,
+        selfDisclosed,
+      },
+      { sessionIndex: taskIndex },
+    );
+  }
+
+  /** RATIFY, coded from what actually happened (§9.3). */
+  function ratifyOf(
+    kind: "agreed" | "impasse",
+    pkg: Package | null,
+  ): "approved_as_is" | "modified" | "rejected" | null {
+    if (!openingPackage) return null;
+    if (kind === "impasse") return "rejected";
+    const same =
+      pkg && task.issues.every((i) => pkg[i.id] === openingPackage[i.id]);
+    return same ? "approved_as_is" : "modified";
+  }
+
+  function finish(kind: "agreed" | "impasse", pkg: Package | null) {
+    onSettled(kind === "agreed" ? pkg : null, {
+      ratify: ratifyOf(kind, pkg),
+      selfDisclosed,
+      postRecipSb: selfDisclosed && proxyVoicedTier !== "sensitive",
+    });
+  }
+
+  async function send(text: string, sentOffer: Package = offer) {
     const own: DisplayMessage = {
       id: `d-p${messages.length}`,
       speaker: "participant",
@@ -987,19 +1075,28 @@ export function DirectNegotiation({
     const next = [...messages, own];
     setMessages(next);
     setDraft("");
+    setConfirmDecline(false);
 
     const voiced = attachedReasonId
       ? [...new Set([...voicedReasonIds, attachedReasonId])]
       : voicedReasonIds;
     setVoicedReasonIds(voiced);
     setAttachedReasonId(null);
-    const requirementReasonGiven =
-      reasonAlreadyVoiced ||
-      voiced.some(
-        (id) =>
-          task.roleBriefs[role].reasonCards.find((c) => c.id === id)
-            ?.issueId === requirement.id,
+
+    // The tier the counterpart reads THIS turn, including a card attached to
+    // this very message — a confession should count the moment it is made.
+    const voicedNow = voiced
+      .map((id) => task.roleBriefs[role].reasonCards.find((c) => c.id === id))
+      .filter(
+        (c): c is NonNullable<typeof c> =>
+          Boolean(c) && c!.issueId === requirement.id,
       );
+    const tierNow: ReasonTier =
+      proxyVoicedTier === "sensitive" || tierOf(voicedNow) === "sensitive"
+        ? "sensitive"
+        : proxyVoicedTier === "work" || tierOf(voicedNow) === "work"
+          ? "work"
+          : "none";
 
     logEvent(
       "message_sent",
@@ -1007,8 +1104,9 @@ export function DirectNegotiation({
         phase: "direct",
         length: text.length,
         secondsRemaining,
-        requirementOption: offer[requirement.id] ?? null,
+        requirementOption: sentOffer[requirement.id] ?? null,
         reasonCardId: attachedReasonId,
+        tier: tierNow,
       },
       { sessionIndex: taskIndex },
     );
@@ -1021,7 +1119,7 @@ export function DirectNegotiation({
         text,
         createdAt: new Date().toISOString(),
         stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET),
-        proposal: Object.keys(offer).length > 0 ? offer : undefined,
+        proposal: Object.keys(sentOffer).length > 0 ? sentOffer : undefined,
         reasonCardId: attachedReasonId ?? undefined,
       });
     }
@@ -1029,23 +1127,23 @@ export function DirectNegotiation({
     setPending(true);
     try {
       const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
-      const decision = counterpartStep(
-        task,
-        counterpartRole,
-        stageNow,
-        offer,
-        lastCounterpartPackage,
-        {
-          reasonGivenForRequirement: requirementReasonGiven,
-          reasonAlreadyRequested: reasonRequested,
-          secondsRemaining,
-        },
-      );
-      if (decision.awaitingReason) setReasonRequested(true);
+      const decision = counterpartStep(task, counterpartRole, stageNow, sentOffer, {
+        tier: tierNow,
+        askedWhy,
+        numbersReminded,
+        numbersMentionedNow: mentionsScoreNumbers(text),
+        secondsRemaining,
+        softCloseOffered,
+      });
+      if (decision.action === "ask_why") setAskedWhy(true);
+      if (decision.action === "nonum") setNumbersReminded(true);
+      if (decision.action === "soft_close") setSoftCloseOffered(true);
 
       let reply: string;
       if (mockAi) {
-        reply = DIRECT_MOCK_REPLIES[Math.min(replies, DIRECT_MOCK_REPLIES.length - 1)];
+        reply = decision.accepts
+          ? DIRECT_MOCK_REPLIES[1]
+          : DIRECT_MOCK_REPLIES[Math.min(replies, DIRECT_MOCK_REPLIES.length - 1)];
         await new Promise((r) => setTimeout(r, 500));
       } else {
         const res = await fetch("/api/counterpart", {
@@ -1055,13 +1153,14 @@ export function DirectNegotiation({
             taskId: task.id,
             participantRole: role,
             stage: stageNow,
-            incoming: offer,
-            lastCounterpartPackage,
-            reasonGiven: requirementReasonGiven,
-            reasonAlreadyRequested: reasonRequested,
+            incoming: sentOffer,
+            tier: tierNow,
+            askedWhy,
+            numbersReminded,
             secondsRemaining,
+            softCloseOffered,
             afterProxy: true,
-            history: [...messages, own].map((m) => ({
+            history: next.map((m) => ({
               role: m.speaker === "participant" ? "user" : "assistant",
               content: m.text,
             })),
@@ -1091,7 +1190,7 @@ export function DirectNegotiation({
           speaker: "counterpart",
           text: reply,
           createdAt: new Date().toISOString(),
-          stage: stageNow,
+          stage: decision.stage,
           proposal: decision.proposal ?? undefined,
           decidedAction: decision.action,
         });
@@ -1099,22 +1198,30 @@ export function DirectNegotiation({
 
       setReplies((n) => n + 1);
       if (decision.accepts || decision.impasse) {
-        setFinalPackage(decision.accepts ? (decision.proposal ?? offer) : null);
-        setSettled(decision.accepts ? "agreed" : "impasse");
-        logEvent(
-          "negotiation_ended",
-          {
-            phase: "direct",
-            reason: decision.accepts ? "agreed" : "impasse",
-            replies: replies + 1,
-            secondsRemaining,
-          },
-          { sessionIndex: taskIndex },
+        settle(
+          decision.accepts ? "agreed" : "impasse",
+          decision.accepts ? (decision.proposal ?? sentOffer) : null,
+          decision.accepts ? "agreed" : "impasse",
         );
       }
     } finally {
       setPending(false);
     }
+  }
+
+  /**
+   * The explicit accept: take the counterpart's standing proposal as-is.
+   * Deterministic — no model reads the participant's words to decide whether
+   * they agreed — and the same control the Baseline arm has, so closing works
+   * identically across conditions.
+   */
+  function acceptStanding() {
+    if (!lastCounterpartPackage || pending || settled) return;
+    setOffer(lastCounterpartPackage);
+    void send(
+      "that works for me — let's go with that.",
+      lastCounterpartPackage,
+    );
   }
 
   return (
@@ -1130,18 +1237,12 @@ export function DirectNegotiation({
               <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs">
                 <span aria-hidden>⏱</span>
                 <CountdownTimer
-                  seconds={NEGOTIATION_SECONDS}
+                  seconds={CLOSING_SECONDS}
                   running={!settled}
                   onTick={setSecondsRemaining}
                   onExpire={() => {
                     if (settled) return;
-                    setFinalPackage(null);
-                    setSettled("impasse");
-                    logEvent(
-                      "negotiation_ended",
-                      { phase: "direct", reason: "timeout" },
-                      { sessionIndex: taskIndex },
-                    );
+                    settle("impasse", null, "timeout");
                   }}
                 />
               </span>
@@ -1154,14 +1255,14 @@ export function DirectNegotiation({
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
               <div>
                 <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
-                  💬 Direct Chat with Counterpart
+                  💬 Close It Together
                 </p>
                 <p className="text-xs text-[var(--ink-2)]">
                   {settled === "agreed"
                     ? "✓ You have reached a mutual agreement!"
                     : settled === "impasse"
                       ? "⚠️ The negotiation ended without an agreement."
-                      : "You are speaking directly with the other participant."}
+                      : "You are talking directly with the other participant. Confirm, adjust, or decline what the proxies reached."}
                 </p>
               </div>
               {settled ? null : pending ? (
@@ -1175,7 +1276,7 @@ export function DirectNegotiation({
             <Transcript
               messages={messages}
               pending={pending}
-              emptyHint="Your AI Proxy has completed its turn. Send a message to take over!"
+              emptyHint="The proxies are done. Say hello and settle it — or accept the package below."
             />
             <ReasonPicker
               task={task}
@@ -1199,6 +1300,51 @@ export function DirectNegotiation({
               }
             />
           </Card>
+
+          {!settled ? (
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              {lastCounterpartPackage ? (
+                <button
+                  type="button"
+                  onClick={acceptStanding}
+                  disabled={pending}
+                  className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-2xs transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  ✓ Accept the package on the table
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!confirmDecline) {
+                    setConfirmDecline(true);
+                    return;
+                  }
+                  settle("impasse", null, "declined");
+                }}
+                disabled={pending}
+                className={cx(
+                  "rounded-xl border px-4 py-2.5 text-sm font-bold shadow-2xs transition-colors disabled:opacity-50",
+                  confirmDecline
+                    ? "border-red-400 bg-red-50 text-red-800 hover:bg-red-100"
+                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                )}
+              >
+                {confirmDecline
+                  ? "Really end without an agreement? Click again to confirm."
+                  : "✗ End without agreement"}
+              </button>
+              {confirmDecline ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDecline(false)}
+                  className="text-xs font-semibold text-slate-500 underline underline-offset-4"
+                >
+                  Keep talking
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           <Card cue={!complete} className="mb-6">
             <CardTitle
@@ -1238,11 +1384,13 @@ export function DirectNegotiation({
       {settled ? (
         <ActionBar
           label="Continue to Review"
-          onClick={() => onSettled(settled === "agreed" ? finalPackage : null)}
+          onClick={() =>
+            finish(settled, settled === "agreed" ? finalPackage : null)
+          }
           note={
             settled === "agreed"
               ? "✓ Agreement reached! Proceed to review."
-              : "⚠️ Impasse recorded. Proceed to review."
+              : "⚠️ No agreement. Proceed to review."
           }
         />
       ) : (
@@ -1255,8 +1403,6 @@ export function DirectNegotiation({
     </>
   );
 }
-
-const DIRECT_STAGE_OFFSET = 3;
 
 const DIRECT_MOCK_REPLIES = [
   "yeah, I watched the whole thing. || honestly I think they landed somewhere reasonable — I can live with where it ended up.",

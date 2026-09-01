@@ -68,10 +68,22 @@ export function leaksForbiddenReason(
 ): boolean {
   const haystack = text.toLowerCase();
   const allowed = new Set(sayable.flatMap(contentWords));
+  // A word is shared with the sayable vocabulary if it matches OR is an
+  // inflection of a sayable word ("close" / "closes", "mistake" /
+  // "mistakes"). Matching is by substring below, so a distinctive word that
+  // is a stem of an everyday sayable word would fire on perfectly legitimate
+  // sentences — the ver.2.12 cards showed this with "close alone".
+  const shared = (w: string) => {
+    if (allowed.has(w)) return true;
+    for (const a of allowed) {
+      if (a.includes(w) || w.includes(a)) return true;
+    }
+    return false;
+  };
 
   for (const card of forbidden) {
     const distinctive = [...new Set(contentWords(card.text))].filter(
-      (w) => !allowed.has(w),
+      (w) => !shared(w),
     );
     // Nothing distinctive left to judge on: this card's whole vocabulary is
     // shared with things the proxy may legitimately say, so any match would be

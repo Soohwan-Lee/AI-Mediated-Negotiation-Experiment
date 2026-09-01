@@ -23,8 +23,8 @@ export interface ProposedTerm {
 
 export interface NegotiationAction {
   actionType: ActionType;
-  /** Which of the five stages this action belongs to. */
-  stage: 1 | 2 | 3 | 4 | 5;
+  /** Which of the six stages this action belongs to. */
+  stage: 1 | 2 | 3 | 4 | 5 | 6;
   /** Issues this action touches. */
   issueTargets: string[];
   proposedTerms: ProposedTerm[];
@@ -101,7 +101,7 @@ export const NEGOTIATION_ACTION_SCHEMA = {
         "leave_unresolved",
       ],
     },
-    stage: { type: "integer", enum: [1, 2, 3, 4, 5] },
+    stage: { type: "integer", enum: [1, 2, 3, 4, 5, 6] },
     requirementStatus: {
       type: "string",
       enum: ["held", "traded", "reduced", "not_addressed"],

@@ -210,13 +210,12 @@ const STEP_OF: Record<Phase, number> = {
 };
 
 /**
- * Total messages in the AI-AI exchange: one per side across the five stages.
- *
- * The PROXIES still run the fixed five-stage script — it is what makes their
- * conversations comparable, and they are not the ones on a clock. The free-form
- * timer applies to the participant's own conversation afterwards.
+ * Total messages in the AI-AI exchange: four per side across the six stages
+ * (stage 3 is the lock and carries no message). The PROXIES run the fixed
+ * script — it is what makes their conversations comparable; the clock applies
+ * to the participant's own closing conversation afterwards.
  */
-const TOTAL_TURNS = 10;
+const TOTAL_TURNS = 8;
 
 /**
  * What each principal is told about the policy in force (Design §7, last
@@ -341,13 +340,15 @@ export function ProxyTask({
   /** The package on the table in the direct conversation. */
   const [offer, setOffer] = useState<Package>({});
   /**
-   * Whether the participant's own AI Proxy actually said a reason out loud.
-   *
+   * The credibility tier the participant's own AI Proxy actually EARNED out
+   * loud (Ver.2.12 §6.2) — "sensitive" only if the SB was really voiced.
    * Recorded from the exchange rather than assumed, because an emergency stop
-   * or a guardrail block can leave the proxy having voiced none — and the
-   * reason-linked rule has to see the same fact the transcript shows.
+   * or a guardrail block can leave an authorized card unsaid, and the ladder
+   * has to see the same fact the transcript shows.
    */
-  const [proxyVoicedReason, setProxyVoicedReason] = useState(false);
+  const [proxyVoicedTier, setProxyVoicedTier] = useState<
+    "none" | "work" | "sensitive"
+  >("none");
   const [tentative, setTentative] = useState<Package | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: TOTAL_TURNS });
@@ -401,6 +402,17 @@ export function ProxyTask({
   useDevAutofill(() => {
     setMandate((m) => ({
       ...m,
+      // The mockup walks the SB rung of the ladder: the scripted exchange
+      // voices the sensitive card, so the mandate must authorize it or the
+      // mockup would show a disclosure the mandate forbids.
+      authorizedReasonIds: [
+        ...new Set([
+          ...m.authorizedReasonIds,
+          ...reasonCards
+            .filter((c) => c.layer === "sensitive")
+            .map((c) => c.id),
+        ]),
+      ],
       issues: m.issues.map((im) => {
         const issue = task.issues.find((i) => i.id === im.issueId)!;
         const isRequirement = issue.id === requirement.id;
@@ -466,19 +478,25 @@ export function ProxyTask({
       // means. Handing the participant the package the exchange was heading
       // for would make the stop cosmetic.
       setTentative(stopped.current ? null : script.tentative);
-      // The scripted exchange voices a work reason at stage 2 — unless it was
-      // stopped before reaching it. Scoped to the requirement issue, same as
-      // the live path: only a reason on the participant's own requirement
-      // issue satisfies the reason-linked rule.
-      setProxyVoicedReason(
-        !stopped.current &&
-          scripted.some(
-            (m) =>
-              m.speaker === "participant_proxy" &&
-              m.reasonCardId &&
-              reasonCards.find((c) => c.id === m.reasonCardId)?.issueId ===
-                requirement.id,
-          ),
+      // The scripted exchange voices the SB at the first reason opportunity —
+      // unless it was stopped before reaching it. The tier is read from the
+      // voiced card's layer, scoped to the participant's own core issue,
+      // exactly as the live path does.
+      const voicedLayers = stopped.current
+        ? []
+        : scripted
+            .filter((m) => m.speaker === "participant_proxy" && m.reasonCardId)
+            .map((m) => reasonCards.find((c) => c.id === m.reasonCardId))
+            .filter(
+              (c): c is NonNullable<typeof c> =>
+                Boolean(c) && c!.issueId === requirement.id,
+            );
+      setProxyVoicedTier(
+        voicedLayers.some((c) => c.layer === "sensitive")
+          ? "sensitive"
+          : voicedLayers.length
+            ? "work"
+            : "none",
       );
       logEvent(
         "negotiation_ended",
@@ -569,7 +587,7 @@ export function ProxyTask({
           done: boolean;
           totalTurns?: number;
           reasonTokens?: string[];
-          reasonForRequirement?: boolean;
+          voicedTier?: "none" | "work" | "sensitive";
           decidedAction?: string;
           stage?: number;
           requirementOption?: string | null;
@@ -584,17 +602,20 @@ export function ProxyTask({
         // dropped server-side, so pushing all of them is correct.
         if (data.reasonTokens?.length) reasonsUsed.push(...data.reasonTokens);
 
-        // THE SERVER DECIDES THIS, not the client. Whether the proxy argued
-        // the participant's own requirement is issue-scoped and must depend on
-        // the principal's CARD alone — never on a pool argument, which is not
-        // the principal's reason. Re-deriving it here from a token and an
-        // issue id was only accidentally correct, and the direct conversation
-        // inherits the answer, so a wrong one changes the primary outcome.
+        // THE SERVER DECIDES THIS, not the client: the tier rung this turn's
+        // voiced card earned, from the principal's CARD alone — never a pool
+        // argument. The direct closing inherits the folded maximum, so a
+        // wrong answer here changes the primary outcome.
         if (
           data.message?.speaker === "participant_proxy" &&
-          data.reasonForRequirement
+          data.voicedTier &&
+          data.voicedTier !== "none"
         ) {
-          setProxyVoicedReason(true);
+          setProxyVoicedTier((prev) =>
+            prev === "sensitive" || data.voicedTier === "sensitive"
+              ? "sensitive"
+              : "work",
+          );
         }
 
         if (
@@ -908,6 +929,12 @@ export function ProxyTask({
             if (participantKey) {
               await getStore().saveMandate(participantKey, mandate);
             }
+            // DECISION-LOCK (Ver.2.12 §6.1): the mandate is fixed before
+            // anyone has spoken and cannot be revised after hearing the
+            // counterpart.
+            logEvent("decision_locked", undefined, {
+              sessionIndex: taskIndex,
+            });
             logEvent(
               "mandate_saved",
               {
@@ -1035,19 +1062,21 @@ export function ProxyTask({
           </>
         }
         steps={[
-          { label: "Review AI Proxy exchange", hint: "Pinned above the chat for full reference" },
-          { label: "Message the other participant", hint: "Direct conversation with your counterpart" },
-          { label: "Settle both terms", hint: "Agree on the final package together" },
+          { label: "Check what the proxies reached", hint: "Their full exchange stays pinned above the chat" },
+          { label: "Talk to the other participant", hint: "Confirm it, adjust it, or add anything in your own words" },
+          { label: "Settle it", hint: "Accept the package, agree a different one, or decline" },
         ]}
-        minutes={10}
+        minutes={3}
         note={
-          <Callout title="⏱ 10-Minute Negotiation Cap" tone="neutral">
+          <Callout title="⏱ 3 minutes to close" tone="neutral">
             <p>
-              Take as much time as you need up to 10 minutes. You can conclude early once you reach mutual agreement.
+              This is a short closing conversation, since the ground work is
+              done. You can accept in one click, or talk it through first. If
+              the clock runs out with nothing agreed, the fallback applies.
             </p>
           </Callout>
         }
-        actionLabel="Start Direct Negotiation"
+        actionLabel="Start the closing conversation"
         onStart={() => {
           setProxyTranscript(transcript);
           setMessages([]);
@@ -1078,13 +1107,29 @@ export function ProxyTask({
         stepIndex={STEP_OF.negotiate}
         proxyTranscript={proxyTranscript}
         openingPackage={tentative}
-        reasonAlreadyVoiced={proxyVoicedReason}
+        proxyVoicedTier={proxyVoicedTier}
         messages={messages}
         setMessages={setMessages}
         offer={offer}
         setOffer={setOffer}
-        onSettled={(pkg) => {
+        onSettled={(pkg, meta) => {
           setTentative(pkg);
+          // §9.3: RATIFY (what happened to the proxies' tentative package),
+          // SELF-DISCLOSE (the SB tagged in the participant's own voice), and
+          // POST-RECIP-SB (a new SB after the counterpart's disclosure, which
+          // in this arm happened during the watched exchange).
+          logEvent(
+            "task_outcome_recorded",
+            {
+              ratify: meta.ratify,
+              selfDisclosed: meta.selfDisclosed,
+              postRecipSb: meta.postRecipSb,
+              preRecipSb: proxyVoicedTier === "sensitive",
+              sbVoiced:
+                proxyVoicedTier === "sensitive" || meta.selfDisclosed,
+            },
+            { sessionIndex: taskIndex },
+          );
           setPhase("review");
         }}
       />

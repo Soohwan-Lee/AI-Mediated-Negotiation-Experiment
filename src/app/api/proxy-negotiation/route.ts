@@ -1,20 +1,31 @@
 /**
- * Proxy-condition AI-AI negotiation — one stage-turn per request.
+ * Proxy-condition AI-AI negotiation — one turn per request.
  *
  * WHO DECIDES WHAT. `lib/negotiation/machine` decides the move: which package
- * goes on the table, whether the counterpart concedes, whether it accepts, and
- * when the exchange ends. The model is asked only to say that move in the
- * right voice. Termination used to be the model's call, and it showed — in
- * testing it "accepted" packages made entirely of its own opening terms after
- * two exchanges. Design §4 gives that job to the state machine, and this route
- * is where the handover happens.
+ * goes on the table, which reason is voiced when, whether the counterpart
+ * concedes, and where the exchange settles. The model is asked only to say
+ * that move in the right voice.
  *
- * ONE TURN PER REQUEST. The client calls this repeatedly with the stage index
- * and the transcript so far. Each invocation is roughly one model call (~7.5s
- * measured end to end against gpt-5.6-sol; gpt-5.6-terra, the current pin, was
- * no slower per turn on the same prompts), well inside Vercel's 60s Hobby
- * limit, and it lets the waiting screen show real progress rather than a blind
- * spinner.
+ * THE EXCHANGE IS EIGHT TURNS, four per side, walking Ver.2.12 §6.1's six
+ * stages (stage 3 is the lock, a recording moment, not a message):
+ *
+ *   0 counterpart opens            1 participant proxy opens
+ *   2 counterpart WR + asks        3 participant proxy voices its designated
+ *                                    reason — the SB if authorized (§6.5),
+ *                                    which is what makes PRE-RECIP-SB true
+ *                                    for a participant who checked it
+ *   4 counterpart discloses SB     5 participant proxy proposes the trade
+ *   6 counterpart evaluates        7 participant proxy closes
+ *
+ * The counterpart's evaluation at turn 6 is the credibility ladder: the tier
+ * earned by the reasons ACTUALLY voiced (recovered from the carried tokens,
+ * pool arguments never counting) sets how far it concedes on the
+ * participant's core issue. Fixed turn order is what keeps Delegate and
+ * Explorer matched on message count (pilot gate 9); the Explorer's two pool
+ * clauses ride INSIDE turns 3 and 5, never as extra turns.
+ *
+ * ONE TURN PER REQUEST: the client drives the sequence, each request stays
+ * well inside Vercel's 60s limit, and the waiting screen shows real progress.
  */
 
 import { NextResponse } from "next/server";
@@ -24,9 +35,11 @@ import {
   buildProxyPlan,
   counterpartStep,
   designatedReason,
-  STAGES,
+  tierOf,
+  type ReasonTier,
 } from "@/lib/negotiation/machine";
 import {
+  cardOfLayer,
   counterRequirementIssue,
   getTask,
   plausibleReasons,
@@ -46,28 +59,13 @@ import type {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/**
- * WHY THERE IS NO YOKED-TRANSCRIPT BRANCH HERE.
- *
- * ver.1.8 required pre-produced, condition-identical receiver stimuli, because
- * only one role was a sender and the other's screen WAS the stimulus. Design
- * Ver.2.4 §13 drops that requirement, and role symmetry is the reason: both
- * roles now hold a requirement, mandate a proxy, and receive the other side's
- * case, so there is no receiver-only arm left to hold constant.
- *
- * What still has to be matched across policies is message count and length
- * (pilot gate 10), and that is enforced structurally — the turn order below is
- * identical for both, and the Explorer's extra reason must fit inside its
- * scheduled message rather than adding a turn.
- */
-
 interface RequestBody {
   taskId: TaskId;
   participantRole: Role;
   policy: "delegate" | "explorer";
   mandate: Mandate;
   sessionIndex: 1 | 2;
-  /** 0-based index into the turn order below. */
+  /** 0-based index into the turn order above. */
   turn: number;
   /** Visible transcript so far, oldest first. */
   history?: Array<{ speaker: Speaker; text: string }>;
@@ -75,52 +73,27 @@ interface RequestBody {
   lastParticipantPackage?: Package | null;
   lastCounterpartPackage?: Package | null;
   /**
-   * Opaque tokens for the reasons this side has already voiced, for the
-   * budget check. Deliberately carries no indication of which kind each was —
-   * see `reasonToken`. The per-issue budgets and the requirement-reason flag
-   * need the kind and the issue, and the server recovers BOTH by re-hashing
-   * the known card and pool ids (`resolveReasonTokens`), so the client never
-   * holds either.
+   * Opaque tokens for the reasons the participant side has already voiced.
+   * Deliberately carries no indication of which kind each was — see
+   * `reasonToken`. The tier and the pool budget need the kind and the issue,
+   * and the server recovers BOTH by re-hashing the known card and pool ids
+   * (`resolveReasonTokens`), so the client never holds either.
    */
   reasonsUsed?: string[];
 }
 
-/**
- * The fixed turn order: each of the five stages carries one message from each
- * side, counterpart first, for ten messages in total (Design §4).
- *
- * A fixed order is what makes Delegate and Explorer comparable — the same
- * number of visible offers and the same message count, differing only in which
- * REASONS are voiced (Design §7 노출량 통제, pilot gate 10).
- *
- * STAGE 4 IS THE ONE EXCEPTION, and it has to be. Everywhere else the
- * counterpart leads, which is what anchors the participant's side. But stage 4
- * is the conditional trade: the counterpart's move there is to EVALUATE the
- * counterpackage against T_MID, and going first meant it evaluated a package
- * that had not been sent yet — the participant proxy's stage-1 opening, worth
- * nothing to it. The Proxy arm could therefore never accept at T_MID and
- * always fell through to T_FINAL at stage 5, while Baseline (where the
- * participant sends within the stage before the counterpart replies) accepted
- * at T_MID normally.
- *
- * That is a mechanical difference in counterpart acceptance behaviour between
- * the two arms of `Pooled Proxy − Baseline`, which is exactly what the fixed
- * rules exist to prevent. Swapping the two turns at stage 4 makes the proxy
- * exchange evaluate the same package at the same threshold as Baseline does.
- */
 type Turn = { stage: StageId; side: "counterpart" | "participant" };
 
-const TURN_ORDER: Turn[] = STAGES.flatMap((stage): Turn[] =>
-  stage === 4
-    ? [
-        { stage, side: "participant" },
-        { stage, side: "counterpart" },
-      ]
-    : [
-        { stage, side: "counterpart" },
-        { stage, side: "participant" },
-      ],
-);
+const TURN_ORDER: Turn[] = [
+  { stage: 1, side: "counterpart" },
+  { stage: 1, side: "participant" },
+  { stage: 2, side: "counterpart" },
+  { stage: 2, side: "participant" },
+  { stage: 4, side: "counterpart" },
+  { stage: 5, side: "participant" },
+  { stage: 5, side: "counterpart" },
+  { stage: 6, side: "participant" },
+];
 
 const TOTAL_TURNS = TURN_ORDER.length;
 
@@ -149,12 +122,9 @@ function mandateSummary(mandate: Mandate, taskId: TaskId): string {
 /**
  * The reason cards, split into what the proxy may say and what it may not.
  *
- * Both lists go into the prompt. Sending only the authorized ones would look
- * tidier and would be wrong: Design §15 P3 requires the unchecked cards to be
- * present so the proxy can let them inform WHICH PACKAGE it chooses while
- * never putting them into words. A proxy that had not been told about a
- * withheld circumstance could not act on it at all, which is a different
- * policy from the one being tested.
+ * Both lists go into the prompt. Design §12 P3 requires the unchecked cards
+ * to be present so the proxy can let them inform WHICH PACKAGE it chooses
+ * while never putting them into words.
  */
 function reasonsFor(taskId: TaskId, role: Role, mandate: Mandate) {
   const task = getTask(taskId);
@@ -163,9 +133,7 @@ function reasonsFor(taskId: TaskId, role: Role, mandate: Mandate) {
     task.issues.find((i) => i.id === issueId)?.label;
   const pick = (authorized: boolean) =>
     cards
-      .filter(
-        (c) => mandate.authorizedReasonIds.includes(c.id) === authorized,
-      )
+      .filter((c) => mandate.authorizedReasonIds.includes(c.id) === authorized)
       .map((c) => ({
         id: c.id,
         text: c.text,
@@ -176,26 +144,19 @@ function reasonsFor(taskId: TaskId, role: Role, mandate: Mandate) {
 }
 
 /**
- * What a proxy says when the model's wording was blocked.
- *
- * Plain, package-only, and carrying no rationale at all — a rationale is
- * exactly the thing most likely to have been blocked, so the safe fallback
- * states the position and nothing else.
+ * What a proxy says when the model's wording was blocked: plain,
+ * package-only, no rationale — a rationale is exactly the thing most likely
+ * to have been blocked.
  */
 function fallbackText(
   task: ReturnType<typeof getTask>,
-  stage: StageId,
   proposal: Package | null,
   isParticipantSide: boolean,
 ): string {
   const side = isParticipantSide
     ? "On my principal's behalf"
     : "On the other participant's behalf";
-  if (!proposal) {
-    return stage === 3
-      ? `${side}: noted. The position on that term stands.`
-      : `${side}: no change to the position this turn.`;
-  }
+  if (!proposal) return `${side}: the position on the terms stands.`;
   const terms = task.issues
     .map((i) => i.options.find((o) => o.id === proposal[i.id])?.label)
     .filter(Boolean)
@@ -206,20 +167,12 @@ function fallbackText(
 /**
  * A stable opaque token for a reason id.
  *
- * Not a security measure — the client is not an adversary — but the difference
- * between "the same reason as last turn" (which the budget needs) and "this
- * sentence came from the pool" (which the participant must not learn).
- *
- * NO KIND MARKER. An earlier version prefixed pool reasons with `pool` so the
- * separate budgets could be counted client-side, with a comment claiming that
- * was safe because the token is opaque. It was not: the token is returned with
- * EVERY message, so the prefix said "the reason in this particular message was
- * added by the AI" — per message, for the whole transcript. That is precisely
- * the judgement OTHER-AI4 asks the participant to make unaided, and it is the
- * Explorer manipulation itself.
- *
- * The kind stays server-side (`poolReasonsUsed` below), which the budget can
- * reconstruct without the client ever holding it.
+ * Not a security measure — the client is not an adversary — but the
+ * difference between "the same reason as last turn" (which the budget needs)
+ * and "this sentence came from the pool" (which the participant must not
+ * learn). NO KIND MARKER, ever: the token is returned with every message, so
+ * any marker would label the Explorer's additions per message for the whole
+ * transcript — the judgement OTHER-AI4 asks the participant to make unaided.
  */
 function reasonToken(id: string): string {
   let h = 0;
@@ -230,15 +183,10 @@ function reasonToken(id: string): string {
 }
 
 /**
- * Recovers each carried token's source — which issue it argued about, and
- * whether it was a principal card or a pool item — by re-hashing the known
- * ids for this task and role.
- *
- * This is what lets the client keep carrying PLAIN tokens while the server
- * runs per-issue budgets and the issue-scoped requirement-reason flag
- * (Design §4, §7 ver.2.5): the candidate space is sixteen ids, the hash is
- * deterministic, and the route is stateless, so the mapping is rebuilt per
- * request and nothing kind- or issue-shaped ever travels to the client.
+ * Recovers each carried token's source — which card or pool item, which
+ * issue, principal or pool — by re-hashing the known ids for this task and
+ * role. The route is stateless; the mapping is rebuilt per request and
+ * nothing kind- or issue-shaped ever travels to the client.
  */
 function resolveReasonTokens(
   taskId: TaskId,
@@ -249,16 +197,23 @@ function resolveReasonTokens(
   sourceId: string;
   issueId: string | null;
   source: "principal" | "pool";
+  layer: ReasonCard["layer"] | null;
 }> {
   const byToken = new Map<
     string,
-    { sourceId: string; issueId: string | null; source: "principal" | "pool" }
+    {
+      sourceId: string;
+      issueId: string | null;
+      source: "principal" | "pool";
+      layer: ReasonCard["layer"] | null;
+    }
   >();
   for (const card of getTask(taskId).roleBriefs[role].reasonCards) {
     byToken.set(reasonToken(card.id), {
       sourceId: card.id,
       issueId: card.issueId,
       source: "principal",
+      layer: card.layer,
     });
   }
   plausibleReasons(taskId, role).forEach((item, i) => {
@@ -266,6 +221,7 @@ function resolveReasonTokens(
       sourceId: `pool:${i}`,
       issueId: item.issueId,
       source: "pool",
+      layer: null,
     });
   });
   return tokens.flatMap((key) => {
@@ -275,44 +231,10 @@ function resolveReasonTokens(
 }
 
 /**
- * How a designated card enters a stage-2 instruction — inline, because that
- * turn carries no package and has room for it.
- *
- * A designated card is the NORMAL case; null means the schedule found nothing
- * left to say on this issue (every authorized card already voiced, or the
- * participant unticked everything they could). The instruction then simply
- * omits the reason rather than inviting the model to supply one, which is the
- * whole point of moving the choice out of the model (Design §7 ver.2.6).
- */
-function reasonClause(card: ReasonCard | null): string {
-  if (!card) return "";
-  return `, giving exactly this authorized reason and no other: "${card.text}"`;
-}
-
-/**
- * The same designation as its own sentence, for the turns whose instruction is
- * already carrying a package and three exact levels.
- */
-function reasonSentence(card: ReasonCard | null): string {
-  if (!card) return "";
-  return ` Then give exactly this authorized reason for holding your requirement, and no other: "${card.text}"`;
-}
-
-/**
- * The pool item the Explorer adds this turn, and the instruction clause that
- * carries it (Design §7 ver.2.6: "삽입 여부·시점은 state machine이 지정").
- *
- * SCHEDULED, NOT VOLUNTEERED. Left to the model, the pool was used whenever a
- * message felt thin, which makes the Explorer's extra latitude a property of
- * the model's mood rather than of the condition. The schedule places it on the
- * two turns where the principal is arguing for something — stage 2 and stage
- * 4 — and matches it to that turn's issue so the per-issue cap is satisfied by
- * construction rather than enforced after the fact.
- *
- * It is chosen only when the turn already has a principal card to sit beside,
- * because §7 makes it additive: a pool clause alone would be an Explorer
- * message whose whole reason came from the pool, which is a different
- * manipulation from the one specified.
+ * The pool item the Explorer adds this turn (Design §6.6: 삽입 여부는 state
+ * machine이 지정, task당 최대 2회). SCHEDULED, NOT VOLUNTEERED: the schedule
+ * places the core-support item inside turn 3 and the exchange item inside
+ * turn 5, so the per-issue cap is satisfied by construction.
  */
 function designatedPool(
   taskId: TaskId,
@@ -324,9 +246,7 @@ function designatedPool(
   const index = pool.findIndex(
     (item, i) => item.issueId === issueId && !alreadyUsed.includes(`pool:${i}`),
   );
-  return index === -1
-    ? null
-    : { id: `pool:${index}`, text: pool[index].text };
+  return index === -1 ? null : { id: `pool:${index}`, text: pool[index].text };
 }
 
 function poolClause(item: { text: string } | null): string {
@@ -335,17 +255,9 @@ function poolClause(item: { text: string } | null): string {
 }
 
 /**
- * A package's levels, written out for a decidedAction.
- *
- * EVERY MOVE THAT CARRIES A PACKAGE MUST NAME ITS LEVELS. The model is asked
- * to say the machine's move in its own words, and a move described only as
- * "the counterpackage" left it inventing levels: in live testing it offered
- * its principal's FLOOR on the spent terms ("a Week 7 start") while the
- * machine's package held Week 5 — so both proxies talked about a package
- * neither was carrying, and the review screen then showed terms nobody had
- * said out loud. The mockup scripts solved this by reading labels out of the
- * package a message carries; this is the live path's version of the same
- * rule.
+ * A package's levels, written out for a decidedAction. Every move that
+ * carries a package must name its levels — a move described only as "the
+ * counterpackage" left the model inventing levels in live testing.
  */
 function packageSentence(
   task: ReturnType<typeof getTask>,
@@ -357,24 +269,6 @@ function packageSentence(
       return `${label ?? "unspecified"} on ${issue.label.toLowerCase()}`;
     })
     .join(", ");
-}
-
-/** The issue a candidate reasonSourceId argues about, or null. */
-function reasonIssueOf(
-  taskId: TaskId,
-  role: Role,
-  reasonSourceId: string | null,
-): string | null {
-  if (!reasonSourceId) return null;
-  if (reasonSourceId.startsWith("pool:")) {
-    const index = Number(reasonSourceId.slice("pool:".length));
-    return plausibleReasons(taskId, role)[index]?.issueId ?? null;
-  }
-  return (
-    getTask(taskId)
-      .roleBriefs[role].reasonCards.find((c) => c.id === reasonSourceId)
-      ?.issueId ?? null
-  );
 }
 
 export async function POST(request: Request) {
@@ -405,31 +299,26 @@ export async function POST(request: Request) {
   const actorRole = isParticipantSide ? body.participantRole : counterpartRole;
 
   // --- the state machine decides the move -------------------------------
-  // Both policies build the SAME plan. Design §7 puts the difference in reason
-  // use, not concession reach — see the note on `buildProxyPlan`.
+  // Both policies build the SAME plan: Design §2.3 puts the difference in
+  // reason use, not concession reach.
   const plan = buildProxyPlan(task, body.participantRole, body.mandate);
 
   const yourRequirement = requirementIssue(task, body.participantRole);
   const theirRequirement = counterRequirementIssue(task, body.participantRole);
 
-  let proposal: Package | null = null;
-  let decidedAction: string;
   /**
-   * The card the state machine has told this turn to voice (Design §7
-   * ver.2.6). Recorded beside the sentence like the move itself, because the
-   * audit question is now "did it say the designated reason", not "did it say
-   * a permitted one".
-   */
-  let designatedCard: ReasonCard | null = null;
-  /**
-   * The principal's cards already voiced this task, recovered from the carried
-   * tokens. This is how "each card at most once" is kept — the schedule skips
-   * what has been said rather than the validator rejecting a repeat.
+   * The participant side's voiced history, recovered from the carried
+   * tokens. The credibility tier reads the VOICED principal cards — a card
+   * that was authorized but stripped by a guardrail block earns nothing, and
+   * a pool argument is not the principal's reason and never counts (§6.6).
    */
   const resolvedHistory = resolveReasonTokens(
     body.taskId,
     body.participantRole,
     body.reasonsUsed ?? [],
+  );
+  const voicedCards = resolvedHistory.filter(
+    (r) => r.source === "principal" && r.issueId === yourRequirement.id,
   );
   const voicedCardIds = resolvedHistory
     .filter((r) => r.source === "principal")
@@ -437,196 +326,175 @@ export async function POST(request: Request) {
   const usedPoolIds = resolvedHistory
     .filter((r) => r.source === "pool")
     .map((r) => r.sourceId);
-  /** The Explorer's added clause for this turn, when the schedule places one. */
-  let designatedPoolItem: { id: string; text: string } | null = null;
+  const tier: ReasonTier = tierOf(
+    voicedCards.map((c) => ({ layer: c.layer ?? "work" })),
+  );
+
   /**
-   * The ids the schedule actually chose, used in preference to whatever the
-   * model reports back.
-   *
-   * WHY THE MODEL'S OWN ANSWER IS NOT THE RECORD. Ver.2.6 §7 moves the choice
-   * of reason to the state machine, so the model returning a DIFFERENT card
-   * id — or none where one was designated — is a reporting error, not a
-   * decision. Budgeting and the requirement-reason flag off the reported id
-   * would let that error spend the wrong budget or, worse, leave the voiced
-   * reason unrecorded and hand the direct conversation a false "no reason was
-   * given". The designation is what was put in the instruction, so it is what
-   * is recorded; the reported id is kept only for the gate-9 audit, where a
-   * mismatch is exactly the thing worth seeing.
+   * The counterpart's turn-6 evaluation — recomputed identically at turn 7,
+   * because the route is stateless and the participant proxy's close has to
+   * answer the same decision the counterpart just rendered.
    */
-  const designatedIds = () => ({
-    reason: designatedCard?.id ?? null,
-    pool: designatedPoolItem?.id ?? null,
-  });
-  /**
-   * The pool is spent only where the principal already has something to say,
-   * and only under Explorer — a Delegate never reaches this.
-   */
+  const evaluate = () =>
+    counterpartStep(
+      task,
+      counterpartRole,
+      5,
+      body.lastParticipantPackage ?? plan.tradeProposal,
+      {
+        tier,
+        // The AI-AI exchange has no spare turn for a deferred "why?", so the
+        // grace question is spent: the ladder answers directly.
+        askedWhy: true,
+        numbersReminded: true,
+      },
+    );
+
+  let proposal: Package | null = null;
+  let decidedAction: string;
+  /** The card the schedule told this turn to voice (participant side). */
+  let designatedCard: ReasonCard | null = null;
+  /** The Explorer's added clause for this turn, when the schedule places one.
+   * Boxed so the assignment inside `addPool` survives TS narrowing. */
+  const poolBox: { item: { id: string; text: string } | null } = { item: null };
+  let accepted = false;
+  let impasse = false;
+  /** The machine's move, stored beside the sentence for the audit. */
+  let counterpartAction: string | null = null;
+
   const addPool = (issueId: string | null) => {
-    if (!isParticipantSide || body.policy !== "explorer" || !designatedCard) {
-      return "";
-    }
-    designatedPoolItem = designatedPool(
+    if (!isParticipantSide || body.policy !== "explorer") return "";
+    poolBox.item = designatedPool(
       body.taskId,
       body.participantRole,
       issueId,
       usedPoolIds,
     );
-    return poolClause(designatedPoolItem);
+    return poolClause(poolBox.item);
   };
-  let accepted = false;
-  let impasse = false;
-  /** The machine's move, stored beside the sentence for the gate-9 audit. */
-  let counterpartAction: string | null = null;
 
   if (isParticipantSide) {
-    switch (stage) {
+    switch (turn) {
       case 1:
         proposal = plan.opening;
         decidedAction = `Open with your principal's preferred package, naming these exact levels: ${packageSentence(task, plan.opening)}.`;
         break;
-      case 2:
-        // No package this turn. The Explorer's extra latitude is over WORDS,
-        // not offers: giving it a fourth substantive package where the
-        // Delegate has three would make the two policies differ in what they
-        // put on the table, and could flip the acceptance test between
-        // conditions for identical mandates.
-        proposal = null;
+      case 3: {
+        // The first reason opportunity (§6.5): the SB if the principal
+        // checked it, otherwise the WR. This is the turn PRE-RECIP-SB reads —
+        // it lands before the counterpart's stage-4 disclosure.
         designatedCard = designatedReason(
           task,
           body.participantRole,
           2,
           body.mandate.authorizedReasonIds,
-          { alreadyVoiced: voicedCardIds },
+          voicedCardIds,
         );
-        decidedAction = `Say that ${yourRequirement.label.toLowerCase()} is your principal's priority${reasonClause(designatedCard)}.${addPool(yourRequirement.id)} Ask which term matters most to them.`;
+        const reasonClause = designatedCard
+          ? ` To make credible why, give exactly this authorized reason and no other: "${designatedCard.text}"`
+          : " Give no reason beyond naming the priority — none has been authorized.";
+        decidedAction = `Answer their question: say that ${yourRequirement.label.toLowerCase()} is your principal's priority.${reasonClause}${addPool(yourRequirement.id)}`;
         break;
-      case 3:
-        // Both sides challenge, once each (Design §4 stage 3). The
-        // participant's proxy sends the challenge aimed at the COUNTERPART'S
-        // requirement.
-        decidedAction = `Send exactly this challenge, in your own words: "${task.standardizedChallenge[counterpartRole]}"`;
-        break;
-      case 4:
-        proposal = plan.counterpackage;
-        // The escalation turn (Design §7 ver.2.6): after the challenge, the
-        // costly reason is spent. The reason gets its OWN sentence rather
-        // than being folded into the package instruction — this turn already
-        // carries three exact levels plus what is held and given, and it is
-        // the turn the counterpart evaluates against T_MID immediately after,
-        // so a blocked message here costs the package sentence and the reason
-        // together.
-        designatedCard = designatedReason(
-          task,
-          body.participantRole,
-          4,
-          body.mandate.authorizedReasonIds,
-          { alreadyVoiced: voicedCardIds },
-        );
-        // THE EXCHANGE ARGUMENT, not the requirement issue's pool item. Stage
-        // 2 already spent that one, and each role's pool holds exactly one
-        // item per issue — so asking for the same issue again returns nothing
-        // and the Explorer would add ONE clause per task where §7 allows two,
-        // manipulating every Explorer participant at half the specified dose
-        // with nothing in the logs to show it. The pool's fourth item carries
-        // no issue precisely because it argues the TRADE rather than a term,
-        // which is this stage's move.
-        decidedAction = `Put this exact counterpackage forward: ${packageSentence(task, plan.counterpackage)}. Say plainly what is held and what is given in exchange, and name exactly these levels — no others.${reasonSentence(designatedCard)}${addPool(null)}`;
-        break;
+      }
       case 5:
-        proposal = plan.tentative;
-        decidedAction = `Confirm the package that goes to review, naming exactly these levels: ${packageSentence(task, plan.tentative)}.`;
+        proposal = plan.tradeProposal;
+        decidedAction = `Propose this conditional exchange, naming these exact levels and no others: ${packageSentence(task, plan.tradeProposal)}. Say plainly that your principal offers ${theirRequirement.label.toLowerCase()} at that level in exchange for holding ${yourRequirement.label.toLowerCase()}.${addPool(null)}`;
         break;
+      default: {
+        // Turn 7 — the close, answering the counterpart's turn-6 decision.
+        const decision = evaluate();
+        if (decision.accepts) {
+          proposal = decision.proposal;
+          decidedAction = `Confirm the tentative package — ${packageSentence(task, decision.proposal!)} — and say the two principals will close it directly; nothing binds until both confirm.`;
+        } else if (decision.action === "propose_max") {
+          // The counterpart itself proposed best↔best (SB voiced). Taking a
+          // better-than-asked package is within any mandate.
+          proposal = decision.proposal;
+          accepted = true;
+          decidedAction = `Say their proposal works for your principal, and record it as the tentative package: ${packageSentence(task, decision.proposal!)}. The principals close it directly.`;
+        } else {
+          // counter_tier. Take it provisionally if it clears the mandate's
+          // minimum on the core issue; otherwise leave it for the principals.
+          const standing = decision.proposal!;
+          const minimumId =
+            body.mandate.issues.find((i) => i.issueId === yourRequirement.id)
+              ?.minimumOptionId ?? null;
+          const order = [...yourRequirement.options].sort(
+            (a, b) =>
+              b.points[body.participantRole] - a.points[body.participantRole],
+          );
+          const withinMandate =
+            !minimumId ||
+            order.findIndex((o) => o.id === standing[yourRequirement.id]) <=
+              order.findIndex((o) => o.id === minimumId);
+          if (withinMandate) {
+            proposal = standing;
+            decidedAction = `Say their counterproposal can work provisionally — record ${packageSentence(task, standing)} as the tentative package for the two principals to close directly.`;
+          } else {
+            impasse = true;
+            decidedAction = `Say their proposal on ${yourRequirement.label.toLowerCase()} is below what your principal instructed you to accept, so the two principals will need to settle this directly. Do not agree to anything.`;
+          }
+        }
+        break;
+      }
     }
   } else {
-    // What the counterpart is being asked to evaluate. At stage 4 the
-    // participant's proxy has just spoken (see TURN_ORDER), so this is their
-    // actual counterpackage; the fallback covers a turn arriving out of order.
-    const incoming =
-      stage >= 4 ? (body.lastParticipantPackage ?? plan.counterpackage) : null;
-    // ISSUE-SCOPED, not "any reason at all". The cards span all three issues
-    // now (ver.2.5), so "a reason was voiced" and "a reason was voiced FOR
-    // THE REQUIREMENT" are different propositions — a proxy that only argued
-    // the timing term has not justified the requirement, and treating it as
-    // if it had would hand the requirement concession over for free. The
-    // carried tokens are resolved back to their issues server-side.
-    const usedReasons = resolveReasonTokens(
-      body.taskId,
-      body.participantRole,
-      body.reasonsUsed ?? [],
-    );
-    const decision = counterpartStep(
-      task,
-      counterpartRole,
-      stage,
-      incoming,
-      body.lastCounterpartPackage ?? null,
-      {
-        reasonGivenForRequirement: usedReasons.some(
-          (r) => r.issueId === yourRequirement.id,
-        ),
-        reasonAlreadyRequested: false,
-      },
-    );
-    proposal = decision.proposal;
-    accepted = decision.accepts;
-    impasse = decision.impasse;
-    counterpartAction = decision.action;
-
-    decidedAction = ((): string => {
-      // Wherever the move carries a package, its exact levels go into the
-      // instruction — see `packageSentence`.
-      const levels = decision.proposal
-        ? packageSentence(task, decision.proposal)
-        : null;
-      switch (decision.action) {
-        case "open":
-          return `Open with your own best package on both terms, naming these exact levels: ${levels}.`;
-        case "state_priority":
-          // THE COUNTERPART GIVES A WORK REASON AND NEVER ITS SENSITIVE ONE.
-          //
-          // Ver.2.6 §4 fixes the counterpart's mandate with all six cards
-          // ticked, so that every participant meets the same reasons and the
-          // receiver-side measures have a stimulus that does not vary. The
-          // first half of that is kept here — its reason is fixed and
-          // identical for everyone. The core-issue sensitive card is NOT,
-          // and the asymmetry with the participant's own proxy is deliberate.
-          //
-          // The two disclosures are different objects. The proxy's is the
-          // MANIPULATION: REASON-SCOPE is the participant's own authorization,
-          // and the ver.2.6 schedule exists precisely so a ticked card is
-          // really said. The counterpart's would be a STIMULUS — and a
-          // stimulus that primes the construct being measured is a confound,
-          // not a control. Reciprocal self-disclosure reliably increases
-          // disclosure, so a counterpart confessing at stage 4 of every task
-          // would push PERC ("explaining my reasons could damage how I came
-          // across") and RISK the same way in BOTH arms — and RISK is gate
-          // 4's task-equivalence instrument, which cannot carry an effect.
-          // It would also compress Task 2's REASON-SCOPE against the very
-          // floor-and-ceiling band gate 12 checks for.
-          //
-          // A third reason is simpler: the same confession arriving from two
-          // different "Other Participants" in Task 1 and Task 2 is a tell
-          // that the counterpart is not a person.
-          return `Say that ${theirRequirement.label.toLowerCase()} is your principal's priority, with one reason about the work — never a personal or private one. Ask which term matters most to them.`;
-        case "challenge":
-          // The mirror of the participant proxy's stage-3 move: this one is
-          // aimed at the PARTICIPANT'S requirement.
-          return `Send exactly this challenge, in your own words: "${task.standardizedChallenge[body.participantRole]}"`;
-        case "request_reason":
-          return `Ask why ${yourRequirement.label.toLowerCase()} matters so much to their principal. Make no new offer this turn.`;
-        case "accept":
-        case "soft_close":
-          return stage >= 5
-            ? `Record the tentative package — ${levels} — and ask both principals to review it. Name exactly these levels.`
-            : `Say the package they proposed — ${levels} — works for your principal. Name exactly these levels.`;
-        case "hold":
-          return `Say most of the package works, but ${yourRequirement.label.toLowerCase()} stays where it is for now — the package as you accept it is: ${levels}. Name exactly these levels.`;
-        case "concede_trade":
-          return `Give a step on the term that matters to them and put this counteroffer forward, naming these exact levels: ${levels}.`;
-        case "impasse":
-          return "Say you cannot reach agreement on these terms.";
+    switch (turn) {
+      case 0: {
+        const decision = counterpartStep(task, counterpartRole, 1, null, {
+          tier,
+          askedWhy: true,
+          numbersReminded: true,
+        });
+        proposal = decision.proposal;
+        counterpartAction = decision.action;
+        decidedAction = `Open with your principal's best package on both terms, naming these exact levels: ${packageSentence(task, decision.proposal!)}.`;
+        break;
       }
-    })();
+      case 2: {
+        // The counterpart's WR, fixed and identical for everyone, plus the
+        // question that opens the participant side's reason opportunity.
+        const wr = cardOfLayer(task, counterpartRole, "work");
+        counterpartAction = "state_priority";
+        decidedAction = `Say that ${theirRequirement.label.toLowerCase()} is your principal's priority, giving exactly this reason: "${wr?.text ?? ""}". Then ask what makes the other side's priority so important to their principal.`;
+        break;
+      }
+      case 4: {
+        // The fixed SB disclosure (§6.3): once, unconditionally, for every
+        // participant, never mirrored to what the participant side said, and
+        // carrying no package and no demand.
+        const sb = cardOfLayer(task, counterpartRole, "sensitive");
+        counterpartAction = "disclose_sb";
+        decidedAction = `Share your principal's own background: they have authorized you to say exactly this, in your own words, keeping every fact: "${sb?.text ?? ""}". Attach no demand and no package to it, and do not ask the other side to reciprocate.`;
+        break;
+      }
+      default: {
+        // Turn 6 — the evaluation, by the ladder.
+        const decision = evaluate();
+        proposal = decision.proposal;
+        accepted = decision.accepts;
+        counterpartAction = decision.action;
+        const levels = decision.proposal
+          ? packageSentence(task, decision.proposal)
+          : null;
+        switch (decision.action) {
+          case "accept_sb":
+            decidedAction = `Say you did not know that was the situation, that this arrangement is better for both sides than forcing it, and accept exactly these levels: ${levels}.`;
+            break;
+          case "accept":
+            decidedAction = `Say the package they proposed works for your principal, naming exactly these levels: ${levels}.`;
+            break;
+          case "propose_max":
+            decidedAction = `Say that given what they shared, a fuller exchange makes more sense — propose exactly these levels and no others: ${levels}. Frame it as: their principal takes what they need on ${yourRequirement.label.toLowerCase()}, and yours asks for ${theirRequirement.label.toLowerCase()} in return.`;
+            break;
+          default:
+            // counter_tier: SCRIPT-FAIR / SCRIPT-LIMIT.
+            decidedAction = `Say that on general grounds alone you cannot go all the way on ${yourRequirement.label.toLowerCase()}, and offer this instead, naming exactly these levels: ${levels}.`;
+            break;
+        }
+        break;
+      }
+    }
   }
 
   // --- the model says it ------------------------------------------------
@@ -658,9 +526,8 @@ export async function POST(request: Request) {
           ? reasonsFor(body.taskId, body.participantRole, body.mandate).forbidden
           : undefined,
         // The pool goes only to the participant's own proxy under Explorer.
-        // The counterpart proxy runs the same policy in the fiction, but its
-        // words are not a measured variable, so it is not given extra latitude
-        // to spend.
+        // The counterpart proxy's words are not a measured variable, so it is
+        // not given extra latitude to spend.
         plausibleReasons:
           isParticipantSide && body.policy === "explorer"
             ? plausibleReasons(body.taskId, body.participantRole)
@@ -669,14 +536,15 @@ export async function POST(request: Request) {
       history,
     });
 
-    // On the participant side the schedule is the record; see `designatedIds`.
-    const scheduled = designatedIds();
+    // On the participant side the SCHEDULE is the record, not the model's
+    // self-report: a model returning a different card id is a reporting
+    // error, and budgeting off it could leave a voiced reason unrecorded.
     const voicedReasonId = isParticipantSide
-      ? scheduled.reason
-      : action.reasonSourceId;
+      ? (designatedCard?.id ?? null)
+      : null;
     const voicedPoolId = isParticipantSide
-      ? scheduled.pool
-      : action.addedReasonSourceId;
+      ? (poolBox.item?.id ?? null)
+      : null;
 
     const validation = validateAction(action, {
       issues: task.issues,
@@ -684,46 +552,20 @@ export async function POST(request: Request) {
       policy: body.policy,
       actorRole,
       stage,
-      // The budget spans the whole task, so the client carries the history —
-      // this route is stateless and one action cannot know what came before.
-      //
-      // The history arrives as opaque tokens (they went out that way, so the
-      // Explorer's additions are not named in the network tab) and is resolved
-      // back to kinds and issues server-side; the current action is tokenised
-      // to match.
-      reasonsUsed: isParticipantSide
-        ? resolveReasonTokens(
-            body.taskId,
-            body.participantRole,
-            body.reasonsUsed ?? [],
-          )
-        : undefined,
-      // The SCHEDULE's ids on the participant side, where there is one; the
-      // counterpart proxy is not scheduled this way, so its reported id
-      // stands.
+      reasonsUsed: isParticipantSide ? resolvedHistory : undefined,
       reasonKey: voicedReasonId ? reasonToken(voicedReasonId) : null,
-      reasonIssueId: isParticipantSide
-        ? reasonIssueOf(body.taskId, body.participantRole, voicedReasonId)
-        : null,
+      reasonIssueId: designatedCard?.issueId ?? null,
       addedReasonKey: voicedPoolId ? reasonToken(voicedPoolId) : null,
-      addedReasonIssueId: isParticipantSide
-        ? reasonIssueOf(body.taskId, body.participantRole, voicedPoolId)
-        : null,
+      addedReasonIssueId: null,
     });
 
-    // A blocked action loses its WORDING, not the move behind it.
-    //
-    // Dropping the turn entirely — which is what returning `skipped` did —
-    // took the state machine's package with it, because the package rides on
-    // the message. The exchange then had a hole where a stage should be, the
-    // counterpart evaluated a stale package at stage 4, and the participant
-    // saw nine messages instead of ten. Appendix E6 asks for a deterministic
-    // fallback action, so that is what a block produces.
+    // A blocked action loses its WORDING, not the move behind it — dropping
+    // the turn would take the machine's package with it.
     const blocked =
       !validation.valid && validation.disposition === "regenerate";
 
     const text = blocked
-      ? fallbackText(task, stage, proposal, isParticipantSide)
+      ? fallbackText(task, proposal, isParticipantSide)
       : action.rationale;
 
     const message: TranscriptMessage = {
@@ -737,10 +579,9 @@ export async function POST(request: Request) {
       internalProvenance: action.internalProvenance,
     };
 
-    // Provenance is stripped before the response leaves the server. The
+    // Provenance is stripped before the response leaves the server: the
     // participant must not be able to tell a pool reason from one of their
-    // own — that indistinguishability IS the Explorer condition, and OTHER-AI4
-    // asks them to try (Design §7, CLAUDE.md §3).
+    // own — that indistinguishability IS the Explorer condition.
     const { internalProvenance, ...visible } = message;
     void internalProvenance;
 
@@ -750,48 +591,16 @@ export async function POST(request: Request) {
       message: visible,
       requirementOption: proposal?.[yourRequirement.id] ?? null,
       // The decided move, in machine vocabulary, so the client can store it
-      // beside the rendered sentence — Design §4 requires the pair for the
-      // gate-9 audit, and there is nowhere else to record it until Supabase is
-      // wired.
-      //
-      // Unlike the Baseline route this is defensible: in a Proxy task the
-      // participant already knows both sides are AI Proxies, so "the system
-      // decided to concede on timing" reveals nothing they were not told. It
-      // must still never carry provenance — see `reasonToken`.
+      // beside the rendered sentence for the audit. Defensible in the Proxy
+      // arm: the participant knows both sides are AI Proxies.
       decidedAction: counterpartAction,
       accepted,
       impasse,
       blocked,
-      // Returning the card id itself was a provenance leak: under Explorer a
-      // `pool:` prefix in the network tab names exactly which messages the AI
-      // added, which is the judgement OTHER-AI4 asks the participant to make
-      // unaided. An opaque token keeps distinct reasons distinguishable from
-      // each other without saying what any of them is.
-      //
-      // FIXED WIDTH, ALWAYS TWO. The shape leaks as surely as the content
-      // does, and this field has now been got wrong twice in the same way.
-      // A separate `addedReasonToken` field is populated only under Explorer,
-      // so its PRESENCE names the AI-added messages. Collapsing the two into
-      // one variable-length array moves the same signal into the LENGTH: two
-      // entries occur only under Explorer, only on a turn that carried a pool
-      // clause. So every turn of every policy returns exactly two opaque
-      // hashes, with a per-turn decoy in any slot that has no real reason.
-      // `resolveReasonTokens` drops anything that does not re-hash to a known
-      // id, so a decoy is inert — it spends no budget and satisfies no rule.
-      //
-      // DECOYS WHEN BLOCKED, not an empty array: a blocked turn's rationale
-      // was replaced by the package-only fallback, so no reason was said and
-      // no real token may be returned — but an empty array would be its own
-      // one-bit tell that a guardrail fired.
-      //
-      // PARTICIPANT SIDE ONLY carries real tokens. The budget and the
-      // requirement rule are about the PARTICIPANT's reasons; a counterpart
-      // token in the same list would be counted against them. Card ids are
-      // role-suffixed so a counterpart card cannot resolve against the
-      // participant's map anyway — but `pool:<n>` ids are not, so a
-      // counterpart turn reporting one would hash to a token that resolves to
-      // the participant's own pool item, and on the requirement issue it would
-      // satisfy the reason rule with an argument the OTHER side made.
+      // FIXED WIDTH, ALWAYS TWO opaque hashes, decoys filling empty slots —
+      // presence, absence, or count of real tokens would each name the
+      // Explorer's added turns in the network tab. `resolveReasonTokens`
+      // drops decoys server-side, so they spend no budget.
       reasonTokens: [
         isParticipantSide && !blocked && voicedReasonId
           ? reasonToken(voicedReasonId)
@@ -800,28 +609,20 @@ export async function POST(request: Request) {
           ? reasonToken(voicedPoolId)
           : reasonToken(`nil:b:${turn}`),
       ],
-      // WHETHER THE PRINCIPAL ARGUED THEIR OWN REQUIREMENT — decided here,
-      // from the principal's CARD alone, and handed over as one boolean.
-      //
-      // The client used to derive this by pairing a token with `reasonIssueId`,
-      // which worked only because of which issue ids the two designation sites
-      // happened to pass. That is a coincidence, not a guarantee, and the
-      // guarantee is load-bearing: a pool argument is not the principal's
-      // reason, so letting one satisfy the rule would hand an Explorer
-      // participant who authorized nothing the requirement concession — 3,200
-      // against 1,200, in one arm only, on the primary outcome.
-      //
-      // As a boolean it also leaks nothing: it is true under Delegate too,
-      // whenever the principal's reason argued their requirement.
-      reasonForRequirement:
-        !blocked &&
-        isParticipantSide &&
-        reasonIssueOf(body.taskId, body.participantRole, voicedReasonId) ===
-          yourRequirement.id,
-      // Violation CODES only. The details name red lines, withheld reason
-      // cards and the validator's reasoning — a participant who opened the
-      // network tab and found "disclosure_permission_violation: reason a_i2_sb_m
-      // was not checked" would have been shown the card they withheld.
+      // What the participant's own proxy voiced THIS TURN, as a tier rung.
+      // The direct closing needs it to carry the credibility ladder over —
+      // and it must reflect what was actually said, not what was authorized:
+      // a guardrail block strips the reason, and assuming it was voiced made
+      // the rule inert for every Proxy participant once before. Not a leak:
+      // it describes the participant's own card, identically under both
+      // policies.
+      voicedTier:
+        !blocked && isParticipantSide && designatedCard
+          ? designatedCard.layer === "sensitive"
+            ? "sensitive"
+            : "work"
+          : "none",
+      // Violation CODES only — details name red lines and withheld cards.
       guardrailViolations: validation.valid
         ? []
         : validation.violations.map((v) => v.code),

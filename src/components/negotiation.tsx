@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { NEGOTIATION } from "@/lib/study-config";
-import type { StageId, Speaker } from "@/lib/types";
+import type { Speaker } from "@/lib/types";
 import { Button, cx } from "./ui";
 
 // ---------------------------------------------------------------------------
@@ -294,53 +294,6 @@ export function MessageComposer({
         >
           {left} characters left
         </span>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Stage rail
-// ---------------------------------------------------------------------------
-
-export function StageRail({
-  stage,
-  goals,
-  note,
-}: {
-  stage: StageId;
-  goals: Record<StageId, string>;
-  note?: string;
-}) {
-  const stages: StageId[] = [1, 2, 3, 4, 5];
-  return (
-    <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
-      <ol className="mb-2.5 flex items-center gap-2">
-        {stages.map((s) => (
-          <li key={s} className="flex flex-1 items-center gap-2">
-            <div
-              className={cx(
-                "h-2 flex-1 rounded-full transition-all duration-300",
-                s < stage
-                  ? "bg-[var(--accent)]/50"
-                  : s === stage
-                    ? "bg-[var(--accent)] shadow-2xs"
-                    : "bg-slate-200",
-              )}
-            />
-          </li>
-        ))}
-      </ol>
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
-          <span className="text-[var(--accent)] font-extrabold mr-1.5">Step {stage} of 5</span>
-          <span>· {goals[stage]}</span>
-        </p>
-        {note ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-[var(--ink-2)] shadow-2xs">
-            💡 {note}
-          </span>
-        ) : null}
       </div>
     </div>
   );
