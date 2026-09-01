@@ -287,14 +287,28 @@ export function BriefingPanel({
         </p>
       </div>
 
+      {/* WHICH SECTIONS START OPEN IS A DESIGN DECISION, NOT A TIDYING ONE
+          (interface rule 5). What is open by default is what a participant
+          reaches for MID-SENTENCE: the numbers, the fallback, and the reason
+          cards — rule 6's decision (which box am I willing to draw from) has to
+          be visible to be made. The situation and objectives fold, because by
+          then they have been read on the brief phase, where `defaultOpen`
+          expands everything.
+
+          These were inverted for a while: the role story — the longest block,
+          and the one already read — was pinned open while all three of the
+          mid-negotiation sections sat behind a click. Do not "balance" this by
+          opening everything either; as one scroll the panel runs to several
+          screens and buries the payoff table under the story, which is the
+          problem the folds were introduced to solve. */}
       <div className="space-y-3">
-        <Fold title="📄 Your Situation" defaultOpen>
+        <Fold title="📄 Your Situation" defaultOpen={defaultOpen}>
           <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed">
             {brief.roleStory}
           </p>
         </Fold>
 
-        <Fold title="🎯 What You Want (Priorities)" defaultOpen>
+        <Fold title="🎯 What You Want (Priorities)" defaultOpen={defaultOpen}>
           <ul className="list-disc space-y-1.5 pl-4 text-xs sm:text-sm leading-relaxed">
             {brief.objectives.map((o) => (
               <li key={o}>{o}</li>
@@ -302,7 +316,7 @@ export function BriefingPanel({
           </ul>
         </Fold>
 
-        <Fold title="🔢 Point Values per Term" defaultOpen={defaultOpen}>
+        <Fold title="🔢 Point Values per Term" defaultOpen>
           <IssueValueTable
             issues={task.issues}
             role={role}
@@ -311,15 +325,31 @@ export function BriefingPanel({
         </Fold>
 
         {brief.reasonCards.length ? (
-          <Fold title="💬 Permitted Reasons">
+          <Fold title="💬 Permitted Reasons" defaultOpen>
             <p className="mb-2.5 rounded-lg border border-[var(--private-line)] bg-amber-100/60 p-2.5 text-xs leading-relaxed font-medium">
               {brief.requirementNote}
+            </p>
+            {/* `disclosureRisk` belongs HERE, in the panel both arms render, and
+                not only on the Proxy mandate screen. It frames what saying a
+                sensitive reason may cost — which is the construct PERC measures
+                and the thing the study manipulates. Showing it in one arm only
+                puts a condition-confounded stimulus directly on the primary
+                contrast (`Pooled Proxy − Baseline`): the Proxy arm would be
+                warned about evaluative risk and Baseline would not, so any
+                difference in disclosure could be the warning rather than the
+                delegation. Design Ver.2.11 §5 makes the same requirement of its
+                own guidance text — "전 조건에서 동일하게 적용함". */}
+            <p className="mb-2.5 max-w-prose text-xs leading-relaxed text-[var(--private-ink)]/80">
+              Each term carries a <strong>work reason</strong> — nothing awkward
+              about saying it — and a piece of{" "}
+              <strong>sensitive background</strong> that is yours to keep.{" "}
+              {brief.disclosureRisk}
             </p>
             <IssueReasonGroups task={task} role={role} />
           </Fold>
         ) : null}
 
-        <Fold title="⚠️ Fallback Outcome" last>
+        <Fold title="⚠️ Fallback Outcome" defaultOpen last>
           <p className="text-xs sm:text-sm leading-relaxed font-medium">{brief.batnaSummary}</p>
         </Fold>
       </div>
