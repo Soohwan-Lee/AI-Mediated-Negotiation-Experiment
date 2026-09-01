@@ -254,11 +254,11 @@ export function OptionChips({
 }) {
   const selectedClass =
     tone === "private"
-      ? "border-amber-500 bg-amber-500 text-white shadow-sm scale-102 font-bold"
-      : "border-[var(--accent)] bg-[var(--accent)] text-white shadow-sm scale-102 font-bold";
+      ? "border-amber-500 bg-amber-500 text-white shadow-sm font-bold ring-2 ring-amber-500/20"
+      : "border-[var(--accent)] bg-[var(--accent)] text-white shadow-sm font-bold ring-2 ring-[var(--accent)]/20";
 
   return (
-    <div className="flex flex-wrap gap-2 pt-1">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-1.5">
       {allowNone ? (
         <Chip
           name={name}
@@ -266,7 +266,7 @@ export function OptionChips({
           onSelect={() => onChange("")}
           selectedClass={selectedClass}
         >
-          <span className="text-[var(--ink-3)] font-medium">{noneLabel}</span>
+          <span className="text-[var(--ink-3)] font-medium truncate">{noneLabel}</span>
         </Chip>
       ) : null}
 
@@ -278,19 +278,21 @@ export function OptionChips({
           onSelect={() => onChange(o.id)}
           selectedClass={selectedClass}
         >
-          <span className="font-semibold">{o.label}</span>
-          {showPoints ? (
-            <span
-              className={cx(
-                "tabular ml-2 rounded-md px-1.5 py-0.5 text-xs font-bold transition-colors",
-                value === o.id
-                  ? "bg-white/20 text-white"
-                  : "bg-slate-100 text-[var(--accent)]",
-              )}
-            >
-              +{o.points[role]} pts
-            </span>
-          ) : null}
+          <div className="flex w-full items-center justify-between gap-2 whitespace-nowrap">
+            <span className="truncate text-xs sm:text-sm font-semibold">{o.label}</span>
+            {showPoints ? (
+              <span
+                className={cx(
+                  "tabular shrink-0 rounded-md px-1.5 py-0.5 text-2xs sm:text-xs font-bold transition-colors",
+                  value === o.id
+                    ? "bg-white/25 text-white"
+                    : "bg-slate-100 text-[var(--accent)]",
+                )}
+              >
+                +{o.points[role]} pts
+              </span>
+            ) : null}
+          </div>
         </Chip>
       ))}
     </div>
@@ -313,10 +315,10 @@ function Chip({
   return (
     <label
       className={cx(
-        "inline-flex cursor-pointer items-center rounded-xl border-2 px-4 py-2.5 text-sm sm:text-[0.9375rem] transition-all duration-150 shadow-2xs select-none active:scale-[0.98]",
+        "flex w-full cursor-pointer items-center rounded-xl border-2 px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-sm transition-all duration-150 shadow-2xs select-none active:scale-[0.98]",
         selected
           ? selectedClass
-          : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-2)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]",
+          : "border-[var(--line-strong)] bg-white text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]/50",
       )}
     >
       <input
