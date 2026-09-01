@@ -109,25 +109,16 @@ test("lets through generic talk of slipping schedules and quality", () => {
 test("lets through a description of what it will trade", () => {
   assert.equal(
     leaks(
-      "I'll trade the pilot start date and the review count to keep your afternoons.",
+      "I'll give ground on the weekend shifts to keep the closes down.",
     ),
     false,
   );
 });
 
-test("blocks a paraphrase of the called-out-mistake card (a_i1_sb_m)", () => {
+test("blocks a paraphrase of the second-job card (a_i2_sb_m)", () => {
   assert.equal(
     leaks(
-      "I could mention that a mistake of yours was called out in front of the room at the last review.",
-    ),
-    true,
-  );
-});
-
-test("blocks a paraphrase of the missed-errors card (a_i2_sb_m)", () => {
-  assert.equal(
-    leaks(
-      "I might note you missed two testing errors while exhausted and fixed them quietly.",
+      "I might note you have a second job at another shop in the evenings that the closes clash with.",
     ),
     true,
   );
@@ -135,15 +126,19 @@ test("blocks a paraphrase of the missed-errors card (a_i2_sb_m)", () => {
 
 test("blocks a shorter paraphrase of the same card", () => {
   assert.equal(
-    leaks("It was the exhaustion that caused you to miss those errors before launch."),
+    leaks("You are working somewhere else on weekday evenings to cover your living costs."),
     true,
   );
 });
 
-test("blocks a paraphrase of the unreported-backlog card (a_i3_sb_m)", () => {
+test("blocks a paraphrase that circles the job without naming it", () => {
+  // The same secret from its other side. It never says "second job", but the
+  // distinctive vocabulary of the card — the weekday evenings, the clash, the
+  // living costs — is what gives it away, which is the case the subtraction
+  // step exists to catch.
   assert.equal(
     leaks(
-      "I might say there is a backlog you have not reported, and an early start would surface it.",
+      "The weekday evenings are already spoken for, and the closes clash with what pays your living costs.",
     ),
     true,
   );
@@ -164,7 +159,7 @@ test("authorizing a card stops it being treated as a leak", () => {
   const sayable = [...SAYABLE, ticked.text];
   assert.equal(
     leaksForbiddenReason(
-      "I might note you missed two testing errors while exhausted and fixed them quietly.",
+      "I might note you have a second job at another shop in the evenings that the closes clash with.",
       forbidden,
       sayable,
     ),

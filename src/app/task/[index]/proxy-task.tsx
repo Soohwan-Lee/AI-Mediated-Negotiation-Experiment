@@ -15,7 +15,7 @@
  *    hand over and read the policy disclosure — a pre-task measure turned
  *    partly post-treatment, in one arm only. It is now asked straight after
  *    the briefing, which is where Baseline asks it too.
- *  - The mandate is ONE screen. Levels on all three terms and the reason cards
+ *  - The mandate is ONE screen. Levels on both terms and the reason cards
  *    used to be two screens in sequence; deciding a position and deciding what
  *    may be said for it is one act, and that the second half was never asked
  *    is the gap this study is about.
@@ -713,7 +713,7 @@ export function ProxyTask({
     );
   }
 
-  /* THE MANDATE IS ONE SCREEN: the levels on all three terms, and which of the
+  /* THE MANDATE IS ONE SCREEN: the levels on both terms, and which of the
      participant's reasons the proxy may say. It was two screens in sequence,
      and merging them is the point of the study rather than a tidy-up —
      deciding a position and deciding what may be said for it is one act, and
@@ -1024,7 +1024,7 @@ export function ProxyTask({
         steps={[
           { label: "Review AI Proxy exchange", hint: "Pinned above the chat for full reference" },
           { label: "Message the other participant", hint: "Direct conversation with your counterpart" },
-          { label: "Settle the three terms", hint: "Agree on the final package together" },
+          { label: "Settle both terms", hint: "Agree on the final package together" },
         ]}
         minutes={10}
         note={

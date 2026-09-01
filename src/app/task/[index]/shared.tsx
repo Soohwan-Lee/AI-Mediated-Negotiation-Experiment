@@ -210,7 +210,7 @@ export function TaskBrief({
 }
 
 // ---------------------------------------------------------------------------
-// Phase: preferences on all three terms
+// Phase: preferences on both terms
 // ---------------------------------------------------------------------------
 
 export interface Preferences {

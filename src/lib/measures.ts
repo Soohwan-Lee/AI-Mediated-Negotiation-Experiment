@@ -313,7 +313,7 @@ export const COMPREHENSION_BLOCK: Block = {
     {
       kind: "choice",
       id: "COMP2",
-      text: "Can one side settle all three terms on its own?",
+      text: "Can one side settle both terms on its own?",
       columns: 2,
       options: [
         { value: "no", label: "No" },

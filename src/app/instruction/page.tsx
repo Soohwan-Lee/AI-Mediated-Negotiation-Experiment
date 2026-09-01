@@ -313,7 +313,7 @@ export default function InstructionPage() {
                   <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">3 Terms, 4 Options Each</p>
                 </div>
                 <p className="text-xs text-[var(--ink-2)] leading-relaxed">
-                  Both sides must agree on the complete package of 3 terms for a successful outcome.
+                  Both sides must agree on the complete package of both terms for a successful outcome.
                 </p>
               </div>
 

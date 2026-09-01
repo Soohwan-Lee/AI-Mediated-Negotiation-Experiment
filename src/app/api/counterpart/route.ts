@@ -141,7 +141,7 @@ export async function POST(request: Request) {
   const decidedAction = ((): string => {
     switch (decision.action) {
       case "open":
-        return "Open with your own best package on all three terms, and say which one matters most to you.";
+        return "Open with your own best package on both terms, and say which one matters most to you.";
       case "state_priority":
         return `Say that ${theirRequirement.label.toLowerCase()} is the term that matters most to you, with one reason about the work. Ask which term matters most to them.`;
       case "challenge":
@@ -159,8 +159,8 @@ export async function POST(request: Request) {
         return "Say time is nearly up and that the package they just proposed works for you — better to settle it than run out.";
       case "hold":
         return `Say you can accept most of what they proposed, but you are keeping ${yourRequirement.label.toLowerCase()} where it is for now.`;
-      case "concede_distributive":
-        return "Give a step on the timing term and put that counteroffer forward.";
+      case "concede_trade":
+        return `Give a step on ${yourRequirement.label.toLowerCase()} — the term that matters to them, not to you — and put that counteroffer forward.`;
       case "impasse":
         return "Say you do not think you can reach agreement on these terms.";
     }

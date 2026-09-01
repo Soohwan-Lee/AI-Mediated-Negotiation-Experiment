@@ -156,35 +156,41 @@ for (const taskId of TASKS) {
 
 for (const taskId of TASKS) {
   for (const role of ROLES) {
-    test(`${taskId}/${role}: every card carries its issue, one WR + one SB per issue`, () => {
+    test(`${taskId}/${role}: one WR + one SB, both on this role's own requirement issue`, () => {
       const task = getTask(taskId);
       const cards = reasonCards(task, role);
-      assert.equal(cards.length, 6);
-      for (const issue of task.issues) {
-        const onIssue = cards.filter((c) => c.issueId === issue.id);
-        assert.equal(onIssue.length, 2, `${issue.id} has WR+SB`);
-        assert.equal(onIssue.filter((c) => c.layer === "work").length, 1);
+      const requirementIssueId = task.requirementIssueId[role];
+
+      // Ver.2.11 §3.2: two cards per role per task, a working reason and a
+      // sensitive background, and BOTH sit on the role's own requirement
+      // issue. The three-issue version gave each role a WR+SB pair on every
+      // issue; with two issues the other side's term is the thing you SPEND,
+      // not the thing you argue for, so it carries no card of your own.
+      assert.equal(cards.length, 2);
+      assert.equal(cards.filter((c) => c.layer === "work").length, 1);
+      assert.equal(cards.filter((c) => c.layer === "sensitive").length, 1);
+      for (const card of cards) {
         assert.equal(
-          onIssue.filter((c) => c.layer === "sensitive").length,
-          1,
+          card.issueId,
+          requirementIssueId,
+          `${card.id} must sit on this role's requirement issue`,
         );
       }
-      // The scoping the acceptance rule's call sites perform: a voiced card
-      // counts only if it sits on the role's own requirement issue.
-      const requirementIssueId = task.requirementIssueId[role];
-      const timingCard = cards.find(
-        (c) => c.issueId !== requirementIssueId && c.layer === "work",
-      );
-      const requirementCard = cards.find(
-        (c) => c.issueId === requirementIssueId && c.layer === "work",
-      );
+
+      // The scoping the acceptance rule's call sites perform. It still has to
+      // be issue-scoped even though every card now satisfies it: the check
+      // reads the card's issue rather than assuming, so a later card added on
+      // the other term cannot silently earn the requirement concession.
       const counts = (voicedIds) =>
         voicedIds.some(
           (id) =>
             cards.find((c) => c.id === id)?.issueId === requirementIssueId,
         );
-      assert.equal(counts([timingCard.id]), false);
-      assert.equal(counts([timingCard.id, requirementCard.id]), true);
+      const theirIssueId = task.issues.find((i) => i.id !== requirementIssueId).id;
+      assert.equal(counts([]), false);
+      assert.equal(counts(["not-a-card"]), false);
+      assert.equal(counts([{ id: "x", issueId: theirIssueId }.id]), false);
+      assert.equal(counts(cards.map((c) => c.id)), true);
     });
   }
 }
@@ -234,9 +240,9 @@ test("both of an issue's cards may be voiced across the task (ver.2.6)", () => {
   // here, because a violation would blank the message and null its token.
   const result = validateAction(actionWith("a_i1_sb_l"), {
     ...baseCtx,
-    reasonsUsed: [used("k1", "quality_reviews", "principal")],
+    reasonsUsed: [used("k1", "weekend_shifts", "principal")],
     reasonKey: "k2",
-    reasonIssueId: "quality_reviews",
+    reasonIssueId: "weekend_shifts",
   });
   assert.equal(result.valid, true);
 });
@@ -244,9 +250,9 @@ test("both of an issue's cards may be voiced across the task (ver.2.6)", () => {
 test("repeating the same principal reason is fine", () => {
   const result = validateAction(actionWith("a_i1_wr_l"), {
     ...baseCtx,
-    reasonsUsed: [used("k1", "quality_reviews", "principal")],
+    reasonsUsed: [used("k1", "weekend_shifts", "principal")],
     reasonKey: "k1",
-    reasonIssueId: "quality_reviews",
+    reasonIssueId: "weekend_shifts",
   });
   assert.equal(result.valid, true);
 });
@@ -254,9 +260,9 @@ test("repeating the same principal reason is fine", () => {
 test("a principal reason on a different issue is fine", () => {
   const result = validateAction(actionWith("a_i2_wr_l"), {
     ...baseCtx,
-    reasonsUsed: [used("k1", "quality_reviews", "principal")],
+    reasonsUsed: [used("k1", "weekend_shifts", "principal")],
     reasonKey: "k2",
-    reasonIssueId: "focus_afternoons",
+    reasonIssueId: "closing_shifts",
   });
   assert.equal(result.valid, true);
 });
@@ -271,11 +277,11 @@ test("the pool is additive: it rides beside a principal card in one message", ()
     actionWith("a_i1_wr_l", "pool_reason", "pool:0"),
     {
       ...baseCtx,
-      reasonsUsed: [used("k1", "quality_reviews", "principal")],
+      reasonsUsed: [used("k1", "weekend_shifts", "principal")],
       reasonKey: "k1",
-      reasonIssueId: "quality_reviews",
+      reasonIssueId: "weekend_shifts",
       addedReasonKey: "p0",
-      addedReasonIssueId: "quality_reviews",
+      addedReasonIssueId: "weekend_shifts",
     },
   );
   assert.equal(result.valid, true);
@@ -286,9 +292,9 @@ test("a second pool reason on the same issue is over budget", () => {
     actionWith("a_i1_wr_l", "pool_reason", "pool:0"),
     {
       ...baseCtx,
-      reasonsUsed: [used("p9", "quality_reviews", "pool")],
+      reasonsUsed: [used("p9", "weekend_shifts", "pool")],
       addedReasonKey: "p0",
-      addedReasonIssueId: "quality_reviews",
+      addedReasonIssueId: "weekend_shifts",
     },
   );
   assert.ok(
@@ -302,11 +308,11 @@ test("a third pool reason in the task is over budget", () => {
     {
       ...baseCtx,
       reasonsUsed: [
-        used("p0", "quality_reviews", "pool"),
-        used("p1", "focus_afternoons", "pool"),
+        used("p0", "weekend_shifts", "pool"),
+        used("p1", "closing_shifts", "pool"),
       ],
       addedReasonKey: "p2",
-      addedReasonIssueId: "pilot_start",
+      addedReasonIssueId: "closing_shifts",
     },
   );
   assert.ok(
@@ -319,7 +325,7 @@ test("the exchange pool item escapes the per-issue cap but not the per-task cap"
     actionWith("a_i1_wr_l", "pool_reason", "pool:3"),
     {
       ...baseCtx,
-      reasonsUsed: [used("p0", "quality_reviews", "pool")],
+      reasonsUsed: [used("p0", "weekend_shifts", "pool")],
       addedReasonKey: "p3",
       addedReasonIssueId: null,
     },
@@ -331,8 +337,8 @@ test("the exchange pool item escapes the per-issue cap but not the per-task cap"
     {
       ...baseCtx,
       reasonsUsed: [
-        used("p0", "quality_reviews", "pool"),
-        used("p1", "focus_afternoons", "pool"),
+        used("p0", "weekend_shifts", "pool"),
+        used("p1", "closing_shifts", "pool"),
       ],
       addedReasonKey: "p3",
       addedReasonIssueId: null,
@@ -351,7 +357,7 @@ test("a Delegate may not fill the added slot either", () => {
       policy: "delegate",
       reasonsUsed: [],
       addedReasonKey: "p0",
-      addedReasonIssueId: "quality_reviews",
+      addedReasonIssueId: "weekend_shifts",
     },
   );
   assert.ok(
@@ -377,7 +383,7 @@ test("a Delegate may not touch the pool at all", () => {
     policy: "delegate",
     reasonsUsed: [],
     reasonKey: "p0",
-    reasonIssueId: "quality_reviews",
+    reasonIssueId: "weekend_shifts",
   });
   assert.ok(
     result.violations.some((v) => v.code === "provenance_policy_violation"),
@@ -390,14 +396,25 @@ test("a Delegate may not touch the pool at all", () => {
 
 for (const taskId of TASKS) {
   for (const role of ROLES) {
-    test(`${taskId}/${role}: standard mandate settles at 4,200 / 3,600`, () => {
+    test(`${taskId}/${role}: standard mandate settles at the full logroll, 3,000 / 3,000`, () => {
       const t = getTask(taskId);
       const plan = buildProxyPlan(t, role, standardMandate(t, role));
-      assert.equal(scorePackage(t, plan.counterpackage, role), 4200);
-      assert.equal(scorePackage(t, plan.counterpackage, other(role)), 3600);
-      assert.ok(
-        scorePackage(t, plan.counterpackage, other(role)) >= ACCEPTANCE.T_MID,
-      );
+      const self = scorePackage(t, plan.counterpackage, role);
+      const them = scorePackage(t, plan.counterpackage, other(role));
+
+      // Ver.2.11 §3.3: the SB path reaches joint 6,000, and with two issues
+      // that is a perfectly symmetric 3,000 each — each side holds its own
+      // priority at Option 1 and gives the other theirs outright. All four
+      // cells must land on it; an asymmetric result means a payoff was edited
+      // on one side only.
+      assert.equal(self, 3000);
+      assert.equal(them, 3000);
+      assert.equal(self + them, 6000);
+
+      // And the counterpart actually takes it. T_MID is calibrated to this
+      // package, so this assertion is what catches a threshold left behind on
+      // the old 6,300-point scale — where nothing reachable cleared it.
+      assert.ok(them >= ACCEPTANCE.T_MID);
     });
   }
 }

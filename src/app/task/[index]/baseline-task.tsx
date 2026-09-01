@@ -154,7 +154,7 @@ const COVER_STEPS = [
   },
   {
     label: "Negotiate",
-    hint: "Chat with the other participant and settle the three terms.",
+    hint: "Chat with the other participant and settle both terms.",
   },
   { label: "Review", hint: "See where it landed." },
 ];
@@ -605,7 +605,7 @@ export function BaselineTask({
       <Matchmaking
         onReady={() => {
           // The counterpart opens, and its opening is FIXED (Design §4 stage
-          // 1: its own best package on all three terms). Every participant
+          // 1: its own best package on both terms). Every participant
           // therefore answers the same anchor, which is what makes their
           // replies comparable — and it is the same order the Proxy tasks run,
           // so Baseline and Proxy transcripts line up stage for stage.
@@ -739,7 +739,7 @@ export function BaselineTask({
                   ? "This conversation has concluded."
                   : canSend
                     ? "Type your message here…"
-                    : "Please choose an option for all 3 terms below first."
+                    : "Please choose an option for both terms below first."
               }
             />
           </Card>

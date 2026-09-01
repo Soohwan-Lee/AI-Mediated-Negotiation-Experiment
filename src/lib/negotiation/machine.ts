@@ -23,7 +23,6 @@ import {
   requirementIssue,
   counterRequirementIssue,
   optionIndex,
-  distributiveIssue,
   preservesRequirement,
   reasonCards,
   scorePackage,
@@ -40,20 +39,30 @@ import type {
  * Counterpart acceptance thresholds (Design §4 "이유 연동 수락 규칙").
  *
  * Working values, to be fixed after the pilot against a target impasse rate
- * below 10% (Design §10 gate 7). T_MID is deliberately set so that a full
- * logroll — giving the counterpart its own priority issue at Option 1 while
- * holding your requirement at Option 1 — scores 3,600 and is accepted:
+ * below 10% (Ver.2.11 §13.2 lists them as pilot-dependent). T_MID is set so
+ * that a full logroll — giving the counterpart its own priority issue at
+ * Option 1 while holding your requirement at Option 1 — is exactly accepted:
  * protecting your requirement while giving away what they actually want is
  * structurally rewarded.
  *
+ * THESE SCALE WITH THE PAYOFF TABLE AND MUST BE RECHECKED WHENEVER IT MOVES.
+ * They were 3,600 / 2,600 for the three-issue task, whose individual maximum
+ * was 6,300. Ver.2.11's two-issue task tops out at 3,000 on any package the
+ * counterpart will agree to, so the old T_MID was above everything reachable
+ * and NOTHING could be accepted — every cell ran to impasse while each
+ * component still looked correct in isolation. A threshold is only meaningful
+ * relative to the scale it is measured on.
+ *
  * T_FINAL sits below T_MID so a late concession can still close, which is the
- * lever on the impasse rate.
+ * lever on the impasse rate. It is held at the same fraction of T_MID as
+ * before (roughly 0.72), which puts it one option-step down on the
+ * counterpart's own priority issue.
  */
 export const ACCEPTANCE = {
-  /** Stage 4, the conditional trade. */
-  T_MID: 3600,
+  /** Stage 4, the conditional trade. The full logroll, exactly. */
+  T_MID: 3000,
   /** Stage 5, the closing threshold. */
-  T_FINAL: 2600,
+  T_FINAL: 2000,
 } as const;
 
 /**
@@ -111,7 +120,7 @@ export type DecidedAction =
   | "state_priority"
   | "challenge"
   | "request_reason"
-  | "concede_distributive"
+  | "concede_trade"
   | "accept"
   | "hold"
   | "soft_close"
@@ -246,7 +255,6 @@ export function counterpartStep(
     awaitingReason: false,
   };
 
-  const timing = distributiveIssue(task);
   const requirement = requirementIssue(task, participantRole);
 
   /** Is the participant asking for something they have not justified? */
@@ -358,14 +366,43 @@ export function counterpartStep(
         };
       }
 
-      // Otherwise trade: concede a step on the distributive issue — the
-      // cheapest currency it has, and the one that keeps the logroll open.
+      // THE REASON RULE OUTRANKS THE TRADE. With two issues the only thing the
+      // counterpart can spend IS the participant's requirement issue, so an
+      // ungated trade would hand over exactly the concession Design §4 says is
+      // withheld until a reason is given — and the participant would get it by
+      // waiting rather than by arguing. When the ask is still unexplained, hold
+      // the position instead: a deal stays reachable at the held package, it
+      // just is not one that gives the requirement away.
+      if (unexplainedAsk) {
+        return {
+          ...base,
+          action: "hold" as const,
+          proposal: withHeldRequirement,
+          accepts: false,
+        };
+      }
+
+      // Otherwise trade: give a step on the PARTICIPANT'S priority issue.
+      //
+      // With two integrative issues that is the only currency there is, and it
+      // is the logroll itself: the counterpart's own priority issue is the one
+      // it is holding, so the only thing it can spend is the term the
+      // participant cares about and it does not. Ver.2.11 §3.3 makes this the
+      // mechanism rather than a fallback — the timing issue that used to be
+      // spent here was constant-sum, so every point conceded was exactly one
+      // point gained and it closed no gap the integrative terms could not close
+      // more cheaply.
       return {
         ...base,
-        action: "concede_distributive" as const,
+        action: "concede_trade" as const,
         proposal: {
           ...held,
-          [timing.id]: concede(task, timing.id, held[timing.id], counterpartRole),
+          [requirement.id]: concede(
+            task,
+            requirement.id,
+            held[requirement.id],
+            counterpartRole,
+          ),
         },
         accepts: false,
       };
@@ -506,7 +543,6 @@ export function buildProxyPlan(
 ): ProxyPlan {
   const requirement = requirementIssue(task, participantRole);
   const theirs = counterRequirementIssue(task, participantRole);
-  const timing = distributiveIssue(task);
   const counterpartRole: Role =
     participantRole === "leader" ? "member" : "leader";
 
@@ -540,7 +576,7 @@ export function buildProxyPlan(
   // TWO THINGS HAVE TO BE TRUE HERE, and each was got wrong once.
   //
   // It must not spend the whole envelope. An early version stopped only at the
-  // principal's fallback, which handed away the timing term as well as the
+  // principal's fallback, which handed away the other term as well as the
   // counterpart's priority issue and landed the principal a hundred points
   // above walking away, when a package worth far more was still acceptable. A
   // proxy that gives away everything it is permitted to give is not executing
@@ -557,13 +593,16 @@ export function buildProxyPlan(
   // conceding it by default would put a mechanical difference straight into
   // `Pooled Proxy − Baseline`.
   //
-  // The requirement is therefore the LAST currency. If the other two terms are
-  // enough, it never moves at all.
+  // The requirement is therefore the LAST currency. With two issues that means
+  // the proxy offers the counterpart's own priority term first, and only
+  // touches the requirement if that was not enough — which on the standard
+  // mandate is never, because handing the other side their priority outright is
+  // already worth T_MID to them.
   const spentOthers = spendDownTo(
     task,
     participantRole,
     opening,
-    [theirs.id, timing.id],
+    [theirs.id],
     limit,
     ACCEPTANCE.T_MID,
   );
@@ -575,7 +614,7 @@ export function buildProxyPlan(
           task,
           participantRole,
           spentOthers,
-          [requirement.id, theirs.id, timing.id],
+          [requirement.id, theirs.id],
           limit,
           ACCEPTANCE.T_MID,
         );

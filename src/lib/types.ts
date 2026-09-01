@@ -99,26 +99,29 @@ export interface IssueOption {
 }
 
 /**
- * What an issue is for, structurally (Design §5 "Issue 구성 rationale").
- * The task is `2 integrative + 1 distributive`:
+ * What an issue is for, structurally (Design Ver.2.11 §3.2).
  *
  *  - `leader_priority`  The Leader's requirement lives here. Worth a lot to
  *                       the Leader, cheap to the Member.
  *  - `member_priority`  The Member's requirement lives here. The mirror image.
- *  - `distributive`     Timing. Constant-sum, so there is push and pull and a
- *                       second currency for the logroll.
  *
- * Two integrative issues, one per role, is the MINIMUM for a role-symmetric
- * design: with only one, a single role would hold the only requirement and the
- * symmetry collapses. Two distributive issues would turn the task into
- * haggling, which is not what this study measures. A `compatible` type is
- * deliberately absent — both sides preferring the same option needs no
- * conversation, so it carries no information.
+ * TWO INTEGRATIVE ISSUES, ONE PER ROLE, AND NOTHING ELSE. That is the minimum
+ * for a role-symmetric design — with only one, a single role would hold the
+ * only requirement and the symmetry collapses — and Ver.2.11 fixes it as the
+ * maximum too.
+ *
+ * The `distributive` timing issue is gone. It existed as a second currency for
+ * the logroll, but on a constant-sum term every point conceded is exactly one
+ * point gained, so it was pure transfer and always the worst rate available;
+ * `buildProxyPlan` already refused to spend it except as a last resort. What it
+ * added in practice was a third term to read and a third set of levels to
+ * choose, on a task whose measured behaviour is which REASONS get said. Ver.2.11
+ * drops it, so the only way to close a gap is the logroll itself.
+ *
+ * A `compatible` type is deliberately absent — both sides preferring the same
+ * option needs no conversation, so it carries no information.
  */
-export type IssueType =
-  | "leader_priority"
-  | "member_priority"
-  | "distributive";
+export type IssueType = "leader_priority" | "member_priority";
 
 export interface Issue {
   id: string;
@@ -153,11 +156,13 @@ export interface Issue {
  * (Design §5 ver.2.5 splits the social cost formally: claiming cost is
  * constant across card types; disclosure cost is what a sensitive card adds.)
  *
- * ver.2.5 restructured the deck: each role holds ONE work reason and ONE
- * sensitive background PER ISSUE — six cards spanning all three terms —
- * instead of six cards about the requirement issue alone. `issueId` is
- * load-bearing: the reason-linked acceptance rule and the per-issue reason
- * budget both key on which issue a voiced card belongs to.
+ * Ver.2.11 holds each role to TWO cards per task — one work reason and one
+ * sensitive background, both on that role's own requirement issue. The other
+ * term is the thing you SPEND, not the thing you argue for, so it carries no
+ * card of your own. `issueId` stays load-bearing even though every card now
+ * satisfies the scope check: the reason-linked acceptance rule reads the
+ * card's issue rather than assuming it, so a card added later on the other
+ * term cannot silently earn the requirement concession.
  */
 export interface ReasonCard {
   id: string;
@@ -167,19 +172,17 @@ export interface ReasonCard {
   /** Shown on the card, verbatim from Design §5. */
   text: string;
   /**
-   * Which facet of the role's ONE backstory a sensitive card carries
-   * (Design §5 "SB 세 단면"). The three sensitive cards are three faces of a
-   * single story, not three separate secrets — that is what keeps them
-   * memorable — and the facet is analysis metadata for the per-issue
-   * delegation pattern.
+   * Which facet of the role's backstory a sensitive card carries.
+   *
+   * Ver.2.11 gives each role ONE sensitive card per task, and the two tasks
+   * show the SAME backstory at a different moment — the manager's staffing
+   * exposure, the senior's second job — so a participant meeting their second
+   * task is not handed a new secret. The facet is analysis metadata.
    */
   facet?:
-    | "fault"
-    | "competence_gap"
+    | "staffing_warning"
     | "overpromise"
-    | "evaluation_anxiety"
-    | "fatigue_fault"
-    | "unreported";
+    | "second_job";
 }
 
 export interface NegotiationTask {

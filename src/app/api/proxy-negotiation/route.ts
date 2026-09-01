@@ -580,7 +580,7 @@ export async function POST(request: Request) {
         : null;
       switch (decision.action) {
         case "open":
-          return `Open with your own best package on all three terms, naming these exact levels: ${levels}.`;
+          return `Open with your own best package on both terms, naming these exact levels: ${levels}.`;
         case "state_priority":
           // THE COUNTERPART GIVES A WORK REASON AND NEVER ITS SENSITIVE ONE.
           //
@@ -621,8 +621,8 @@ export async function POST(request: Request) {
             : `Say the package they proposed — ${levels} — works for your principal. Name exactly these levels.`;
         case "hold":
           return `Say most of the package works, but ${yourRequirement.label.toLowerCase()} stays where it is for now — the package as you accept it is: ${levels}. Name exactly these levels.`;
-        case "concede_distributive":
-          return `Give a step on the timing term and put this counteroffer forward, naming these exact levels: ${levels}.`;
+        case "concede_trade":
+          return `Give a step on the term that matters to them and put this counteroffer forward, naming these exact levels: ${levels}.`;
         case "impasse":
           return "Say you cannot reach agreement on these terms.";
       }

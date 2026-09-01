@@ -30,7 +30,6 @@
 
 import {
   counterRequirementIssue,
-  distributiveIssue,
   plausibleReasons,
   requirementIssue,
 } from "../tasks";
@@ -105,15 +104,12 @@ function pkg(
   role: Role,
   mineAt: number,
   theirsAt: number,
-  timingAt: number,
 ): Package {
   const mine = requirementIssue(task, role);
   const theirs = counterRequirementIssue(task, role);
-  const timing = distributiveIssue(task);
   return {
     [mine.id]: byPreference(mine, role)[mineAt - 1].id,
     [theirs.id]: byPreference(theirs, role)[theirsAt - 1].id,
-    [timing.id]: byPreference(timing, role)[timingAt - 1].id,
   };
 }
 
@@ -172,16 +168,16 @@ function label(
  * the term the other side actually wants. That is the logroll, and it is the
  * outcome the payoffs were built to make available.
  *
- *   opening       mine 1, theirs 1, timing 1  — everything my way (6,300)
+ *   opening       mine 1, theirs 1  — everything my way (3,900)
  *   theirs        the mirror, from their side — everything their way
- *   trade         mine 1, theirs 4, timing 3  — I keep my requirement where I
- *                 wanted it and hand them their priority term outright
+ *   trade         mine 1, theirs 4  — I keep my requirement where I wanted it
+ *                 and hand them their priority term outright
  *
- * The trade is what the state machine independently arrives at from the
- * standard mandate: 4,200 to the speaker, 3,600 to the other side, which is
- * exactly T_MID. Script and machine agreeing is not decoration — a mockup
- * showing a package the real system would never produce is a mockup of a
- * different study, and this pair has drifted apart twice.
+ * With two issues the trade IS the whole logroll and it is symmetric: 3,000 to
+ * the speaker, 3,000 to the other side, joint 6,000, which Ver.2.11 §3.3 names
+ * as the maximum any pair can reach. Script and machine agreeing is not
+ * decoration — a mockup showing a package the real system would never produce
+ * is a mockup of a different study, and this pair has drifted apart twice.
  *
  * Note that the requirement stays at Option 1, not at its threshold. Giving
  * the other side their priority term outright is enough on its own, so the
@@ -191,10 +187,10 @@ function label(
 function trajectory(task: NegotiationTask, role: Role) {
   const other: Role = role === "leader" ? "member" : "leader";
   return {
-    opening: pkg(task, role, 1, 1, 1),
+    opening: pkg(task, role, 1, 1),
     // Their opening, expressed from their side and therefore their best.
-    counterpartOpening: pkg(task, other, 1, 1, 1),
-    trade: pkg(task, role, 1, 4, 2),
+    counterpartOpening: pkg(task, other, 1, 1),
+    trade: pkg(task, role, 1, 4),
   };
 }
 
@@ -209,7 +205,6 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
   );
   const mine = requirementIssue(task, role);
   const theirs = counterRequirementIssue(task, role);
-  const timing = distributiveIssue(task);
   const cards = task.roleBriefs[role].reasonCards;
   // The reason voiced at stage 2 must sit on the ROLE'S OWN requirement issue.
   // Cards span all three issues now (ver.2.5), so "the first work card" would
@@ -240,14 +235,14 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b1c",
         1,
         "counterpart",
-        `hi! good to be sorting this out. || my opening would be ${L(theirOpen, theirs.id)} on ${theirs.label.toLowerCase()}, ${L(theirOpen, mine.id)} on ${mine.label.toLowerCase()}, and ${L(theirOpen, timing.id)}. tell me what matters most your end though.`,
+        `hi! good to be sorting this out. || my opening would be ${L(theirOpen, theirs.id)} on ${theirs.label.toLowerCase()} and ${L(theirOpen, mine.id)} on ${mine.label.toLowerCase()}. tell me what matters most your end though.`,
         { proposal: theirOpen },
       ),
       m(
         "b1p",
         1,
         "participant",
-        `hi — likewise. || mine's a mirror image really: ${L(opening, mine.id)} on ${mine.label.toLowerCase()}, ${L(opening, theirs.id)} on ${theirs.label.toLowerCase()}, and ${L(opening, timing.id)}.`,
+        `hi — likewise. || mine's a mirror image really: ${L(opening, mine.id)} on ${mine.label.toLowerCase()} and ${L(opening, theirs.id)} on ${theirs.label.toLowerCase()}.`,
         { proposal: opening },
       ),
       m(
@@ -260,7 +255,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b2p",
         2,
         "participant",
-        `${mine.label.toLowerCase()}, easily. ${workCard ? lowerFirst(workCard.text) : "it's the one that changes how the work actually goes."} || the timing I'm more relaxed about.`,
+        `${mine.label.toLowerCase()}, easily. ${workCard ? lowerFirst(workCard.text) : "it's the one that changes how the work actually goes."} || the other one I'm more relaxed about.`,
         { reasonCardId: workCard?.id },
       ),
       m("b3c", 3, "counterpart", task.standardizedChallenge[role]),
@@ -281,7 +276,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b4p",
         4,
         "participant",
-        `that works for me. || ${L(trade, theirs.id)} on yours, ${L(trade, mine.id)} on mine, and ${L(trade, timing.id)} on the date to meet you halfway.`,
+        `that works for me. || ${L(trade, theirs.id)} on yours, ${L(trade, mine.id)} on mine. you get the one you care about in full.`,
         { proposal: trade },
       ),
       m(
@@ -331,7 +326,6 @@ function proxyScript(
   );
   const mine = requirementIssue(task, role);
   const theirs = counterRequirementIssue(task, role);
-  const timing = distributiveIssue(task);
   const cards = task.roleBriefs[role].reasonCards;
   // Same per-issue pick as the Baseline script — see the note there.
   const workCard = cards.find(
@@ -366,14 +360,14 @@ function proxyScript(
         "p1c",
         1,
         "counterpart_proxy",
-        `Opening for my principal: ${L(theirOpen, theirs.id)} on ${theirs.label.toLowerCase()}, ${L(theirOpen, mine.id)} on ${mine.label.toLowerCase()}, ${L(theirOpen, timing.id)}. ${theirs.label} is where their weight is.`,
+        `Opening for my principal: ${L(theirOpen, theirs.id)} on ${theirs.label.toLowerCase()}, ${L(theirOpen, mine.id)} on ${mine.label.toLowerCase()}. ${theirs.label} is where their weight is.`,
         { proposal: theirOpen },
       ),
       m(
         "p1p",
         1,
         "participant_proxy",
-        `Noted — close to a mirror of ours. Opening: ${L(opening, mine.id)} on ${mine.label.toLowerCase()}, ${L(opening, theirs.id)} on ${theirs.label.toLowerCase()}, ${L(opening, timing.id)}. ${mine.label} is the one my principal needs held.`,
+        `Noted — close to a mirror of ours. Opening: ${L(opening, mine.id)} on ${mine.label.toLowerCase()}, ${L(opening, theirs.id)} on ${theirs.label.toLowerCase()}. ${mine.label} is the one my principal needs held.`,
         { proposal: opening },
       ),
       m(
@@ -403,7 +397,7 @@ function proxyScript(
         "p4p",
         4,
         "participant_proxy",
-        `Then here is the trade: you take ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()} in full, I hold ${L(trade, mine.id)} on ${mine.label.toLowerCase()}, and we meet at ${L(trade, timing.id)}.${explorerAddition}`,
+        `Then here is the trade: you take ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()} in full, and I hold ${L(trade, mine.id)} on ${mine.label.toLowerCase()}.${explorerAddition}`,
         {
           proposal: trade,
           ...(policy === "explorer"
@@ -415,14 +409,14 @@ function proxyScript(
         "p4c",
         4,
         "counterpart_proxy",
-        `That works for my principal. ${theirs.label} in full is what they needed, and ${L(trade, timing.id)} on the date is a fair split.`,
+        `That works for my principal. ${theirs.label} in full is what they needed, and holding ${L(trade, mine.id)} is what mine needed.`,
         { proposal: trade },
       ),
       m(
         "p5p",
         5,
         "participant_proxy",
-        `Then this is the package for review: ${L(trade, theirs.id)}, ${L(trade, mine.id)}, ${L(trade, timing.id)}. Neither principal is bound until they approve it.`,
+        `Then this is the package for review: ${L(trade, theirs.id)} and ${L(trade, mine.id)}. Neither principal is bound until they approve it.`,
         { proposal: trade },
       ),
       m(

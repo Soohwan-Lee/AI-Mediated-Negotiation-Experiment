@@ -3,7 +3,7 @@
 /**
  * The two ways issues are shown, used everywhere issues appear.
  *
- * A participant has three terms, each with four levels, and a private point
+ * A participant has two terms, each with four levels, and a private point
  * value for every level. That is more than anyone holds in their head, so it
  * is shown in exactly two forms and never a third:
  *
@@ -42,12 +42,12 @@ function share(issue: Issue, points: number, role: Role): number {
  * information the design withholds.
  *
  * BOTH ARE DERIVED FROM THE TASK, never from the module constants. An earlier
- * version read `MAX_INDIVIDUAL_POINTS` and `RESERVATION_POINTS` directly, and
- * the practice round therefore told participants their best outcome "across
- * all three terms" was 6,300 against a fallback of 2,500 — while the practice
- * task has TWO terms and a fallback of 200. The first payoff sheet anyone sees
- * is the practice one, so that was a wrong scale taught before the real task
- * and then silently contradicted by it.
+ * version read `MAX_INDIVIDUAL_POINTS` and `RESERVATION_POINTS` directly, so
+ * the practice round quoted the real task's maximum and fallback instead of
+ * its own. The first payoff sheet anyone sees is the practice one, so that was
+ * a wrong scale taught before the real task and then silently contradicted by
+ * it. The practice task still keeps its own smaller numbers, so the hazard is
+ * live even now that both tasks have the same shape.
  *
  * WHAT IT MUST NOT SAY. Nothing about the other side's numbers, nothing about
  * the joint total, and no hint that trading term against term pays better
