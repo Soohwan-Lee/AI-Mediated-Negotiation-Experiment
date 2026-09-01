@@ -288,13 +288,13 @@ export function BriefingPanel({
       </div>
 
       <div className="space-y-3">
-        <Fold title="📄 Your Situation" defaultOpen={defaultOpen}>
+        <Fold title="📄 Your Situation" defaultOpen>
           <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed">
             {brief.roleStory}
           </p>
         </Fold>
 
-        <Fold title="🎯 What You Want" defaultOpen={defaultOpen}>
+        <Fold title="🎯 What You Want (Priorities)" defaultOpen>
           <ul className="list-disc space-y-1.5 pl-4 text-xs sm:text-sm leading-relaxed">
             {brief.objectives.map((o) => (
               <li key={o}>{o}</li>
@@ -302,30 +302,25 @@ export function BriefingPanel({
           </ul>
         </Fold>
 
-        {brief.reasonCards.length ? (
-          <Fold title="💬 Your Reasons (Term by Term)" defaultOpen>
-            <p className="mb-3 rounded-lg border border-[var(--private-line)] bg-amber-100/60 p-3 text-xs sm:text-sm leading-relaxed font-medium">
-              {brief.requirementNote}
-            </p>
-            <p className="mb-3 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)]/80">
-              Each term comes with a <strong>work reason</strong> (safe to share) and a piece of{" "}
-              <strong>sensitive background</strong> (private to you).{" "}
-              {brief.disclosureRisk}
-            </p>
-            <IssueReasonGroups task={task} role={role} />
-          </Fold>
-        ) : null}
-
-        <Fold title="⚠️ If No Agreement (Fallback)" defaultOpen>
-          <p className="text-xs sm:text-sm leading-relaxed font-medium">{brief.batnaSummary}</p>
-        </Fold>
-
-        <Fold title="🔢 Point Values per Term" defaultOpen last>
+        <Fold title="🔢 Point Values per Term" defaultOpen={defaultOpen}>
           <IssueValueTable
             issues={task.issues}
             role={role}
             reservationPoints={task.reservationPoints}
           />
+        </Fold>
+
+        {brief.reasonCards.length ? (
+          <Fold title="💬 Permitted Reasons">
+            <p className="mb-2.5 rounded-lg border border-[var(--private-line)] bg-amber-100/60 p-2.5 text-xs leading-relaxed font-medium">
+              {brief.requirementNote}
+            </p>
+            <IssueReasonGroups task={task} role={role} />
+          </Fold>
+        ) : null}
+
+        <Fold title="⚠️ Fallback Outcome" last>
+          <p className="text-xs sm:text-sm leading-relaxed font-medium">{brief.batnaSummary}</p>
         </Fold>
       </div>
 

@@ -158,6 +158,8 @@ export function TaskBrief({
   steps: string[];
   onContinue: () => void;
 }) {
+  const brief = task.roleBriefs[role];
+
   return (
     <>
       <Page width="wide">
@@ -168,24 +170,72 @@ export function TaskBrief({
           current={0}
         />
 
+        {/* Shared Public Scenario */}
         <Card className="mb-6 border-slate-200 bg-white">
-          <CardTitle hint="Shared public context:">📋 The Scenario Context</CardTitle>
-          <p className="text-sm sm:text-base leading-relaxed text-[var(--ink-2)]">
+          <CardTitle hint="Public context known to both participants:">
+            📋 Project Scenario: {task.title}
+          </CardTitle>
+          <p className="text-sm sm:text-base leading-relaxed text-slate-700 mt-2">
             {task.publicBrief}
           </p>
-          <div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-600 border border-slate-200">
+          <div className="mt-3.5 flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-600 border border-slate-200">
             <span>🌐</span>
-            <span>Both sides can see the scenario above. All information below is strictly confidential to you.</span>
+            <span>Both parties share the project background above. Your personal goals and situation below are private.</span>
           </div>
         </Card>
 
-        <BriefingPanel task={task} role={role} defaultOpen />
+        {/* Private Role & Mission Instructions */}
+        <Card tone="private" className="mb-6 border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
+          <div className="flex items-center justify-between gap-2 border-b border-amber-200 pb-3 mb-4">
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900">
+                Your Confidential Role Briefing
+              </p>
+              <h2 className="text-lg sm:text-xl font-black text-slate-950">
+                {role === "leader" ? "👑" : "🛠️"} {brief.title}
+              </h2>
+            </div>
+            <PrivateTag />
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-amber-200 bg-white/80 p-3.5 shadow-2xs">
+              <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 mb-1">
+                📄 Your Situation
+              </p>
+              <p className="text-xs sm:text-sm leading-relaxed text-slate-800">
+                {brief.roleStory}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-white/80 p-3.5 shadow-2xs">
+              <p className="text-xs font-extrabold uppercase tracking-wider text-amber-900 mb-2">
+                🎯 What You Need to Achieve (Your Priorities)
+              </p>
+              <ul className="space-y-1.5 text-xs sm:text-sm text-slate-800">
+                {brief.objectives.map((obj, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-amber-700 font-bold">•</span>
+                    <span>{obj}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-xs sm:text-sm text-blue-950">
+              <p className="font-bold mb-1">💡 Next Step</p>
+              <p className="text-xs text-blue-900 leading-relaxed">
+                On the next screen, you will review the 3 specific terms, check what each option is worth to you, and set up your negotiation goals.
+              </p>
+            </div>
+          </div>
+        </Card>
       </Page>
 
       <ActionBar
-        label="I have read my briefing"
+        label="Continue to Set Your Negotiation Goals →"
         onClick={onContinue}
-        note="💡 It stays pinned in the sidebar throughout the task."
+        note="💡 Your briefing is also always available in the sidebar."
       />
     </>
   );
