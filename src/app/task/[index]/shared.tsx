@@ -346,12 +346,34 @@ export function PreferenceForm({
           />
 
           <div className="mb-6">
-            <Callout tone="private" title="🔒 Strictly Confidential (Only You See This)">
+            <Callout tone="private" title="🔒 Strictly Confidential · Your Negotiation Boundaries">
               <p className="text-xs sm:text-sm leading-relaxed">
                 {isProxy
-                  ? "Define the operating limits for your AI Proxy. It opens asking for your Ideal Target and will never compromise below your Reservation Floor."
-                  : "These ratings record your private starting priorities to compare against the final agreement. The other party never sees them."}
+                  ? "Tell your AI Proxy where to start and where to stop. It uses these two limits to negotiate safely on your behalf."
+                  : "These selections record your starting priorities to measure your agreement. Your counterpart never sees your points or choices."}
               </p>
+
+              {isProxy ? (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-amber-200 text-xs">
+                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2.5 text-emerald-950">
+                    <p className="font-bold flex items-center gap-1.5 mb-1">
+                      <span>🏆</span> 1. Your Best Goal (Opening Ask)
+                    </p>
+                    <p className="text-2xs sm:text-xs text-emerald-900 leading-relaxed">
+                      What you ideally hope to get. Your AI Proxy will ask for this first to aim high.
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-amber-950">
+                    <p className="font-bold flex items-center gap-1.5 mb-1">
+                      <span>🛡️</span> 2. Your Walkaway Limit (Absolute Minimum)
+                    </p>
+                    <p className="text-2xs sm:text-xs text-amber-900 leading-relaxed">
+                      The lowest option you can accept. If the counterpart pushes back, your proxy may compromise, but <strong>will never agree below this limit</strong>.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
               <PointsKey
                 issues={task.issues}
                 role={role}
@@ -371,9 +393,12 @@ export function PreferenceForm({
                 </div>
 
                 <div className="mb-3.5">
-                  <p className="mb-1.5 text-xs font-extrabold uppercase tracking-wider text-emerald-700">
-                    🏆 Ideal Target (What you want)
-                  </p>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-700">
+                      🏆 1. Your Best Goal (Aim high)
+                    </p>
+                    <span className="text-2xs text-slate-500">Proxy opens asking for this</span>
+                  </div>
                   <OptionChips
                     issue={issue}
                     role={role}
@@ -386,9 +411,12 @@ export function PreferenceForm({
                 </div>
 
                 <div id={`q-min-${issue.id}`}>
-                  <p className="mb-1.5 text-xs font-extrabold uppercase tracking-wider text-amber-700">
-                    🛡️ Reservation Floor (Minimum acceptable)
-                  </p>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-amber-700">
+                      🛡️ 2. Your Walkaway Limit (Lowest acceptable)
+                    </p>
+                    <span className="text-2xs text-slate-500">Proxy will NEVER go below this</span>
+                  </div>
                   <OptionChips
                     issue={issue}
                     role={role}
@@ -409,14 +437,14 @@ export function PreferenceForm({
               role={role}
               reservationPoints={task.reservationPoints}
               selection={preferred}
-              label="Ideal target package totals"
+              label="If you achieve your Best Goal"
             />
             <PackageValue
               issues={task.issues}
               role={role}
               reservationPoints={task.reservationPoints}
               selection={minimum}
-              label="Minimum acceptable package totals"
+              label="At your lowest Walkaway Limit"
             />
           </div>
 

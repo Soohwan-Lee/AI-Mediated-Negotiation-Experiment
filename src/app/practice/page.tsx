@@ -161,7 +161,7 @@ export default function PracticePage() {
       {
         id: `pr-ai-${m.length}`,
         speaker: "participant_proxy",
-        text: "I will open asking for your Ideal Target level on both terms. If the counterpart pushes back, I will only compromise down to your Reservation Floor, using the work reasons you authorized.",
+        text: "I will open by proposing your Best Goal on both terms. If the counterpart pushes back, I will defend your position and will never compromise below your Walkaway Limit, using the work reasons you authorized.",
       },
     ]);
     setProxyPending(false);
@@ -216,7 +216,7 @@ export default function PracticePage() {
           isProxy
             ? [
                 { label: "Step 1: Check your practice goals", hint: "Review the private situation in the sidebar" },
-                { label: "Step 2: Set your mandate bounds", hint: "Choose your ideal target and minimum acceptable floor" },
+                { label: "Step 2: Set your negotiation boundaries", hint: "Choose your best goal (aim high) and walkaway limit (lowest acceptable)" },
                 { label: "Step 3: Consult your AI Proxy", hint: "Ask a test question to see how it will defend your position" },
                 { label: "Step 4: Quick 1-question check", hint: "Confirm that points and reasons are clear" },
               ]
@@ -342,9 +342,29 @@ export default function PracticePage() {
                     </span>
                   ) : null}
                 </div>
-                <CardTitle hint="Select your Ideal Target and Reservation Floor for each term:">
+                <CardTitle hint="Set your boundaries: where to start aiming high, and where to stop conceding:">
                   🎯 Step 1: Configure Your AI Proxy Instructions
                 </CardTitle>
+
+                {/* Helpful Mini Guide */}
+                <div className="mt-2.5 mb-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-xl border border-blue-200 bg-blue-50/60 p-2.5 text-xs text-blue-950">
+                  <div>
+                    <span className="font-bold flex items-center gap-1 text-emerald-800">
+                      <span>🏆</span> 1. Your Best Goal:
+                    </span>
+                    <p className="text-2xs text-slate-600 mt-0.5">
+                      The best option you hope to get. Proxy will open asking for this first.
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold flex items-center gap-1 text-amber-800">
+                      <span>🛡️</span> 2. Your Walkaway Limit:
+                    </span>
+                    <p className="text-2xs text-slate-600 mt-0.5">
+                      The lowest option you can tolerate. Proxy will <strong>never go below this</strong>.
+                    </p>
+                  </div>
+                </div>
 
                 <div className="space-y-4 mt-3">
                   {task.issues.map((issue) => (
@@ -355,9 +375,12 @@ export default function PracticePage() {
                       </div>
 
                       <div className="mb-3">
-                        <p className="text-2xs font-extrabold uppercase tracking-wider text-emerald-700 mb-1">
-                          🏆 Ideal Target (What Proxy opens with)
-                        </p>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-2xs font-extrabold uppercase tracking-wider text-emerald-700">
+                            🏆 1. Your Best Goal (Aim high)
+                          </p>
+                          <span className="text-2xs text-slate-500">Proxy opens with this</span>
+                        </div>
                         <OptionChips
                           issue={issue}
                           role={role}
@@ -368,9 +391,12 @@ export default function PracticePage() {
                       </div>
 
                       <div>
-                        <p className="text-2xs font-extrabold uppercase tracking-wider text-amber-700 mb-1">
-                          🛡️ Reservation Floor (Proxy will not go below this)
-                        </p>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-2xs font-extrabold uppercase tracking-wider text-amber-700">
+                            🛡️ 2. Your Walkaway Limit (Absolute minimum)
+                          </p>
+                          <span className="text-2xs text-slate-500">Proxy will NEVER compromise below this</span>
+                        </div>
                         <OptionChips
                           issue={issue}
                           role={role}
