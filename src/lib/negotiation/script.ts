@@ -269,7 +269,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b4c",
         4,
         "counterpart",
-        `ok, that's fair. || so if I get ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()}, I can live with ${L(trade, mine.id)} on yours. would you move on the date?`,
+        `ok, that's fair. || so if I get ${L(trade, mine.id)} on ${mine.label.toLowerCase()}, I can live with ${L(trade, theirs.id)} on yours. does that work?`,
         { proposal: trade },
       ),
       m(
@@ -374,13 +374,13 @@ function proxyScript(
         "p2c",
         2,
         "counterpart_proxy",
-        `Then we may have room. Mine can move on the date if ${theirs.label.toLowerCase()} holds — going short there leaves them carrying the risk. Where is your flexibility?`,
+        `Then we may have room. Mine can move on ${mine.label.toLowerCase()} if ${theirs.label.toLowerCase()} holds — going short there leaves them carrying the risk. Where is your flexibility?`,
       ),
       m(
         "p2p",
         2,
         "participant_proxy",
-        `That is workable — ours is on the date and on ${theirs.label.toLowerCase()}. ${workCard ? workCard.text : "The requirement term is where the work is affected."}`,
+        `That is workable — ours is on ${theirs.label.toLowerCase()}. ${workCard ? workCard.text : "The requirement term is where the work is affected."}`,
         {
           reasonCardId: workCard?.id,
           internalProvenance: "principal_reason",

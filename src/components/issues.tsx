@@ -255,8 +255,13 @@ export function OptionChips({
       ? "border-amber-500 bg-amber-500 text-white shadow-sm font-bold ring-2 ring-amber-500/20"
       : "border-[var(--accent)] bg-[var(--accent)] text-white shadow-sm font-bold ring-2 ring-[var(--accent)]/20";
 
+  // Two columns, not four. The labels are short phrases ("4 per month",
+  // "1 per week") rather than single words, and at four columns inside the
+  // task's ~50rem content width every one of them truncated to "4 per mo…" —
+  // which is the part of a chip a participant actually has to read. Two
+  // columns fit the phrase and the point badge whole.
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-1.5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1.5">
       {allowNone ? (
         <Chip
           name={name}

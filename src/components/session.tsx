@@ -444,6 +444,22 @@ export function ReasonBox({
   );
 }
 
+/**
+ * The reason cards, work and sensitive kept visually apart (interface rule 6).
+ *
+ * NO ISSUE HEADING. It used to group the cards under the label of the issue
+ * they argue about, which was safe while every issue carried a pair: the
+ * heading repeated what the briefing already showed. Ver.2.11 gives each role
+ * cards on their OWN requirement issue only, so that same heading would now
+ * name the one term the study is about, on every screen the cards appear —
+ * exactly what Design §5 principle 1 forbids ("Issue type·핵심 요구 표시는
+ * 비표시"). The cards say which term they argue for in their own text, which
+ * is the participant's own briefing rather than a label the interface adds.
+ *
+ * What must stay is the SPLIT. Which box a participant is willing to draw from
+ * is the whole measure, so the two keep their own headings, borders and
+ * colours here, on the mandate screen, and in the Baseline picker alike.
+ */
 export function IssueReasonGroups({
   task,
   role,
@@ -454,32 +470,22 @@ export function IssueReasonGroups({
   renderCard?: (card: { id: string; text: string }) => ReactNode;
 }) {
   const cards = task.roleBriefs[role].reasonCards;
+  if (!cards.length) return null;
   return (
-    <div className="space-y-3">
-      {task.issues.map((issue) => {
-        const onIssue = cards.filter((c) => c.issueId === issue.id);
-        if (!onIssue.length) return null;
-        return (
-          <div key={issue.id} className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3">
-            <p className="mb-2 text-xs sm:text-sm font-bold text-[var(--ink)]">
-              {issue.label}
-            </p>
-            <ReasonBox
-              title="Work reason"
-              cards={onIssue.filter((c) => c.layer === "work")}
-            >
-              {renderCard}
-            </ReasonBox>
-            <ReasonBox
-              title="Sensitive background"
-              cards={onIssue.filter((c) => c.layer === "sensitive")}
-              sensitive
-            >
-              {renderCard}
-            </ReasonBox>
-          </div>
-        );
-      })}
+    <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3">
+      <ReasonBox
+        title="Work reason"
+        cards={cards.filter((c) => c.layer === "work")}
+      >
+        {renderCard}
+      </ReasonBox>
+      <ReasonBox
+        title="Sensitive background"
+        cards={cards.filter((c) => c.layer === "sensitive")}
+        sensitive
+      >
+        {renderCard}
+      </ReasonBox>
     </div>
   );
 }
