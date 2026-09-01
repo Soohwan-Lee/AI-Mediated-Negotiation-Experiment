@@ -70,8 +70,6 @@ export function PointsKey({
     (sum, issue) => sum + Math.max(...issue.options.map((o) => o.points[role])),
     0,
   );
-  // Spelled out, because "all 3 terms" in a sentence of prose reads as a
-  // typo next to the figures that are deliberately numerals.
   const WORDS = ["no", "one", "two", "three", "four", "five", "six"];
   const termCount =
     issues.length === 2
@@ -79,38 +77,31 @@ export function PointsKey({
       : `all ${WORDS[issues.length] ?? issues.length} terms`;
 
   return (
-    <p
+    <div
       className={cx(
-        "max-w-prose text-[0.75rem] leading-relaxed text-[var(--private-ink)]",
+        "rounded-xl border border-[var(--private-line)] bg-[var(--private-soft)] p-3.5 sm:p-4 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)] shadow-2xs",
         className,
       )}
     >
-      <span aria-hidden>🔢 </span>
-      Points say how much a level is worth <strong>to you</strong> — higher is
-      better for your situation. The best possible outcome for you across{" "}
-      {termCount} is{" "}
-      <span className="tabular font-semibold">{best.toLocaleString()}</span>.
-      With no agreement you get your fallback of{" "}
-      <span className="tabular font-semibold">
-        {reservationPoints.toLocaleString()}
-      </span>
-      .
-    </p>
+      <div className="flex items-center gap-2 font-bold text-sm text-[var(--private-strong)] mb-1.5">
+        <span>🔢</span>
+        <span>Your Point Guide</span>
+      </div>
+      <p className="mb-2 text-xs sm:text-[0.8125rem]">
+        Points indicate how much a term is worth <strong>to you</strong> (higher is better).
+      </p>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-100/70 px-2.5 py-1 font-semibold text-amber-900 shadow-2xs">
+          🏆 Best possible ({termCount}): <strong className="tabular text-sm">{best.toLocaleString()} pts</strong>
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white/80 px-2.5 py-1 font-semibold text-slate-800 shadow-2xs">
+          🛡️ No-agreement fallback: <strong className="tabular text-sm">{reservationPoints.toLocaleString()} pts</strong>
+        </span>
+      </div>
+    </div>
   );
 }
 
-/**
- * What the package currently on the table is worth to the participant.
- *
- * The running total is what turns three separate numbers into a decision:
- * picking a level is only meaningful against what the whole package pays, and
- * against the fallback that is the alternative to agreeing at all. Shown only
- * once every term has a level, because a partial sum invites reading it as
- * the total and it would drop as terms were added.
- *
- * Again: the participant's OWN total only. No joint figure, and no comparison
- * with the other side — those are what the conversation is for.
- */
 export function PackageValue({
   issues,
   role,
@@ -121,7 +112,6 @@ export function PackageValue({
   issues: Issue[];
   role: Role;
   selection: Package | Record<string, string | null>;
-  /** This task's own fallback — the practice task's is not the real one. */
   reservationPoints: number;
   label?: string;
 }) {
@@ -135,43 +125,36 @@ export function PackageValue({
   const clears = total >= reservationPoints;
 
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[0.8125rem] text-[var(--private-ink)]">
-      <span>{label}</span>
-      <span className="tabular text-[1.0625rem] font-semibold text-[var(--ink)]">
-        {total.toLocaleString()}
-      </span>
-      <span className="text-[0.75rem]">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--private-line)] bg-[var(--private-surface)] p-3.5 sm:p-4 shadow-2xs">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-lg shadow-2xs">
+          {clears ? "🏆" : "⚠️"}
+        </span>
+        <div>
+          <p className="text-xs font-semibold text-[var(--private-strong)] uppercase tracking-wide">
+            {label}
+          </p>
+          <p className="tabular text-xl sm:text-2xl font-black text-[var(--ink)]">
+            {total.toLocaleString()} <span className="text-sm font-semibold text-[var(--ink-3)]">pts</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center">
         {clears ? (
-          <>
-            — above your fallback of{" "}
-            <span className="tabular">
-              {reservationPoints.toLocaleString()}
-            </span>
-          </>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 shadow-2xs">
+            <span>✓</span> Above fallback ({reservationPoints.toLocaleString()})
+          </span>
         ) : (
-          <>
-            — <span className="font-semibold text-[var(--caution)]">below</span>{" "}
-            your fallback of{" "}
-            <span className="tabular">
-              {reservationPoints.toLocaleString()}
-            </span>
-          </>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400 bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 shadow-2xs">
+            <span>⚠️</span> Below fallback ({reservationPoints.toLocaleString()})
+          </span>
         )}
-      </span>
+      </div>
     </div>
   );
 }
 
-/**
- * Is this the term the participant most needs to protect?
- *
- * Each role's own priority issue, which in ver.2.4 is also where their
- * requirement lives. Both roles get the marker on their own side, because
- * both need to know where their weight sits before trading anything away —
- * and the marker is symmetric for the same reason the payoffs are: a
- * highlight only one role saw would be a difference between the roles that
- * nothing in the design asked for.
- */
 function mattersMost(issue: Issue, role: Role): boolean {
   return role === "member"
     ? issue.type === "member_priority"
@@ -183,66 +166,61 @@ export function IssueValueTable({
   role,
   reservationPoints,
   showPoints = true,
-  /** Show the scale the numbers are on. Off where a `PointsKey` is already
-      on screen, so the same two anchors are not stated twice. */
   showKey = true,
 }: {
   issues: Issue[];
   role: Role;
-  /** This task's own fallback, so the practice round states its own. */
   reservationPoints: number;
   showPoints?: boolean;
   showKey?: boolean;
 }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {showPoints && showKey ? (
         <PointsKey
           issues={issues}
           role={role}
           reservationPoints={reservationPoints}
-          className="border-b border-[var(--private-line)] pb-3"
+          className="mb-2"
         />
       ) : null}
       {issues.map((issue) => (
-        <div key={issue.id}>
-          <div className="mb-1.5 flex items-baseline justify-between gap-2">
-            <p className="text-[0.875rem] font-semibold">{issue.label}</p>
+        <div key={issue.id} className="rounded-xl border border-[var(--private-line)] bg-white/60 p-4 shadow-2xs">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-sm sm:text-base font-bold text-[var(--ink)]">{issue.label}</p>
             {mattersMost(issue, role) ? (
-              <span className="shrink-0 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-[var(--private-strong)]">
-                Matters most
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-0.5 text-[0.6875rem] font-extrabold uppercase tracking-wide text-amber-900 shadow-2xs">
+                ⭐ Priority
               </span>
             ) : null}
           </div>
-          <p className="mb-1 text-[0.8125rem] leading-snug text-[var(--private-ink)]/75">
+          <p className="mb-2 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)]/80">
             {issue.description}
           </p>
-          {/* Why the level matters to YOU. Without it the point column is just
-              numbers to optimize; with it there is something to say to the
-              other side that is not "this is worth more to me". */}
-          <p className="mb-2 max-w-prose text-[0.8125rem] italic leading-snug text-[var(--private-ink)]/75">
-            {issue.rationale[role]}
-          </p>
+          <div className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/70 p-2.5 text-xs sm:text-[0.8125rem] leading-relaxed text-[var(--private-ink)]">
+            <span className="font-semibold">💡 Your Situation: </span>
+            <span className="italic">{issue.rationale[role]}</span>
+          </div>
 
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {issue.options.map((o) => (
-              <li key={o.id} className="flex items-center gap-2 text-[0.8125rem]">
-                <span className="min-w-0 flex-1 truncate">{o.label}</span>
+              <li key={o.id} className="flex items-center gap-3 text-xs sm:text-sm rounded-lg bg-white p-2 border border-slate-100 shadow-2xs">
+                <span className="min-w-0 flex-1 font-medium text-[var(--ink)]">{o.label}</span>
                 {showPoints ? (
-                  <>
+                  <div className="flex items-center gap-2.5">
                     <span
                       aria-hidden
-                      className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--private-line)]"
+                      className="h-2 w-20 shrink-0 overflow-hidden rounded-full bg-slate-100 border border-slate-200"
                     >
                       <span
-                        className="block h-full rounded-full bg-[var(--private-strong)]"
+                        className="block h-full rounded-full bg-[var(--accent)] transition-all"
                         style={{ width: `${share(issue, o.points[role], role)}%` }}
                       />
                     </span>
-                    <span className="tabular w-7 shrink-0 text-right text-[0.75rem] text-[var(--private-ink)]">
-                      {o.points[role]}
+                    <span className="tabular font-bold text-xs sm:text-sm text-[var(--accent)] min-w-[3.5rem] text-right">
+                      {o.points[role].toLocaleString()} pts
                     </span>
-                  </>
+                  </div>
                 ) : null}
               </li>
             ))}
@@ -253,12 +231,6 @@ export function IssueValueTable({
   );
 }
 
-/**
- * Pick one level of one issue.
- *
- * Chips rather than a dropdown: every level and what it is worth stays on
- * screen, so choosing is a comparison rather than a memory test.
- */
 export function OptionChips({
   issue,
   role,
@@ -274,7 +246,6 @@ export function OptionChips({
   role: Role;
   value: string | null;
   onChange: (optionId: string) => void;
-  /** Radio group name — must be unique on the page. */
   name: string;
   showPoints?: boolean;
   allowNone?: boolean;
@@ -283,11 +254,11 @@ export function OptionChips({
 }) {
   const selectedClass =
     tone === "private"
-      ? "border-[var(--private-strong)] bg-[var(--private-strong)] text-white"
-      : "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]";
+      ? "border-amber-500 bg-amber-500 text-white shadow-sm scale-102 font-bold"
+      : "border-[var(--accent)] bg-[var(--accent)] text-white shadow-sm scale-102 font-bold";
 
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2 pt-1">
       {allowNone ? (
         <Chip
           name={name}
@@ -295,7 +266,7 @@ export function OptionChips({
           onSelect={() => onChange("")}
           selectedClass={selectedClass}
         >
-          <span className="text-[var(--ink-3)]">{noneLabel}</span>
+          <span className="text-[var(--ink-3)] font-medium">{noneLabel}</span>
         </Chip>
       ) : null}
 
@@ -307,15 +278,17 @@ export function OptionChips({
           onSelect={() => onChange(o.id)}
           selectedClass={selectedClass}
         >
-          {o.label}
+          <span className="font-semibold">{o.label}</span>
           {showPoints ? (
             <span
               className={cx(
-                "tabular ml-1.5 text-[0.75rem]",
-                value === o.id ? "opacity-70" : "text-[var(--ink-3)]",
+                "tabular ml-2 rounded-md px-1.5 py-0.5 text-xs font-bold transition-colors",
+                value === o.id
+                  ? "bg-white/20 text-white"
+                  : "bg-slate-100 text-[var(--accent)]",
               )}
             >
-              {o.points[role]}
+              +{o.points[role]} pts
             </span>
           ) : null}
         </Chip>
@@ -340,10 +313,10 @@ function Chip({
   return (
     <label
       className={cx(
-        "cursor-pointer rounded-full border px-3 py-1.5 text-[0.8125rem] transition-colors",
+        "inline-flex cursor-pointer items-center rounded-xl border-2 px-4 py-2.5 text-sm sm:text-[0.9375rem] transition-all duration-150 shadow-2xs select-none active:scale-[0.98]",
         selected
           ? selectedClass
-          : "border-[var(--line-strong)] bg-[var(--surface)] hover:border-[var(--ink-3)]",
+          : "border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-2)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]",
       )}
     >
       <input

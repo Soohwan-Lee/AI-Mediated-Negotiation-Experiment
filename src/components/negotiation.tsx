@@ -29,19 +29,11 @@ export function CountdownTimer({
 }: {
   seconds: number;
   onExpire?: () => void;
-  /**
-   * Reports the remaining seconds each tick.
-   *
-   * The counterpart reads the clock — a low one is what makes it offer to
-   * settle rather than keep trading — so the number cannot live only in here.
-   */
   onTick?: (remaining: number) => void;
   running?: boolean;
 }) {
   const [remaining, setRemaining] = useState(seconds);
 
-  // Keep the latest callbacks without restarting the interval when the parent
-  // re-renders with new function identities.
   const onExpireRef = useRef(onExpire);
   const onTickRef = useRef(onTick);
   useEffect(() => {
@@ -54,8 +46,6 @@ export function CountdownTimer({
     const id = window.setInterval(() => {
       setRemaining((r) => {
         const next = Math.max(0, r - 1);
-        // Reporting from inside the updater would run during render in React's
-        // strict double-invoke, so it is queued instead.
         window.setTimeout(() => onTickRef.current?.(next), 0);
         if (next === 0) {
           window.clearInterval(id);
@@ -73,10 +63,16 @@ export function CountdownTimer({
 
   return (
     <span
-      className={`font-mono text-sm tabular-nums ${low ? "text-red-600" : "text-[var(--ink-2)]"}`}
+      className={cx(
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs sm:text-sm font-mono font-bold tracking-tight shadow-2xs transition-all",
+        low
+          ? "border-red-300 bg-red-50 text-red-600 animate-pulse"
+          : "border-slate-200 bg-white text-[var(--ink-2)]",
+      )}
       aria-live="off"
     >
-      {mm}:{ss}
+      <span aria-hidden>{low ? "⚠️" : "⏱️"}</span>
+      <span>{mm}:{ss}</span>
     </span>
   );
 }
@@ -85,40 +81,39 @@ export function CountdownTimer({
 // Transcript
 // ---------------------------------------------------------------------------
 
-/**
- * How each speaker is named on screen.
- *
- * DECEPTION INTEGRITY: the counterpart is presented as the other person taking
- * part, and their proxy belongs to that person. Nothing here may read as a
- * system component.
- *
- * "Other Participant" rather than a first name. A pseudonym invites the
- * question of where it came from; a role label is the same claim the consent
- * form and the instructions already make, so the three agree. It also keeps
- * the label identical for every participant, which a name could not do without
- * someone eventually noticing that everyone met the same person.
- *
- * The label is a role, but the VOICE is a person — see the P1 prompt. If the
- * counterpart ever starts writing like a system, this label stops being
- * credible and starts being a tell.
- */
-const SPEAKER_LABEL: Record<Speaker, string> = {
-  participant: "You",
-  counterpart: "Other Participant",
-  participant_proxy: "Your AI Proxy",
-  counterpart_proxy: "Their AI Proxy",
-  counterpart_principal: "Other Participant",
-  system: "System",
+const SPEAKER_CONFIG: Record<Speaker, { label: string; avatar: string; badgeClass: string }> = {
+  participant: {
+    label: "You",
+    avatar: "🧑‍💼",
+    badgeClass: "text-blue-900 bg-blue-50 border-blue-200",
+  },
+  counterpart: {
+    label: "Other Participant",
+    avatar: "👤",
+    badgeClass: "text-slate-800 bg-slate-100 border-slate-200",
+  },
+  participant_proxy: {
+    label: "Your AI Proxy",
+    avatar: "🤖",
+    badgeClass: "text-indigo-900 bg-indigo-50 border-indigo-200",
+  },
+  counterpart_proxy: {
+    label: "Their AI Proxy",
+    avatar: "🤖",
+    badgeClass: "text-purple-900 bg-purple-50 border-purple-200",
+  },
+  counterpart_principal: {
+    label: "Other Participant",
+    avatar: "👤",
+    badgeClass: "text-slate-800 bg-slate-100 border-slate-200",
+  },
+  system: {
+    label: "System",
+    avatar: "📢",
+    badgeClass: "text-slate-700 bg-slate-100 border-slate-200",
+  },
 };
 
-/**
- * What a transcript is allowed to render.
- *
- * Deliberately narrower than `TranscriptMessage`: there is no field here for
- * internal provenance, so a component physically cannot show which elements
- * the Explorer generated. The route strips it too, but that is a rule someone
- * could forget; this is a type error. Do not widen it to the stored shape.
- */
 export interface DisplayMessage {
   id: string;
   speaker: Speaker;
@@ -135,21 +130,12 @@ export function Transcript({
   messages: DisplayMessage[];
   pending?: boolean;
   emptyHint?: string;
-  /**
-   * Lay the whole thing out in the page instead of scrolling inside a box.
-   * Used where the transcript is the thing being read rather than a live
-   * conversation being added to — a box that scrolls internally invites
-   * skipping, and a completed AI-AI negotiation has to be read.
-   */
   flow?: boolean;
-  /** Marker at the end of the messages, for "have they reached the bottom". */
   endRef?: React.Ref<HTMLDivElement>;
 }) {
   const ownEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Following a live conversation. In flow mode the participant controls the
-    // scroll, so moving it under them would be wrong.
     if (flow) return;
     ownEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, pending, flow]);
@@ -158,54 +144,58 @@ export function Transcript({
     <div
       className={
         flow
-          ? "flex flex-col gap-3 p-4"
-          : "flex h-full min-h-80 flex-col gap-3 overflow-y-auto p-4"
+          ? "flex flex-col gap-3.5 p-4 sm:p-5"
+          : "flex h-full min-h-80 flex-col gap-3.5 overflow-y-auto p-4 sm:p-5 bg-slate-50/40"
       }
     >
       {messages.length === 0 && !pending ? (
-        <p className="m-auto max-w-xs text-center text-sm text-[var(--ink-2)]">
-          {emptyHint ?? "No messages yet."}
-        </p>
+        <div className="m-auto max-w-xs text-center py-8">
+          <span className="text-3xl mb-2 block opacity-70">💬</span>
+          <p className="text-sm font-medium text-[var(--ink-3)]">
+            {emptyHint ?? "No messages yet. Send a message to begin!"}
+          </p>
+        </div>
       ) : null}
 
       {messages.map((m) => {
         const own =
           m.speaker === "participant" || m.speaker === "participant_proxy";
-        // The participant's OWN words and their proxy's are different things
-        // to every §9.4 item that asks who said what, so the proxy's bubbles
-        // get an outlined variant of the own-side treatment rather than the
-        // identical fill. Same side, same alignment — it spoke FOR them — but
-        // distinguishable at a glance in the interleaved direct-phase scroll.
-        // This is speaker differentiation, not a visibility surface, so rule
-        // 1 (colour encodes who can see) is untouched: all three bubbles
-        // remain shared-table content.
         const ownProxy = m.speaker === "participant_proxy";
+        const isCounterpartProxy = m.speaker === "counterpart_proxy";
+        const config = SPEAKER_CONFIG[m.speaker] ?? SPEAKER_CONFIG.system;
+
         if (m.speaker === "system") {
           return (
-            <p
-              key={m.id}
-              className="mx-auto max-w-md text-center text-xs text-[var(--ink-2)]"
-            >
-              {m.text}
-            </p>
+            <div key={m.id} className="mx-auto my-2 max-w-md text-center">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-[var(--ink-3)] shadow-2xs">
+                <span>📢</span> {m.text}
+              </span>
+            </div>
           );
         }
+
         return (
           <div
             key={m.id}
-            className={`flex flex-col ${own ? "items-end" : "items-start"}`}
+            className={cx("flex flex-col gap-1", own ? "items-end" : "items-start")}
           >
-            <span className="mb-1 text-xs text-[var(--ink-2)]">
-              {SPEAKER_LABEL[m.speaker]}
-            </span>
+            <div className="flex items-center gap-1.5 px-1">
+              <span className="text-xs">{config.avatar}</span>
+              <span className="text-xs font-bold text-[var(--ink-3)]">
+                {config.label}
+              </span>
+            </div>
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
+              className={cx(
+                "max-w-[85%] sm:max-w-[78%] px-4 py-3 text-sm sm:text-[0.9375rem] leading-relaxed shadow-2xs transition-all",
                 ownProxy
-                  ? "border-2 border-[var(--accent)] bg-[var(--surface)] text-[var(--ink)]"
+                  ? "rounded-2xl rounded-tr-xs border-2 border-blue-500 bg-blue-50/80 text-slate-900 font-medium"
                   : own
-                    ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
-                    : "border border-[var(--line)] bg-[var(--surface-muted)]"
-              }`}
+                    ? "rounded-2xl rounded-tr-xs bg-[var(--accent)] text-white font-normal shadow-sm"
+                    : isCounterpartProxy
+                      ? "rounded-2xl rounded-tl-xs border-2 border-purple-400 bg-purple-50/70 text-slate-900 font-medium"
+                      : "rounded-2xl rounded-tl-xs border border-slate-200 bg-white text-slate-900 shadow-2xs",
+              )}
             >
               {m.text}
             </div>
@@ -214,13 +204,15 @@ export function Transcript({
       })}
 
       {pending ? (
-        <div className="flex items-start">
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface-muted)] px-4 py-2.5">
-            <span className="inline-flex gap-1">
+        <div className="flex items-start gap-2 pt-1">
+          <span className="text-xs mt-1">🤖</span>
+          <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-4 py-3 shadow-2xs">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="text-xs font-medium text-[var(--ink-3)] mr-1">Replying</span>
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
-                  className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--ink-2)]"
+                  className="h-2 w-2 animate-bounce rounded-full bg-[var(--accent)]"
                   style={{ animationDelay: `${i * 0.15}s` }}
                 />
               ))}
@@ -235,14 +227,6 @@ export function Transcript({
   );
 }
 
-/**
- * Message length cap (Design §7 노출량 통제), read from one place.
- *
- * Both sides are held to it, because message length is one of the things
- * matched across conditions — an Explorer that writes twice as much as a
- * Delegate to fit an extra reason would confound the contrast with sheer
- * airtime, which is what pilot gate 10 checks.
- */
 export const MAX_MESSAGE_CHARS = NEGOTIATION.maxMessageChars;
 
 export function MessageComposer({
@@ -254,18 +238,12 @@ export function MessageComposer({
   sendLabel = "Send",
   cue,
 }: {
-  /** Controlled, so mockup mode can put a written message in place. */
   value: string;
   onChange: (text: string) => void;
   onSend: (text: string) => void;
   disabled?: boolean;
   placeholder?: string;
   sendLabel?: string;
-  /**
-   * It is the participant's turn and they can act on it. Gives the box a
-   * visible edge, because "is it my move?" is a real question in a
-   * conversation that answers itself several seconds later.
-   */
   cue?: boolean;
 }) {
   const trimmed = value.trim();
@@ -278,8 +256,8 @@ export function MessageComposer({
   }
 
   return (
-    <div className="border-t border-[var(--line)] p-3">
-      <div className="flex items-end gap-2">
+    <div className="border-t border-slate-200 bg-white p-3.5 sm:p-4 rounded-b-2xl">
+      <div className="flex items-end gap-2.5">
         <textarea
           value={value}
           rows={3}
@@ -292,28 +270,31 @@ export function MessageComposer({
               submit();
             }
           }}
-          /* The cue is the glow on the edge, never a fill. Tinting the box
-             said "this field is special" in the same language the sand
-             surfaces use to say "this is private to you", which is the one
-             thing colour is reserved for here (interface rule 1). It also
-             clears the moment they start typing — once there are words in the
-             box, the participant plainly knows it is their turn. */
           className={cx(
-            "flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-shadow focus:border-[var(--focus)] disabled:bg-[var(--surface-muted)]",
-            cue && !value ? "cue-ring" : "border-[var(--line)]",
+            "flex-1 resize-none rounded-xl border px-3.5 py-2.5 text-sm sm:text-base outline-none transition-all placeholder:text-[var(--ink-4)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--focus-ring)] disabled:bg-slate-50 shadow-2xs",
+            cue && !value ? "cue-ring" : "border-slate-300",
           )}
         />
-        <Button onClick={submit} disabled={disabled || !trimmed || over}>
-          {sendLabel}
+        <Button
+          onClick={submit}
+          disabled={disabled || !trimmed || over}
+          className="h-11 px-5 shadow-sm"
+        >
+          <span>{sendLabel}</span>
+          <span aria-hidden className="text-base">🚀</span>
         </Button>
       </div>
-      <p
-        className={`mt-1.5 text-right text-xs tabular-nums ${
-          over ? "text-red-600" : "text-[var(--ink-3)]"
-        }`}
-      >
-        {left} characters left
-      </p>
+      <div className="mt-2 flex items-center justify-between text-xs text-[var(--ink-3)] px-1">
+        <span>Press <strong className="font-semibold text-slate-600">Enter</strong> to send</span>
+        <span
+          className={cx(
+            "tabular font-semibold",
+            over ? "text-red-600 font-bold" : "text-[var(--ink-3)]",
+          )}
+        >
+          {left} characters left
+        </span>
+      </div>
     </div>
   );
 }
@@ -322,17 +303,6 @@ export function MessageComposer({
 // Stage rail
 // ---------------------------------------------------------------------------
 
-/**
- * Where you are in the five stages, and what this one is for.
- *
- * A five-step exchange with a fixed structure is only legible if the structure
- * is on screen. Without this, a participant three messages in has no way to
- * know whether two more turns are coming or twenty, and the pacing of what
- * they concede depends on that guess — which would put a nuisance variable
- * straight into the primary outcome.
- *
- * Identical in both conditions and for both roles.
- */
 export function StageRail({
   stage,
   goals,
@@ -340,52 +310,48 @@ export function StageRail({
 }: {
   stage: StageId;
   goals: Record<StageId, string>;
-  /** One line on what to do right now. */
   note?: string;
 }) {
   const stages: StageId[] = [1, 2, 3, 4, 5];
   return (
-    <div className="border-b border-[var(--line)] bg-[var(--surface-muted)] px-4 py-3">
-      <ol className="mb-2 flex items-center gap-1.5">
+    <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
+      <ol className="mb-2.5 flex items-center gap-2">
         {stages.map((s) => (
-          <li key={s} className="flex flex-1 items-center gap-1.5">
-            <span
-              className={
+          <li key={s} className="flex flex-1 items-center gap-2">
+            <div
+              className={cx(
+                "h-2 flex-1 rounded-full transition-all duration-300",
                 s < stage
-                  ? "h-1.5 flex-1 rounded-full bg-[var(--accent)]/40"
+                  ? "bg-[var(--accent)]/50"
                   : s === stage
-                    ? "h-1.5 flex-1 rounded-full bg-[var(--accent)]"
-                    : "h-1.5 flex-1 rounded-full bg-[var(--line-strong)]"
-              }
+                    ? "bg-[var(--accent)] shadow-2xs"
+                    : "bg-slate-200",
+              )}
             />
           </li>
         ))}
       </ol>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <p className="text-[0.8125rem] font-semibold">
-          Step {stage} of 5 · {goals[stage]}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
+          <span className="text-[var(--accent)] font-extrabold mr-1.5">Step {stage} of 5</span>
+          <span>· {goals[stage]}</span>
         </p>
         {note ? (
-          <p className="text-[0.8125rem] text-[var(--ink-2)]">{note}</p>
+          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-[var(--ink-2)] shadow-2xs">
+            💡 {note}
+          </span>
         ) : null}
       </div>
     </div>
   );
 }
 
-/**
- * "The other participant is watching this too" (Design §4 관전 중).
- *
- * Shown throughout a Proxy negotiation. It is the thing that makes the
- * exchange feel observed rather than private, which is the condition the
- * social-cost measures are asked about — a participant who believed nobody
- * else saw the exchange would be answering about a different situation.
- */
 export function SpectatorBanner() {
   return (
-    <p className="flex items-center gap-2 border-b border-[var(--line)] bg-[var(--accent-soft)] px-4 py-2 text-[0.8125rem] text-[var(--ink-2)]">
+    <div className="flex items-center justify-center gap-2 border-b border-blue-200 bg-blue-50/90 px-4 py-2.5 text-xs sm:text-sm font-semibold text-blue-900 shadow-2xs">
+      <span className="flex h-2 w-2 rounded-full bg-red-500 animate-ping" />
       <span aria-hidden>👀</span>
-      The other participant is watching this too. Neither of you can step in.
-    </p>
+      <span>LIVE SPECTATING: The other participant is watching this exchange too.</span>
+    </div>
   );
 }
