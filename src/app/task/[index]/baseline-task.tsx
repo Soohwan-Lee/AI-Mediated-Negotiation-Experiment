@@ -683,6 +683,18 @@ export function BaselineTask({
         stepIndex={STEP_OF.review}
         tentative={tentative}
         hoped={prefs ? toPackage(prefs.preferred) : null}
+        behaviour={{
+          // No proxy ran, so there is nothing to ratify. PRE/POST-RECIP split
+          // on the counterpart's SB disclosure, which is its SECOND live
+          // reply — a fixed script position, so the comparison is against a
+          // constant rather than against whatever the participant happened to
+          // trigger.
+          ratify: null,
+          selfDisclosed: sbVoicedAtReply !== null,
+          preRecipSb: sbVoicedAtReply !== null && sbVoicedAtReply <= 1,
+          postRecipSb: sbVoicedAtReply !== null && sbVoicedAtReply > 1,
+          sbVoiced: sbVoicedAtReply !== null,
+        }}
         transcript={messages}
         isProxy={false}
         transcriptTitle="The conversation"

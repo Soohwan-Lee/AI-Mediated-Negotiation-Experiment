@@ -42,6 +42,7 @@ import {
   cx,
 } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
+import { codeOutcome } from "@/lib/negotiation/machine";
 import { useParticipant } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import {
@@ -74,6 +75,7 @@ export function ReviewPhase({
   stepIndex,
   tentative,
   hoped,
+  behaviour,
   transcript,
   transcriptTitle,
   transcriptHint,
@@ -96,6 +98,30 @@ export function ReviewPhase({
    * a screen that editorialised it would be a manipulation of its own.
    */
   hoped?: Package | null;
+  /**
+   * The behavioural measures the negotiation produced (§9.3), passed in from
+   * whichever arm ran it.
+   *
+   * They are written into the SAME `task_outcome_t{n}` row as everything else
+   * this screen records, rather than left in the event log. The event log is
+   * an append-only trace for auditing what happened when; the outcome row is
+   * what the export reads per task. Splitting one task's outcomes across both
+   * would mean reconstructing half of each participant's primary measures by
+   * replaying their events, which is exactly the kind of derivation that goes
+   * wrong quietly.
+   */
+  behaviour?: {
+    /** RATIFY — Proxy only; null in Baseline, which has nothing to ratify. */
+    ratify?: "approved_as_is" | "modified" | "rejected" | null;
+    /** SELF-DISCLOSE — the SB voiced in the participant's own words. */
+    selfDisclosed?: boolean;
+    /** PRE-RECIP-SB — their SB was out before the counterpart's disclosure. */
+    preRecipSb?: boolean;
+    /** POST-RECIP-SB — a new SB after hearing the counterpart's. */
+    postRecipSb?: boolean;
+    /** SB-VOICED — by any channel, proxy or in person. */
+    sbVoiced?: boolean;
+  };
   transcript: DisplayMessage[];
   transcriptTitle: string;
   transcriptHint: string;
@@ -200,6 +226,25 @@ export function ReviewPhase({
           theirRequirementPreserved: tentative
             ? preservesRequirement(task, counterpartRole, tentative[theirs.id])
             : false,
+          // §3.4's outcome set, derived by `codeOutcome` rather than
+          // recomputed here — one definition of UNLOCK, CONCEAL-PREMIUM,
+          // JOINT and MAX-JOINT, the same one the tests pin.
+          ...(() => {
+            const coded = codeOutcome(task, role, tentative, Boolean(tentative));
+            return {
+              UNLOCK: coded.unlocked,
+              "CONCEAL-PREMIUM": coded.concealPremium,
+              POINTS: coded.participantPoints,
+              JOINT: coded.jointPoints,
+              "MAX-JOINT": coded.maxJoint,
+            };
+          })(),
+          // §9.3's disclosure measures, from the arm that ran the exchange.
+          RATIFY: behaviour?.ratify ?? null,
+          "SELF-DISCLOSE": behaviour?.selfDisclosed ?? false,
+          "PRE-RECIP-SB": behaviour?.preRecipSb ?? false,
+          "POST-RECIP-SB": behaviour?.postRecipSb ?? false,
+          "SB-VOICED": behaviour?.sbVoiced ?? false,
         },
       );
     }

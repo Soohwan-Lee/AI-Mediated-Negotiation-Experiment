@@ -366,6 +366,12 @@ export function ProxyTask({
   const [showStopped, setShowStopped] = useState(false);
   /** M1 (§9.3): asked right after the mandate, of non-disclosers only. */
   const [m1Answer, setM1Answer] = useState<string | null>(null);
+  /** What the closing conversation produced, for the outcome row (§9.3). */
+  const [closing, setClosing] = useState<{
+    ratify: "approved_as_is" | "modified" | "rejected" | null;
+    selfDisclosed: boolean;
+    postRecipSb: boolean;
+  } | null>(null);
 
   const mockAi = useDevMockAi();
   const script = scriptedTask(task, role, policy);
@@ -1151,6 +1157,7 @@ export function ProxyTask({
         setOffer={setOffer}
         onSettled={(pkg, meta) => {
           setTentative(pkg);
+          setClosing(meta);
           // §9.3: RATIFY (what happened to the proxies' tentative package),
           // SELF-DISCLOSE (the SB tagged in the participant's own voice), and
           // POST-RECIP-SB (a new SB after the counterpart's disclosure, which
@@ -1187,6 +1194,17 @@ export function ProxyTask({
           .filter((im) => im.preferredOptionId)
           .map((im) => [im.issueId, im.preferredOptionId as string]),
       )}
+      behaviour={{
+        ratify: closing?.ratify ?? null,
+        selfDisclosed: closing?.selfDisclosed ?? false,
+        // PRE-RECIP-SB in this arm is the proxy's own doing: its scheduled
+        // SB lands at the first reason opportunity, before the counterpart's
+        // stage-4 disclosure. `proxyVoicedTier` is what it ACTUALLY voiced.
+        preRecipSb: proxyVoicedTier === "sensitive",
+        postRecipSb: closing?.postRecipSb ?? false,
+        sbVoiced:
+          proxyVoicedTier === "sensitive" || Boolean(closing?.selfDisclosed),
+      }}
       transcript={messages}
       proxyTranscript={proxyTranscript}
       isProxy
