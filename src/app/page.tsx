@@ -58,7 +58,7 @@ const STEPS = [
   {
     title: "Two negotiation tasks",
     detail:
-      "Each has a ten-minute limit, then some questions and a bonus decision.",
+      "A briefing, the negotiation itself, then some questions and a decision about the other person.",
     minutes: 2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward),
   },
   {
@@ -169,7 +169,14 @@ export default function ConsentPage() {
 
         {/* Study Timeline Steps */}
         <Card className="mb-6">
-          <CardTitle hint="Standard 4-step sequence (approx. 25–30 minutes total):">
+          {/* The total is SUMMED FROM THE STEPS, never written in. A
+              hardcoded figure here said "approx. 25-30 minutes" directly
+              under a badge reading ~55 min, and called five steps four —
+              the first thing a participant reads about how long this takes,
+              contradicting itself twice. */}
+          <CardTitle
+            hint={`${STEPS.length} parts, about ${STEPS.reduce((n, s) => n + s.minutes, 0) + STAGE_MINUTES.consent} minutes in total:`}
+          >
             🗺️ Study Flow Timeline
           </CardTitle>
           <ol className="relative mt-4 space-y-3.5">

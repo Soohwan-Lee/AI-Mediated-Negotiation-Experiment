@@ -430,21 +430,33 @@ export function PreferenceForm({
             ))}
           </div>
 
+          {/* WHAT THESE TWO NUMBERS ARE, AND WHAT THEY ARE NOT. They price
+              the two positions the participant just entered — nothing more.
+              Under the Ver.2.12 ladder what a package is actually worth
+              depends on the reasons that get voiced (§3.3), so labelling the
+              floor's value as an expected outcome would forecast a number
+              the negotiation does not owe them. The labels therefore name
+              the POSITION being priced, and the note says plainly that
+              neither is a prediction. */}
           <div className="mt-5 space-y-2 rounded-2xl border border-[var(--private-line)] bg-amber-50/50 p-4 sm:p-5 shadow-2xs">
             <PackageValue
               issues={task.issues}
               role={role}
               reservationPoints={task.reservationPoints}
               selection={preferred}
-              label="If you achieve your Best Goal"
+              label="What your Best Goal is worth to you"
             />
             <PackageValue
               issues={task.issues}
               role={role}
               reservationPoints={task.reservationPoints}
               selection={minimum}
-              label="At your lowest Walkaway Limit"
+              label="What your Walkaway Limit is worth to you"
             />
+            <p className="pt-1 text-xs leading-relaxed text-[var(--private-ink)]">
+              These price the two positions you just set. Where the
+              negotiation actually lands is up to the conversation.
+            </p>
           </div>
 
           {reasons ? <div className="mt-6">{reasons}</div> : null}

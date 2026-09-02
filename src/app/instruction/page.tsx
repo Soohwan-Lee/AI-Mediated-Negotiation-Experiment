@@ -209,7 +209,7 @@ export default function InstructionPage() {
           {/* Quick Gist card */}
           <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/40 to-blue-50/20">
             <CardTitle hint="At a glance:">
-              🎯 Study Overview in 4 Lines
+              🎯 The study in five lines
             </CardTitle>
             <dl className="space-y-2.5 mt-3">
               <Gist term="Where you are">
@@ -223,6 +223,17 @@ export default function InstructionPage() {
               <Gist term="What you settle">
                 <strong>Two things about the schedule</strong> — and you have to agree
                 on both. Neither of you can set them alone.
+              </Gist>
+              {/* A first-time reader was told the point sheet was private
+                  before being told what it was FOR, so "why it is not
+                  obvious" had nothing to bite on. This says what a good
+                  outcome is — a higher score, no agreement pays the low
+                  fallback — WITHOUT naming the trade that gets you there:
+                  finding it is the behaviour being observed. */}
+              <Gist term="What counts as doing well">
+                Each option is worth points to you, privately. A better deal is
+                one worth more points to you — and no agreement at all pays the
+                low fallback score to both of you.
               </Gist>
               <Gist term="Why it is not obvious">
                 You each have a private point sheet, and{" "}
@@ -340,11 +351,13 @@ export default function InstructionPage() {
               <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 shadow-2xs">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-lg">🤖</span>
-                  <p className="text-xs sm:text-sm font-bold text-blue-950">Direct vs. AI Proxy Mode</p>
+                  <p className="text-xs sm:text-sm font-bold text-blue-950">The two tasks work differently</p>
                 </div>
                 <p className="text-xs text-blue-900 leading-relaxed">
-                  In one task you talk to the other person yourself. In the other,
-                  an AI Proxy speaks for you first, using instructions you write.
+                  In one, you talk to the other person yourself from the start.
+                  In the other, you write instructions for an AI Proxy, watch it
+                  put your case, and then finish the conversation yourself. Each
+                  task explains itself before it begins.
                 </p>
               </div>
             </div>
