@@ -594,7 +594,7 @@ export async function POST(request: Request) {
   }));
 
   try {
-    const generate = () =>
+    const generate = (correction = "") =>
       generateAction({
       kind: body.policy,
       ctx: {
@@ -602,7 +602,7 @@ export async function POST(request: Request) {
         agentRole: actorRole,
         issues: task.issues,
         stage: effectiveStage,
-        decidedAction,
+        decidedAction: decidedAction + correction,
         mandateSummary: isParticipantSide
           ? mandateSummary(body.mandate, body.taskId)
           : undefined,
@@ -613,13 +613,17 @@ export async function POST(request: Request) {
         forbiddenReasons: isParticipantSide
           ? reasonsFor(body.taskId, body.participantRole, body.mandate).forbidden
           : undefined,
-        // The pool goes only to the participant's own proxy under Explorer.
-        // The counterpart proxy's words are not a measured variable, so it is
-        // not given extra latitude to spend.
-        plausibleReasons:
-          isParticipantSide && body.policy === "explorer"
-            ? plausibleReasons(body.taskId, body.participantRole)
-            : undefined,
+        // THE MODEL IS NO LONGER SHOWN THE POOL. The clause is appended to the
+        // finished message instead, so listing it here only offered the model
+        // a second thing it might say INSTEAD of its principal's card — and
+        // measured live it took that option: on the reason turn the card
+        // survived 4 of 4 Delegate generations against 1 of 4 Explorer ones.
+        // A failure that fires in one arm only, on the reason turn, biases
+        // `Explorer - Delegate` itself.
+        //
+        // The Delegate-side guardrail is unaffected: it reads the action's
+        // own `pool:` fields, which a Delegate never had the pool to fill.
+        plausibleReasons: undefined,
       },
       history,
     });
@@ -645,16 +649,38 @@ export async function POST(request: Request) {
      * One retry, not a loop: each turn is a live request in front of a
      * waiting participant, and a second failure is rare enough to accept.
      */
+    /** Both generations dropped the card the schedule designated. */
+    let cardMissing = false;
     let { action, stubbed } = await generate();
     if (
       isParticipantSide &&
       designatedCard &&
       !mentionsCard(action.rationale, designatedCard.text)
     ) {
-      const second = await generate();
-      if (mentionsCard(second.action.rationale, designatedCard.text)) {
-        action = second.action;
-        stubbed = second.stubbed;
+      // The retry says WHAT WENT WRONG rather than repeating the same ask. A
+      // bare second roll failed too in live runs — the model does not know it
+      // omitted anything, so an identical prompt reproduces the omission.
+      //
+      // AND IT NEVER TAKES THE TURN DOWN WITH IT. This route already spends
+      // ~7.5s on one generation inside Vercel's 60s limit, and a second call
+      // is a second chance to time out: one live run lost a whole turn to an
+      // ETIMEDOUT raised HERE, after the first generation had already come
+      // back perfectly usable. A retry that can fail worse than not retrying
+      // is not worth having, so a throw leaves the first attempt standing.
+      try {
+        const second = await generate(
+          ` YOUR LAST ATTEMPT LEFT THE REASON OUT. The message is not acceptable without it. Reframe this reason in your own words and make it the body of the message: "${designatedCard.text}"`,
+        );
+        if (mentionsCard(second.action.rationale, designatedCard.text)) {
+          action = second.action;
+          stubbed = second.stubbed;
+        } else {
+          cardMissing = true;
+        }
+      } catch (retryError) {
+        // Logged, not raised: the first attempt is still a valid message.
+        console.warn("[proxy-negotiation] card retry failed", retryError);
+        cardMissing = true;
       }
     }
 
@@ -706,7 +732,20 @@ export async function POST(request: Request) {
     // it (§6.6: "one short clause beside that message's authorized reason"),
     // and the cap below then applies to the whole message — so the added
     // clause cannot buy the Explorer arm extra LENGTH either.
-    const poolText = poolBox.item?.text ?? null;
+    // THE POOL CLAUSE IS WITHHELD WHEN THE CARD IS MISSING, and that guard is
+    // the whole reason this is not just a tidiness check.
+    //
+    // Appending it unconditionally made the omission POLICY-CORRELATED: an
+    // Explorer message that dropped the card still arrived carrying a fluent
+    // argument, so nothing downstream noticed, while the same failure under
+    // Delegate produced an obviously reasonless message. Measured live on the
+    // reason turn the card survived 4 of 4 Delegate generations and 1 of 4
+    // Explorer ones. A defect that fires in one arm only, on the reason turn,
+    // is a bias in `Explorer - Delegate` itself — the contrast the study
+    // exists to measure.
+    //
+    // Withholding it makes both policies fail identically and visibly.
+    const poolText = cardMissing ? null : (poolBox.item?.text ?? null);
     const withPool =
       !blocked && poolText && !containsPoolClause(action.rationale, poolText)
         ? `${action.rationale} || ${poolText}`

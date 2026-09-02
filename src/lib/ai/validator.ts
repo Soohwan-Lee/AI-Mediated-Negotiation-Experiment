@@ -378,6 +378,30 @@ export function validateAction(
 }
 
 /**
+ * How much of `clause` this text carries, as a share of its distinctive words.
+ *
+ * Shared by the cap's protection matching. Deliberately lenient: the proxies
+ * reframe rather than quote, so an exact or near-exact threshold would never
+ * fire on a correctly written message.
+ */
+function clauseOverlap(text: string, clause: string): number {
+  const words = (t: string) =>
+    new Set(
+      t
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 4),
+    );
+  const want = words(clause);
+  if (want.size === 0) return 0;
+  const have = words(text);
+  let hits = 0;
+  for (const w of want) if (have.has(w)) hits += 1;
+  return hits / want.size;
+}
+
+/**
  * Trim one generated message to the study's exposure cap, at a bubble seam.
  *
  * §7 caps message length so the Explorer arm cannot simply say MORE than the
@@ -426,12 +450,24 @@ export function capMessageLength(
     Array.isArray(protect) ? protect : [protect]
   ).filter((p): p is string => typeof p === "string" && p.trim().length > 0);
 
+  // MATCHED BY CONTENT OVERLAP, NOT CONTAINMENT, and that is the whole point.
+  // A proxy is REQUIRED to reframe its principal's card rather than quote it
+  // (§6.6), so the bubble carrying the card never contains the card's own
+  // words. A containment match found the verbatim pool clause and missed the
+  // reframed card every time, so the cap protected the addition and dropped
+  // the reason — the exact inversion of what it is for.
   const protectedIdx: number[] = [];
   for (const clause of wanted) {
-    const needle = clause.trim();
     let found = -1;
+    let bestScore = 0;
     for (let i = 0; i < bubbles.length; i += 1) {
-      if (bubbles[i].includes(needle) && !protectedIdx.includes(i)) found = i;
+      if (protectedIdx.includes(i)) continue;
+      const score = clauseOverlap(bubbles[i], clause);
+      // Ties go to the later bubble: an appended clause sits at the end.
+      if (score >= 0.25 && score >= bestScore) {
+        bestScore = score;
+        found = i;
+      }
     }
     if (found >= 0) protectedIdx.push(found);
   }

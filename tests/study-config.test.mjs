@@ -140,3 +140,26 @@ test("an absent protected clause does not break the trim", () => {
   assert.ok(capped.length <= 30);
   assert.ok(text.includes(capped.split("||")[0].trim()));
 });
+
+test("a REFRAMED card is protected, not just a quoted one", () => {
+  // The regression this pins: proxies are required to reframe a card rather
+  // than quote it (§6.6), so containment matching found the verbatim pool
+  // clause and missed the reframed card every time. The cap then protected
+  // the Explorer's addition and dropped the principal's own reason — with the
+  // schedule still recording the card as voiced, and the ladder driven off
+  // that record. Measured live it produced a POLICY-CORRELATED failure: the
+  // card survived 4 of 4 Delegate generations and 1 of 4 Explorer ones.
+  const card =
+    "The truth is, I got the weekend demand forecast wrong twice last month " +
+    "and had to ask another store's manager for emergency cover. The district " +
+    "manager knows, and if it happens again it goes into my operations review.";
+  const reframed =
+    "Two missed forecasts last month required emergency cover from another " +
+    "store; the district knows, and a repeat goes into the operations review.";
+  const text = ["Weekend shifts are our priority.", reframed, "What is your top issue?", POOL].join(" || ");
+
+  const capped = capMessageLength(text, 280, [card, POOL]);
+  assert.ok(capped.length <= 280);
+  assert.ok(capped.includes(reframed), "the reframed card was dropped");
+  assert.ok(capped.includes(POOL), "the pool clause was dropped");
+});

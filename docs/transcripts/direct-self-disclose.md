@@ -11,8 +11,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5 · propose_max)_
 
-> given what you've told me, a fuller trade makes more sense.
-> i can hold closing shifts at 1 per week if you take 4 weekend shifts per month on your end.
+> got it — given what you’ve shared, a fuller trade makes more sense.
+> i can move to 1 closing shift a week if you take 4 weekend shifts a month in return.
 >
 > _package: Weekend shifts: 4 per month · Closing shifts: 1 per week_
 
@@ -25,12 +25,12 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 **counterpart** _(stage 6 · accept_sb)_
 
 > glad that works.
-> given the situation you shared, 4 weekend shifts a month and 1 closing shift a week beats forcing it on either side.
+> given what you shared, 4 weekend shifts a month and 1 closing shift a week beats forcing it on either side.
 >
 > _package: Weekend shifts: 4 per month · Closing shifts: 1 per week_
 
 ## Checks
 
-- ✓ counterpart answers the confession by proposing best↔best — given what you've told me, a fuller trade makes more sense. || i can hold closing shifts at 1 per week if you take 4 weekend shifts per month on your end.
+- ✓ counterpart answers the confession by proposing best↔best — got it — given what you’ve shared, a fuller trade makes more sense.||i can move to 1 closing shift a week if you take 4 weekend shifts a month in return.
 - ✓ the exchange then settles at best↔best — Weekend shifts: 4 per month · Closing shifts: 1 per week
 - ✓ P2 voice held across replies

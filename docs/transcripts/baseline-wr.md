@@ -17,9 +17,9 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 2 · state_priority)_
 
-> i hear daytime cover is your main concern.
-> when doubles stack up, my focus drops badly toward the end of a shift. Bringing them down is my key condition for these four weeks.
-> is daytime coverage the term that matters most to you, and why?
+> i hear that daytime cover is the priority for you.
+> for me, when doubles stack up, my focus drops badly toward the end of a shift. Bringing doubles down is the condition that matters most these four weeks.
+> which term matters most to you, and why?
 
 **participant**
 
@@ -29,9 +29,9 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 4 · disclose_sb)_
 
-> i need to be honest about something.
+> i need to be candid about something.
 > late in a double last month, I entered the inventory wrong twice. A coworker caught it, so it never reached you.
-> if doubles keep coming, I’m afraid the next mistake will be one nobody catches.
+> if the doubles keep coming, I'm afraid the next mistake will be one nobody catches.
 
 **participant**
 
@@ -41,9 +41,9 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 5 · counter_tier)_
 
-> i hear why you need the daytime cover.
-> i can’t go all the way to 4 extra daytime shifts on what we’ve discussed.
-> if we set doubles at 1 per week, I can commit to 3 extra daytime shifts.
+> i appreciate you moving the doubles down.
+> based on what we’ve covered, i can’t go all the way to 4 daytime shifts.
+> i can commit to 3 extra daytime shifts if we hold doubles at 1 per week.
 >
 > _package: Extra peak daytime shifts: 3 shifts · Double shifts: 1 per week_
 
@@ -55,8 +55,9 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 6 · accept)_
 
-> that package works for me.
-> 3 extra peak daytime shifts and 1 double shift per week. Nothing’s final until we both confirm it.
+> that works for me, thanks.
+> the package is 3 extra peak daytime shifts and 1 double shift per week.
+> nothing’s final until we both confirm, but I’m confirming this package.
 >
 > _package: Extra peak daytime shifts: 3 shifts · Double shifts: 1 per week_
 
