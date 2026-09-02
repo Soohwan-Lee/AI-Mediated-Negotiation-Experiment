@@ -220,6 +220,45 @@ messages with the package-only fallback on exactly the closing turns — the
 machine stamps an accept as stage 6, and the model sometimes echoes the trade
 stage it was mid-way through. It is still logged for the audit.
 
+**Message SHAPE is enforced on the text, not asked for in a prompt.** Two
+things travel together in `capMessageLength`, and both were prompt-only once
+and both failed:
+
+- **Every AI message is bubble-split and under 280 characters.** The `||`
+  rule lived in `HUMAN_CHAT_STYLE`, which only P1 and P2 ever saw, so the two
+  proxies — the only thing a Proxy participant watches for minutes — wrote
+  one 220-character paragraph a turn, 16 turns out of 16. It is in
+  `SHARED_RULES` now, and the cap is applied rather than requested: §7's
+  exposure control exists so the Explorer arm cannot simply say MORE than the
+  Delegate arm, and unenforced it did (226 characters against 194, longest
+  471 against 401 — a contrast the policy manipulation would have carried).
+- **The cut is taken at a bubble seam, and never from a clause that carries
+  meaning.** `capMessageLength` takes protected clauses in PRIORITY ORDER,
+  the principal's card first and the Explorer's pool clause second. Both
+  halves of that are load-bearing and both were learned the hard way. Cutting
+  from the end removed the pool clause, which is the last bubble the model
+  writes — the cap undoing the manipulation it was written to protect.
+  Protecting only the pool clause then pushed the CARD out, which is worse:
+  the schedule records the card as voiced and the ladder is driven off that
+  record, so a participant was credited with a disclosure nobody heard.
+  Matching is by CONTENT OVERLAP, never containment — a proxy is required to
+  reframe a card rather than quote it (§6.6), so a containment match finds
+  the verbatim pool clause every time and the reframed card never. That one
+  detail made the failure POLICY-CORRELATED: 4 of 4 Delegate generations kept
+  the card against 1 of 4 Explorer ones, which is a bias in
+  `Explorer − Delegate` itself.
+
+**The pool clause is APPENDED, not requested, and the model is not shown the
+pool at all.** As an instruction it competed with the card instruction on the
+same turn ("give exactly this authorized reason and no other") and lost about
+three times in four — while `voicedPoolId` spent the §6.6 budget from the
+schedule regardless, so a dropped clause was recorded as voiced.
+`designatedPool` still decides whether and which, so the per-issue and
+per-task budgets are unchanged, and the Delegate guardrail is untouched: it
+reads the action's own `pool:` fields, which a Delegate never had the pool to
+fill. When both generations drop the card the pool clause is withheld too, so
+the two policies fail identically rather than Explorer failing softer.
+
 **The Explorer's pool reasons have their own budget and their own action
 field.** At most one per issue and two per task, riding in
 `addedReasonSourceId` BESIDE the principal's card rather than instead of it.
@@ -788,10 +827,20 @@ through the real routes; see "Verified against the live model" below.
 Nothing structural. What remains is values to fix and behaviour to observe:
 
 - **Pilot-dependent numbers.** The fallback (600), the outcome ladder
-  (1,000 / 2,000 / 3,000), the strength of the §5② decision guidelines, the
-  advertised time, the payment (£7.50 participation, £1.00 bonus per task —
-  GBP because Prolific pays in it, and both must clear Prolific's fair-pay
-  rate), and the Prolific completion code.
+  (1,000 / 2,000 / 3,000), the strength of the §5② decision guidelines, and
+  the Prolific completion code.
+
+  **The payment is settled**: £8.00 participation plus a £1.00 bonus is £9.00
+  for a 60-minute study, which is exactly Prolific's recommended fair-pay rate
+  (their hard floor is £6.00/hour). GBP because Prolific pays in it. The pound
+  is held back and presented as something a Leader decides and a Member
+  receives, and every participant is paid it in full — the third deception
+  alongside the counterpart's existence and the upward evaluation, retracted
+  by name at `/debriefing`. It is held back rather than paid flat because
+  gate 2's POWER3 asks whether outcomes that mattered depended on the other
+  person's decisions, and a bonus the Member believes someone else is
+  deciding IS that dependence. `tests/study-config.test.mjs` pins base plus
+  bonus against the advertised total and both against the rate.
 
   On the impasse target (gate 6, under 10%): the ladder makes impasse much
   harder to reach than the old threshold rule did, because every rung is an
@@ -801,9 +850,15 @@ Nothing structural. What remains is values to fix and behaviour to observe:
   package — which is a real behaviour worth measuring, not a bug. Watch the
   rate rather than pre-emptively widening anything.
 
-- **Timing.** `STAGE_MINUTES` sums to about 55 minutes, which is what the
-  consent page advertises (and the consent timeline now derives its total from
-  those same numbers, so the two cannot drift apart again). Gate 8 asks for a
+- **Timing.** `STAGE_MINUTES` sums to 61 minutes and the consent page
+  advertises 60. `TOTAL_MINUTES` is derived from those same numbers and
+  `timingIsHonest()` pins the relation — the advertised figure may round the
+  budget DOWN by at most a minute and never further, because a listing that
+  promises less than the study takes underpays anyone slower than the estimate
+  and the fair-pay rate is computed from it. (It was 55 against a
+  four-minute-per-task survey budget, for about twenty-five rating items and
+  seven written answers; seven is the honest figure and the six minutes that
+  restores were six minutes of unpaid work.) Gate 8 asks for a
   task median under 12 minutes. A Proxy task is the longer arm — the proxies'
   watching plus a 3-minute closing — but both clocks are caps, not targets. The
   pilot median decides this; the lever is the reply-delay range, never the
