@@ -18,15 +18,13 @@ export type ViolationCode =
   | "unknown_option"
   | "unauthorized_issue"
   | "red_line_violation"
-  | "concession_envelope_violation"
   | "fabricated_personal_fact"
   | "impossible_resource_promise"
   | "role_authority_violation"
   | "disclosure_permission_violation"
   | "provenance_policy_violation"
   | "rationale_budget_exceeded"
-  | "stage_mismatch"
-  | "agent_option_not_allowed";
+  | "stage_mismatch";
 
 export interface Violation {
   code: ViolationCode;

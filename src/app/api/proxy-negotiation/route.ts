@@ -814,8 +814,19 @@ export async function POST(request: Request) {
       // the rule inert for every Proxy participant once before. Not a leak:
       // it describes the participant's own card, identically under both
       // policies.
+      //
+      // SCOPED TO THE REQUIREMENT ISSUE, like every sibling computation
+      // (`resolveReasonTokens` here, `personallyVoiced` in the direct
+      // closing, the Baseline picker). Inert today because
+      // `designatedReason` already filters by issue and both cards sit on
+      // the requirement term — but unscoped it is the one place a card added
+      // on the OTHER term would hand the direct phase a tier the machine's
+      // own log refuses to grant.
       voicedTier:
-        !blocked && isParticipantSide && designatedCard
+        !blocked &&
+        isParticipantSide &&
+        designatedCard &&
+        designatedCard.issueId === yourRequirement.id
           ? designatedCard.layer === "sensitive"
             ? "sensitive"
             : "work"

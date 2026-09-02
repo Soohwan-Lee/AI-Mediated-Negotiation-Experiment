@@ -62,6 +62,26 @@ Two gaps in this document were closed while writing that store:
 it — so pilot gate 9's rationale audit had no source. `logGuardrailEvent` now
 exists.
 
+**`logGuardrailEvent` STILL HAS NO CALLER, and that is a gap, not dead code.**
+The validator's verdict and the Explorer's `internalProvenance` are both
+computed on every turn in `/api/proxy-negotiation` and both are discarded
+there. They cannot be handed to the client to persist the way messages are:
+rule 3 of "Things the participant must never learn" forbids the response
+carrying the KIND of a reason, and provenance is exactly that kind — a per
+message tell for the whole transcript.
+
+So the audit needs a SERVER-side write, which is the one piece of persistence
+that does not exist yet. It lands with `/api/persist`: that route holds the
+service-role key, and the guardrail write is one more `{op, payload}` on it.
+Until then gate 10's guardrail audit and gate 9's rationale audit have no
+source outside `npm run simulate`, which returns `guardrailViolations` on
+every turn and is currently the only reader.
+
+Do not "clean up" `logGuardrailEvent`, `GuardrailEvent`, or the
+`internalProvenance` field to remove the unused-symbol warning. They are the
+two ends of a wire whose middle is scheduled, and deleting them would silently
+drop a pilot gate.
+
 ## Principles
 
 - **Pseudonymous keys.** `participant_key` is the join key everywhere.

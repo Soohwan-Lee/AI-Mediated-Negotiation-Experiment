@@ -15,8 +15,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2 · state_priority)_
 
-> got it — keeping closes down is your main concern.
-> weekends are my most urgent condition: the peaks need experienced cover.
+> got it — keeping closes down matters most to you.
+> weekend peaks need experienced cover; this quarter, weekend coverage is my most urgent condition.
 > which term matters most to you, and why?
 
 **participant**
@@ -25,8 +25,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 4 · disclose_sb)_
 
-> the truth is, I got the weekend demand forecast wrong twice last month. I had to ask another store's manager for emergency cover.
-> the district manager knows, and if it happens again it goes into my operations review.
+> the truth is, I got the weekend demand forecast wrong twice last month.
+> I had to ask another store's manager for emergency cover, and the district manager knows.
 
 **participant**
 
@@ -34,8 +34,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5 · nonum)_
 
-> i hear you on the closes running late and stacking up.
-> i can’t compare numbers, but I’d like to understand a little more about why keeping them down matters so much before I move.
+> i hear you.
+> before i move on the closes, can you tell me why they matter so much to you?
+> i’d like to understand that first.
 
 **participant**
 
@@ -43,8 +44,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5 · ask_why)_
 
-> i hear that closes are the part you most need reduced.
-> based on that, I can’t go all the way down on closes, but I can offer 3 per week if you can do 4 weekend shifts per month.
+> got it — i can’t go all the way down on closes based on what i’ve heard.
+> if you can hold 4 weekend shifts per month, i can concede to 3 closing shifts per week.
 >
 > _package: Weekend shifts: 4 per month · Closing shifts: 3 per week_
 

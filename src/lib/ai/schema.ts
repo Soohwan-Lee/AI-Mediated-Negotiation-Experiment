@@ -28,10 +28,6 @@ export interface NegotiationAction {
   /** Issues this action touches. */
   issueTargets: string[];
   proposedTerms: ProposedTerm[];
-  /** "If you accept X, we can move on Y" — links two issues. */
-  conditionalLink: { give: string[]; get: string[] } | null;
-  /** Where this side's requirement stands after this action. */
-  requirementStatus: "held" | "traded" | "reduced" | "not_addressed";
   /**
    * Which of the principal's own reason cards the visible rationale draws on,
    * if any — a card id, designated by the state machine (Design §7 ver.2.6).
@@ -77,12 +73,10 @@ export const NEGOTIATION_ACTION_SCHEMA = {
   required: [
     "actionType",
     "stage",
-    "requirementStatus",
     "reasonSourceId",
     "addedReasonSourceId",
     "issueTargets",
     "proposedTerms",
-    "conditionalLink",
     "rationale",
     "unresolved",
     "internalProvenance",
@@ -102,10 +96,6 @@ export const NEGOTIATION_ACTION_SCHEMA = {
       ],
     },
     stage: { type: "integer", enum: [1, 2, 3, 4, 5, 6] },
-    requirementStatus: {
-      type: "string",
-      enum: ["held", "traded", "reduced", "not_addressed"],
-    },
     reasonSourceId: { type: ["string", "null"] },
     addedReasonSourceId: { type: ["string", "null"] },
     issueTargets: { type: "array", items: { type: "string" } },
@@ -119,15 +109,6 @@ export const NEGOTIATION_ACTION_SCHEMA = {
           issueId: { type: "string" },
           optionId: { type: "string" },
         },
-      },
-    },
-    conditionalLink: {
-      type: ["object", "null"],
-      additionalProperties: false,
-      required: ["give", "get"],
-      properties: {
-        give: { type: "array", items: { type: "string" } },
-        get: { type: "array", items: { type: "string" } },
       },
     },
     rationale: { type: "string" },

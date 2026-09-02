@@ -308,9 +308,18 @@ These are load-bearing. Breaking any one invalidates the data.
    in use — §7 requires it, and OTHER-AI4 is unanswerable otherwise); the
    *condition name* never is.
 3. **Which individual reasons came from the Explorer pool.** Internal
-   provenance is recorded for audit and stripped server-side before the
+   provenance is computed for the audit and stripped server-side before the
    response leaves `/api/proxy-negotiation`. `DisplayMessage` has no field for
    it, so a transcript component cannot render it even by accident.
+
+   **It is not yet PERSISTED anywhere, and that is deliberate rather than
+   forgotten.** `logGuardrailEvent` exists on both stores and has no caller,
+   because the only place provenance may be written is the SERVER — handing
+   it to the client to save, the way messages are saved, is precisely the
+   per-message tell the next paragraph forbids. The write lands with
+   `/api/persist`, which holds the service-role key. Until then the audit's
+   only source is `npm run simulate`. Do not delete either end of that wire
+   to silence an unused-symbol warning; see docs/DATA_MODEL.md.
 
    Nothing else in the response may carry the kind either. The running reason
    budget travels as an opaque token, and an earlier version prefixed pool

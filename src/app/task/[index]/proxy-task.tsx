@@ -493,6 +493,8 @@ export function ProxyTask({
     if (mockAi) {
       const scripted = script.messages;
       setProgress({ done: 0, total: scripted.length });
+      /** How many messages actually reached the screen before any stop. */
+      let playedCount = 0;
       for (let i = 0; i < scripted.length; i += 1) {
         if (stopped.current) break;
         // Short in mockup mode: the point is to read the flow, and a real
@@ -506,18 +508,26 @@ export function ProxyTask({
           })),
         );
         setProgress({ done: i + 1, total: scripted.length });
+        playedCount = i + 1;
       }
       // A stopped negotiation has no agreement — that is what stopping it
       // means. Handing the participant the package the exchange was heading
       // for would make the stop cosmetic.
       setTentative(stopped.current ? null : script.tentative);
-      // The scripted exchange voices the SB at the first reason opportunity —
-      // unless it was stopped before reaching it. The tier is read from the
-      // voiced card's layer, scoped to the participant's own core issue,
-      // exactly as the live path does.
-      const voicedLayers = stopped.current
-        ? []
-        : scripted
+      // The tier is read from the voiced card's layer, scoped to the
+      // participant's own core issue, exactly as the live path does.
+      //
+      // A STOP DOES NOT ERASE WHAT WAS ALREADY SAID. This read `stopped ? []`,
+      // which zeroed the tier however late the stop came — so stopping at
+      // message 7 of 8, with the SB voiced and visible on screen, left the
+      // mockup's counterpart refusing a package the live build accepts. The
+      // live path never had this: it accumulates the tier per turn and a stop
+      // just breaks the loop. Slicing to the messages actually PLAYED is what
+      // makes the two agree, which CLAUDE.md requires of the scripts.
+      const played = stopped.current
+        ? scripted.slice(0, playedCount)
+        : scripted;
+      const voicedLayers = played
             .filter((m) => m.speaker === "participant_proxy" && m.reasonCardId)
             .map((m) => reasonCards.find((c) => c.id === m.reasonCardId))
             .filter(

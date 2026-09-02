@@ -40,9 +40,7 @@ function stubAction(ctx: PromptContext): NegotiationAction {
     proposedTerms: first
       ? [{ issueId: first.id, optionId: first.options[0].id }]
       : [],
-    conditionalLink: null,
     stage: ctx.stage,
-    requirementStatus: "not_addressed",
     reasonSourceId: null,
     addedReasonSourceId: null,
     rationale:

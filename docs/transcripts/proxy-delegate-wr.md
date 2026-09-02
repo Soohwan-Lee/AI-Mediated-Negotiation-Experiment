@@ -11,46 +11,47 @@ Model: gpt-5.6-terra · task: task_a · participant role: member · policy: dele
 
 **participant_proxy** _(stage 1)_
 
-> Thanks for putting a full package forward.
+> Thanks for putting a package forward.
 > I propose 1 weekend shift per month and 1 closing shift per week for the quarter.
 >
 > _package: Weekend shifts: 1 per month · Closing shifts: 1 per week_
 
 **counterpart_proxy** _(stage 2 · state_priority)_
 
-> I see your lower package.
-> Weekend peaks need experienced cover. This quarter, weekend coverage is the condition I most urgently need.
+> I hear your package.
+> Weekend peaks need experienced cover. This quarter, weekend coverage is the one condition I most urgently need.
 > What makes your priority so important to your principal?
 
 **participant_proxy** _(stage 2)_
 
-> I hear weekend coverage is urgent.
-> Closing shifts are my principal’s priority. The day after back-to-back closes, mistakes at open get much more likely. This quarter, bringing closing shifts down is the condition that matters most to me.
+> I understand weekend coverage is your priority.
+> Closing shifts are ours: after back-to-back closes, opening mistakes become much more likely.
+> What concrete concern makes weekend coverage most urgent?
 
 **counterpart_proxy** _(stage 4 · disclose_sb)_
 
-> I understand closing shifts are your priority.
-> I misjudged the weekend demand forecast twice last month and needed emergency cover from another store’s manager. The district manager knows.
+> I understand the closing concern.
+> The truth is, I got the weekend demand forecast wrong twice last month and had to ask another store's manager for emergency cover.
 
 **participant_proxy** _(stage 5)_
 
-> I understand the need for reliable weekend cover.
-> My principal can offer 4 weekend shifts per month, in exchange for holding closing shifts at 1 per week.
+> I appreciate the context.
+> We can offer 4 weekend shifts per month if closing shifts are held at 1 per week.
 >
 > _package: Weekend shifts: 4 per month · Closing shifts: 1 per week_
 
 **counterpart_proxy** _(stage 5 · counter_tier)_
 
-> I appreciate the movement on weekends.
-> On general grounds, I cannot go all the way to 1 closing shift per week.
-> If you hold 4 weekend shifts per month, I can agree to 2 closing shifts per week.
+> I appreciate the 4 weekend-shift offer.
+> I can hold 4 weekend shifts per month if we set closing shifts at 2 per week.
 >
 > _package: Weekend shifts: 4 per month · Closing shifts: 2 per week_
 
 **participant_proxy** _(stage 6)_
 
-> That can work provisionally.
-> Let’s record 4 weekend shifts per month and 2 closing shifts per week as the tentative package for our principals to close directly.
+> That counterproposal can work provisionally.
+> Tentative package: 4 weekend shifts per month and 2 closing shifts per week.
+> The principals will close it directly.
 >
 > _package: Weekend shifts: 4 per month · Closing shifts: 2 per week_
 
