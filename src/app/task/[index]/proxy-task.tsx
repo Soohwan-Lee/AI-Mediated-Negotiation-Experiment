@@ -1284,6 +1284,26 @@ function ReasonMandateSection({
   mandate: Mandate;
   onToggle: (cardId: string) => void;
 }) {
+  /**
+   * One card, as a thing you hand to your proxy or keep.
+   *
+   * THE TICK HAS TO READ AS DELEGATION, not as agreement. It is a checkbox
+   * next to a sentence, which is the shape of "I agree" or "this applies to
+   * me" everywhere else on the internet — and a participant who reads it that
+   * way is answering a different question from the one the study asks. What
+   * ticking actually does is give an AI Proxy permission to say this sentence
+   * out loud, in front of the other side, on their behalf; that is the whole
+   * measured decision, and the callout above was the only thing saying so.
+   *
+   * So the state is stated on the row itself, in the proxy's own vocabulary:
+   * a robot and "Your proxy may say this" when ticked, a lock and "Kept to
+   * yourself" when not. Both states are labelled, deliberately — showing a
+   * badge only when ticked makes ticking look like the completed answer and
+   * an untouched row look unfinished, which is a nudge toward disclosure on
+   * exactly the outcome the study measures. §7's defaults (work on, sensitive
+   * off) still decide what starts ticked; this only names what the state
+   * means.
+   */
   const row = (card: { id: string; text: string }) => {
     const checked = mandate.authorizedReasonIds.includes(card.id);
     return (
@@ -1301,8 +1321,21 @@ function ReasonMandateSection({
           onChange={() => onToggle(card.id)}
           className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 accent-blue-600"
         />
-        <span className="text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
-          {card.text}
+        <span className="min-w-0">
+          <span
+            className={cx(
+              "mb-1.5 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold",
+              checked
+                ? "border-blue-300 bg-white text-blue-800"
+                : "border-slate-200 bg-slate-50 text-slate-600",
+            )}
+          >
+            <span aria-hidden>{checked ? "🤖" : "🔒"}</span>
+            {checked ? "Your proxy may say this" : "Kept to yourself"}
+          </span>
+          <span className="block text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
+            {card.text}
+          </span>
         </span>
       </label>
     );
@@ -1341,8 +1374,12 @@ function ReasonMandateSection({
       </div>
 
       <Card tone="private" className="border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
-        <CardTitle hint="You hold a work reason and a piece of confidential background. Select what may be said on your behalf:">
-          💬 Permitted Reasons Mandate
+        {/* "Hand to your proxy" rather than "permitted reasons mandate". The
+            old title named the DATA STRUCTURE; a participant meeting this
+            screen for the first time has to work out from it that ticking a
+            box is delegating speech to a machine. Say the act. */}
+        <CardTitle hint="Tick a reason to let your proxy use it. Leave it unticked and it stays with you — your proxy will never say it.">
+          🤖 What your proxy may say for you
         </CardTitle>
 
         <p className="mb-4 text-xs sm:text-sm leading-relaxed text-amber-950 font-medium">

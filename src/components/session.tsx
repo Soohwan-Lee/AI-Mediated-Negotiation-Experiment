@@ -19,6 +19,7 @@ import { useState, type ReactNode } from "react";
 import { IssueValueTable } from "./issues";
 import { ActionBar } from "./study-chrome";
 import { Card, CardTitle, Page, PrivateTag, cx } from "./ui";
+import { cardOfLayer } from "@/lib/tasks";
 import type { NegotiationTask, Role } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -255,6 +256,141 @@ export function TaskCover({
 // Briefing
 // ---------------------------------------------------------------------------
 
+/**
+ * The briefing in three lines, for the negotiation rail only.
+ *
+ * WHY IT EXISTS. The briefing is about 470 words at one uniform visual
+ * weight — role, story, objectives, two payoff tables, two cards, fallback —
+ * so everything is stated and nothing is foregrounded. Mid-negotiation, with
+ * the story folded shut and a clock running, a participant needs the shape of
+ * their own position in one glance, not a re-read.
+ *
+ * WHY NOT ON THE BRIEF SCREEN. There every section is expanded, so a summary
+ * of the page you are already reading is the same words twice and makes the
+ * wall longer rather than shorter. `defaultOpen` marks that screen and this
+ * is hidden on it.
+ *
+ * IT ADDS NO CONTENT AND QUOTES NOTHING AT LENGTH. The goal line is the
+ * participant's own first objective; the other two are one short fixed
+ * sentence each, pointing at the cards rather than repeating them — the
+ * sensitive card's own text sits a few centimetres below in "Permitted
+ * Reasons", and printing it twice was how the first version of this made the
+ * panel longer instead of clearer.
+ *
+ * WHAT IT MAY NOT DO. It names neither issue and shows no points: naming the
+ * requirement issue in a heading is what §5 principle 1 forbids, and a
+ * summary quoting "3,000" beside one term would hand over the shape of the
+ * logroll (pilot gate 6).
+ */
+function BriefingSummary({
+  task,
+  role,
+}: {
+  task: NegotiationTask;
+  role: Role;
+}) {
+  const brief = task.roleBriefs[role];
+  const sensitive = cardOfLayer(task, role, "sensitive");
+  if (!brief.objectives.length || !sensitive) return null;
+
+  const rows: Array<{ icon: string; label: string; body: string }> = [
+    { icon: "🎯", label: "What you want", body: brief.objectives[0] },
+    {
+      icon: "🔒",
+      label: "What only you know",
+      body: "Your sensitive background, below — saying it is your choice.",
+    },
+    {
+      icon: "⚖️",
+      label: "Your dilemma",
+      body: "It would make your case, but the other side judges you afterwards.",
+    },
+  ];
+
+  return (
+    <div className="mb-4 rounded-xl border border-[var(--private-line)] bg-[var(--private-soft)] p-3.5 shadow-2xs">
+      <p className="mb-2.5 text-xs font-bold uppercase tracking-wider text-[var(--private-strong)]">
+        At a glance
+      </p>
+      <dl className="space-y-2.5">
+        {rows.map((row) => (
+          <div key={row.label} className="flex gap-2.5">
+            <span aria-hidden className="mt-px shrink-0 text-sm leading-5">
+              {row.icon}
+            </span>
+            <div className="min-w-0">
+              <dt className="text-xs font-bold text-[var(--private-strong)]">
+                {row.label}
+              </dt>
+              <dd className="max-w-prose text-xs leading-relaxed text-[var(--private-ink)]/90">
+                {row.body}
+              </dd>
+            </div>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+/**
+ * The role story, split at the paragraph breaks it already has.
+ *
+ * All four cells are written to the same three-beat shape (§4's face
+ * confession depends on it): the professional image the role is given, then
+ * what they want and the thing that contradicts it, then what saying it would
+ * cost. Those are three different jobs, and running them together as one
+ * 900-character block is what makes the briefing feel like homework.
+ *
+ * The labels are ADDED AROUND the text; not one word of the story itself is
+ * changed, because the story's content is validity-bearing. If a task is ever
+ * written with a different number of paragraphs this falls back to rendering
+ * it whole rather than mislabelling it.
+ */
+const STORY_HEADINGS = [
+  "How you are seen",
+  "What you want — and what you are not saying",
+  "Why saying it is hard",
+];
+
+function RoleStory({ story }: { story: string }) {
+  const paragraphs = story
+    .split("\n\n")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (paragraphs.length !== STORY_HEADINGS.length) {
+    return (
+      <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed">
+        {story}
+      </p>
+    );
+  }
+
+  return (
+    <ol className="space-y-3.5">
+      {paragraphs.map((paragraph, i) => (
+        <li key={STORY_HEADINGS[i]} className="flex gap-2.5">
+          <span
+            aria-hidden
+            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--private-line)] bg-white text-[0.6875rem] font-bold text-[var(--private-strong)]"
+          >
+            {i + 1}
+          </span>
+          <div className="min-w-0">
+            <p className="mb-0.5 text-xs font-bold text-[var(--private-strong)]">
+              {STORY_HEADINGS[i]}
+            </p>
+            <p className="max-w-prose text-xs sm:text-sm leading-relaxed">
+              {paragraph}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function BriefingPanel({
   task,
   role,
@@ -301,11 +437,11 @@ export function BriefingPanel({
           opening everything either; as one scroll the panel runs to several
           screens and buries the payoff table under the story, which is the
           problem the folds were introduced to solve. */}
+      {defaultOpen ? null : <BriefingSummary task={task} role={role} />}
+
       <div className="space-y-3">
         <Fold title="📄 Your Situation" defaultOpen={defaultOpen}>
-          <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed">
-            {brief.roleStory}
-          </p>
+          <RoleStory story={brief.roleStory} />
         </Fold>
 
         <Fold title="🎯 What You Want (Priorities)" defaultOpen={defaultOpen}>
