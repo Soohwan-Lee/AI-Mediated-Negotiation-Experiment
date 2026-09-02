@@ -376,3 +376,45 @@ export function validateAction(
           : "mark_unresolved",
   };
 }
+
+/**
+ * Trim one generated message to the study's exposure cap, at a bubble seam.
+ *
+ * §7 caps message length so the Explorer arm cannot simply say MORE than the
+ * Delegate arm: with an extra pool clause to fit, its messages ran longer, and
+ * a contrast between "one reason" and "two reasons" would then also be a
+ * contrast between 194 and 226 characters. Length would confound exactly the
+ * comparison the policy manipulation isolates (pilot gate 9).
+ *
+ * The prompt asks for this too, but a prompt is a request. Measured over ten
+ * live runs the proxies ignored it — 220 characters on average and 471 at the
+ * worst — so the cap is applied to the text rather than hoped for.
+ *
+ * IT CUTS AT A BUBBLE BOUNDARY, never mid-sentence. Dropping whole trailing
+ * bubbles loses the least-load-bearing clause (the model puts its ask last and
+ * its move first) and always leaves a message that reads as finished. If even
+ * the first bubble is over the cap it is truncated on a word boundary, which
+ * is a fallback that the live runs never reached.
+ */
+export function capMessageLength(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+
+  const bubbles = text
+    .split("||")
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  const kept: string[] = [];
+  for (const bubble of bubbles) {
+    const candidate = [...kept, bubble].join(" || ");
+    if (candidate.length > maxChars) break;
+    kept.push(bubble);
+  }
+  if (kept.length > 0) return kept.join(" || ");
+
+  // No whole bubble fits. Cut the first one back to a word boundary.
+  const head = bubbles[0] ?? text;
+  const cut = head.slice(0, maxChars);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > maxChars * 0.6 ? cut.slice(0, lastSpace) : cut).trim();
+}

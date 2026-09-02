@@ -16,7 +16,8 @@
 
 import { NextResponse } from "next/server";
 import { generateAction } from "@/lib/ai/client";
-import { validateAction } from "@/lib/ai/validator";
+import { NEGOTIATION } from "@/lib/study-config";
+import { capMessageLength, validateAction } from "@/lib/ai/validator";
 import {
   counterpartStep,
   mentionsScoreNumbers,
@@ -245,9 +246,12 @@ export async function POST(request: Request) {
     // machinery. The client re-runs `counterpartStep` itself from the same
     // inputs and gets the same answer, because the machine is deterministic.
     return NextResponse.json({
-      message: blocked
-        ? fallbackText(task, decision.action, decision.proposal)
-        : action.rationale,
+      message: capMessageLength(
+        blocked
+          ? fallbackText(task, decision.action, decision.proposal)
+          : action.rationale,
+        NEGOTIATION.maxMessageChars,
+      ),
       proposal: decision.proposal,
     });
   } catch (error) {

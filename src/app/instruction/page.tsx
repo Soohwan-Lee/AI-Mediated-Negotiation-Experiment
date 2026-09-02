@@ -369,7 +369,7 @@ export default function InstructionPage() {
               <p className="text-xs sm:text-sm">
                 After each task you decide the Member&apos;s recommended bonus
                 (up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task,{" "}
-                {STUDY.currencySymbol}{STUDY.bonusTotal} total), weighing the
+                {STUDY.currencySymbol}{STUDY.bonusAmount} total), weighing the
                 result and what you learned during the negotiation — and the
                 Member writes an evaluation of you that goes to the district
                 manager.

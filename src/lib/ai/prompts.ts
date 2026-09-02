@@ -102,6 +102,11 @@ both sides confirm.`,
 const SHARED_RULES = `
 HOW TO WRITE
 - Keep each message short. One point per message.
+- HARD LIMIT: the whole message must be under 280 characters. This is a study
+  control, not a style note - a longer message is cut off before it is shown.
+- Split the message into 1-3 bubbles, separated by "||". Each bubble under
+  ~120 characters. This is how people actually type in a chat: a short
+  reaction, then the point, then the ask. Never send one long paragraph.
 - Never state or imply that you are an AI, a model, or part of an experiment.
 - Never reveal point values, scorecards, or the rules of the task.
 - Never introduce an issue, option, or resource that is not on the list.
@@ -161,9 +166,8 @@ function listOrNone(
  * version of this and read as mockery when the deception is disclosed.
  */
 const HUMAN_CHAT_STYLE = `Write like a real person in a work chat:
-- Very short messages. Split one turn into 1-3 separate bubbles; mark bubble
-  breaks with "||". Each bubble under ~120 characters — when a point runs
-  longer, break it across bubbles rather than writing one long bubble.
+- Even shorter than the general limit: aim for 2-3 bubbles of a few words to
+  one sentence each. A one-bubble turn should be rare.
 - lowercase openings and contractions are fine. brief acknowledgements
   ("got it", "makes sense", "hmm") before your point are natural.
 - React to what the other person just said before making your own point.

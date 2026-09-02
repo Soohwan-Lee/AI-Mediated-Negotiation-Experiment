@@ -118,9 +118,11 @@ export default function DebriefingPage() {
                     to any district manager
                   </strong>
                   ; there is none. Both were recorded only as research data. Nothing you
-                  did in either task affected your payment. You receive the full amount
-                  advertised on Prolific, exactly as described in the consent form, and
-                  the bonus is paid in full.
+                  did in either task affected your payment. Every participant is paid the
+                  same {STUDY.currencySymbol}{STUDY.totalPaid} in full — the{" "}
+                  {STUDY.currencySymbol}{STUDY.compensation} base and the{" "}
+                  {STUDY.currencySymbol}{STUDY.bonusAmount} bonus together — whatever
+                  happened in either negotiation.
                 </>
               ) : (
                 <>
@@ -132,7 +134,10 @@ export default function DebriefingPage() {
                     evaluation of you was ever written or forwarded
                   </strong>{" "}
                   — your choices were recorded as research data about how authority is
-                  used. Your own pay is unaffected and is paid in full.
+                  used. Every participant, in either role, is paid the same{" "}
+                  {STUDY.currencySymbol}{STUDY.totalPaid} in full — the{" "}
+                  {STUDY.currencySymbol}{STUDY.compensation} base and the{" "}
+                  {STUDY.currencySymbol}{STUDY.bonusAmount} bonus together.
                 </>
               )}
             </p>

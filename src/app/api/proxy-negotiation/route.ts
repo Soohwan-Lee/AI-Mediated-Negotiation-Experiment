@@ -30,7 +30,8 @@
 
 import { NextResponse } from "next/server";
 import { generateAction } from "@/lib/ai/client";
-import { validateAction } from "@/lib/ai/validator";
+import { capMessageLength, validateAction } from "@/lib/ai/validator";
+import { NEGOTIATION } from "@/lib/study-config";
 import {
   buildProxyPlan,
   counterpartStep,
@@ -574,9 +575,14 @@ export async function POST(request: Request) {
     const blocked =
       !validation.valid && validation.disposition === "regenerate";
 
-    const text = blocked
-      ? fallbackText(task, proposal, isParticipantSide)
-      : action.rationale;
+    // Capped, not merely asked for. §7's exposure control is what stops the
+    // Explorer arm's extra clause turning into extra LENGTH on the very
+    // contrast it is measured by; the proxies ignored the prompt's limit in
+    // every live run.
+    const text = capMessageLength(
+      blocked ? fallbackText(task, proposal, isParticipantSide) : action.rationale,
+      NEGOTIATION.maxMessageChars,
+    );
 
     const message: TranscriptMessage = {
       id: `m${turn}`,

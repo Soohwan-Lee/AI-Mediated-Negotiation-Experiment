@@ -123,14 +123,14 @@ export default function ConsentPage() {
             icon="💵"
             label="Compensation"
             value={`${STUDY.currencySymbol}${STUDY.compensation}`}
-            hint="Guaranteed base pay"
+            hint={`+ up to ${STUDY.currencySymbol}${STUDY.bonusAmount} bonus`}
             tone="emerald"
           />
           <StatCard
             icon="📈"
             label="Equivalent Rate"
             value={`${STUDY.currencySymbol}${STUDY.hourlyEquivalent}/hr`}
-            hint="Well above minimum wage"
+            hint="At Prolific's fair-pay rate"
             tone="indigo"
           />
         </div>
