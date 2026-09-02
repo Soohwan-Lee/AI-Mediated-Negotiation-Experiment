@@ -383,7 +383,16 @@ export function ProxyTask({
       label: PHASE_LABELS[p],
       active: phase === p,
       run: () => {
-        if (p === "review" && transcript.length === 0) {
+        // EVERY PHASE PAST THE EXCHANGE NEEDS THE EXCHANGE. Jumping straight
+        // to `handover` or `direct` left the transcript empty, so the handover
+        // screen read "They did not reach agreement" and the direct closing
+        // opened with no standing package and the bottom rung of the ladder —
+        // a mockup of a failed negotiation, on the screens most worth reading.
+        // Only `review` was seeded, which hid it: that screen was the one
+        // being checked.
+        const needsExchange =
+          p === "handover" || p === "negotiate" || p === "review";
+        if (needsExchange && transcript.length === 0) {
           setTranscript(
             script.messages.map((m) => ({
               id: m.id,
@@ -392,6 +401,20 @@ export function ProxyTask({
             })),
           );
           setTentative(script.tentative);
+          // The scripted exchange voices the SB at the first reason
+          // opportunity, so the tier the closing inherits is the SB rung —
+          // the same value `runNegotiation` derives when it plays the script.
+          setProxyVoicedTier(
+            script.messages.some(
+              (m) =>
+                m.speaker === "participant_proxy" &&
+                m.reasonCardId &&
+                reasonCards.find((c) => c.id === m.reasonCardId)?.layer ===
+                  "sensitive",
+            )
+              ? "sensitive"
+              : "work",
+          );
         }
         setPhase(p);
       },
