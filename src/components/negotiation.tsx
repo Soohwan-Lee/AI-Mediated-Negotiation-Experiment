@@ -174,6 +174,17 @@ export function Transcript({
           );
         }
 
+        // "||" marks bubble breaks (Design §12 P1): one turn arrives as one
+        // to three short bubbles, the way a person actually types in a work
+        // chat. Rendering the marker literally was a tell in itself — no
+        // human sends "||" — so the turn is split here, one bubble per
+        // segment under a single speaker header, with a short stagger so
+        // later bubbles land the way follow-up messages do.
+        const bubbles = m.text
+          .split("||")
+          .map((b) => b.trim())
+          .filter(Boolean);
+
         return (
           <div
             key={m.id}
@@ -185,20 +196,28 @@ export function Transcript({
                 {config.label}
               </span>
             </div>
-            <div
-              className={cx(
-                "max-w-[85%] sm:max-w-[78%] px-4 py-3 text-sm sm:text-[0.9375rem] leading-relaxed shadow-2xs transition-all",
-                ownProxy
-                  ? "rounded-2xl rounded-tr-xs border-2 border-blue-500 bg-blue-50/80 text-slate-900 font-medium"
-                  : own
-                    ? "rounded-2xl rounded-tr-xs bg-[var(--accent)] text-white font-normal shadow-sm"
-                    : isCounterpartProxy
-                      ? "rounded-2xl rounded-tl-xs border-2 border-purple-400 bg-purple-50/70 text-slate-900 font-medium"
-                      : "rounded-2xl rounded-tl-xs border border-slate-200 bg-white text-slate-900 shadow-2xs",
-              )}
-            >
-              {m.text}
-            </div>
+            {bubbles.map((bubble, i) => (
+              <div
+                key={`${m.id}-${i}`}
+                style={
+                  flow ? undefined : { animationDelay: `${i * 0.45}s` }
+                }
+                className={cx(
+                  "max-w-[85%] sm:max-w-[78%] px-4 py-3 text-sm sm:text-[0.9375rem] leading-relaxed shadow-2xs",
+                  flow ? undefined : "bubble-in",
+                  ownProxy
+                    ? "rounded-2xl border-2 border-blue-500 bg-blue-50/80 text-slate-900 font-medium"
+                    : own
+                      ? "rounded-2xl bg-[var(--accent)] text-white font-normal shadow-sm"
+                      : isCounterpartProxy
+                        ? "rounded-2xl border-2 border-purple-400 bg-purple-50/70 text-slate-900 font-medium"
+                        : "rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xs",
+                  i === 0 && (own ? "rounded-tr-xs" : "rounded-tl-xs"),
+                )}
+              >
+                {bubble}
+              </div>
+            ))}
           </div>
         );
       })}

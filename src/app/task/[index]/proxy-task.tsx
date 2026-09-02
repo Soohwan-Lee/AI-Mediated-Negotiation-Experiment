@@ -1182,6 +1182,11 @@ export function ProxyTask({
       steps={STEP_LABELS}
       stepIndex={STEP_OF.review}
       tentative={tentative}
+      hoped={Object.fromEntries(
+        mandate.issues
+          .filter((im) => im.preferredOptionId)
+          .map((im) => [im.issueId, im.preferredOptionId as string]),
+      )}
       transcript={messages}
       proxyTranscript={proxyTranscript}
       isProxy

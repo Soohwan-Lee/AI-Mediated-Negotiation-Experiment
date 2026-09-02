@@ -296,3 +296,19 @@ body {
       0 0 18px 3px rgba(217, 119, 6, 0.24) !important;
   }
 }
+
+/* Chat bubbles land one after another, like follow-up messages. */
+.bubble-in {
+  animation: bubble-in 0.28s ease-out backwards;
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

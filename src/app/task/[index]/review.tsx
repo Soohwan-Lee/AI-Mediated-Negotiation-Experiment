@@ -73,6 +73,7 @@ export function ReviewPhase({
   steps,
   stepIndex,
   tentative,
+  hoped,
   transcript,
   transcriptTitle,
   transcriptHint,
@@ -86,6 +87,15 @@ export function ReviewPhase({
   steps: string[];
   stepIndex: number;
   tentative: Package | null;
+  /**
+   * What the participant said they wanted before negotiating — the entry
+   * preferences under Baseline, the mandate's preferred levels under Proxy.
+   * Ver.2.12 §7 asks the result screen to put hoped-for and agreed side by
+   * side, per issue, with the participant's own point difference — neutrally,
+   * never as praise or blame: on the WR-only path the gap IS the finding, and
+   * a screen that editorialised it would be a manipulation of its own.
+   */
+  hoped?: Package | null;
   transcript: DisplayMessage[];
   transcriptTitle: string;
   transcriptHint: string;
@@ -244,10 +254,74 @@ export function ReviewPhase({
 
           <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
             <Card className="border-slate-200 bg-white">
-              <CardTitle hint="Settled option for each term:">📦 Final Agreed Package</CardTitle>
+              <CardTitle
+                hint={
+                  hoped
+                    ? "What you set out to get, next to what was agreed:"
+                    : "Settled option for each term:"
+                }
+              >
+                📦 Final Agreed Package
+              </CardTitle>
               <div className="mt-3">
                 {tentative ? (
-                  <TermsList task={task} terms={tentative} />
+                  hoped ? (
+                    <div className="space-y-2.5">
+                      {task.issues.map((issue) => {
+                        const hopedLabel = issue.options.find(
+                          (o) => o.id === hoped[issue.id],
+                        )?.label;
+                        const agreedLabel = issue.options.find(
+                          (o) => o.id === tentative[issue.id],
+                        )?.label;
+                        const same = hoped[issue.id] === tentative[issue.id];
+                        return (
+                          <div
+                            key={issue.id}
+                            className="rounded-xl border border-slate-100 bg-slate-50/60 p-3"
+                          >
+                            <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
+                              {issue.label}
+                            </p>
+                            <p className="mt-1 text-xs sm:text-sm text-[var(--ink-2)]">
+                              You hoped for{" "}
+                              <strong className="text-slate-800">
+                                {hopedLabel ?? "—"}
+                              </strong>
+                              {" · "}agreed{" "}
+                              <strong className="text-slate-800">
+                                {agreedLabel ?? "—"}
+                              </strong>
+                              {same ? " — as you hoped." : "."}
+                            </p>
+                          </div>
+                        );
+                      })}
+                      {(() => {
+                        // The gap is reported on the CORE issue only (§3.3's
+                        // neutral shortfall line). A whole-package delta would
+                        // show a shortfall even on the best reachable
+                        // agreement, because the plan's level on the OTHER
+                        // side's term was never winnable — and reading the
+                        // maximum as a loss is exactly the editorialising
+                        // this screen must not do.
+                        const at = (pkg: Package) =>
+                          mine.options.find((o) => o.id === pkg[mine.id])
+                            ?.points[role] ?? 0;
+                        const gap = at(hoped) - at(tentative);
+                        if (gap <= 0) return null;
+                        return (
+                          <p className="text-xs text-[var(--ink-2)]">
+                            On {mine.label.toLowerCase()}, the agreement is
+                            below what you hoped for — {gap.toLocaleString()}{" "}
+                            points less for you on that term.
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <TermsList task={task} terms={tentative} />
+                  )
                 ) : (
                   <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-center text-xs sm:text-sm font-semibold text-amber-900">
                     No mutual agreement was reached. Fallback conditions apply.

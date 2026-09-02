@@ -172,6 +172,15 @@ const PHASE_LABELS: Record<Phase, string> = {
   review: "Review",
 };
 
+/** Entry preferences as a package (nulls dropped). */
+function toPackage(
+  chosen: Record<string, string | null>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(chosen).filter(([, v]) => v) as Array<[string, string]>,
+  );
+}
+
 const STEP_OF: Record<Phase, number> = {
   intro: 0,
   brief: 0,
@@ -673,6 +682,7 @@ export function BaselineTask({
         steps={STEP_LABELS}
         stepIndex={STEP_OF.review}
         tentative={tentative}
+        hoped={prefs ? toPackage(prefs.preferred) : null}
         transcript={messages}
         isProxy={false}
         transcriptTitle="The conversation"

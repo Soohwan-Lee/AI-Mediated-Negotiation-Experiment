@@ -196,7 +196,7 @@ export default function PracticePage() {
   if (phase === "intro") {
     return (
       <TaskCover
-        eyebrow={`Tutorial · Practice Sandbox (${isProxy ? "AI Proxy Mode" : "Direct Chat Mode"})`}
+        eyebrow="Tutorial · Practice Sandbox"
         title="Interactive Practice Round"
         doesNotCount
         scene={isProxy ? "proxy" : "direct"}
@@ -207,8 +207,8 @@ export default function PracticePage() {
             </p>
             <p className="text-slate-600 text-sm">
               {isProxy
-                ? "Your upcoming Task 1 will be in AI Proxy Mode. In this practice round, you will learn how to set goals, delegate instructions to an AI Proxy, and test its strategy."
-                : "Your upcoming Task 1 will be in Direct Negotiation Mode. In this practice round, you will learn how to build an offer package and exchange messages directly."}
+                ? "In your first task, an AI Proxy will negotiate from your instructions before you finish the conversation yourself. This practice shows you those controls: setting goals, writing instructions, and checking them."
+                : "In your first task you will chat with the other participant directly. This practice shows you those controls: building an offer package and sending messages."}
             </p>
           </>
         }
@@ -247,7 +247,7 @@ export default function PracticePage() {
       <Page width="wide">
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <PageHeader
-            eyebrow={`Practice Sandbox · ${isProxy ? "AI Proxy Delegation Preview" : "Direct Chat Preview"}`}
+            eyebrow="Practice Sandbox"
             title="Interactive Practice: Step-by-Step Guide"
             subtitle="Follow the numbered steps below to try each control before the real task begins."
           />
