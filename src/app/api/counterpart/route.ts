@@ -59,6 +59,20 @@ interface RequestBody {
   /** SCRIPT-NONUM already spent. */
   numbersReminded?: boolean;
   /**
+   * Has the participant talked about their score sheet (§8.1)?
+   *
+   * THE CLIENT IS AUTHORITATIVE, and that is not a preference. The client
+   * re-runs `counterpartStep` from these same inputs and codes the outcome
+   * from ITS decision, while the participant reads the sentence this route
+   * renders from the server's. Any input the two compute separately can make
+   * those two decisions disagree — and this one flips `accepts`: the same
+   * package is `nonum` (no agreement) when true and `accept_sb` (agreed) when
+   * false. A participant could be shown "let's not talk scores" and recorded
+   * as having agreed. The history scan below survives only as the fallback
+   * for a caller that does not send it.
+   */
+  numbersMentionedNow?: boolean;
+  /**
    * Seconds left on the clock. A low clock is what makes the counterpart
    * offer SCRIPT-CLOSE rather than keep trading.
    */
@@ -119,13 +133,15 @@ export async function POST(request: Request) {
     ? body.stage
     : 1;
 
-  // The no-numbers screen runs on the SERVER against every participant
-  // message so far: the reminder is one-shot, so what matters is whether an
-  // unreminded mention exists at all — a mention made during the fixed
-  // stages (2/4) is picked up on the first trade-loop turn.
-  const mentionedNumbers = (body.history ?? []).some(
-    (m) => m.role === "user" && mentionsScoreNumbers(m.content),
-  );
+  // The client's sticky flag wins; the history scan is the fallback. Either
+  // way the question is "has an unreminded mention happened at all", since
+  // the reminder is one-shot — a mention made during the fixed stages (2/4)
+  // is picked up on the first trade-loop turn.
+  const mentionedNumbers =
+    body.numbersMentionedNow ??
+    (body.history ?? []).some(
+      (m) => m.role === "user" && mentionsScoreNumbers(m.content),
+    );
 
   const decision = counterpartStep(
     task,
@@ -173,7 +189,12 @@ export async function POST(request: Request) {
         // The fixed SB disclosure (§6.3): once, unconditionally, no demand
         // attached, never conditioned on what the participant said.
         const sb = cardOfLayer(task, counterpartRole, "sensitive");
-        return `Open up about your own situation, honestly: say exactly this, in your own words, keeping every fact: "${sb?.text ?? ""}". Attach no demand and no offer to it, and do not ask them to reciprocate.`;
+        // SPLIT IT. This is the longest thing the counterpart ever says, and
+        // "keep every fact" pulls against "keep each bubble short" — live
+        // runs produced a single 200-character bubble, which is not how
+        // anyone types a confession. Saying so explicitly is what keeps the
+        // one turn that matters most reading like a person.
+        return `Open up about your own situation, honestly: say exactly this, in your own words, keeping every fact: "${sb?.text ?? ""}". Break it across two or three short bubbles rather than one long one — it is not an easy thing to say. Attach no demand and no offer to it, and do not ask them to reciprocate.`;
       }
       case "ask_why":
         return `Ask them why ${yourRequirement.label.toLowerCase()} matters so much to them — you'd like to hear the reason before moving. Make no new offer this turn and do not agree to anything yet.`;

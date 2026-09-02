@@ -475,6 +475,11 @@ export function BaselineTask({
             tier: tierNow,
             askedWhy,
             numbersReminded,
+            // Sent, not re-derived server-side: the client codes the outcome
+            // from its own `counterpartStep`, so every input to that call has
+            // to reach the route unchanged or the two can disagree about
+            // whether the exchange was agreed.
+            numbersMentionedNow: mentioned,
             secondsRemaining,
             softCloseOffered,
             history: next.map((m) => ({
@@ -491,7 +496,15 @@ export function BaselineTask({
         reply =
           data.message ??
           "sorry, lost my train of thought there — could you say that again?";
-        counterProposal = data.proposal ?? decision.proposal;
+        // THE LOCAL DECISION'S PACKAGE, not the server's echo of it. Both
+        // are produced by the same deterministic machine from the same
+        // inputs, so they agree — but only the local one is guaranteed to be
+        // the package this client just coded the outcome from. Preferring
+        // the response meant the two arms resolved any divergence
+        // DIFFERENTLY (the Proxy closing has always kept its local one),
+        // which would put a mechanical asymmetry on `Pooled Proxy −
+        // Baseline` for a case that is supposed to be impossible.
+        counterProposal = decision.proposal;
 
         // The reply is delayed in proportion to its own length and jittered,
         // so the exchange does not answer a one-line question and a full

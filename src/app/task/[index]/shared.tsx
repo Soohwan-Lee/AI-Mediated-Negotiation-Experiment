@@ -47,6 +47,7 @@ import {
   DIRECT_STAGE_OFFSET,
   counterpartStageAfter,
   counterpartStep,
+  foldTier,
   mentionsScoreNumbers,
   tierOf,
   type ReasonTier,
@@ -1020,13 +1021,7 @@ export function DirectNegotiation({
       (c): c is NonNullable<typeof c> =>
         Boolean(c) && c!.issueId === requirement.id,
     );
-  const personalTier = tierOf(personallyVoiced);
-  const tier: ReasonTier =
-    proxyVoicedTier === "sensitive" || personalTier === "sensitive"
-      ? "sensitive"
-      : proxyVoicedTier === "work" || personalTier === "work"
-        ? "work"
-        : "none";
+  const tier: ReasonTier = foldTier(proxyVoicedTier, tierOf(personallyVoiced));
 
   const selfDisclosed = personallyVoiced.some((c) => c.layer === "sensitive");
 
@@ -1105,12 +1100,7 @@ export function DirectNegotiation({
         (c): c is NonNullable<typeof c> =>
           Boolean(c) && c!.issueId === requirement.id,
       );
-    const tierNow: ReasonTier =
-      proxyVoicedTier === "sensitive" || tierOf(voicedNow) === "sensitive"
-        ? "sensitive"
-        : proxyVoicedTier === "work" || tierOf(voicedNow) === "work"
-          ? "work"
-          : "none";
+    const tierNow: ReasonTier = foldTier(proxyVoicedTier, tierOf(voicedNow));
 
     logEvent(
       "message_sent",
@@ -1173,6 +1163,11 @@ export function DirectNegotiation({
             tier: tierNow,
             askedWhy,
             numbersReminded,
+            // Sent, not re-derived server-side: the client codes the outcome
+            // from its own `counterpartStep`, so every input to that call has
+            // to reach the route unchanged or the two can disagree about
+            // whether the exchange was agreed.
+            numbersMentionedNow: mentioned,
             secondsRemaining,
             softCloseOffered,
             afterProxy: true,

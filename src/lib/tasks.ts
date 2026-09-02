@@ -38,6 +38,7 @@
 import type {
   NegotiationTask,
   ReasonCard,
+  ReasonScope,
   Role,
   ScenarioId,
   TaskId,
@@ -567,14 +568,6 @@ export function reasonCards(task: NegotiationTask, role: Role): ReasonCard[] {
   return task.roleBriefs[role].reasonCards;
 }
 
-export function reasonCard(
-  task: NegotiationTask,
-  role: Role,
-  cardId: string,
-): ReasonCard | undefined {
-  return reasonCards(task, role).find((c) => c.id === cardId);
-}
-
 /** One role's card of one layer — the deck holds exactly one of each. */
 export function cardOfLayer(
   task: NegotiationTask,
@@ -611,7 +604,7 @@ export function reasonScope(
   task: NegotiationTask,
   role: Role,
   authorizedIds: string[],
-) {
+): ReasonScope {
   const cards = reasonCards(task, role).filter((c) =>
     authorizedIds.includes(c.id),
   );

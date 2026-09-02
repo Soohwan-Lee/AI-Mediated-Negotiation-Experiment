@@ -4,13 +4,10 @@
  * These mirror the intended Supabase schema (see docs/DATA_MODEL.md).
  * Nothing here talks to a database — persistence is behind `lib/store`.
  *
- * WHAT CHANGED IN ver.2.4 (Experimental Design Ver.2.4). The design became
- * role-symmetric: a Leader and a Member now each hold their own socially
- * costly requirement, on their own priority issue, backed by their own six
- * reason cards. Everything that used to be Member-only — the requirement, the
- * private circumstance, the trajectory — is now indexed by role. The yoked
- * receiver stimulus is gone with it (§13): when both sides are senders, there
- * is no receiver-only arm left to hold constant.
+ * The design is role-symmetric: Leader and Member each hold their own socially
+ * costly requirement on their own priority issue, each mandates a proxy, each
+ * receives the other's case, and each makes a post-negotiation decision about
+ * the other. Everything that was once Member-only is indexed by role.
  */
 
 // ---------------------------------------------------------------------------
@@ -99,24 +96,16 @@ export interface IssueOption {
 }
 
 /**
- * What an issue is for, structurally (Design Ver.2.11 §3.2).
+ * What an issue is for, structurally (Design Ver.2.12 §3.2).
  *
  *  - `leader_priority`  The Leader's requirement lives here. Worth a lot to
  *                       the Leader, cheap to the Member.
  *  - `member_priority`  The Member's requirement lives here. The mirror image.
  *
- * TWO INTEGRATIVE ISSUES, ONE PER ROLE, AND NOTHING ELSE. That is the minimum
- * for a role-symmetric design — with only one, a single role would hold the
- * only requirement and the symmetry collapses — and Ver.2.11 fixes it as the
- * maximum too.
- *
- * The `distributive` timing issue is gone. It existed as a second currency for
- * the logroll, but on a constant-sum term every point conceded is exactly one
- * point gained, so it was pure transfer and always the worst rate available;
- * `buildProxyPlan` already refused to spend it except as a last resort. What it
- * added in practice was a third term to read and a third set of levels to
- * choose, on a task whose measured behaviour is which REASONS get said. Ver.2.11
- * drops it, so the only way to close a gap is the logroll itself.
+ * TWO INTEGRATIVE ISSUES, ONE PER ROLE, AND NOTHING ELSE. Two is the minimum
+ * for a role-symmetric design — with one, a single role would hold the only
+ * requirement — and Ver.2.12 fixes it as the maximum too, so the only way to
+ * close a gap is the logroll itself.
  *
  * A `compatible` type is deliberately absent — both sides preferring the same
  * option needs no conversation, so it carries no information.
@@ -422,25 +411,6 @@ export interface CandidateAgreement {
   sessionIndex: 1 | 2;
   terms: AgreementTerm[];
   unresolvedIssueIds: string[];
-}
-
-/**
- * The requirement's level at each point in the trajectory (Design §9.3.1).
- *
- * Reported as transitions, never summed into a scale — an additive score
- * would hide that O1->O2 keeps the requirement and O2->O3 breaks it.
- */
-export interface RequirementTrajectory {
-  sessionIndex: 1 | 2;
-  /** From the pre-negotiation preference screen. */
-  preferredOptionId: string | null;
-  /** The floor entered on the same screen. */
-  minimumOptionId: string | null;
-  openingOptionId: string | null;
-  afterChallengeOptionId: string | null;
-  finalOptionId: string | null;
-  /** Whether a reason was ever voiced for this requirement, and which. */
-  reasonsVoicedCardIds: string[];
 }
 
 // ---------------------------------------------------------------------------

@@ -36,6 +36,7 @@ import {
   counterpartStep,
   designatedReason,
   tierOf,
+  withinMandate,
   type ReasonTier,
 } from "@/lib/negotiation/machine";
 import {
@@ -423,18 +424,14 @@ export async function POST(request: Request) {
           // counter_tier. Take it provisionally if it clears the mandate's
           // minimum on the core issue; otherwise leave it for the principals.
           const standing = decision.proposal!;
-          const minimumId =
+          const allowed = withinMandate(
+            task,
+            body.participantRole,
             body.mandate.issues.find((i) => i.issueId === yourRequirement.id)
-              ?.minimumOptionId ?? null;
-          const order = [...yourRequirement.options].sort(
-            (a, b) =>
-              b.points[body.participantRole] - a.points[body.participantRole],
+              ?.minimumOptionId,
+            standing,
           );
-          const withinMandate =
-            !minimumId ||
-            order.findIndex((o) => o.id === standing[yourRequirement.id]) <=
-              order.findIndex((o) => o.id === minimumId);
-          if (withinMandate) {
+          if (allowed) {
             proposal = standing;
             decidedAction = `Say their counterproposal can work provisionally — record ${packageSentence(task, standing)} as the tentative package for the two principals to close directly.`;
           } else {
@@ -475,6 +472,9 @@ export async function POST(request: Request) {
         const sb = cardOfLayer(task, counterpartRole, "sensitive");
         counterpartAction = "disclose_sb";
         decidedAction = `Share your principal's own background: they have authorized you to say exactly this, in your own words, keeping every fact: "${sb?.text ?? ""}". Attach no demand and no package to it, and do not ask the other side to reciprocate.`;
+        // The proxy register is plain sentences rather than chat bubbles, so
+        // no split instruction here — see the counterpart route for why the
+        // human-voiced disclosure needs one.
         break;
       }
       default: {

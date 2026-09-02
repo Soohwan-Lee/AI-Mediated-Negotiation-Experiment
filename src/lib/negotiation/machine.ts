@@ -60,6 +60,21 @@ export const TIER_LIMIT_INDEX: Record<ReasonTier, number> = {
   sensitive: 0,
 };
 
+/**
+ * The higher of two tiers.
+ *
+ * The Proxy closing needs it: the ladder carries over from what the proxy
+ * voiced and can only RISE when the participant tags a card in person. It is
+ * one function because the same fold is read twice per turn — once for what
+ * the counterpart sees, once for what `settle()` logs as an analysis variable
+ * — and two hand-written ternaries would eventually disagree.
+ */
+export function foldTier(a: ReasonTier, b: ReasonTier): ReasonTier {
+  if (a === "sensitive" || b === "sensitive") return "sensitive";
+  if (a === "work" || b === "work") return "work";
+  return "none";
+}
+
 /** The tier the voiced cards have earned. Reads layers, never text. */
 export function tierOf(
   voiced: ReadonlyArray<Pick<ReasonCard, "layer">>,
@@ -304,42 +319,31 @@ export function counterpartStep(
       const best = maxPackage(task, participantRole);
       const standing = tierPackage(task, participantRole, state.tier);
 
-      if (state.tier === "sensitive") {
-        // §3.3: once the SB is voiced the maximum is not left to be found.
-        // A best↔best proposal is accepted; anything else — including an
-        // acceptable but submaximal ask — is answered by proposing best↔best
-        // directly (SCRIPT-PROPOSE-MAX).
-        const isMax =
-          incoming &&
-          task.issues.every((i) => incoming[i.id] === best[i.id]);
-        if (isMax) {
-          return {
-            ...base,
-            stage: 6,
-            action: "accept_sb",
-            proposal: incoming,
-            accepts: true,
-          };
-        }
-        return {
-          ...base,
-          action: "propose_max",
-          proposal: best,
-          accepts: false,
-        };
-      }
-
+      // ANYTHING WITHIN TIER IS ACCEPTED, AT EVERY TIER, and the SB rung is
+      // not an exception. An earlier version refused a within-tier package
+      // under `sensitive` unless it was exactly best↔best — so a participant
+      // who had paid the full face cost and then asked for LESS than they had
+      // earned was turned down, on a package strictly better for the
+      // counterpart. §3.3 opens the best option to them; it does not oblige
+      // them to take it.
       if (acceptable) {
         return {
           ...base,
           stage: 6,
-          action: "accept",
+          action: state.tier === "sensitive" ? "accept_sb" : "accept",
           proposal: incoming,
           accepts: true,
         };
       }
 
-      // Clock running out: offer to settle on the standing proposal, once.
+      // THE CLOCK OUTRANKS THE LADDER'S UPGRADE OFFER. This check sits ahead
+      // of `propose_max` deliberately: at the sensitive tier the counterpart
+      // would otherwise re-propose the maximum on every remaining turn and
+      // never offer to settle, so a maximum-disclosure participant who kept
+      // asking for something out of tier could run the clock out and score the
+      // 600 fallback — below the 1,000 a participant who said nothing gets.
+      // That inverts the ladder for the people who paid the most, which is the
+      // one thing the outcome table cannot do.
       if (
         state.secondsRemaining !== undefined &&
         state.secondsRemaining <= SOFT_CLOSE_SECONDS &&
@@ -349,7 +353,20 @@ export function counterpartStep(
           ...base,
           stage: 6,
           action: "soft_close",
-          proposal: standing,
+          // At the SB rung the thing to settle on is the maximum they earned.
+          proposal: state.tier === "sensitive" ? best : standing,
+          accepts: false,
+        };
+      }
+
+      if (state.tier === "sensitive") {
+        // §3.3: once the SB is voiced the maximum is not left to be found. An
+        // out-of-tier ask is answered by proposing best↔best directly
+        // (SCRIPT-PROPOSE-MAX) rather than by a bare refusal.
+        return {
+          ...base,
+          action: "propose_max",
+          proposal: best,
           accepts: false,
         };
       }
@@ -416,6 +433,29 @@ export interface ProxyPlan {
 }
 
 /**
+ * Does a package respect the principal's own floor on their core issue?
+ *
+ * ONE DEFINITION, because both the plan builder and the proxy route's closing
+ * turn ask it, and a mandate-floor check that drifted between them would
+ * disagree about whether the proxies may settle — on the primary outcome,
+ * in one arm only.
+ */
+export function withinMandate(
+  task: NegotiationTask,
+  participantRole: Role,
+  minimumOptionId: string | null | undefined,
+  pkg: Package,
+): boolean {
+  if (!minimumOptionId) return true;
+  const req = requirementIssue(task, participantRole);
+  const ranked = rankedOptions(task, req.id, participantRole);
+  const minRank = ranked.findIndex((o) => o.id === minimumOptionId);
+  const atRank = ranked.findIndex((o) => o.id === pkg[req.id]);
+  if (minRank < 0 || atRank < 0) return true;
+  return atRank <= minRank;
+}
+
+/**
  * Turns a mandate into the proxy's plan.
  *
  * BOTH POLICIES COMPUTE THIS IDENTICALLY. Design §2.3 defines Delegate and
@@ -478,19 +518,18 @@ export function buildProxyPlan(
   // Where the ladder says this exchange settles, unless the principal's own
   // minimum forbids taking it.
   const settle = tierPackage(task, participantRole, tier);
-  const minimumId = forIssue(req.id)?.minimumOptionId ?? null;
-  const withinMandate = (() => {
-    if (!minimumId) return true;
-    const minRank = ranked.findIndex((o) => o.id === minimumId);
-    const settleRank = ranked.findIndex((o) => o.id === settle[req.id]);
-    return settleRank <= minRank;
-  })();
+  const allowed = withinMandate(
+    task,
+    participantRole,
+    forIssue(req.id)?.minimumOptionId,
+    settle,
+  );
 
   return {
     opening,
     tradeProposal,
     tier,
-    tentative: withinMandate ? settle : null,
+    tentative: allowed ? settle : null,
   };
 }
 

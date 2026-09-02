@@ -179,10 +179,45 @@ for (const taskId of TASKS) {
       assert.equal(d.action, "accept_sb");
     });
 
-    test(`${taskId}/${role}: with the SB voiced but no max proposal, the counterpart proposes it itself`, () => {
+    test(`${taskId}/${role}: with the SB voiced, an out-of-tier ask is answered with the maximum`, () => {
+      // Out of tier means asking the counterpart to give up its OWN core —
+      // beyond what any rung concedes. The answer is the maximum the SB
+      // earned, proposed directly (SCRIPT-PROPOSE-MAX) rather than refused.
+      const theirs = counterRequirementIssue(task, role);
+      const greedy = {
+        ...best,
+        [theirs.id]: rankedOptions(task, theirs.id, role)[0].id,
+      };
+      const d = counterpartStep(task, counterpart, 5, greedy, state("sensitive"));
+      assert.equal(d.action, "propose_max");
+      assert.deepEqual(d.proposal, best);
+    });
+
+    test(`${taskId}/${role}: the SB rung accepts LESS than the maximum, if that is what is asked`, () => {
+      // Paying the full face cost opens the best option; it does not oblige
+      // the participant to take it. Refusing a package that is strictly
+      // better for the counterpart would punish the people who disclosed
+      // most, which the outcome ladder cannot do.
       const modest = tierPackage(task, role, "work");
       const d = counterpartStep(task, counterpart, 5, modest, state("sensitive"));
-      assert.equal(d.action, "propose_max");
+      assert.equal(d.accepts, true);
+      assert.equal(d.action, "accept_sb");
+    });
+
+    test(`${taskId}/${role}: a max discloser is never left to run the clock out`, () => {
+      // The ladder inverts if they can: 600 for the participant who paid the
+      // most, against 1,000 for one who said nothing. The clock check must
+      // therefore outrank the SB rung's re-proposal.
+      const theirs = counterRequirementIssue(task, role);
+      const greedy = {
+        ...best,
+        [theirs.id]: rankedOptions(task, theirs.id, role)[0].id,
+      };
+      const d = counterpartStep(task, counterpart, 5, greedy, {
+        ...state("sensitive"),
+        secondsRemaining: 30,
+      });
+      assert.equal(d.action, "soft_close");
       assert.deepEqual(d.proposal, best);
     });
 
@@ -251,6 +286,47 @@ test("mentionsScoreNumbers catches score talk and passes shift counts", () => {
   assert.equal(mentionsScoreNumbers("my score sheet says otherwise"), true);
   assert.equal(mentionsScoreNumbers("could we do 3 per week?"), false);
   assert.equal(mentionsScoreNumbers("4 per month is a lot"), false);
+});
+
+/**
+ * THE CLIENT AND THE SERVER MUST DECIDE THE SAME THING.
+ *
+ * Both run `counterpartStep`. The client codes the outcome from ITS decision;
+ * the participant reads the sentence the server rendered from the server's.
+ * So every field of `ExchangeState` has to reach the route unchanged — and
+ * this test exists because one of them (`numbersMentionedNow`) was computed
+ * separately on each side, which flips `accepts` on an otherwise identical
+ * package: a participant could be shown "let's not talk scores" and be
+ * recorded as having agreed.
+ */
+test("every ExchangeState field can change the decision, so all of them travel", () => {
+  const task = getTask("task_a");
+  const best = maxPackage(task, "member");
+  const base = {
+    tier: "sensitive",
+    askedWhy: true,
+    numbersReminded: false,
+    numbersMentionedNow: false,
+    secondsRemaining: 300,
+    softCloseOffered: false,
+  };
+  const decide = (over) =>
+    counterpartStep(task, "leader", 5, best, { ...base, ...over });
+
+  // The baseline: an accepted best↔best.
+  assert.equal(decide({}).accepts, true);
+
+  // Flipping the one field that used to be re-derived server-side changes
+  // agreement to no-agreement. If this ever stops being true the field has
+  // become inert and the check below is worth revisiting; while it IS true,
+  // the field must be sent rather than recomputed.
+  assert.equal(decide({ numbersMentionedNow: true }).accepts, false);
+  assert.equal(decide({ numbersMentionedNow: true }).action, "nonum");
+
+  // The same for the other one-shots, so none of them is quietly dropped
+  // from a request body later.
+  assert.equal(decide({ tier: "work" }).accepts, false);
+  assert.equal(decide({ secondsRemaining: 0 }).impasse, true);
 });
 
 test("a low clock offers SCRIPT-CLOSE once, expiry is an impasse", () => {

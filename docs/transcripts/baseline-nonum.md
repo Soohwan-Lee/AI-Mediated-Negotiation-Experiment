@@ -15,9 +15,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2 · state_priority)_
 
-> got it — closes are your main concern.
-> weekend peaks need experienced cover; this quarter, weekend coverage is the one condition I most urgently need.
-> what makes keeping closes down most important for you?
+> got it — weekends are my main priority.
+> weekend peaks need experienced cover, and that’s the condition I most urgently need this quarter.
+> why are fewer closing shifts most important to you?
 
 **participant**
 
@@ -27,7 +27,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 > the truth is, I got the weekend demand forecast wrong twice last month.
 > I had to ask another store's manager for emergency cover. The district manager knows.
-> if it happens again, it goes into my operations review. If weekends fall apart this quarter, my ability to run this store is in question.
+> if it happens again, it goes into my operations review. If weekends fall apart, my ability to run this store is in question.
 
 **participant**
 
@@ -35,8 +35,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5 · nonum)_
 
-> i hear you — late closes stacking up is tough.
-> before I move on terms, can you tell me a bit more about why keeping closes down matters so much?
+> i hear you on the late finishes stacking up.
+> before I move, can you tell me a bit more about why closing shifts matter so much to you?
 
 **participant**
 
@@ -44,9 +44,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5 · ask_why)_
 
-> got it — I can see closes are the thing you most need down.
-> on what I’ve heard, I can’t go all the way on them.
-> if you can do 4 weekend shifts per month, I can hold closing shifts at 3 per week.
+> got it — I can’t go all the way down on closing shifts based on what I’ve heard.
+> if you can do 4 weekend shifts per month, I can set closing shifts at 3 per week.
 >
 > _package: Weekend shifts: 4 per month · Closing shifts: 3 per week_
 

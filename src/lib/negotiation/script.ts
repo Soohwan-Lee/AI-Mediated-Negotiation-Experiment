@@ -65,22 +65,6 @@ export interface ScriptedTask {
   agreed: boolean;
 }
 
-/**
- * Counterpart persona for the Baseline condition (Design §12 P1).
- *
- * Deliberately nameless. The counterpart is presented by role — "the other
- * participant" — because a pseudonym invites the question of where it came
- * from, and because one label for everyone cannot be compared between
- * participants the way a name eventually would be. Each task's counterpart is
- * introduced as a DIFFERENT participant (Ver.2.12 §3.5); the label does not
- * change, the matchmaking framing does.
- */
-export const COUNTERPART_PERSONA = {
-  label: "Other Participant",
-  /** Shown while the counterpart is composing. */
-  typingLabel: "The other participant is typing…",
-} as const;
-
 // ---------------------------------------------------------------------------
 // Package shorthand
 // ---------------------------------------------------------------------------

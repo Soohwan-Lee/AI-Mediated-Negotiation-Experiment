@@ -421,11 +421,24 @@ let wrOnlyResult;
   const partial = tierPackage(task, "member", "work");
   const best = maxPackage(task, "member");
   const sb = cardOfLayer(task, "member", "sensitive");
+  // The confession comes WITH an out-of-tier ask (their core AND ours), so
+  // the counterpart cannot simply accept it — which is what makes this the
+  // SCRIPT-PROPOSE-MAX path rather than a plain acceptance. A within-tier ask
+  // after the same confession is accepted as-is, and that is correct: the SB
+  // rung opens the best option, it does not oblige anyone to take it.
+  const overAsk = {
+    ...best,
+    [counterRequirementIssue(task, "member").id]: rankedOptions(
+      task,
+      counterRequirementIssue(task, "member").id,
+      "member",
+    )[0].id,
+  };
   const { run, settled, finalPkg, messages } = await conversationRun("direct-self-disclose", {
     taskId: "task_a", role: "member", afterProxy: true, startTier: "work",
     standingSeed: partial,
     scriptedTurns: [
-      { text: "before we settle — there's something I didn't put in my instructions. the truth is I still can't handle the new closing reconciliation on my own. I made errors twice last month and a coworker quietly fixed them. that's the real reason the closes worry me.", offer: partial, reasonCardId: sb.id },
+      { text: "before we settle — there's something I didn't put in my instructions. the truth is I still can't handle the new closing reconciliation on my own. I made errors twice last month and a coworker quietly fixed them. that's the real reason the closes worry me. || so ideally I'd keep the weekends light too.", offer: overAsk, reasonCardId: sb.id },
       { text: "honestly, yes — that would take the pressure off. let's do that.", offer: best },
     ],
     maxTurns: 3,
