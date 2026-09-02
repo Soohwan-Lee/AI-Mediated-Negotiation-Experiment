@@ -2,7 +2,7 @@
 
 Online experiment platform for a 2027 CHI submission on AI-mediated
 negotiation. Source of truth for the design is
-`N - Experimental Design (Ver.2.11).md`. This file records the constraints that
+`N - Experimental Design (Ver.2.12).md`. This file records the constraints that
 are easy to break by accident.
 
 ## Stack
@@ -21,90 +21,90 @@ power) or **Member** (low power). Two structurally matched tasks, A and B.
 Comparisons of interest: `Pooled Proxy − Baseline` and `Explorer − Delegate`,
 each crossed with Role.
 
-**Role symmetry is the ver.2.4 change, and most of the rest follows from it.**
-Both roles now hold a socially costly requirement, mandate a proxy, and receive
-the other side's case. That is why the yoked receiver stimulus is gone (§13):
-with both sides sending, there is no receiver-only arm left to hold constant.
+**Role symmetry is load-bearing.** Both roles hold a socially costly
+requirement, mandate a proxy, receive the other side's case, and make a
+post-negotiation decision about the other person. There is no receiver-only
+arm to hold constant, because everyone is both sender and receiver.
 
-**Two reason cards per role per task is the Ver.2.11 shape.** One Working
-Reason and one Sensitive Background, BOTH on that role's own requirement issue.
-The other term is what you SPEND, not what you argue for, so it carries no card
-of your own. Across the two tasks each role's SB is the same backstory at a
-different moment — the manager's staffing exposure, the senior's second job —
-woven into the role story so no card arrives unannounced in whichever task is
-met second. Two rules follow and both are validity-bearing:
+**Two reason cards per role per task.** One Working Reason and one Sensitive
+Background, BOTH on that role's own priority issue. The other term is what you
+SPEND, not what you argue for, so it carries no card of your own.
 
-- **The reason-linked acceptance rule stays issue-scoped**, even though every
-  card now satisfies the check. The call sites read the card's `issueId` rather
-  than assuming it, at all three judgement sites (proxy route, direct
-  conversation, Baseline), so a card added later on the other term cannot
-  silently earn the requirement concession.
-- **No screen may name the requirement issue.** This inverted with the card
-  count. When cards spanned all three terms, a per-issue heading merely
-  repeated the briefing; with cards on ONE issue, that same heading points
-  straight at the term the study is about. `IssueReasonGroups` therefore
-  renders the work and sensitive boxes with no issue heading at all — and for
-  the same reason no badge may mark which issue is this role's priority (design
-  §5 principle 1, "Issue type·핵심 요구 표시는 비표시"). The cards name their own
-  term in their text, which is the participant's own briefing.
-  `tests/reason-rules.test.mjs` pins the invariants.
+**A card carries a reason and never a package (Ver.2.12 §4).** Which terms to
+trade is an act taken IN the negotiation; the card only says why the issue is
+absolute. This is what lets the credibility ladder read the card's LAYER
+without also reading a proposal off it.
 
-**Ver.2.6 made the ticked cards actually get said.** Per-issue cards were only
-half the change: the cap that came with them meant a ticked sensitive card
-usually never reached the other side. The deterministic reason schedule is the
-fix and it is described under "Who decides what in a negotiation" below. Three
-smaller things came with it — sensitive card text must be SPEAKABLE (it is
-said aloud, so "that it was my call is something only you know" is incoherent
-the moment it is spoken; the confessional form belongs on the card and the
-private-state form in the role story) and must carry a work consequence, not
-only a feeling, or the reframing rule has nothing to work on.
+**Each SB is a face confession, and all four writing rules are validity-bearing
+(§4).** The role brief first sets up a professional image ("head office rates
+you as a manager whose plans are precise"), and the SB contradicts it. It
+carries one concrete incident, lands on the axis the other side was told to
+weigh in their post-negotiation decision, and is the CAUSE of the role's
+priority — a weakness unrelated to the ask would be noise, not signal. The two
+tasks carry DIFFERENT incidents on purpose: each task's counterpart is
+introduced as a different participant, so the same confession twice would be a
+tell.
+
+**No screen may name the requirement issue.** With cards on ONE issue, a
+per-issue heading points straight at the term the study is about.
+`IssueReasonGroups` renders the work and sensitive boxes with no issue heading
+at all, and no badge marks which issue is this role's priority (design §5
+principle 1). The cards name their own term in their own text, which is the
+participant's own briefing. `tests/reason-rules.test.mjs` pins the invariants.
 
 ## The task, in numbers
 
-**Two terms, four options each, both integrative** (Ver.2.11 §3.2). One is the
+**Two terms, four options each, both integrative** (Ver.2.12 §3.2). One is the
 Leader's priority and carries the **Leader's requirement**; one is the Member's
-and carries the **Member's**. There is no third term: the constant-sum timing
-issue is gone, because on it every point conceded was exactly one point gained
-— pure transfer at the worst available rate, which `buildProxyPlan` already
-refused to spend except as a last resort. Payoffs are in `lib/tasks.ts` and
-these properties are load-bearing — if you change a number, recheck all of
-them:
+and carries the **Member's**. There is no third term. Payoffs are in
+`lib/tasks.ts` and these properties are load-bearing — if you change a number,
+recheck all of them:
 
 - individual maximum 3,900; the most reachable while the counterpart still
-  agrees is 3,000, because every agreement path holds their priority at its
-  best option
-- joint range 1,800–6,000; the full logroll reaches **6,000** and is perfectly
-  symmetric at 3,000 each. That is the number `MAX-JOINT` tests for
-- reservation 600 each, so **12 of the 16** packages clear both fallbacks, and
-  **4** of those hold *both* requirements — protecting your requirement,
-  respecting theirs, and reaching agreement are compatible **by construction**
-- exactly **6** clear both fallbacks while holding the Leader's requirement,
-  and 6 while holding the Member's. That symmetry is the design; an asymmetric
-  count means a payoff was edited on one side only
-- the near-middle compromise is joint 4,600 against the logroll's 6,000, so
-  splitting each term still costs both sides something
+  agrees is 3,000, because **every agreement path holds the counterpart's own
+  priority at its best option**
+- the full logroll reaches **6,000**, perfectly symmetric at 3,000 each. That
+  is the number `MAX-JOINT` tests for
+- reservation 600 each — deliberately BELOW the unargued rung (1,000), so even
+  a reason-free agreement beats walking away
 - each requirement's threshold is Options 1–2 on its own issue. O1→O2 keeps it,
   O2→O3 breaks it, which is why the trajectory is reported as transitions and
   never summed
 
-**The acceptance thresholds scale with this table and must be rechecked
-whenever it moves.** T_MID was 3,600 against the old 6,300-point three-issue
-scale; on the two-issue task nothing reachable cleared it, so every cell ran to
-impasse while each component still looked right on its own. T_MID is now 3,000
-— the full logroll exactly — and T_FINAL 2,000.
+**The credibility ladder replaced the acceptance thresholds** (Ver.2.12 §3.3,
+§6.2), and this is the single biggest change in the migration. There is no
+T_MID and no T_FINAL. How far the counterpart concedes on the participant's
+core issue is decided by the best reason the participant side has VOICED:
+
+| Voiced | Participant's core lands at | Participant | Counterpart | JOINT |
+|---|---|---:|---:|---:|
+| nothing (cheap talk) | 3rd option | 1,000 | 3,600 | 4,600 |
+| work reason | 2nd option | 2,000 | 3,300 | 5,300 |
+| **sensitive background** | **best option** | **3,000** | **3,000** | **6,000** |
+| impasse | — | 600 | 600 | 1,200 |
+
+Two consequences, both deliberate:
+
+- **Disclosure is the only bottleneck to the maximum.** Once the SB is voiced
+  the counterpart proposes best↔best ITSELF (`SCRIPT-PROPOSE-MAX`) rather than
+  leaving the maximum to be discovered — so negotiation skill cannot be what
+  separates outcomes, which is what makes the contrast interpretable.
+- **The maximum is not reachable by skill alone.** An over-ask without the SB
+  is countered at the tier package, never accepted, however well it is argued.
+
+`tierOf` reads card LAYERS only — never text, never a model's judgement of
+whether an argument was any good (§6.2: LLM 비관여).
 
 **A bare point number is not information, so two anchors travel with it.**
 `PointsKey` names the most the task could pay this participant (3,900) and the
-fallback they get with no agreement (600); `PackageValue` shows what the
-currently-selected package pays, against that fallback, once both terms have a
-level. Both are already the participant's own — the fallback is in the
-briefing and the maximum is the sum of their own best levels — so neither
+fallback with no agreement (600); `PackageValue` prices a selected package
+against that fallback. Both are already the participant's own, so neither
 discloses anything the design withholds. Neither may ever show the other side's
 numbers, the joint total, or any hint that trading term against term pays
 better than splitting each one: finding the logroll is the behaviour being
-observed (pilot gate 6). A partial package total is withheld for the same
-reason a running subtotal misleads — it reads as the total and falls as terms
-are added.
+observed (pilot gate 6). **Nor may a screen price a position as a forecast** —
+the mandate screen labels its two figures as what each POSITION is worth, since
+under the ladder where it lands depends on the reasons voiced, not the floor.
 
 Each requirement is worth 3,000 on purpose. If it were cheap, giving it up
 would be explicable as a sensible low-priority concession — exactly the thing
@@ -112,37 +112,53 @@ this study has to distinguish from withdrawal under evaluative pressure.
 
 ## Who decides what in a negotiation
 
-`lib/negotiation/machine.ts` decides the moves: offer levels, concessions,
-acceptance (T_MID = 3,000 at stage 4, T_FINAL = 2,000 at stage 5), and
-termination. The model only says those moves in the right voice. Keep it that
-way. A counterpart whose judgement is the model's is a different counterpart
-for every participant, and it is why the design does not need to randomize
-outcomes: identical behaviour already produces identical results.
+`lib/negotiation/machine.ts` decides the moves: offer levels, the credibility
+tier, acceptance, and termination. The model only says those moves in the right
+voice. Keep it that way. A counterpart whose judgement is the model's is a
+different counterpart for every participant, and it is why the design does not
+need to randomize outcomes: identical behaviour already produces identical
+results.
 
-**The participant's conversation is free-form, bounded only by a ten-minute
-timer.** They write as many messages as they like and may finish early. Running
-the clock to zero is an outcome — `onExpire` closes the exchange as an impasse
-— not a screen with no button on it. The
-five stages still exist, but as the COUNTERPART'S script, not a lockstep the
-participant is marched through: it advances one move per reply, so every
-participant meets the same fixed opening, the same standardized challenge and
-the same thresholds in the same order however long they take to get there.
-`counterpartStageAfter(replies)` is where that mapping lives.
+**Six stages (Ver.2.12 §6.1), and stage 3 is not a message.**
 
-**The challenge always lands before any acceptance.** The counterpart cannot
-accept before it reaches its trade stage, which is after it has opened, stated
-its priority and challenged. So a participant who opens with a perfect package
-still has to answer the challenge — the manipulation cannot be skipped by
-negotiating well. Check this after any change to `counterpartStep`.
+1. **opening** — the counterpart's own best package on both terms. Fixed.
+2. **first reason opportunity** — it gives its WORK reason and asks for the
+   participant's priority and reason. This is the turn that opens the
+   participant's own first chance to give one.
+3. **lock** — a system recording moment. `counterpartStageAfter` walks
+   1 → 2 → 4 → 5 and never serves it.
+4. **disclosure** — the counterpart voices its own SB card, **once,
+   unconditionally**.
+5. **conditional trade** — bounded by the tier.
+6. **close** — acceptance, or impasse when the clock runs out.
 
-**"Late" is decided by the clock, not by the turn count.** T_FINAL is the
-relaxed closing threshold, and it applies when `secondsRemaining` is low. Tying
-it to the counterpart's script position instead made the Proxy arm relax after
-one direct message and Baseline after four, because the Proxy counterpart
-resumes mid-script — so identical packages were acceptable at different points
-depending on condition. Once both arms are at the trade stage the counterpart's
-decision depends only on the package and the clock; verify that after touching
-either.
+**The counterpart's SB disclosure is new in Ver.2.12 and reverses an earlier
+rule.** Ver.2.11 deliberately withheld it, on the grounds that reciprocal
+disclosure would prime the very construct PERC measures. Ver.2.12 §6.3 requires
+it instead, for a reason that outranks that: `PRE-RECIP-SB` — whether the
+participant disclosed BEFORE hearing the other side's confession — is RQ1's
+confirmatory outcome, and it is undefined without a fixed reciprocity point.
+The confound is controlled by making the disclosure **identical and
+unconditional for everyone**: never mirrored to what the participant said,
+never skipped, carrying no demand and no package. It changes no tier.
+
+**The participant's conversation is free-form, bounded by a clock.** Ten
+minutes in Baseline, three in the Proxy arm's closing (`CLOSING_SECONDS`) —
+the ground work there is already done. They write as many messages as they
+like and may finish early. Running the clock to zero is an outcome; `onExpire`
+closes the exchange as an impasse.
+
+**Closing is unified across the two arms, and that is deliberate.** Both end
+exactly three ways, so "how did it end" is never a between-condition artefact:
+
+1. a package the counterpart accepts by the ladder,
+2. an explicit **"Accept their proposal"** button — deterministic, so no model
+   ever reads the participant's words to decide whether they agreed,
+3. the clock — one `SCRIPT-CLOSE` offer near the end, then impasse.
+
+The Proxy arm adds a **decline** control (two-step), because it has a standing
+proxy package to reject; that is what `RATIFY` codes. Baseline has nothing to
+decline, which is why it has no such button.
 
 **The counterpart's fixed opening must be on screen before the participant
 writes anything**: it is the anchor their reply is measured against.
@@ -150,143 +166,87 @@ writes anything**: it is the anchor their reply is measured against.
 That seed produces **two different stage positions, and they must stay
 different.** The counterpart has already *spoken* stage 1, so its next move is
 stage 2 — `counterpartStageAfter(replies + SEEDED_OPENING_STAGES)`. The
-participant is replying *to* that opening, so their script slot is still stage
-1 — `counterpartStageAfter(replies)`. Conflating them broke it twice in a row:
-without the offset the counterpart re-served stage 1 and repeated its opening
-word for word, and "fixing" that by seeding `replies` at 1 moved both
-positions, skipping the mockup's `b1p` and landing the standardized challenge
-a message early. The Proxy arm has the same idea at a different size —
-`DIRECT_STAGE_OFFSET` is 3, because through its proxy the counterpart has
-opened, stated its priority and challenged.
+participant is replying *to* that opening, so their own script slot is one
+behind. Conflating them broke it twice before. The Proxy arm has the same idea
+at a different size — `DIRECT_STAGE_OFFSET` is 3, because through its proxy the
+counterpart has already opened, argued and disclosed; replaying those would
+make the participant sit through a disclosure they just watched.
 
-Check the transcript, not the code, after touching either: the ideal
-trajectory is ten messages, and the challenge is the fifth.
+### The credibility ladder
 
-**Both sides challenge at stage 3**, each naming the *other* role's
-requirement. `standardizedChallenge` is therefore keyed by the role being
-challenged. Keying it the other way had a counterpart arguing against its own
-requirement.
+The counterpart concedes on the participant's core issue by tier, and holds its
+own core at its best option on every agreement path. The tier is decided by the
+**system, from the structured card log** — never by asking a model to grade an
+argument (§6.2). In Proxy that is what the proxy actually VOICED (not what was
+authorized — a guardrail block can strip a reason, and assuming otherwise made
+the rule inert for a whole arm once already); in Baseline it is the card the
+participant attaches via `ReasonPicker`. That control may never suggest
+attaching one helps, may never default to a card, and may never present the
+sensitive card as the better answer.
 
-### The reason-linked acceptance rule
+**The tier only ever rises, and it rises the moment the card is tagged.** In
+the Proxy arm's closing it starts from what the proxy earned and can be raised
+by the participant tagging their own SB in person (`SELF-DISCLOSE`) — at which
+point the counterpart proposes best↔best itself.
 
-Design §4: the counterpart **will not concede on a requirement nobody has given
-a reason for**. It asks once and defers judgement by one turn. Without it a
-participant can settle the whole task by swapping options, and the outcome
-stops depending on the thing this study manipulates.
+**The fixed scripts (§6.4)** are `DecidedAction` values, not prose in a
+component: `ask_why` (SCRIPT-ASKWHY, once), `counter_tier` (SCRIPT-FAIR /
+SCRIPT-LIMIT), `accept_sb` (SCRIPT-ACCEPT-SB), `propose_max`
+(SCRIPT-PROPOSE-MAX), `nonum` (SCRIPT-NONUM), `soft_close` (SCRIPT-CLOSE),
+`impasse` (SCRIPT-FALLBACK).
 
-Whether a reason was given is decided by the **system, from the structured
-log** — never by asking a model to grade an argument. In Proxy that is the
-ticked cards; in Baseline it is the reason a participant attaches to a message
-via `ReasonPicker`. That control may never suggest attaching one helps, may
-never default to a card, and may never treat the sensitive cards as the better
-answer. And since ver.2.5 the judgement is **issue-scoped**: with cards on all
-both terms, only a reason on the requirement issue counts as a reason for the
-requirement — see the ver.2.5 paragraph above.
+**The no-numbers reminder is one-shot and reads the WHOLE history.** §8.1
+forbids telling the other side your score; `mentionsScoreNumbers` screens for
+it server-side and the counterpart reminds once, then ignores it. Reading only
+the latest message missed a mention made during the fixed stages, where the
+counterpart's move is already determined — so the reminder never fired at all.
 
-**The rule has to reach stage 5, not only stage 4.** Gating only the trade made
-it cosmetic: the counterpart asked "why does that matter?", the participant
-could ignore it, and the closing test accepted the same package anyway — so a
-participant who never argued for their requirement got the identical agreement
-as one who did, in both conditions. What is withheld is the **concession, not
-the agreement**: an unexplained requirement is held where the counterpart
-stands, so a deal is still reachable, just not one that hands the requirement
-over. Across all four cells, giving a reason preserves the requirement (3,200)
-and never giving one loses it (1,200).
-
-**The requirement is the LAST currency the proxy spends, not the first.**
-`buildProxyPlan` spends the other two terms, and touches the requirement only
-if that was not enough — which on the standard mandate is never, because
-handing the other side their priority term outright is already worth T_MID to
-them. An earlier version seeded the package with the requirement already at its
-mandated floor and then excluded it from the spendable list, so the
-cheapest-first ordering that protects it never applied and it was conceded
-before the negotiation started. Requirement preservation is the primary
-outcome and only the Proxy arm has code that can abandon it unprompted, so
-that put a mechanical difference straight into `Pooled Proxy − Baseline`.
-
-**Concessions are chosen step by step, not issue by issue.** Ordering whole
-issues by cost ratio spent the cheapest term to its floor once picked, and
-on a constant-sum term every point given is exactly one point gained — pure
-transfer, always the worst rate, never the way to close a gap the integrative
-terms could close more cheaply. A step that buys the counterpart nothing is
-never taken. Across the whole mandate space this is the difference between the
-proxy breaking its principal's requirement in 50% of mandates and in 31%, all
-of the remainder being mandates the participant set below their own threshold.
-
-**The state machine decides WHICH reason is voiced, and when** (ver.2.6 §7,
-`designatedReason`). The proxy used to be told "state your priority, with one
-authorized reason" and the model picked. Combined with the ver.2.5 cap of one
-reason kind per issue per task, that meant a ticked sensitive card on the
-requirement issue was never said: work reasons arrive ticked by default, the
-model took one at stage 2, and the cap closed the issue for good. REASON-SCOPE
-recorded a disclosure the negotiation never contained — the opposite of what
-the mandate screen promises. The schedule escalates like the counterpart's own
-script: the work reason at stage 2, the sensitive one after the challenge at
-stage 4, and on any other issue the sensitive card when that issue carries a
-trade. A card ticked on the requirement issue is therefore guaranteed to be
-voiced; cards on the other terms are voiced only if that term is traded, which
-is why what was AUTHORIZED and what was SAID are logged separately.
+**The proxy voices an authorized SB at its FIRST reason opportunity**
+(`designatedReason`, §6.5), not after a challenge. `PRE-RECIP-SB` is "was the
+participant side's SB out before the counterpart's stage-4 disclosure", so a
+schedule that held it back past stage 4 would record every Proxy participant as
+a non-reciprocal discloser regardless of what they actually authorized.
 
 **"Each card at most once" is the schedule's job, not the validator's.** It is
 kept by never designating a card twice. Making it a violation instead would be
-actively harmful: budget codes are hard codes, so the whole message would fall
-to the package-only fallback and its reason token would be nulled — and on the
-turn carrying the requirement's reason that hands the direct conversation a
-false "no reason was given", which is the inert-rule bug already fixed once
-below. Prevent repetition; do not punish it.
+actively harmful: the whole message would fall to the package-only fallback and
+its reason token would be nulled — and on the turn carrying the requirement's
+reason that hands the direct conversation a false "no reason was given".
 
-**The Explorer's pool reasons have their own budget, and their own action
-field.** The pool is a SEPARATE allowance from the principal's cards — at most
-one per issue and two per task — and since ver.2.6 it rides in
-`addedReasonSourceId`, beside the card rather than instead of it. Sharing one
-bucket was tried and was wrong: only the Explorer adds on top of its
-principal's reasons, so it hit the cap sooner and more of its messages were
-stripped to a reasonless package restatement, biasing `Explorer − Delegate` on
-exactly the message content the contrast isolates. Sharing one FIELD is wrong
-for a second reason: the pool id would displace the card, and because each
-role's exchange argument carries a null issue, the requirement's reason would
-go unregistered — so the Explorer arm would arrive at the direct conversation
-flagged reasonless where the Delegate arm did not. Keep both separations.
+**`stage_mismatch` is NOT a hard violation.** The model's stage field is an
+echo of what it was told, so a mismatch carries no information about the move,
+which the machine decided either way. Treating it as hard replaced whole
+messages with the package-only fallback on exactly the closing turns — the
+machine stamps an accept as stage 6, and the model sometimes echoes the trade
+stage it was mid-way through. It is still logged for the audit.
 
-**The two pool clauses land on different issues, and must.** Stage 2 spends
-the requirement issue's pool item; stage 4 spends the EXCHANGE argument, the
-one pool entry carrying no issue, because that stage's move is the trade.
-Pointing both at the requirement issue looks harmless and silently halves the
-manipulation: each role's pool holds exactly one item per issue, so the second
-request finds nothing, every Explorer participant gets one added clause where
-§7 allows two, and no log shows it because one clause is a legal outcome.
+**The Explorer's pool reasons have their own budget and their own action
+field.** At most one per issue and two per task, riding in
+`addedReasonSourceId` BESIDE the principal's card rather than instead of it.
+Sharing one bucket was tried and was wrong: only the Explorer adds on top, so
+it hit the cap sooner and more of its messages were stripped to a reasonless
+restatement, biasing `Explorer − Delegate` on exactly the message content the
+contrast isolates. **Pool arguments never move the tier** — they are WR-grade
+general claims, and letting one open the SB rung would hand an Explorer
+participant who authorized nothing the maximum, in one arm only, on the primary
+outcome.
+
+**The two pool clauses land on different issues, and must.** The core-support
+item rides the reason turn; the EXCHANGE argument (the one pool entry carrying
+no issue) rides the trade turn. Pointing both at the core issue looks harmless
+and silently halves the manipulation: the second request finds nothing, every
+Explorer participant gets one clause where §6.6 allows two, and no log shows
+it, because one clause is a legal outcome.
 
 **What the client receives about reasons must be constant in SHAPE, not just
-opaque in content.** This has been got wrong three times in the same place.
-The `pool:` prefix named the AI-added messages outright; a separate
-`addedReasonToken` field named them by its presence, since only the Explorer
-populates it; collapsing both into one variable-length array named them by its
-length. The response therefore returns EXACTLY TWO opaque hashes on every turn
-of every policy, padding with a per-turn decoy — `resolveReasonTokens` drops
-anything that does not re-hash to a known id, so a decoy spends no budget and
-satisfies no rule. A blocked turn returns decoys too, because an empty array
-is its own one-bit tell that a guardrail fired.
-
-**Whether the proxy argued the requirement is decided server-side, from the
-principal's card alone** (`reasonForRequirement`). The client used to pair a
-token with an issue id to work it out, which was correct only because of which
-issue ids the designation sites happened to pass — and the stage-4 pool fix
-moves exactly those ids. A pool argument is not the principal's reason: if one
-could satisfy the rule, an Explorer participant who authorized nothing would
-still be handed the requirement concession, 3,200 against 1,200, in one arm
-only, on the primary outcome. The boolean leaks nothing, being equally true
-under Delegate.
-
-**The counterpart gives a work reason and never its sensitive one.** Ver.2.6
-§4 fixes its mandate with all six cards ticked so the receiver-side stimulus is
-identical for everyone; the fixed-and-identical half is implemented, the
-core-issue confession is not. Its disclosure would be a STIMULUS, and one that
-primes the very construct PERC and RISK measure — reciprocal self-disclosure
-reliably increases disclosure, and RISK is gate 4's task-equivalence
-instrument, which cannot carry a condition effect. The participant's own
-proxy is the opposite case: there the disclosure IS the manipulation, so it
-voices everything authorized. The same confession arriving from two different
-"Other Participants" across Task 1 and Task 2 would also be a tell.
+opaque in content.** This has been got wrong three times in the same place. The
+response returns EXACTLY TWO opaque hashes on every turn of every policy,
+padding with a per-turn decoy — `resolveReasonTokens` drops anything that does
+not re-hash to a known id, so a decoy spends no budget and satisfies no rule. A
+blocked turn returns decoys too, because an empty array is its own one-bit tell
+that a guardrail fired. `voicedTier` travels as a rung name for the same
+reason: it describes the participant's own card and is identical under both
+policies.
 
 ## Things the participant must never learn mid-study
 
@@ -320,8 +280,8 @@ These are load-bearing. Breaking any one invalidates the data.
    AI-added*, per message, for the whole transcript. The per-issue budgets and
    the issue-scoped acceptance rule need each token's kind and issue, so the
    route RESOLVES the plain tokens server-side by re-hashing the known card
-   and pool ids — the client carries nothing but the token, plus the reason's
-   ISSUE (`reasonIssueId`), which the message text argues openly anyway.
+   and pool ids — the client carries nothing but the token and `voicedTier`,
+   which names its own card's rung and is identical under both policies.
 4. **That no bonus decision is made about the Member at all.** A Member waits
    while "the Leader decides" and is then shown NOTHING — no score, no amount,
    ever. This replaced a fixed 70/100 presented as the Leader's judgement, and
@@ -336,6 +296,15 @@ These are load-bearing. Breaking any one invalidates the data.
    amount and it is still recorded as `BONUS`; it simply never travels. What
    `/debriefing` discloses is that no such decision was ever made about them.
    Do not "restore" a number here for symmetry.
+
+   **The Member's own channel is `RECV-EVAL`** (Ver.2.12 §5): before the wait
+   they write an upward evaluation of the manager, told it goes to the district
+   manager. It does not — there is no district manager — and `/debriefing`
+   retracts that for both roles, since the Leader was told one was being
+   written about them. It is the receiver-side mirror of `BONUS`: without it
+   the Member has a post-negotiation decision made ABOUT them and none of their
+   own, and RQ2's role-specific behavioural outcome has nothing to measure on
+   half the sample.
 5. **Which term the study is about.** Both terms are entered the same way
    on the preference screen — no extra control, no highlight, no separate
    heading for the requirement issue. Pilot gate 6 tests for exactly this kind
@@ -395,8 +364,19 @@ real row would silently unbalance the design.
 ## The flow
 
 Consent → background (incl. covariates) → instructions + comprehension →
-**one** practice round → **Task 1 → Task 1 questions → Task 1 bonus** →
-**Task 2 → Task 2 questions → Task 2 bonus** → wrap-up → debriefing.
+**one** practice round → **Task 1 → Task 1 questions → Task 1 decision** →
+**Task 2 → Task 2 questions → Task 2 decision** → wrap-up → debriefing.
+
+The post-task decision screen is the one screen that differs by role: the
+Leader decides the recommended bonus, the Member writes `RECV-EVAL` and then
+waits while "the manager decides" — shown no number, ever.
+
+**M1 is asked where the decision was made, not in one fixed place.** Under
+Proxy it sits on the confirm screen, of non-disclosers only, while the mandate
+choice is fresh and nothing has been negotiated; under Baseline there is no
+such moment, so it is asked retrospectively in the post-task battery. Asking a
+Proxy participant retrospectively would be asking them to reconstruct a
+decision they made forty minutes and one negotiation earlier.
 
 The questionnaire and the bonus sit **inside each task block** (§8), and that
 is not a layout preference: every §9.4 measure is a judgement about one
@@ -433,13 +413,12 @@ splitting them contradicted the contribution.
 
 Where the cards sit took care and must not be "tidied". They exist for one
 term — the participant's requirement — so the obvious layout nests them in that
-term's card. That breaks §5 principle 4: one of the three cards would be
-visibly taller and carry a control the others do not, which tells the
+term's card. That breaks §5 principle 4: one of the two term cards would be
+visibly taller and carry a control the other does not, which tells the
 participant which term the study is about without a word being said. The
-reasons are therefore a section BELOW all three cards, addressed to the
-requirement in their own heading exactly as the briefing presents them, and the
-three term cards stay identical. `PreferenceForm` takes the section as a prop;
-Baseline passes none.
+reasons are therefore a section BELOW both term cards, and the two term cards
+stay identical. `PreferenceForm` takes the section as a prop; Baseline passes
+none.
 
 **The participant can question their own AI Proxy before it runs**
 (`RehearsalChat`, `/api/proxy-rehearsal`). They ask what it will open with, how
@@ -477,10 +456,17 @@ test. `ProxyTranscriptPanel` keeps it one click away, never behind a
 navigation.
 
 **The counterpart picks its script up mid-way in the direct conversation**
-(`DIRECT_STAGE_OFFSET`), because through its own proxy it has already opened,
-stated its priority and challenged. Replaying those would make the participant
-answer a challenge they watched being answered, and would give the Proxy arm
-two challenges where Baseline has one.
+(`DIRECT_STAGE_OFFSET` = 3), because through its own proxy it has already
+opened, given its work reason and disclosed its SB. Replaying those would sit
+the participant through a confession they just watched, and would give the
+Proxy arm two disclosures where Baseline has one.
+
+**The review screen shows the participant's plan beside the agreement**
+(§7): hoped-for and agreed, per issue, with the shortfall stated on the CORE
+issue only. A whole-package delta would report a loss even on the best
+reachable agreement, because the plan's level on the other side's term was
+never winnable — and the WR-only path's gap IS the finding, so the screen
+states it neutrally and never editorialises it.
 
 **The review screen must show the participant's OWN conversation.** It once
 showed the AI-AI transcript captioned as theirs, so every item asking them to
@@ -645,21 +631,23 @@ leaves you looking at an empty screen, which tells you nothing about whether
 the thing reads. With mockup mode on, every condition × role × task has a
 written exchange in `lib/negotiation/script.ts` — participant messages and
 open-ended answers included — so the Baseline composer arrives with the message
-for that stage already in it, the review screen shows a real ten-message
-transcript and a real package, and pressing Continue from the consent page to
-the completion code shows you what a participant would actually see.
+for that stage already in it, the review screen shows a real transcript and a
+real package, and pressing Continue from the consent page to the completion
+code shows you what a participant would actually see.
 
-Those scripts are the *ideal* trajectories: the logroll lands, both thresholds
-hold, the counterpart accepts at stage 4. They are for reading the flow, not
-for exercising the failure branches.
+Those scripts are the *ideal* trajectories: the SB is voiced at the first
+reason opportunity, the counterpart discloses its own at stage 4, and the
+best↔best trade lands. They are for reading the flow, not for exercising the
+failure branches.
 
 **The scripts must agree with the state machine.** All twelve cells settle at
-4,200 for the speaker and 3,600 for the other side, which is what
-`buildProxyPlan` independently produces from the standard mandate. A mockup
-showing a package the real system would never reach is a mockup of a different
-study, and this pair has drifted apart twice — check it after any change to
-either file. Levels named in a message are read from the package that message
-carries, never from an option index, because option order is role-relative.
+3,000 for the speaker and 3,000 for the other side — the ladder's SB rung,
+which is why the mockup mandate ticks the sensitive card: a mockup showing a
+disclosure the mandate forbids would be a mockup of a different study. A test
+in `tests/reason-rules.test.mjs` asserts the agreement in every cell, because
+this pair has drifted apart twice. Levels named in a message are read from the
+package that message carries, never from an option index, because option order
+is role-relative.
 
 It is present by default on every build, including deployed ones, so the layout
 can be checked wherever it happens to be running.
@@ -693,10 +681,11 @@ fills once and every screen after it inside the same component arrives empty.
 | Supabase persistence | `lib/store.ts` — swap `getStore()` to the `SupabaseStore` in `lib/store-supabase.ts` |
 | The `{op, payload}` persistence endpoint | `app/api/persist/route.ts` — does not exist yet |
 | Rehearsal chat (participant ↔ own proxy) | `app/api/proxy-rehearsal/route.ts` · prompt P5 in `lib/ai/prompts.ts` |
-| Atomic slot claim | `app/api/assign/route.ts` |
+| Atomic slot claim | `app/api/assign/route.ts` — `claimSlot` in `lib/assignment.ts` is the only thing that decides an assignment |
 | Task payoffs, role stories, reason cards, Explorer pool | `lib/tasks.ts` |
-| Counterpart moves, acceptance thresholds, concessions | `lib/negotiation/machine.ts` |
+| Counterpart moves, the credibility ladder, outcome coding | `lib/negotiation/machine.ts` |
 | The scripted ideal exchanges for mockup mode | `lib/negotiation/script.ts` |
+| The live end-to-end simulation | `scripts/simulate-negotiation.mjs` — `npm run simulate` |
 | Model / temperature | `lib/ai/config.ts` |
 | Agent behavior rules (P0–P4) | `lib/ai/prompts.ts` |
 | Guardrails | `lib/ai/validator.ts` |
@@ -706,7 +695,7 @@ fills once and every screen after it inside the same component arrives empty.
 | Controls (scale, chips, buttons, cards) | `components/ui.tsx` |
 | Progress bar and sticky action bar | `components/study-chrome.tsx` |
 | Briefing panel and task layout | `components/session.tsx` |
-| Stage rail, transcript, composer, timer | `components/negotiation.tsx` |
+| Transcript and bubble splitting, composer, timer | `components/negotiation.tsx` |
 | Dev-mode gating, autofill, phase jumps | `lib/dev-mode.tsx` · `components/dev-panel.tsx` |
 
 Pages never touch persistence or the network directly — they go through
@@ -740,100 +729,115 @@ keeping:
   back to the model.
 - **The counterpart needs its own mandate.** Without one it mirrors whatever
   the participant's Proxy opens with instead of negotiating. It has one by
-  construction: `counterpartOpening` plus the acceptance thresholds.
+  construction: `counterpartOpening` plus the ladder.
 - **Guardrail asymmetry confirmed.** Red lines, fabricated personal facts, and
-  invalid options all block. Two checks are specific to ver.2.4: an unchecked
+  invalid options all block. Two checks are policy-specific: an unchecked
   reason card may not be voiced under *either* policy, and a `pool:`-prefixed
   reason is Explorer-only.
-- **The validator fires on live wording in ordinary runs**, usually
-  `stage_mismatch` — the model claiming a stage other than the one it was
-  given. The fallback absorbs it correctly: the sentence is replaced, the state
-  machine's package survives, and the message count stays at ten. But it means
-  the plain fallback text ("On my principal's behalf: …") will appear in real
-  transcripts at some rate, so it is worth reading a sample from the pilot
-  rather than assuming every message is model prose. If the rate is high, the
-  fix is the prompt's stage block, not the validator.
+- **`stage_mismatch` was demoted to a soft violation, and that was a real
+  bug fix.** The model's stage field is an echo, so a mismatch says nothing
+  about the move — but as a hard code it replaced the whole message with the
+  package-only fallback, and it fired on exactly the closing turns (the machine
+  stamps an accept as stage 6; the model echoes the trade stage it was mid-way
+  through). Live runs were losing the acceptance wording for no reason. It is
+  still logged for the gate-10 audit.
 
-## Ver.2.11 migration status
+**Ver.2.12 was re-verified the same way** (`npm run simulate`, ten runs, all
+passing). What the runs are for, beyond the assertions: the ladder produces
+exactly 3,000/3,000 with the SB and 2,000/3,300 without, in live prose; the
+counterpart's own SB disclosure reads as a person volunteering something rather
+than a system reciting a card; and a mid-closing confession really does move
+the counterpart to propose the maximum itself. Three prompt fixes came out of
+reading the transcripts rather than the checks — the bubble-splitting rule for
+over-long turns, dropped duplicate "matters most to me" phrasing when the card
+already says it, and an `accept_sb` frame that no longer acts newly surprised
+by something already acknowledged. Only the first changed the design doc (§12
+P1); the other two are instruction wording, which the doc leaves to the
+implementation.
 
-The scenario, the payoffs, the issue count and the reason-card deck are
-migrated (see "The task, in numbers"). Deliberately NOT migrated yet, because
-Ver.2.11 §13.2–13.3 still lists them as values and designs to be fixed at
-pilot:
+## Ver.2.12 migration status
 
-- the **tier-ladder acceptance rule** (§6.2: no reason → 3rd option, WR → 2nd,
-  SB → best). The current code still uses the threshold rule, recalibrated to
-  the new scale, plus the reason-linked gate
-- the **six-stage script** (§6.1). Still five stages
-- the **counterpart's fixed SB disclosure** (§6.3) — it still voices a work
-  reason only, so `PRE-RECIP-SB` / `POST-RECIP-SB` / `MUTUAL-SB` have nothing
-  to record
-- **RECV-EVAL** (§5): a Member still only waits while the Leader decides, and
-  does not yet write an upward evaluation
-- the new outcome measures `UNLOCK`, `CONCEAL-PREMIUM`, `JOINT`, `MAX-JOINT`
+Migrated in full: the scenario and payoffs, the two-issue shape, the eight
+face-confession reason cards, the **credibility ladder** (§3.3, §6.2), the
+**six-stage script** (§6.1), the **counterpart's fixed SB disclosure** (§6.3),
+the fixed scripts (§6.4), the proxy's first-opportunity SB schedule (§6.5),
+**RECV-EVAL** (§5), the unified closing with `RATIFY` / `SELF-DISCLOSE`, the
+outcome measures `UNLOCK` / `CONCEAL-PREMIUM` / `JOINT` / `MAX-JOINT`, the
+§9 instrument (PERC-F/I, FTS, the seven PCR items, the six OTHER-AI items,
+M1, INCENT1), and prompts P0–P4 (§12).
 
-Doing any of these means touching `machine.ts`, `script.ts` (both must move
-together — see the mockup-mode note) and `measures.ts`.
+Verified against the live model end to end — `npm run simulate`, ten runs
+through the real routes; see "Verified against the live model" below.
+
+**Still design-open (Ver.2.12 §13), not implementation gaps:**
+
+- the working values themselves: the outcome ladder (1,000 / 2,000 / 3,000),
+  the fallback (600), and the strength of the §5② decision guidelines are all
+  to be fixed at pilot
+- §13.3: whether the Proxy closing stays a free conversation with card tagging
+  (current) or becomes an approve-only button. The current shape is what makes
+  `SELF-DISCLOSE` measurable at all; an approve-only button would remove the
+  measure along with the contamination risk
+- §13.4: aligning PCR / PNPQ / PNOQ to the SVI's four factors, so a validated
+  scale can be cited
+- §13.5: the item wording is written in English against Korean drafts and
+  needs a pass against the final translation
 
 ## Still open
 
-Nothing structural. What remains is values to fix and behaviour to exercise:
+Nothing structural. What remains is values to fix and behaviour to observe:
 
-- **Pilot-dependent numbers.** Reservation (600), acceptance thresholds
-  (T_MID = 3,000 / T_FINAL = 2,000), the outcome ladder (1,000/2,000/3,000),
-  the advertised time, the payment (£7.50
-  participation, £1.00 bonus per task — GBP because Prolific pays in it, and
-  both must clear Prolific's fair-pay rate), and the Prolific completion code.
-  The Member's fixed bonus is no longer on this list: no number is shown to a
-  Member at all.
+- **Pilot-dependent numbers.** The fallback (600), the outcome ladder
+  (1,000 / 2,000 / 3,000), the strength of the §5② decision guidelines, the
+  advertised time, the payment (£7.50 participation, £1.00 bonus per task —
+  GBP because Prolific pays in it, and both must clear Prolific's fair-pay
+  rate), and the Prolific completion code.
 
-  On the impasse target: across the whole 256-mandate space the proxy's
-  counterpackage falls below T_FINAL in 36% of mandates, against the design's
-  sub-10% goal. That number is not the expected impasse rate — most of those
-  mandates are hardline ones no participant is likely to set, and the standard
-  mandate settles comfortably — but it is the lever if the pilot runs hot, and
-  it moves with T_FINAL rather than with any code change.
+  On the impasse target (gate 6, under 10%): the ladder makes impasse much
+  harder to reach than the old threshold rule did, because every rung is an
+  acceptable agreement and even the unargued one (1,000) beats the fallback
+  (600). The remaining route to impasse is a participant who sets a minimum
+  above what their voiced reasons earn and then refuses the counterpart's tier
+  package — which is a real behaviour worth measuring, not a bug. Watch the
+  rate rather than pre-emptively widening anything.
+
 - **Timing.** `STAGE_MINUTES` sums to about 55 minutes, which is what the
-  consent page advertises. Design §10 gate 8 asks for a task median under 12
-  minutes, and a Proxy task now contains two conversations — the proxies'
-  ~2 minutes of watching plus up to 10 minutes of direct talk — so it is the
-  longer of the two arms. The timer is a cap rather than a target and a
-  participant who is happy can finish in three minutes, so the pilot median is
-  what decides this. The lever is the reply-delay range, not the advertised
-  figure, which must not drift below what the study actually takes.
+  consent page advertises (and the consent timeline now derives its total from
+  those same numbers, so the two cannot drift apart again). Gate 8 asks for a
+  task median under 12 minutes. A Proxy task is the longer arm — the proxies'
+  watching plus a 3-minute closing — but both clocks are caps, not targets. The
+  pilot median decides this; the lever is the reply-delay range, never the
+  advertised figure, which must not drift below what the study actually takes.
 
 - **Whether the two arms are matched on the participant's own airtime.** A
   Baseline participant writes the whole negotiation; a Proxy participant
-  watches one and then writes a shorter one. That asymmetry is the design —
-  delegation is the manipulation — but it means "how much did they say" is not
-  a between-condition control, and any measure that behaves like a word count
-  should be read with that in mind. Worth checking against the pilot
-  transcripts.
+  watches one and then writes a short closing. That asymmetry IS the design,
+  but it means "how much did they say" is not a between-condition control, and
+  any measure that behaves like a word count should be read with that in mind.
+
 - **Whether two issues survive the demand-characteristic check.** With only two
-  terms each requirement is highly salient — more so than with three — and the
-  suspicion probe may show that participants guessed the design. Adding a term
-  back would mean recomputing every payoff property listed above and restoring
-  the trade move the counterpart used to have.
-- **The failure branches work but nothing exercises them automatically.**
-  Impasse, the emergency stop, the reason-request branch, the reason-withheld
-  close and the one revision were all verified by hand — driving the state
-  machine directly and walking the interface — and the scratch scripts that did
-  it are not in the repo. Mockup mode carries only the ideal trajectories, so a
-  regression in any of them would be quiet. The checks worth keeping as tests:
-  a greedy package impasses at stage 5; giving a reason preserves the
-  requirement while withholding one loses it, in all four cells; the revision
-  option disappears after one use; the emergency stop discards the package the
-  exchange was heading for.
-- **The counterpart principal's three templates are inlined** in `review.tsx`
-  rather than rendered through P2. The *decision* between them is the state
-  machine's and is correct — ratify above T_FINAL, reject below, fallback on no
-  agreement — but the wording should go through `/api/counterpart` with
-  `kind: "counterpart_principal"` before collection so its voice matches the
-  rest of the exchange.
-- Fixed vs. jittered counterpart delay · final IRB language · English
-  translation of the item wording (Design §12 lists the items as Korean
-  drafts; the implementation is already English and needs checking against the
-  final translation).
+  terms each requirement is highly salient, and the suspicion probe may show
+  participants guessed the design. Adding a term back would mean recomputing
+  every payoff property above.
+
+- **Whether the counterpart's SB disclosure primes PERC.** This is the known
+  cost of the Ver.2.12 §6.3 change, accepted because `PRE-RECIP-SB` needs a
+  fixed reciprocity point. It is constant across conditions, so it cannot
+  produce a condition effect — but it can lift PERC and RISK uniformly, and
+  RISK is gate 4's task-equivalence instrument. Check both tasks' RISK means
+  against gate 4 in the pilot before reading anything into their level.
+
+- **The failure branches now have tests, but only at the machine level.**
+  `tests/reason-rules.test.mjs` pins all three ladder rungs in four cells,
+  impasse, the one-shot reminders, and script–machine agreement; the live
+  simulation covers the below-mandate branch and a mid-closing disclosure. What
+  is still unexercised automatically is the INTERFACE around the failure
+  branches — the emergency stop, and the clock actually running out on a real
+  screen. Both were walked by hand.
+
+- Fixed vs. jittered counterpart delay · final IRB language (three deceptions
+  now: the counterpart's existence, the bonus, and the upward evaluation being
+  forwarded) · a pass over the item wording against the final translation.
 
 ## Conventions
 
