@@ -100,3 +100,43 @@ test("the cap the routes apply is the design's exposure control", () => {
   // extra LENGTH on the contrast it is measured by (pilot gate 9).
   assert.equal(NEGOTIATION.maxMessageChars, 280);
 });
+
+// --- protected clauses ------------------------------------------------------
+
+const CARD = "the closing reconciliation still cannot be handled alone";
+const POOL = "Steady service through the weekend peak is the baseline any store is judged on.";
+
+test("a protected clause survives a cut taken from the end", () => {
+  // The Explorer's pool clause is the LAST bubble the model writes, so a
+  // naive trailing-bubble trim removes the manipulation itself.
+  const text = [
+    "a bit of preamble that is not load-bearing at all here",
+    "some more filler that can go without costing the study anything",
+    CARD,
+    POOL,
+  ].join(" || ");
+  const capped = capMessageLength(text, 160, [CARD, POOL]);
+  assert.ok(capped.length <= 160);
+  assert.ok(capped.includes(POOL), "pool clause was cut");
+});
+
+test("when both cannot fit, the CARD wins over the pool clause", () => {
+  // The card drives the credibility ladder and the schedule records it as
+  // voiced either way; a message carrying only the pool clause would credit
+  // a participant with a disclosure nobody heard.
+  const text = ["filler", CARD, POOL].join(" || ");
+  const capped = capMessageLength(text, CARD.length + 8, [CARD, POOL]);
+  assert.ok(capped.includes(CARD), "card was dropped in favour of the pool clause");
+});
+
+test("protection is a no-op when the message already fits", () => {
+  const text = `short || ${POOL}`;
+  assert.equal(capMessageLength(text, 280, [CARD, POOL]), text);
+});
+
+test("an absent protected clause does not break the trim", () => {
+  const text = ["one bubble here", "two bubbles here", "three bubbles here"].join(" || ");
+  const capped = capMessageLength(text, 30, [CARD, POOL]);
+  assert.ok(capped.length <= 30);
+  assert.ok(text.includes(capped.split("||")[0].trim()));
+});

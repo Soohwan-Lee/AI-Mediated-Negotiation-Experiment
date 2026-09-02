@@ -251,10 +251,84 @@ function designatedPool(
   return index === -1 ? null : { id: `pool:${index}`, text: pool[index].text };
 }
 
-function poolClause(item: { text: string } | null): string {
-  if (!item) return "";
-  return ` In the same message, add this one further argument as a short clause: "${item.text}"`;
+/**
+ * Does this message carry the designated card's substance?
+ *
+ * Content-word overlap, not a substring: the proxies are REQUIRED to reframe
+ * a card rather than quote it (§6.6), so an exact match would fail on every
+ * correct message. A third of the card's distinctive words is deliberately
+ * lenient — the check exists to catch a message that dropped the reason
+ * entirely, and a false "it is there" costs far less than re-rolling good
+ * reframings in front of a waiting participant.
+ */
+function mentionsCard(message: string, cardText: string): boolean {
+  const words = (t: string) =>
+    new Set(
+      t
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 4),
+    );
+  const want = words(cardText);
+  if (want.size === 0) return true;
+  const have = words(message);
+  let hits = 0;
+  for (const w of want) if (have.has(w)) hits += 1;
+  return hits / want.size >= 0.33;
 }
+
+/**
+ * Did the model already say the pool clause, in its own words?
+ *
+ * A loose content-word overlap rather than a substring match: the proxies are
+ * told to rephrase, so an exact match would almost never fire and the clause
+ * would be appended twice in slightly different wording. Over half the
+ * clause's distinctive words appearing in the message is taken as "already
+ * said" — the failure mode that matters is duplication, and the cost of a
+ * false negative (one appended clause the model half-covered) is far smaller
+ * than the cost of the clause going missing entirely.
+ */
+function containsPoolClause(message: string, clause: string): boolean {
+  const words = (t: string) =>
+    new Set(
+      t
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 4),
+    );
+  const want = words(clause);
+  if (want.size === 0) return false;
+  const have = words(message);
+  let hits = 0;
+  for (const w of want) if (have.has(w)) hits += 1;
+  return hits / want.size > 0.5;
+}
+
+/**
+ * The Explorer's one added clause for this turn (§6.6) is NOT requested in
+ * the decidedAction — it is appended to the finished message instead.
+ *
+ * It rode in the instruction first, and lost. It competed with the card
+ * instruction on the same turn, and a card instruction is the more forceful
+ * one; the clause survived about one generation in four. Rewording both
+ * helped and did not fix it, and softening the card instruction to make room
+ * ("no other CARD") then cost the card itself: messages came back carrying
+ * the added argument and not the principal's own reason.
+ *
+ * Both failures are validity defects rather than wording problems. The pool
+ * clause IS the Explorer manipulation, and `voicedPoolId` spends the §6.6
+ * budget from the SCHEDULE — so a dropped clause was recorded as voiced and
+ * `Explorer - Delegate` compared Delegate against a mostly-Delegate Explorer.
+ * The card, meanwhile, drives the credibility ladder, so a dropped card
+ * credited a participant with a disclosure nobody heard.
+ *
+ * Appending settles both: the model is asked for exactly one thing (its
+ * principal's card), and the addition is placed afterwards, as its own
+ * bubble, which is also how §6.6 describes it. `designatedPool` still decides
+ * WHETHER and WHICH, so the per-issue and per-task budgets are unchanged.
+ */
 
 /**
  * A package's levels, written out for a decidedAction. Every move that
@@ -371,15 +445,15 @@ export async function POST(request: Request) {
    */
   let effectiveStage: StageId = stage;
 
+  /** Designate this turn's pool item, if the schedule places one here. */
   const addPool = (issueId: string | null) => {
-    if (!isParticipantSide || body.policy !== "explorer") return "";
+    if (!isParticipantSide || body.policy !== "explorer") return;
     poolBox.item = designatedPool(
       body.taskId,
       body.participantRole,
       issueId,
       usedPoolIds,
     );
-    return poolClause(poolBox.item);
   };
 
   if (isParticipantSide) {
@@ -402,12 +476,14 @@ export async function POST(request: Request) {
         const reasonClause = designatedCard
           ? ` To make credible why, give exactly this authorized reason and no other: "${designatedCard.text}"`
           : " Give no reason beyond naming the priority — none has been authorized.";
-        decidedAction = `Answer their question: say that ${yourRequirement.label.toLowerCase()} is your principal's priority.${reasonClause}${addPool(yourRequirement.id)}`;
+        decidedAction = `Answer their question: say that ${yourRequirement.label.toLowerCase()} is your principal's priority.${reasonClause}`;
+        addPool(yourRequirement.id);
         break;
       }
       case 5:
         proposal = plan.tradeProposal;
-        decidedAction = `Propose this conditional exchange, naming these exact levels and no others: ${packageSentence(task, plan.tradeProposal)}. Say plainly that your principal offers ${theirRequirement.label.toLowerCase()} at that level in exchange for holding ${yourRequirement.label.toLowerCase()}.${addPool(null)}`;
+        decidedAction = `Propose this conditional exchange, naming these exact levels and no others: ${packageSentence(task, plan.tradeProposal)}. Say plainly that your principal offers ${theirRequirement.label.toLowerCase()} at that level in exchange for holding ${yourRequirement.label.toLowerCase()}.`;
+        addPool(null);
         break;
       default: {
         // Turn 7 — the close, answering the counterpart's turn-6 decision.
@@ -518,7 +594,8 @@ export async function POST(request: Request) {
   }));
 
   try {
-    const { action, stubbed } = await generateAction({
+    const generate = () =>
+      generateAction({
       kind: body.policy,
       ctx: {
         task,
@@ -546,6 +623,40 @@ export async function POST(request: Request) {
       },
       history,
     });
+
+    /**
+     * ONE retry when the designated card went unsaid.
+     *
+     * The schedule records the card as voiced and the credibility ladder is
+     * driven off that record, so a message that quietly omitted it credited
+     * the participant with a disclosure nobody ever heard — the ladder's
+     * primary outcome, wrong, with nothing in the log to show it. Measured
+     * live it happened in roughly one generation in four.
+     *
+     * A RETRY, NOT A VIOLATION. Marking it hard would swap the whole message
+     * for the package-only fallback, which on the reason turn is worse than
+     * the problem: the fallback carries no reason at all and nulls the reason
+     * token, handing the direct conversation a false "no reason was given".
+     * And it cannot be appended the way the pool clause is, because §6.6
+     * requires the proxy to REFRAME a card rather than read it out — pasting
+     * the card's own words would break the reframing rule the Delegate and
+     * Explorer prompts share. Asking again is the only move that keeps both.
+     *
+     * One retry, not a loop: each turn is a live request in front of a
+     * waiting participant, and a second failure is rare enough to accept.
+     */
+    let { action, stubbed } = await generate();
+    if (
+      isParticipantSide &&
+      designatedCard &&
+      !mentionsCard(action.rationale, designatedCard.text)
+    ) {
+      const second = await generate();
+      if (mentionsCard(second.action.rationale, designatedCard.text)) {
+        action = second.action;
+        stubbed = second.stubbed;
+      }
+    }
 
     // On the participant side the SCHEDULE is the record, not the model's
     // self-report: a model returning a different card id is a reporting
@@ -575,13 +686,45 @@ export async function POST(request: Request) {
     const blocked =
       !validation.valid && validation.disposition === "regenerate";
 
-    // Capped, not merely asked for. §7's exposure control is what stops the
-    // Explorer arm's extra clause turning into extra LENGTH on the very
-    // contrast it is measured by; the proxies ignored the prompt's limit in
-    // every live run.
+    // THE EXPLORER'S ADDED CLAUSE IS APPENDED, NOT REQUESTED.
+    //
+    // It rode in the decidedAction as an instruction, and the model dropped it
+    // roughly three times in four — it competed with the card instruction on
+    // the same turn, and a card instruction is the more forceful one. Rewording
+    // both helped and did not fix it: measured live it still landed about one
+    // turn in four.
+    //
+    // That is a validity defect, not a wording preference. The clause IS the
+    // Explorer manipulation, and `voicedPoolId` above already spends the §6.6
+    // budget on it from the SCHEDULE — so a dropped clause was being recorded
+    // as voiced, and `Explorer − Delegate` was comparing Delegate against an
+    // Explorer that was mostly Delegate. The same reasoning CLAUDE.md applies
+    // to the rehearsal leak screen applies here: what the design requires is
+    // enforced, not hoped for.
+    //
+    // It is appended as its own bubble, which is also how the design describes
+    // it (§6.6: "one short clause beside that message's authorized reason"),
+    // and the cap below then applies to the whole message — so the added
+    // clause cannot buy the Explorer arm extra LENGTH either.
+    const poolText = poolBox.item?.text ?? null;
+    const withPool =
+      !blocked && poolText && !containsPoolClause(action.rationale, poolText)
+        ? `${action.rationale} || ${poolText}`
+        : action.rationale;
+
     const text = capMessageLength(
-      blocked ? fallbackText(task, proposal, isParticipantSide) : action.rationale,
+      blocked ? fallbackText(task, proposal, isParticipantSide) : withPool,
       NEGOTIATION.maxMessageChars,
+      // BOTH clauses that carry meaning are protected, CARD FIRST.
+      //
+      // The Explorer's pool clause is the last bubble, so an unprotected cut
+      // from the end removed the manipulation and left the arm looking like
+      // Delegate. Protecting only the pool clause then pushed the CARD out
+      // instead — messages arrived carrying the added argument and not the
+      // principal's own reason, which is worse: the schedule records the card
+      // as voiced and drives the ladder off it, so the participant would have
+      // been credited with a disclosure nobody ever heard.
+      blocked ? null : [designatedCard?.text ?? null, poolText],
     );
 
     const message: TranscriptMessage = {

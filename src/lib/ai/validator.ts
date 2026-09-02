@@ -387,16 +387,25 @@ export function validateAction(
  * comparison the policy manipulation isolates (pilot gate 9).
  *
  * The prompt asks for this too, but a prompt is a request. Measured over ten
- * live runs the proxies ignored it — 220 characters on average and 471 at the
- * worst — so the cap is applied to the text rather than hoped for.
+ * live runs the proxies ignored it - 220 characters on average and 471 at the
+ * worst - so the cap is applied to the text rather than hoped for.
  *
  * IT CUTS AT A BUBBLE BOUNDARY, never mid-sentence. Dropping whole trailing
- * bubbles loses the least-load-bearing clause (the model puts its ask last and
- * its move first) and always leaves a message that reads as finished. If even
- * the first bubble is over the cap it is truncated on a word boundary, which
- * is a fallback that the live runs never reached.
+ * bubbles always leaves a message that reads as finished, and if even the
+ * first bubble is over the cap it is truncated on a word boundary.
+ *
+ * `protect` IS LOAD-BEARING AND THIS IS WHERE THE NAIVE VERSION BIT. Trailing
+ * bubbles are not uniformly the least important: the Explorer's added pool
+ * clause is the LAST thing the model writes, so cutting from the end removed
+ * the Explorer manipulation itself from about three messages in four - the
+ * cap silently undoing the condition it was written to protect. A protected
+ * clause is kept and the cut is taken from the bubbles before it instead.
  */
-export function capMessageLength(text: string, maxChars: number): string {
+export function capMessageLength(
+  text: string,
+  maxChars: number,
+  protect?: ReadonlyArray<string | null | undefined> | string | null,
+): string {
   if (text.length <= maxChars) return text;
 
   const bubbles = text
@@ -404,13 +413,69 @@ export function capMessageLength(text: string, maxChars: number): string {
     .map((b) => b.trim())
     .filter(Boolean);
 
-  const kept: string[] = [];
-  for (const bubble of bubbles) {
-    const candidate = [...kept, bubble].join(" || ");
-    if (candidate.length > maxChars) break;
-    kept.push(bubble);
+  // Which bubbles carry something that must survive the cut. Matched by
+  // containment, because the model wraps a clause in a sentence of its own;
+  // the LAST match for each, because that is where a clause is appended.
+  //
+  // ORDER IS PRIORITY. The caller passes the card reason first and the pool
+  // clause second, and when both cannot fit the earlier one wins — the card
+  // drives the credibility ladder, and a message that voiced only the pool
+  // clause would leave the participant's own disclosure unheard while the
+  // schedule recorded it as voiced.
+  const wanted = (
+    Array.isArray(protect) ? protect : [protect]
+  ).filter((p): p is string => typeof p === "string" && p.trim().length > 0);
+
+  const protectedIdx: number[] = [];
+  for (const clause of wanted) {
+    const needle = clause.trim();
+    let found = -1;
+    for (let i = 0; i < bubbles.length; i += 1) {
+      if (bubbles[i].includes(needle) && !protectedIdx.includes(i)) found = i;
+    }
+    if (found >= 0) protectedIdx.push(found);
   }
-  if (kept.length > 0) return kept.join(" || ");
+
+  // Keep as many protected bubbles as fit, in priority order.
+  const keptProtected: number[] = [];
+  for (const i of protectedIdx) {
+    const size = [...keptProtected, i]
+      .sort((a, b) => a - b)
+      .map((j) => bubbles[j])
+      .join(" || ").length;
+    if (size <= maxChars) keptProtected.push(i);
+  }
+
+  const reserved = keptProtected.length
+    ? keptProtected
+        .sort((a, b) => a - b)
+        .map((j) => bubbles[j])
+        .join(" || ").length + 4
+    : 0;
+  const budget = maxChars - reserved;
+
+  const kept: number[] = [];
+  for (let i = 0; i < bubbles.length; i += 1) {
+    if (keptProtected.includes(i)) continue;
+    const candidate = [...kept, i].map((j) => bubbles[j]).join(" || ");
+    if (candidate.length > budget) break;
+    kept.push(i);
+  }
+
+  if (keptProtected.length > 0) {
+    // Reassemble in the order the model wrote them.
+    const order = [...kept, ...keptProtected].sort((a, b) => a - b);
+    const out = order.map((j) => bubbles[j]).join(" || ");
+    if (out.length <= maxChars) return out;
+    return keptProtected
+      .sort((a, b) => a - b)
+      .map((j) => bubbles[j])
+      .join(" || ")
+      .slice(0, maxChars)
+      .trim();
+  }
+
+  if (kept.length > 0) return kept.map((j) => bubbles[j]).join(" || ");
 
   // No whole bubble fits. Cut the first one back to a word boundary.
   const head = bubbles[0] ?? text;
