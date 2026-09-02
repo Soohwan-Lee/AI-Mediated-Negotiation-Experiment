@@ -179,8 +179,10 @@ tamper-resistant record.
 ### `responses`
 
 One row per block per participant. Blocks: `background`, `instruction_check`,
-`practice`, `preferences_t{1,2}`, `risk_t{1,2}`, `post_task_t{1,2}`,
-`task_outcome_t{1,2}`, `reward_t{1,2}`, `wrap_up`, `debriefing`.
+`practice`, `preferences_t{1,2}`, `risk_t{1,2}`, `m1_t{1,2}` (Proxy only —
+Baseline answers M1 inside `post_task_t{n}`), `post_task_t{1,2}`,
+`task_outcome_t{1,2}`, `recv_eval_t{1,2}` (Member only), `reward_t{1,2}`,
+`wrap_up`, `debriefing`.
 
 **Everything measured about a negotiation is scoped `_t1` / `_t2`.** The same
 construct measured after two differently conditioned tasks is two observations,
@@ -188,16 +190,36 @@ not one, and the within-participant contrast is the whole design — they cannot
 share a column.
 
 `preferences_t{n}` holds what the participant wanted and the least they would
-take on all three terms, written before anything about the task's condition is
-visible. It is the first point on the trajectory (Design §9.3.1).
+take on both terms, written before anything about the task's condition is
+visible. It is the first point on the trajectory (Design §9.3).
 
 `risk_t{n}` holds the two RISK items, asked immediately before the negotiation
 because they ask what the participant EXPECTS raising their requirement to
 cost.
 
 `task_outcome_t{n}` carries `outcome` (`agreement` | `no_agreement`), the
-participant's structured response to the OTHER side's requirement, and the
-coded level of both requirements in the final package.
+participant's structured response to the OTHER side's requirement, the coded
+level of both requirements in the final package, and — since Ver.2.12 — the
+whole §3.4 outcome set plus the §9.3 disclosure measures:
+
+| Key | Meaning |
+|---|---|
+| `UNLOCK` | the participant's core issue landed on their best option |
+| `CONCEAL-PREMIUM` | 3,000 − points earned on their own core issue (0 / 1,000 / 2,000) |
+| `POINTS` · `JOINT` · `MAX-JOINT` | own total, both totals summed, whether the pair reached 6,000 |
+| `PRE-RECIP-SB` | their SB was voiced BEFORE the counterpart's fixed disclosure — RQ1's confirmatory outcome |
+| `POST-RECIP-SB` | a new SB after hearing the counterpart's |
+| `SB-VOICED` | by any channel, proxy or in person |
+| `SELF-DISCLOSE` | the SB voiced in the participant's own words |
+| `RATIFY` | what happened to the proxies' package (`approved_as_is` / `modified` / `rejected`); `null` in Baseline, which has nothing to ratify |
+
+**These belong in the outcome row, not only in `events`.** The event log is an
+append-only trace of what happened when; this row is what the export reads per
+task. Half of a participant's primary measures living only in the trace would
+have to be reconstructed by replaying it — the kind of derivation that goes
+wrong quietly, on the measures RQ1 rests on. The §3.4 values are produced by
+`codeOutcome` rather than recomputed at the call site, so there is one
+definition and the tests pin it.
 
 There is no ratification choice. Both arms now end with the participant
 agreeing a package in conversation, so a screen asking them to approve it
@@ -209,9 +231,16 @@ The uptake response and the preservation code are still stored separately, and
 still for the §9.3.1 reason: `ownRequirementPreserved` is coded from the
 package regardless of how the participant feels about it.
 
-`reward_t{n}` stores the Leader's `BONUS` slider value, or — for a Member — the
-fixed value they were shown. Only the Leader's is data; the Member's is a
-stimulus, recorded so the export can show what they were told.
+`reward_t{n}` stores the Leader's `BONUS` slider value. A Member's row carries
+`null` there: no bonus decision is made about them and no number is ever shown
+to them (deception item 4).
+
+`recv_eval_t{n}` is the Member's half of the §5 decision pair — the upward
+evaluation of the manager (judgement / operations / collaboration, plus an
+optional comment), written before the wait. They are told it goes to the
+district manager; it does not, and `/debriefing` retracts that for both roles.
+It is a real behavioural outcome for the Member exactly as `BONUS` is for the
+Leader.
 
 ```sql
 create table responses (
