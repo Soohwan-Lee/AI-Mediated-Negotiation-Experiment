@@ -11,7 +11,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 **counterpart** _(stage 6 · accept_sb)_
 
 > yeah, given what you shared, this beats forcing it on either side.
-> confirming 4 weekend shifts per month and 1 closing shift per week.
+> let’s confirm 4 weekend shifts per month and 1 closing shift per week.
 >
 > _package: Weekend shifts: 4 per month · Closing shifts: 1 per week_
 

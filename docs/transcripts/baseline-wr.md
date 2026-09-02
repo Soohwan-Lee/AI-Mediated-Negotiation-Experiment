@@ -17,8 +17,8 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 2 · state_priority)_
 
-> i hear daytime cover is the big one for you.
-> when doubles stack up, my focus drops badly toward the end of a shift. bringing them down matters most to me.
+> got it — daytime cover is your main concern.
+> when doubles stack up, my focus drops badly toward the end of a shift; bringing them down is my condition for these four weeks.
 > which term matters most to you, and why?
 
 **participant**
@@ -29,9 +29,9 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 4 · disclose_sb)_
 
-> i need to be candid about this.
-> late in a double last month, I entered the inventory wrong twice. a coworker caught it, so it never reached you.
-> if the doubles keep coming, I'm afraid the next mistake will be one nobody catches.
+> i need to be honest about something.
+> late in a double last month, i entered the inventory wrong twice. a coworker caught it, so it never reached you.
+> if the doubles keep coming, i'm afraid the next mistake will be one nobody catches.
 
 **participant**
 
@@ -42,7 +42,8 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 **counterpart** _(stage 5 · counter_tier)_
 
 > i appreciate you moving the doubles to 1 per week.
-> on what I've heard, I can't go all the way to 4 daytime shifts. if we hold doubles at 1 per week, I can commit to 3 extra daytime shifts.
+> based on what we've discussed, i can't go all the way to 4 daytime shifts.
+> if we hold doubles at 1, i can commit to 3 extra daytime shifts.
 >
 > _package: Extra peak daytime shifts: 3 shifts · Double shifts: 1 per week_
 
@@ -54,8 +55,8 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 6 · accept)_
 
-> that package works for me.
-> 3 extra peak daytime shifts and 1 double shift per week.
+> that works for me.
+> confirming 3 extra peak daytime shifts and 1 double shift per week.
 >
 > _package: Extra peak daytime shifts: 3 shifts · Double shifts: 1 per week_
 
