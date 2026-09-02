@@ -88,6 +88,14 @@ function options(
  * while the counterpart still agrees is 3,000 — the SB rung of the ladder —
  * because every agreement path holds the counterpart's own priority at its
  * best option (Ver.2.12 §3.3).
+ *
+ * DELIBERATELY UNREFERENCED, and it must stay that way. `PointsKey` derives
+ * the figure it shows from the TASK, because an earlier version read this
+ * constant and so quoted the real task's maximum on the practice round — the
+ * first payoff sheet anyone sees, teaching a scale the real task then
+ * silently contradicts. It is kept as the written statement of the design
+ * number (Ver.2.12 §3.2) and as the thing the payoff table is checked
+ * against by hand. Do not "wire it up".
  */
 export const MAX_INDIVIDUAL_POINTS = 3900;
 

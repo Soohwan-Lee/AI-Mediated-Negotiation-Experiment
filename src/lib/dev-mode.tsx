@@ -309,12 +309,6 @@ export function useDevMockAi(): boolean {
   return enabled && mockAi;
 }
 
-/** True when screens should fill themselves on arrival. */
-export function useDevAutoFill(): boolean {
-  const { enabled, autoFill } = useDevMode();
-  return enabled && autoFill;
-}
-
 /**
  * Registers a "Fill this page" handler while the calling page is mounted.
  * The handler may change identity every render; only the latest is called.

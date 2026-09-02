@@ -308,10 +308,3 @@ export function backStep(
   return { key, href: FLOW[flowIndex(key)].href, label: flowLabel(key) };
 }
 
-/** Which task index a flow key belongs to, for the per-task pages. */
-export function taskIndexFromKey(key: FlowKey | null): 1 | 2 | null {
-  if (!key) return null;
-  if (key.endsWith("-1")) return 1;
-  if (key.endsWith("-2")) return 2;
-  return null;
-}

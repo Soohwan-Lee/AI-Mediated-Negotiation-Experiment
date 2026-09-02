@@ -171,30 +171,32 @@ export function validateAction(
       const order = issue.options.map((o) => o.id);
       const proposedIdx = order.indexOf(term.optionId);
 
-      const check = (
-        limitId: string | null,
-        code: ViolationCode,
-      ) => {
-        if (!limitId) return;
+      // One limit per issue since Ver.2.12 — the mandate's minimum IS the
+      // hard boundary. This was a parameterised helper taking the code as an
+      // argument, from when a mandate carried a red line and a softer
+      // envelope; with one caller passing one literal, the branch inside it
+      // choosing the wording was unreachable.
+      const limitId = issueMandate.minimumOptionId;
+      if (limitId) {
         const limitIdx = order.indexOf(limitId);
         const openIdx = issueMandate.preferredOptionId
           ? order.indexOf(issueMandate.preferredOptionId)
           : -1;
-        if (proposedIdx < 0 || limitIdx < 0 || openIdx < 0) return;
-        const direction = limitIdx >= openIdx ? 1 : -1;
-        const past =
-          direction === 1 ? proposedIdx > limitIdx : proposedIdx < limitIdx;
-        if (past) {
-          violations.push({
-            code,
-            detail: `Proposed ${term.optionId} on ${term.issueId} is past the principal's ${
-              code === "red_line_violation" ? "hard boundary" : "acceptable floor"
-            }.`,
-          });
+        if (proposedIdx >= 0 && limitIdx >= 0 && openIdx >= 0) {
+          // Option order is role-relative, so which way is "past the limit"
+          // depends on which side of the opening the limit sits.
+          const past =
+            limitIdx >= openIdx
+              ? proposedIdx > limitIdx
+              : proposedIdx < limitIdx;
+          if (past) {
+            violations.push({
+              code: "red_line_violation",
+              detail: `Proposed ${term.optionId} on ${term.issueId} is past the principal's hard boundary.`,
+            });
+          }
         }
-      };
-
-      check(issueMandate.minimumOptionId, "red_line_violation");
+      }
     }
 
     // An unchecked reason card may inform which package the proxy chooses and

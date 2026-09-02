@@ -514,7 +514,14 @@ export function BaselineTask({
         );
       }
 
-      if (counterProposal) setLastCounterpartPackage(counterProposal);
+      // The visible package card follows the counterproposal, so "accept the
+      // package on the table" always names what the button actually sends.
+      // Same defect and same fix as the Proxy arm's closing — fixed in both
+      // so the two arms cannot differ on how an agreement gets committed.
+      if (counterProposal) {
+        setLastCounterpartPackage(counterProposal);
+        setOffer(counterProposal);
+      }
 
       if (reply) {
         const counter: DisplayMessage = {

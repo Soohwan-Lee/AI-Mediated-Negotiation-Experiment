@@ -594,6 +594,12 @@ export async function POST(request: Request) {
   }));
 
   try {
+    // One pass: it returns both halves, and calling it twice repeated a
+    // `getTask` plus two filters and two maps on every request.
+    const mandateReasons = isParticipantSide
+      ? reasonsFor(body.taskId, body.participantRole, body.mandate)
+      : null;
+
     const generate = (correction = "") =>
       generateAction({
       kind: body.policy,
@@ -606,13 +612,8 @@ export async function POST(request: Request) {
         mandateSummary: isParticipantSide
           ? mandateSummary(body.mandate, body.taskId)
           : undefined,
-        authorizedReasons: isParticipantSide
-          ? reasonsFor(body.taskId, body.participantRole, body.mandate)
-              .authorized
-          : undefined,
-        forbiddenReasons: isParticipantSide
-          ? reasonsFor(body.taskId, body.participantRole, body.mandate).forbidden
-          : undefined,
+        authorizedReasons: isParticipantSide ? mandateReasons?.authorized : undefined,
+        forbiddenReasons: isParticipantSide ? mandateReasons?.forbidden : undefined,
         // THE MODEL IS NO LONGER SHOWN THE POOL. The clause is appended to the
         // finished message instead, so listing it here only offered the model
         // a second thing it might say INSTEAD of its principal's card — and

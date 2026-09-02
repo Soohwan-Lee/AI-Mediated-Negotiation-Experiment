@@ -1137,18 +1137,31 @@ export function ProxyTask({
             </p>
           </>
         }
-        steps={[
-          { label: "Check what the proxies reached", hint: "Their full exchange stays pinned above the chat" },
-          { label: "Talk to the other participant", hint: "Confirm it, adjust it, or add anything in your own words" },
-          { label: "Settle it", hint: "Accept the package, agree a different one, or decline" },
-        ]}
+        // THE STEPS DESCRIBE THE SITUATION THE PARTICIPANT IS ACTUALLY IN.
+        // With no tentative package there is nothing to accept in one click
+        // and nothing to confirm, and promising both left a participant
+        // hunting for an Accept button that is correctly not rendered.
+        steps={
+          tentative
+            ? [
+                { label: "Check what the proxies reached", hint: "Their full exchange stays pinned above the chat" },
+                { label: "Talk to the other participant", hint: "Confirm it, adjust it, or add anything in your own words" },
+                { label: "Settle it", hint: "Accept the package, agree a different one, or decline" },
+              ]
+            : [
+                { label: "Check where the proxies got to", hint: "Their full exchange stays pinned above the chat" },
+                { label: "Choose a level on each term", hint: "The package card below the chat is yours to set" },
+                { label: "Agree it with the other participant", hint: "Or end without an agreement if you cannot" },
+              ]
+        }
         minutes={3}
         note={
           <Callout title="⏱ 3 minutes to close" tone="neutral">
             <p>
-              This is a short closing conversation, since the ground work is
-              done. You can accept in one click, or talk it through first. If
-              the clock runs out with nothing agreed, the fallback applies.
+              {tentative
+                ? "This is a short closing conversation, since the ground work is done. You can accept in one click, or talk it through first."
+                : "Your proxies did not settle on a package, so set the levels you want on the card below the chat and put them to the other participant."}{" "}
+              If the clock runs out with nothing agreed, the fallback applies.
             </p>
           </Callout>
         }

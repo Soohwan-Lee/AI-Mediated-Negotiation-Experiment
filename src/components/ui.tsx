@@ -14,7 +14,6 @@
  *    submitting a midpoint they never chose.
  */
 
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 export function cx(...parts: Array<string | false | null | undefined>) {
@@ -219,9 +218,6 @@ export function PrivateTag({ children = "Private to you" }: { children?: ReactNo
   );
 }
 
-export function Divider({ className }: { className?: string }) {
-  return <hr className={cx("border-[var(--line)]", className ?? "my-8")} />;
-}
 
 /**
  * Visual key point item with icon for scanning dense information quickly.
@@ -339,19 +335,6 @@ export function Button({
   );
 }
 
-export function LinkButton({
-  href,
-  children,
-}: {
-  href: string;
-  children: ReactNode;
-}) {
-  return (
-    <Link href={href} className={cx(BUTTON_BASE, BUTTON_SIZE.md, BUTTON_VARIANT.primary)}>
-      {children}
-    </Link>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Fields

@@ -154,9 +154,6 @@ export const CLOSING_SECONDS = 3 * 60;
 /** Below this, the counterpart offers SCRIPT-CLOSE once. */
 export const SOFT_CLOSE_SECONDS = 60;
 
-/** The six stages (Ver.2.12 §6.1). Stage 3 is the lock, never a message. */
-export const STAGES: readonly StageId[] = [1, 2, 3, 4, 5, 6];
-
 // ---------------------------------------------------------------------------
 // The participant's rule about numbers
 // ---------------------------------------------------------------------------

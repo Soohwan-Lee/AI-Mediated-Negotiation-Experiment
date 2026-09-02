@@ -30,6 +30,7 @@
 
 import {
   useEffect,
+  useRef,
   useState,
   type Dispatch,
   type ReactNode,
@@ -1004,6 +1005,10 @@ export function DirectNegotiation({
     useState<Package | null>(openingPackage);
   /** Two-step guard on "end without agreement". */
   const [confirmDecline, setConfirmDecline] = useState(false);
+  /** Synchronous mirror of `settled`, so two callers in one tick cannot both win. */
+  const settledRef = useRef(false);
+  /** How it ended — "declined" and "timeout" are both impasses, and RATIFY distinguishes them. */
+  const [settledReason, setSettledReason] = useState("");
 
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const complete = chosen === task.issues.length;
@@ -1039,8 +1044,14 @@ export function DirectNegotiation({
     pkg: Package | null,
     reason: string,
   ) {
+    // The ref, not the state, is what the guards read: `setSettled` does not
+    // take effect until the next render, and both callers here can fire
+    // inside the same tick.
+    if (settledRef.current) return;
+    settledRef.current = true;
     setFinalPackage(pkg);
     setSettled(kind);
+    setSettledReason(reason);
     logEvent(
       "negotiation_ended",
       {
@@ -1055,21 +1066,36 @@ export function DirectNegotiation({
     );
   }
 
-  /** RATIFY, coded from what actually happened (§9.3). */
+  /**
+   * RATIFY, coded from what actually happened (§9.3).
+   *
+   * A TIMEOUT IS NOT A REJECTION. `RATIFY` codes a DECISION the participant
+   * took about their proxies' package, and the clock running out is the
+   * absence of one — a participant who read the pinned transcript and let it
+   * expire was being recorded as having actively rejected the package, which
+   * is a different behaviour with a different meaning for RQ1. It is `null`,
+   * the same value the arm without a standing package uses, and `reason`
+   * ("timeout" vs "declined") remains in the event log to tell the two apart.
+   */
   function ratifyOf(
     kind: "agreed" | "impasse",
     pkg: Package | null,
+    reason: string,
   ): "approved_as_is" | "modified" | "rejected" | null {
     if (!openingPackage) return null;
-    if (kind === "impasse") return "rejected";
+    if (kind === "impasse") return reason === "declined" ? "rejected" : null;
     const same =
       pkg && task.issues.every((i) => pkg[i.id] === openingPackage[i.id]);
     return same ? "approved_as_is" : "modified";
   }
 
-  function finish(kind: "agreed" | "impasse", pkg: Package | null) {
+  function finish(
+    kind: "agreed" | "impasse",
+    pkg: Package | null,
+    reason: string,
+  ) {
     onSettled(kind === "agreed" ? pkg : null, {
-      ratify: ratifyOf(kind, pkg),
+      ratify: ratifyOf(kind, pkg, reason),
       selfDisclosed,
       postRecipSb: selfDisclosed && proxyVoicedTier !== "sensitive",
     });
@@ -1185,7 +1211,25 @@ export function DirectNegotiation({
         await new Promise((r) => setTimeout(r, counterpartDelayMs(reply.length)));
       }
 
-      if (decision.proposal) setLastCounterpartPackage(decision.proposal);
+      // THE VISIBLE CARD FOLLOWS THE COUNTERPROPOSAL, and this is not
+      // cosmetic. `offer` is the "Current Negotiation Package" chip card;
+      // `lastCounterpartPackage` is what "✓ Accept the package on the table"
+      // actually sends. They were separate, and nothing synced them.
+      //
+      // A participant at the work rung who edits the chips to their own best
+      // level and sends it gets `counter_tier` back — the machine holds them
+      // one option down. That counterpackage silently became the accept
+      // target while the card still showed what they had asked for, so the
+      // button's own label pointed at the wrong package and one click
+      // committed them to 2,000 where the card said 3,000.
+      //
+      // `acceptStanding` does call `setOffer` first, but React batches it with
+      // the `send()` on the next line, so the correction painted only after
+      // the commitment it was meant to inform.
+      if (decision.proposal) {
+        setLastCounterpartPackage(decision.proposal);
+        setOffer(decision.proposal);
+      }
 
       const counter: DisplayMessage = {
         id: `d-c${messages.length}`,
@@ -1208,7 +1252,15 @@ export function DirectNegotiation({
       }
 
       setReplies((n) => n + 1);
-      if (decision.accepts || decision.impasse) {
+      // FIRST SETTLEMENT WINS. `onExpire` guards on `settled` and this did
+      // not, so a reply still in flight when the clock ran out overwrote the
+      // recorded impasse with an agreement — two `negotiation_ended` events
+      // for one exchange, and which one survived decided by network timing.
+      // The reply delay is 8-25s on a 180s closing clock, so a message sent
+      // near the end is genuinely likely to land after zero. Baseline has the
+      // same shape on a 600s clock, which made this an asymmetry on the
+      // primary contrast as well as a bug.
+      if (!settledRef.current && (decision.accepts || decision.impasse)) {
         settle(
           decision.accepts ? "agreed" : "impasse",
           decision.accepts ? (decision.proposal ?? sentOffer) : null,
@@ -1273,7 +1325,15 @@ export function DirectNegotiation({
                     ? "✓ You have reached a mutual agreement!"
                     : settled === "impasse"
                       ? "⚠️ The negotiation ended without an agreement."
-                      : "You are talking directly with the other participant. Confirm, adjust, or decline what the proxies reached."}
+                      : openingPackage
+                        ? "You are talking directly with the other participant. Confirm, adjust, or decline what the proxies reached."
+                        : // No standing package: there is nothing to confirm
+                          // or decline, and saying otherwise sent the
+                          // participant looking for an Accept button that is
+                          // correctly not rendered. What they must do instead
+                          // is set the levels themselves, which is also what
+                          // the "Select terms first" cue points at.
+                          "Your proxies did not settle on a package. Choose a level on each term below, then put it to the other participant."}
                 </p>
               </div>
               {settled ? null : pending ? (
@@ -1396,7 +1456,11 @@ export function DirectNegotiation({
         <ActionBar
           label="Continue to Review"
           onClick={() =>
-            finish(settled, settled === "agreed" ? finalPackage : null)
+            finish(
+              settled,
+              settled === "agreed" ? finalPackage : null,
+              settledReason,
+            )
           }
           note={
             settled === "agreed"
