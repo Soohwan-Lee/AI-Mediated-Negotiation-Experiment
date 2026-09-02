@@ -1330,8 +1330,21 @@ function ReasonMandateSection({
                 : "border-slate-200 bg-slate-50 text-slate-600",
             )}
           >
-            <span aria-hidden>{checked ? "🤖" : "🔒"}</span>
-            {checked ? "Your proxy may say this" : "Kept to yourself"}
+            {/* NOT A LOCK. The box around this row is already headed "🔒
+                SENSITIVE BACKGROUND", so a second lock immediately below it
+                read as a subtitle for that box rather than as the state of
+                this tick — the two meanings stacked vertically with the same
+                icon. Worse than confusing: a 🔒 that says "this is the
+                sensitive card" instead of "this is not being shared" colours
+                the exact decision being measured. The badge is about the
+                PROXY either way, so both states are said in the proxy's
+                terms, and the unticked one is marked with a plain prohibition
+                rather than a monkey covering its mouth — this is a screen
+                about a workplace confession, not a joke about secrets. */}
+            <span aria-hidden>{checked ? "🤖" : "🚫"}</span>
+            {checked
+              ? "Your proxy may say this"
+              : "Your proxy will not say this"}
           </span>
           <span className="block text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
             {card.text}
@@ -1378,7 +1391,7 @@ function ReasonMandateSection({
             old title named the DATA STRUCTURE; a participant meeting this
             screen for the first time has to work out from it that ticking a
             box is delegating speech to a machine. Say the act. */}
-        <CardTitle hint="Tick a reason to let your proxy use it. Leave it unticked and it stays with you — your proxy will never say it.">
+        <CardTitle hint="Each reason is yours. Tick one to let your proxy say it for you; leave it unticked and your proxy never will.">
           🤖 What your proxy may say for you
         </CardTitle>
 
