@@ -574,24 +574,6 @@ export function rankedOptions(
   return [...issue.options].sort((a, b) => b.points[role] - a.points[role]);
 }
 
-/**
- * The counterpart's opening — its own best package on every issue (Ver.2.12
- * §6.3 Opening: own core best + participant core worst, which with two
- * mirrored issues is the same thing). Fixed, so every participant meets the
- * same opening.
- */
-export function counterpartOpening(
-  task: NegotiationTask,
-  counterpartRole: Role,
-): Record<string, string> {
-  return Object.fromEntries(
-    task.issues.map((issue) => [
-      issue.id,
-      rankedOptions(task, issue.id, counterpartRole)[0].id,
-    ]),
-  );
-}
-
 /** Every reason card available to one role in one task. */
 export function reasonCards(task: NegotiationTask, role: Role): ReasonCard[] {
   return task.roleBriefs[role].reasonCards;

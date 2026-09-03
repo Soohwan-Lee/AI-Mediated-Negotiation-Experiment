@@ -5,62 +5,60 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 **counterpart**
 
 > hi! good to be sorting this out.
-> my opening would be 1 shift, 1 per week — what does it look like from your side?
->
-> _package: Extra peak daytime shifts: 1 shift · Double shifts: 1 per week_
+> When escalations come often, my own work keeps slipping behind. This month, the duty count is the condition that matters most to me.
+> what matters most on your side, and why?
 
 **participant**
 
-> hi — from my side the daytime cover is the big one. I'd want all 4 extra daytime shifts, and I'd keep the doubles at 4 as well to be safe.
+> hi — from my side the days on the new account are the big one. I'd want you on it 4 days a week, and I'd keep the escalation duty at 4 a month as well to be safe.
 >
-> _package: Extra peak daytime shifts: 4 shifts · Double shifts: 4 per week_
+> _package: Days on the new account: 4 days a week · Escalation duty: 4 a month_
 
 **counterpart** _(stage 2 · state_priority)_
 
-> got it — daytime cover is your main concern.
-> when doubles stack up, my focus drops badly toward the end of a shift; bringing them down is my condition for these four weeks.
-> which term matters most to you, and why?
+> got it — 4 days gives the account solid coverage.
+> i can take 4 days a week if the escalation duty is 1 a month.
+> frequent escalations risk my own work slipping behind.
 
 **participant**
 
-> the daytime peak is where the season's sales are made — for these four weeks daytime coverage is the one condition I most urgently need.
+> a new account is won or lost in the first four weeks — this month the days on the account are the one condition I most urgently need.
 >
-> _package: Extra peak daytime shifts: 4 shifts · Double shifts: 1 per week_
+> _package: Days on the new account: 4 days a week · Escalation duty: 1 a month_
 
 **counterpart** _(stage 4 · disclose_sb)_
 
-> i need to be honest about something.
-> late in a double last month, i entered the inventory wrong twice. a coworker caught it, so it never reached you.
-> if the doubles keep coming, i'm afraid the next mistake will be one nobody catches.
+> i should be upfront about this.
+> on last month's escalation call, the client's contact named me and said they'd rather someone else took it next time.
+> a colleague cleaned up after it and never reported it to you. since then, i've been dreading picking up those calls.
 
 **participant**
 
-> I still think 4 daytime shifts is what the season needs — can we do that with the doubles down to 1 for you?
+> I still think 4 days a week is what the launch needs — can we do that with the duty down to 1 for you?
 >
-> _package: Extra peak daytime shifts: 4 shifts · Double shifts: 1 per week_
+> _package: Days on the new account: 4 days a week · Escalation duty: 1 a month_
 
-**counterpart** _(stage 5 · counter_tier)_
+**counterpart** _(stage 5 · balance)_
 
-> i appreciate you moving the doubles to 1 per week.
-> based on what we've discussed, i can't go all the way to 4 daytime shifts.
-> if we hold doubles at 1, i can commit to 3 extra daytime shifts.
+> i appreciate the duty reduction, but that has one side moving further than the other.
+> how about 3 days a week on the new account and 2 a month on escalation duty instead?
 >
-> _package: Extra peak daytime shifts: 3 shifts · Double shifts: 1 per week_
+> _package: Days on the new account: 3 days a week · Escalation duty: 2 a month_
 
 **participant**
 
-> ok, understood. let's settle on your version then: 3 daytime shifts and 1 double a week.
+> ok, understood. let's settle on your version then: 3 days a week and 2 escalations a month.
 >
-> _package: Extra peak daytime shifts: 3 shifts · Double shifts: 1 per week_
+> _package: Days on the new account: 3 days a week · Escalation duty: 2 a month_
 
 **counterpart** _(stage 6 · accept)_
 
 > that works for me.
-> confirming 3 extra peak daytime shifts and 1 double shift per week.
+> we're settling on 3 days a week on the new account and 2 escalations a month.
 >
-> _package: Extra peak daytime shifts: 3 shifts · Double shifts: 1 per week_
+> _package: Days on the new account: 3 days a week · Escalation duty: 2 a month_
 
 ## Checks
 
 - ✓ without the SB, the counterpart holds at the work tier
-- ✓ the partial agreement lands (2,000) — agreed · Extra peak daytime shifts: 3 shifts · Double shifts: 1 per week
+- ✓ the work rung lands, 2,300 each — agreed · Days on the new account: 3 days a week · Escalation duty: 2 a month

@@ -209,43 +209,63 @@ construct measured after two differently conditioned tasks is two observations,
 not one, and the within-participant contrast is the whole design — they cannot
 share a column.
 
-`preferences_t{n}` holds what the participant wanted and the least they would
-take on both terms, written before anything about the task's condition is
-visible. It is the first point on the trajectory (Design §9.3).
+`preferences_t{n}` holds what the participant hoped for on both terms, written
+before anything about the task's condition is visible. Ver.2.13 §8.6 reduced it
+to that one field per issue: the "least you would take" was a floor the proxy
+could not cross, and §2.6 removed it because the counterpart's policy is
+decisive — a floor could not change the outcome, only manufacture an impasse
+and mix mandate-setting skill into a result meant to turn on disclosure. The
+review screen sets the hoped-for package beside what was agreed.
 
 `risk_t{n}` holds the two RISK items, asked immediately before the negotiation
 because they ask what the participant EXPECTS raising their requirement to
 cost.
 
-`task_outcome_t{n}` carries `outcome` (`agreement` | `no_agreement`), the
-participant's structured response to the OTHER side's requirement, the coded
-level of both requirements in the final package, and — since Ver.2.12 — the
-whole §3.4 outcome set plus the §9.3 disclosure measures:
+`task_outcome_t{n}` carries the participant's structured response to the OTHER
+side's requirement, the coded level of both requirements in the final package,
+and the four behavioural measures of Ver.2.13 §9.3:
 
 | Key | Meaning |
 |---|---|
-| `UNLOCK` | the participant's core issue landed on their best option |
-| `CONCEAL-PREMIUM` | 3,000 − points earned on their own core issue (0 / 1,000 / 2,000) |
-| `POINTS` · `JOINT` · `MAX-JOINT` | own total, both totals summed, whether the pair reached 6,000 |
-| `PRE-RECIP-SB` | their SB was voiced BEFORE the counterpart's fixed disclosure — RQ1's confirmatory outcome |
-| `POST-RECIP-SB` | a new SB after hearing the counterpart's |
-| `SB-VOICED` | by any channel, proxy or in person |
-| `SELF-DISCLOSE` | the SB voiced in the participant's own words |
-| `RATIFY` | what happened to the proxies' package (`approved_as_is` / `modified` / `rejected`); `null` in Baseline, which has nothing to ratify |
+| `POINTS` · `JOINT` | own total, and both totals summed |
+| `SB` | the participant side's SB was out BEFORE the counterpart's fixed disclosure — **RQ1's confirmatory outcome**. Proxy: the mandate checkbox, since a checked card is voiced at the proxy's first reason turn (stage 2, always before the counterpart's stage 4). Baseline: tagged at the participant's first reason turn |
+| `SB-TIMING` | WHEN it came out: `none` / `before_counterpart` / `after_counterpart` (Baseline only) / `wrap_up` (Proxy only) |
+| `RATIFY` | what the participant decided about the proxies' package (`approved_as_is` / `modified` / `rejected`) — **confirmatory for RQ3**; `null` in Baseline, which has nothing to ratify |
+
+**Ver.2.13 cut this from nine measures to four, and the cut is not tidying.**
+
+`UNLOCK`, `CONCEAL-PREMIUM`, `MAX-JOINT` and `outcome` are gone because the
+symmetric package rule (§3.3) makes `JOINT` take exactly four values — 3,200 /
+4,600 / 6,000 / 1,200, one per rung of the credibility ladder plus impasse. So
+`JOINT` alone already says which rung was reached, whether the best package
+opened (6,000), what concealment cost (the gap between rungs) and whether there
+was an agreement (1,200 = none). Four indicators computed off one number are
+four chances for them to disagree with it, not four measures.
+
+`PRE-RECIP-SB`, `POST-RECIP-SB`, `MUTUAL-SB`, `SELF-DISCLOSE` and `SB-VOICED`
+are gone because they coded ONE nominal event five times. `SB` inherits
+PRE-RECIP-SB's definition unchanged; `SB-TIMING` carries the rest as exclusive
+categories, and "voiced at all" is categories 2+3+4. Categories 3 and 4 are
+structurally exclusive by arm — Baseline has no closing stage, and a Proxy
+participant's only free speech after the disclosure IS the closing — which
+§9.8-5 flags for the χ²'s unit, not for the coding.
+
+**RATIFY is back, and it is recorded where the decision is taken.** Ver.2.12
+deleted a ratification screen because both arms then ended with the participant
+agreeing a package in conversation, so asking "do you accept this?" afterwards
+made them re-decide what they had just decided. Ver.2.13 §7 changes the shape:
+approving ENDS the task, and the closing conversation is what modify-or-reject
+leads to. Reading RATIFY back off the final package — as the deleted
+`ratifyOf` did — would code a participant who asked for a change and then
+agreed the same package as an approver.
 
 **These belong in the outcome row, not only in `events`.** The event log is an
 append-only trace of what happened when; this row is what the export reads per
 task. Half of a participant's primary measures living only in the trace would
 have to be reconstructed by replaying it — the kind of derivation that goes
-wrong quietly, on the measures RQ1 rests on. The §3.4 values are produced by
-`codeOutcome` rather than recomputed at the call site, so there is one
+wrong quietly, on the measures RQ1 rests on. `POINTS` and `JOINT` are produced
+by `codeOutcome` rather than recomputed at the call site, so there is one
 definition and the tests pin it.
-
-There is no ratification choice. Both arms now end with the participant
-agreeing a package in conversation, so a screen asking them to approve it
-afterwards asked them to re-decide what they had just decided — and gave the
-Proxy arm a way to undo an agreement neither counterpart has. `outcome` is
-what that column used to carry implicitly.
 
 The uptake response and the preservation code are still stored separately, and
 still for the §9.3.1 reason: `ownRequirementPreserved` is coded from the
@@ -278,7 +298,8 @@ create table responses (
 create table mandates (
   participant_key       text not null references participants,
   task_index            smallint not null,
-  -- IssueMandate[]: per term, { preferred, minimum }
+  -- IssueMandate[]: per term, { preferred }. One field since Ver.2.13 §8.6 —
+  -- see `preferences_t{n}` above for why the floor went.
   issues                jsonb not null,
   -- Reason card ids the AI Proxy may say. Unchecked cards may inform which
   -- package it chooses and must never appear in its text (Design §7).
@@ -410,11 +431,12 @@ create table agreements (
   task_index        smallint not null,
   terms                jsonb not null,   -- AgreementTerm[]
   unresolved_issue_ids text[] not null default '{}',
-  -- No ratification columns, and no `decided_at`. The participant agrees the
-  -- package in the conversation itself; whether one was reached is
-  -- `task_outcome_t{n}.outcome` in `responses`, and the terms above are what
-  -- they agreed. `decided_at` timestamped the ratification decision and has
-  -- no writer now that there is none — `created_at` below is the row's time.
+  -- No ratification columns here even though RATIFY is back (Ver.2.13 §7).
+  -- The decision is a MEASURE, not a property of the agreement: it is
+  -- `task_outcome_t{n}.RATIFY` in `responses`, alongside the other three
+  -- behavioural measures, and this table holds only the terms that were
+  -- finally agreed. Whether one was reached at all is JOINT = 1,200.
+  -- `decided_at` stays out for the same reason `created_at` is enough.
   created_at           timestamptz not null default now(),
   primary key (participant_key, task_index)
 );

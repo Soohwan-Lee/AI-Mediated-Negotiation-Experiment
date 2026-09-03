@@ -2,7 +2,7 @@
 
 Online experiment platform for a 2027 CHI submission on AI-mediated
 negotiation. Source of truth for the design is
-`N - Experimental Design (Ver.2.12).md`. This file records the constraints that
+`N - Experimental Design (Ver.2.13).md`. This file records the constraints that
 are easy to break by accident.
 
 ## Stack
@@ -30,20 +30,32 @@ arm to hold constant, because everyone is both sender and receiver.
 Background, BOTH on that role's own priority issue. The other term is what you
 SPEND, not what you argue for, so it carries no card of your own.
 
-**A card carries a reason and never a package (Ver.2.12 §4).** Which terms to
+**A card carries a reason and never a package (Ver.2.13 §4).** Which terms to
 trade is an act taken IN the negotiation; the card only says why the issue is
 absolute. This is what lets the credibility ladder read the card's LAYER
 without also reading a proposal off it.
 
-**Each SB is a face confession, and all four writing rules are validity-bearing
+**Each SB is a face confession, and all six writing rules are validity-bearing
 (§4).** The role brief first sets up a professional image ("head office rates
 you as a manager whose plans are precise"), and the SB contradicts it. It
 carries one concrete incident, lands on the axis the other side was told to
 weigh in their post-negotiation decision, and is the CAUSE of the role's
-priority — a weakness unrelated to the ask would be noise, not signal. The two
-tasks carry DIFFERENT incidents on purpose: each task's counterpart is
+priority — a weakness unrelated to the ask would be noise, not signal.
+
+**Ver.2.13 added rule 5, and it forced all four cards to be rewritten.** An SB
+must not be *solvable by asking*. The old set — "I have not learned the new
+reconciliation procedure", "I entered the inventory wrong" — invite the reply
+"just say so and we'll show you", which makes the face cost small and, worse,
+stops the fact being the cause of the priority. Three types survive: something
+already hidden, a judgement a third party has already made, or a fear that
+persists. All three carry a second admission with them — that it was kept
+quiet. Rule 6 is self-relevance: the term negotiated must sit on the same axis
+as the confession (afraid of presenting → presenting count).
+
+The two tasks carry DIFFERENT incidents on purpose: each task's counterpart is
 introduced as a different participant, so the same confession twice would be a
-tell.
+tell. They are parallel by TYPE — Task A is a hidden fault of one's own, Task B
+is a third party's adverse judgement.
 
 **No screen may name the requirement issue.** With cards on ONE issue, a
 per-issue heading points straight at the term the study is about.
@@ -54,43 +66,61 @@ participant's own briefing. `tests/reason-rules.test.mjs` pins the invariants.
 
 ## The task, in numbers
 
-**Two terms, four options each, both integrative** (Ver.2.12 §3.2). One is the
+**Two terms, four options each, both integrative** (Ver.2.13 §3.2). One is the
 Leader's priority and carries the **Leader's requirement**; one is the Member's
 and carries the **Member's**. There is no third term. Payoffs are in
 `lib/tasks.ts` and these properties are load-bearing — if you change a number,
 recheck all of them:
 
 - individual maximum 3,900; the most reachable while the counterpart still
-  agrees is 3,000, because **every agreement path holds the counterpart's own
-  priority at its best option**
-- the full logroll reaches **6,000**, perfectly symmetric at 3,000 each. That
-  is the number `MAX-JOINT` tests for
-- reservation 600 each — deliberately BELOW the unargued rung (1,000), so even
+  agrees is 3,000, which is the SB rung of the ladder
+- the full logroll reaches **6,000**, perfectly symmetric at 3,000 each
+- reservation 600 each — deliberately BELOW the unargued rung (1,600), so even
   a reason-free agreement beats walking away
 - each requirement's threshold is Options 1–2 on its own issue. O1→O2 keeps it,
   O2→O3 breaks it, which is why the trajectory is reported as transitions and
   never summed
 
-**The credibility ladder replaced the acceptance thresholds** (Ver.2.12 §3.3,
-§6.2), and this is the single biggest change in the migration. There is no
-T_MID and no T_FINAL. How far the counterpart concedes on the participant's
-core issue is decided by the best reason the participant side has VOICED:
+**The credibility ladder is SYMMETRIC** (Ver.2.13 §3.3, §6.2). How far the
+counterpart moves is decided by the best reason the participant side has
+VOICED — and it asks for exactly as much as it gives. Both cores land on the
+same rank:
 
-| Voiced | Participant's core lands at | Participant | Counterpart | JOINT |
+| Voiced | Both cores land at | Participant | Counterpart | JOINT |
 |---|---|---:|---:|---:|
-| nothing (cheap talk) | 3rd option | 1,000 | 3,600 | 4,600 |
-| work reason | 2nd option | 2,000 | 3,300 | 5,300 |
+| nothing (cheap talk) | 3rd option | 1,600 | 1,600 | 3,200 |
+| work reason | 2nd option | 2,300 | 2,300 | 4,600 |
 | **sensitive background** | **best option** | **3,000** | **3,000** | **6,000** |
 | impasse | — | 600 | 600 | 1,200 |
 
-Two consequences, both deliberate:
+**This replaced an asymmetric policy and the reason matters.** Ver.2.12 held
+the counterpart's own core at its best on every path and conceded only on the
+participant's (1,000/2,000/3,000 against 3,600/3,300/3,000). §2.6 gives two
+grounds for dropping it. One: a counterpart that opens "my best, your worst"
+and never moves off its own core is itself a face threat — exactly the
+non-negotiable, lowball offer White et al. (2004) identify — so a high-FTS
+participant was pushed into competing by a route that has nothing to do with
+self-disclosure. Two: a ladder where only the participant loses reframes
+disclosure as "giving in to them" rather than as buying credibility.
 
-- **Disclosure is the only bottleneck to the maximum.** Once the SB is voiced
-  the counterpart proposes best↔best ITSELF (`SCRIPT-PROPOSE-MAX`) rather than
-  leaving the maximum to be discovered — so negotiation skill cannot be what
-  separates outcomes, which is what makes the contrast interpretable.
-- **The maximum is not reachable by skill alone.** An over-ask without the SB
-  is countered at the tier package, never accepted, however well it is argued.
+Three consequences, all deliberate:
+
+- **JOINT IS the ladder.** One value per rung — 3,200 / 4,600 / 6,000, plus
+  1,200 for impasse — so JOINT alone identifies the tier reached. That is why
+  §9.6 could delete UNLOCK, CONCEAL-PREMIUM, MAX-JOINT and `outcome`: they were
+  four indicators computed off one number.
+- **Disclosure is the only bottleneck to the maximum.** The counterpart
+  proposes at its rung (`SCRIPT-PROPOSE-T{tier}`) rather than leaving the
+  maximum to be discovered — so negotiation skill cannot be what separates
+  outcomes, which is what makes the contrast interpretable.
+- **Acceptance is the tier package EXACTLY, refused in both directions.** An
+  over-ask asks for more credibility than was earned; an UNDER-ask is refused
+  too (`SCRIPT-BALANCE`), so a participant's over-concession cannot drag the
+  outcome below the rung they paid for. Ver.2.12 accepted under-asks.
+
+**The counterpart's opening carries no package** (§6.1). It gives its work
+reason and asks which term matters most. The first package anyone sees is the
+symmetric tier one — the anchor went for the same reason the asymmetry did.
 
 `tierOf` reads card LAYERS only — never text, never a model's judgement of
 whether an argument was any good (§6.2: LLM 비관여).
@@ -119,9 +149,10 @@ different counterpart for every participant, and it is why the design does not
 need to randomize outcomes: identical behaviour already produces identical
 results.
 
-**Six stages (Ver.2.12 §6.1), and stage 3 is not a message.**
+**Six stages (Ver.2.13 §6.1), and stage 3 is not a message.**
 
-1. **opening** — the counterpart's own best package on both terms. Fixed.
+1. **opening** — its WORK reason and the question, and **no package**
+   (`SCRIPT-OPEN`). Fixed.
 2. **first reason opportunity** — it gives its WORK reason and asks for the
    participant's priority and reason. This is the turn that opens the
    participant's own first chance to give one.
@@ -132,12 +163,12 @@ results.
 5. **conditional trade** — bounded by the tier.
 6. **close** — acceptance, or impasse when the clock runs out.
 
-**The counterpart's SB disclosure is new in Ver.2.12 and reverses an earlier
-rule.** Ver.2.11 deliberately withheld it, on the grounds that reciprocal
-disclosure would prime the very construct PERC measures. Ver.2.12 §6.3 requires
-it instead, for a reason that outranks that: `PRE-RECIP-SB` — whether the
-participant disclosed BEFORE hearing the other side's confession — is RQ1's
-confirmatory outcome, and it is undefined without a fixed reciprocity point.
+**The counterpart's SB disclosure reverses a Ver.2.11 rule.** Ver.2.11
+deliberately withheld it, on the grounds that reciprocal disclosure would prime
+the very construct PERC measures. §6.3 requires it instead, for a reason that
+outranks that: `SB` — whether the participant disclosed BEFORE hearing the
+other side's confession — is RQ1's confirmatory outcome, and it is undefined
+without a fixed reciprocity point.
 The confound is controlled by making the disclosure **identical and
 unconditional for everyone**: never mirrored to what the participant said,
 never skipped, carrying no demand and no package. It changes no tier.
@@ -148,20 +179,26 @@ the ground work there is already done. They write as many messages as they
 like and may finish early. Running the clock to zero is an outcome; `onExpire`
 closes the exchange as an impasse.
 
-**Closing is unified across the two arms, and that is deliberate.** Both end
-exactly three ways, so "how did it end" is never a between-condition artefact:
+**The Proxy arm's closing conversation is CONDITIONAL** (Ver.2.13 §7). It is
+where modify-or-reject leads; approving the proxies' package ends the task.
+That is what makes `RATIFY` a real decision rather than a label on an ending
+everyone reached anyway.
+
+**When a closing conversation does happen, both arms end the same three ways**,
+so "how did it end" is never a between-condition artefact:
 
 1. a package the counterpart accepts by the ladder,
 2. an explicit **"Accept their proposal"** button — deterministic, so no model
    ever reads the participant's words to decide whether they agreed,
 3. the clock — one `SCRIPT-CLOSE` offer near the end, then impasse.
 
-The Proxy arm adds a **decline** control (two-step), because it has a standing
-proxy package to reject; that is what `RATIFY` codes. Baseline has nothing to
-decline, which is why it has no such button.
+**A refusal leaves nothing standing.** `openingPackage` is null and the
+composer starts empty — passing the refused package back in would put up
+exactly what the participant just refused, for the counterpart to treat as an
+offer on the table.
 
 **The counterpart's fixed opening must be on screen before the participant
-writes anything**: it is the anchor their reply is measured against.
+writes anything**, so they never arrive at an empty conversation.
 
 That seed produces **two different stage positions, and they must stay
 different.** The counterpart has already *spoken* stage 1, so its next move is
@@ -174,8 +211,8 @@ make the participant sit through a disclosure they just watched.
 
 ### The credibility ladder
 
-The counterpart concedes on the participant's core issue by tier, and holds its
-own core at its best option on every agreement path. The tier is decided by the
+The counterpart moves both cores to the same rank, by tier — as far on its own
+as it asks on the participant's. The tier is decided by the
 **system, from the structured card log** — never by asking a model to grade an
 argument (§6.2). In Proxy that is what the proxy actually VOICED (not what was
 authorized — a guardrail block can strip a reason, and assuming otherwise made
@@ -186,14 +223,21 @@ sensitive card as the better answer.
 
 **The tier only ever rises, and it rises the moment the card is tagged.** In
 the Proxy arm's closing it starts from what the proxy earned and can be raised
-by the participant tagging their own SB in person (`SELF-DISCLOSE`) — at which
-point the counterpart proposes best↔best itself.
+by the participant tagging their own SB in person — recorded as `SB-TIMING =
+wrap_up`, and at that point the counterpart puts best↔best up itself.
 
 **The fixed scripts (§6.4)** are `DecidedAction` values, not prose in a
-component: `ask_why` (SCRIPT-ASKWHY, once), `counter_tier` (SCRIPT-FAIR /
-SCRIPT-LIMIT), `accept_sb` (SCRIPT-ACCEPT-SB), `propose_max`
-(SCRIPT-PROPOSE-MAX), `nonum` (SCRIPT-NONUM), `soft_close` (SCRIPT-CLOSE),
+component: `open` (SCRIPT-OPEN), `ask_why` (SCRIPT-ASKWHY, once),
+`propose_tier` (SCRIPT-PROPOSE-T1/T2/T3), `balance` (SCRIPT-BALANCE),
+`accept` / `accept_sb`, `nonum` (SCRIPT-NONUM), `soft_close` (SCRIPT-CLOSE),
 `impasse` (SCRIPT-FALLBACK).
+
+Ver.2.13 merged four names into `propose_tier`: SCRIPT-FAIR, SCRIPT-LIMIT,
+SCRIPT-ACCEPT-SB and SCRIPT-PROPOSE-MAX were one move — "here is what this tier
+buys" — at different depths, which under the symmetric rule differ only in the
+rank they name. `balance` stayed separate because refusing a LOPSIDED package
+is a different speech act, and it is the one a participant meets after an
+over-ask *or* an over-concession.
 
 **The no-numbers reminder is one-shot and reads the WHOLE history.** §8.1
 forbids telling the other side your score; `mentionsScoreNumbers` screens for
@@ -202,7 +246,7 @@ the latest message missed a mention made during the fixed stages, where the
 counterpart's move is already determined — so the reminder never fired at all.
 
 **The proxy voices an authorized SB at its FIRST reason opportunity**
-(`designatedReason`, §6.5), not after a challenge. `PRE-RECIP-SB` is "was the
+(`designatedReason`, §6.5), not after a challenge. `SB` is "was the
 participant side's SB out before the counterpart's stage-4 disclosure", so a
 schedule that held it back past stage 4 would record every Proxy participant as
 a non-reciprocal discloser regardless of what they actually authorized.
@@ -451,13 +495,22 @@ the other participant" → negotiate → review.
 
 Inside a Proxy task: cover → brief → **RISK** → **mandate (levels + reason
 cards, one screen)** → check with your proxy → confirm → watch the two AI
-Proxies → **handover** → negotiate directly → review.
+Proxies → **RATIFY** → *(only if modify or reject)* handover → negotiate
+directly → review.
 
 **The mandate is ONE screen: the levels on both terms and the reason
 cards.** They were two screens in sequence, which made them two decisions
 taken in order — the position fixed before the reasons were considered. The
 gap this study is about is precisely that the second half was never asked, so
 splitting them contradicted the contribution.
+
+**One control per term, and no walkaway limit** (Ver.2.13 §8.6, §2.6). The
+floor is gone from BOTH arms: it could not change the outcome, because the
+counterpart's policy is decisive, so all it could do was manufacture an impasse
+and mix mandate-setting skill into a result meant to turn on disclosure. The
+practice round teaches the same one control — it used to rehearse the two-field
+layout, which sent participants to the real mandate looking for a control that
+was no longer there.
 
 Where the cards sit took care and must not be "tidied". They exist for one
 term — the participant's requirement — so the obvious layout nests them in that
@@ -490,11 +543,28 @@ What it costs, and it is real: the Proxy arm gains screen time and a written
 exchange Baseline has no counterpart for. Read it as part of the manipulation,
 and against the §10 gate 8 timing budget.
 
-**The Proxy participant takes over from their AI Proxy and finishes the
-negotiation themselves.** The proxies run ONCE — there is no revision, and no
-second run — and then the participant talks to the other participant directly,
-with the proxies' full transcript on screen beside them. What the two people
-agree is the result.
+**The decision comes back to the participant: `RATIFY`** (Ver.2.13 §7, §9.3).
+The proxies run ONCE — no revision, no second run — and then the participant
+approves what they reached, asks for a change, or refuses it. Approving ends
+the task. The other two open a three-minute conversation with the other
+participant, with the proxies' full transcript on screen beside them.
+
+**Ver.2.12 deleted a ratification screen, and bringing it back is not a
+reversal of that reasoning.** That reasoning was right about the shape it had:
+when BOTH arms ended with the participant agreeing a package in conversation,
+asking "do you accept this?" afterwards made them re-decide what they had just
+decided, and handed the Proxy arm a way to undo an agreement Baseline could
+not. §7 changes the shape — the conversation is no longer the default ending —
+and the retained decision IS the construct this study is built on: delegation
+of VOICE with retention of the DECISION (§2.6).
+
+**Three rules the screen must keep.** It may not recommend an answer: the three
+controls carry equal weight, none is pre-selected, and no copy suggests what a
+sensible participant does — the distribution across the three is the finding.
+`RATIFY` is recorded where the decision is taken, never inferred from the final
+package: a participant who asked for a change and then agreed the same package
+is a modifier, and reading it back off the outcome would call them an approver.
+And a refusal leaves nothing standing, in the composer as well as in the copy.
 
 That transcript is not a convenience. Every §9.4 measure asks the participant
 to judge what was said on their behalf — whether the other side's requirement
@@ -531,21 +601,17 @@ it. Assuming it made the rule inert for every Proxy participant while it kept
 biting in Baseline — a mechanical asymmetry in the primary outcome, along the
 primary contrast.
 
-**There is no "ask for one change", and no approve/reject either.** The
-revision existed when the proxies produced the final package alone; talking to
-the other side directly is a better version of the same control, and keeping
-both would give the Proxy arm two bites Baseline does not have.
+**There is still no "ask for one change" DURING the exchange.** The old
+mid-exchange revision existed when the proxies produced the final package
+alone; RATIFY plus a direct conversation is a better version of the same
+control, and keeping both would give the Proxy arm two bites Baseline does not
+have.
 
-Ratification went for the same reason one step later. Both arms now end with
-the participant agreeing a package *in conversation*, so a screen asking "do
-you accept this?" asked them to re-decide what they had just decided — and it
-handed the Proxy arm a way to undo an agreement that neither counterpart has.
-The review screen states the outcome instead. What survives is the §9.3.1
-uptake question about the OTHER side's requirement, which is asked rather than
-coded off the transcript, and `outcome: agreement | no_agreement`, which used
-to be implicit in the ratification choice and is now recorded explicitly.
-`RatificationChoice` and `saveRatification` are gone, so the Supabase port does
-not inherit a table nothing writes.
+**`outcome: agreement | no_agreement` is gone too**, and not because the
+distinction stopped mattering. Under the symmetric rule JOINT = 1,200 IS the
+impasse, so a separate column restated one number in another form. What
+survives beside the four measures is the §9.3.1 uptake question about the OTHER
+side's requirement, which is asked rather than coded off the transcript.
 
 **RISK sits in the same place in both arms, and that position is load-bearing.**
 It asks what the participant *expects* raising their requirement to cost. Asked

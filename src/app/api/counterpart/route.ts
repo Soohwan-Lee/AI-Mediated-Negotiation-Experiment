@@ -224,7 +224,12 @@ export async function POST(request: Request) {
         // SCRIPT-BALANCE. Refuses BOTH directions: an over-ask asks for more
         // credibility than was earned, and an over-concession would drag the
         // outcome below the rung the participant paid for (§6.2).
-        return `Say that what they proposed has one side moving further than the other, and that you would rather both moved the same amount — put this forward instead, naming exactly these levels: ${levels}.`;
+        // TWO BUBBLES, SAID SO EXPLICITLY. This move carries a judgement
+        // ("that's one-sided") AND a package, and asked as one sentence the
+        // model wrote it as one 179-character bubble — over the 120-char
+        // bubble rule, which is what makes the counterpart read like a person
+        // typing rather than a system.
+        return `Say that what they proposed has one side moving further than the other. Then, in a SEPARATE short bubble, put this forward instead, naming exactly these levels: ${levels}. Keep each bubble to one short sentence.`;
       case "soft_close":
         return `Say time is nearly up and offer to settle on this package rather than run out: ${levels}. Ask if they'll take it.`;
       case "impasse":

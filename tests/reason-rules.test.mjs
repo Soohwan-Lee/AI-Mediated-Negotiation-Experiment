@@ -39,7 +39,6 @@ const {
   counterRequirementIssue,
   rankedOptions,
   scorePackage,
-  counterpartOpening,
   cardOfLayer,
 } = await import("../src/lib/tasks.ts");
 const {
@@ -518,12 +517,19 @@ for (const taskId of TASKS) {
   }
 }
 
-test("the counterpart's opening is its own best package on both terms", () => {
+test("the counterpart's opening carries NO package (Ver.2.13 §6.1)", () => {
+  // The anchored opening — "my best, your worst" — is gone. §2.6 identifies it
+  // as a face threat in its own right: the non-negotiable, lowball offer
+  // White et al. (2004) name, which made a high-FTS participant competitive by
+  // a route that has nothing to do with self-disclosure. The first package the
+  // participant ever sees is now the symmetric tier one.
   for (const taskId of TASKS) {
     const task = getTask(taskId);
     for (const role of ROLES) {
-      const opening = counterpartOpening(task, role);
-      assert.equal(scorePackage(task, opening, role), 3900);
+      const d = counterpartStep(task, role, 1, null, state("none"));
+      assert.equal(d.action, "open");
+      assert.equal(d.proposal, null);
+      assert.equal(d.accepts, false);
     }
   }
 });
@@ -542,7 +548,7 @@ function poolAction(overrides = {}) {
     stage: 2,
     reasonSourceId: "a_wr_l",
     addedReasonSourceId: "pool:0",
-    rationale: "Weekend cover matters, and steady weekend service is the baseline.",
+    rationale: "The deadline matters, and client trust starts with keeping the dates you gave.",
     unresolved: true,
     internalProvenance: "pool_reason",
     ...overrides,

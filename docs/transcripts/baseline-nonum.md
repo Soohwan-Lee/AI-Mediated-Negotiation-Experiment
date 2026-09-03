@@ -5,9 +5,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 **counterpart**
 
 > hi! good to be sorting this out.
-> my opening would be 4 per month, 4 per week — what does it look like from your side?
->
-> _package: Weekend shifts: 4 per month · Closing shifts: 4 per week_
+> The client's own timeline is tight, so the report has to land early. This quarter, the deadline is the one condition I most urgently need.
+> what matters most on your side, and why?
 
 **participant**
 
@@ -15,9 +14,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2 · state_priority)_
 
-> got it — closes are the key issue for you.
-> weekend peaks need experienced cover; that’s the condition I most urgently need this quarter.
-> which term matters most to you, and why?
+> got it — keeping review sessions down is your priority.
+> if you can support the report at 2 weeks, I can take three of the four review sessions, leaving you with one.
+> would that work?
 
 **participant**
 
@@ -25,8 +24,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 4 · disclose_sb)_
 
-> i got the weekend demand forecast wrong twice last month and had to ask another store manager for emergency cover.
-> the district manager knows, and if it happens again it goes into my operations review.
+> i should be straight about it.
+> i promised this deadline to the client myself, without checking with the team first.
+> the director thinks I confirmed our schedule; if it slips, it shows I committed without checking.
 
 **participant**
 
@@ -34,8 +34,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5 · nonum)_
 
-> i can’t compare this in point numbers.
-> i hear that closes run late and stack up — what makes keeping them down especially important for you?
+> i can’t compare point totals directly.
+> you mentioned the late stacking-up—what makes having fewer review sessions especially important for you?
+> i’d like to understand that before moving.
 
 **participant**
 
@@ -43,11 +44,10 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5 · ask_why)_
 
-> i hear you — keeping closes down is the main thing for you.
-> based on what I've heard, I can't go all the way down on closes.
-> if you can do 4 weekend shifts per month, I can hold closes at 3 per week.
+> that makes sense — we still don’t know much about each other’s situation.
+> could we meet in the middle for now: 4 weeks for the report, and you present 3 of 4 review sessions?
 >
-> _package: Weekend shifts: 4 per month · Closing shifts: 3 per week_
+> _package: Final report deadline: 4 weeks · Review sessions you present: 3 of 4_
 
 ## Checks
 

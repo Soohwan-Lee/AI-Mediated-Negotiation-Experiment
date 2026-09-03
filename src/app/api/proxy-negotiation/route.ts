@@ -572,7 +572,7 @@ export async function POST(request: Request) {
             break;
           default:
             // SCRIPT-BALANCE — one side moved further than the other.
-            decidedAction = `Say their proposal has one side moving further than the other, and that your principal would rather both moved equally — put this forward instead, naming exactly these levels: ${levels}.`;
+            decidedAction = `Say their proposal has one side moving further than the other. Then, in a separate short sentence, put this forward instead, naming exactly these levels: ${levels}.`;
             break;
         }
         break;
