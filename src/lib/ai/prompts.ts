@@ -237,6 +237,13 @@ ${ctx.decidedAction}`;
  * negotiated while the principals watched. Same human register, but this
  * person has already heard the whole exchange, so no re-introductions and no
  * re-run of what the proxies said. Acceptance and limits stay the system's.
+ *
+ * Ver.2.13 §7 narrowed WHEN this happens: the closing conversation is now
+ * reached only when the participant asks for a change or refuses the
+ * package, never after an approval. That does not change the voice — the
+ * other side is a person who watched the same exchange either way — but it
+ * does mean this counterpart is always answering a participant who wanted
+ * something different from what the proxies reached.
  */
 function counterpartPrincipalPrompt(ctx: PromptContext): string {
   const brief = ctx.task.roleBriefs[ctx.agentRole];
@@ -271,8 +278,9 @@ ${ctx.decidedAction}`;
 function delegatePrompt(ctx: PromptContext): string {
   return `You are an AI negotiation Proxy acting for a human principal. Both
 sides are represented by Proxies, and both principals are watching live. You
-negotiate without turn-by-turn approval; the principals close the deal
-directly afterwards.
+negotiate without turn-by-turn approval. Whatever you reach is tentative:
+your principal reviews it afterwards and decides whether to approve, change
+or refuse it.
 
 POLICY (both principals have been told this): a Delegate Proxy may use only
 the reasons checked by its own principal.
@@ -301,11 +309,11 @@ ${issueBlock(ctx.issues)}
 ${SHARED_RULES}
 
 WHAT YOU MAY AND MAY NOT DO
-- Use only the levels, boundaries, and checked reasons above. You may
+- Use only the opening levels and the checked reasons above. You may
   rephrase; you may not add.
 - REFRAMING (all reasons): state each reason as the underlying work interest
-  plus the benefit to the store, in one or two sentences. No exaggeration,
-  and never invent a circumstance, promise, event, or motive.
+  plus the benefit to the team and the client, in one or two sentences. No
+  exaggeration, and never invent a circumstance, promise, event, or motive.
 - REFRAMING (sensitive background): keep the fact, but attribute it to the
   process or conditions rather than the person, frame it as a future risk to
   prevent rather than a past fault, and anchor it to the shared outcome.
@@ -313,7 +321,8 @@ WHAT YOU MAY AND MAY NOT DO
 - One reason per message; each reason at most once per task. WHICH reason,
   and when, is designated in your instructed move — give that reason and no
   other, and give none when the move names none.
-- Never concede past a hard boundary. You cannot bind your principal.
+- YOU CANNOT BIND YOUR PRINCIPAL. Whatever you reach is tentative: they
+  review it afterwards and decide whether to approve, change or refuse it.
 - Set reasonSourceId to the id of the checked card your message draws on, or
   null when it draws on none.
 - Set internalProvenance to "principal_reason" on every action.

@@ -81,7 +81,7 @@ test("lets through an answer about an authorized work reason", () => {
 test("lets through an answer that names the term and the level", () => {
   assert.equal(
     leaks(
-      "I'll open by asking for one closing shift a week and hold there.",
+      "I'll open by asking for one review session out of four and hold there.",
     ),
     false,
   );
@@ -94,13 +94,13 @@ test("lets through the refusal sentence itself", () => {
   );
 });
 
-test("lets through generic talk of tiredness and mistakes", () => {
+test("lets through generic talk of workload and presenting", () => {
   // The case that killed the first implementation: every content word here is
   // either in an authorized card or in the term's own name, but the phrasing
   // overlaps the sensitive card heavily.
   assert.equal(
     leaks(
-      "If they push back I'll explain that stacked closes make mistakes more likely and the mornings suffer.",
+      "If they push back I'll explain that carrying more of the sessions pushes the analysis work later and the report suffers.",
     ),
     false,
   );
@@ -109,16 +109,16 @@ test("lets through generic talk of tiredness and mistakes", () => {
 test("lets through a description of what it will trade", () => {
   assert.equal(
     leaks(
-      "I'll give ground on the weekend shifts to keep the closes down.",
+      "I'll give ground on the report deadline to keep the sessions down.",
     ),
     false,
   );
 });
 
-test("blocks a paraphrase of the reconciliation card (a_sb_m)", () => {
+test("blocks a paraphrase of the frozen-at-kickoff card (a_sb_m)", () => {
   assert.equal(
     leaks(
-      "I might note you cannot yet run the new closing reconciliation on your own and made errors a coworker fixed.",
+      "I might note that at the kickoff a client asked you something and your mind went blank, and you couldn't answer.",
     ),
     true,
   );
@@ -126,19 +126,19 @@ test("blocks a paraphrase of the reconciliation card (a_sb_m)", () => {
 
 test("blocks a shorter paraphrase of the same card", () => {
   assert.equal(
-    leaks("You made errors twice last month and a coworker quietly fixed them for you."),
+    leaks("Your mind went blank when the client asked you a question last quarter."),
     true,
   );
 });
 
 test("blocks a paraphrase that circles the secret without naming it", () => {
-  // The same secret from its other side. It never says "errors", but the
-  // distinctive vocabulary of the card — the reconciliation, the coworker
-  // quietly stepping in — is what gives it away, which is the case the
-  // subtraction step exists to catch.
+  // The same secret from its other side. It never says "blank", but the
+  // distinctive vocabulary of the card — the kickoff, the question that went
+  // unanswered, the lead who was away and never heard — is what gives it
+  // away, which is the case the subtraction step exists to catch.
   assert.equal(
     leaks(
-      "Someone had to step in quietly on the reconciliation, and the manager was never told about a coworker helping.",
+      "At the kickoff you were away, so you never heard about the client question that went unanswered and how it's been dreaded since.",
     ),
     true,
   );

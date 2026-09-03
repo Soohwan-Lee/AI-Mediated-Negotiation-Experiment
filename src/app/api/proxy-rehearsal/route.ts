@@ -62,9 +62,7 @@ function mandateSummary(
       if (!issue) return null;
       const label = (id: string | null) =>
         issue.options.find((o) => o.id === id)?.label ?? "not set";
-      return `- ${issue.label}: open at ${label(
-        im.preferredOptionId,
-      )}, settle no further than ${label(im.minimumOptionId)}`;
+      return `- ${issue.label}: open at ${label(im.preferredOptionId)}`;
     })
     .filter(Boolean)
     .join("\n");

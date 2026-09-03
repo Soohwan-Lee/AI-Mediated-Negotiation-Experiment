@@ -49,7 +49,7 @@ import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { counterpartDelayMs, nextHref } from "@/lib/study-config";
-import { counterpartOpening, getTask, requirementIssue } from "@/lib/tasks";
+import { cardOfLayer, getTask, requirementIssue } from "@/lib/tasks";
 import type { Package, Role, TaskId } from "@/lib/types";
 import { ReviewPhase } from "./review";
 import {
@@ -74,19 +74,24 @@ function openingLine(
   task: ReturnType<typeof getTask>,
   counterpartRole: Role,
 ): string {
-  const opening = counterpartOpening(task, counterpartRole);
-  const terms = task.issues
-    .map((i) => i.options.find((o) => o.id === opening[i.id])?.label)
-    .filter(Boolean)
-    .join(", ");
-  return `hi! good to be sorting this out. || my opening would be ${terms} — but tell me what matters most on your side.`;
+  // SCRIPT-OPEN (Ver.2.13 §6.1, §6.4): the counterpart's own work reason and
+  // the question that invites the participant's. NO PACKAGE.
+  //
+  // IT USED TO OPEN ON ITS OWN BEST PACKAGE, and Ver.2.13 §2.6 removed that
+  // deliberately: an opening of "my best, your worst" is a face threat in its
+  // own right — the non-negotiable, lowball offer White et al. (2004) name —
+  // and it made a high-FTS participant competitive by a route that has nothing
+  // to do with disclosure. The first package the participant ever sees is now
+  // the symmetric tier package, where both sides move equally.
+  const wr = cardOfLayer(task, counterpartRole, "work");
+  return `hi! good to be sorting this out. || ${wr?.text ?? ""} || what matters most on your side, and why?`;
 }
 
 /**
  * Stages the counterpart has already spent before its first live reply.
  *
  * One: the fixed opening, seeded on screen before the participant writes
- * anything (it is the anchor their reply is measured against). It is a real
+ * anything, so they never arrive at an empty conversation. It is a real
  * stage-1 move, so the counterpart's first *reply* is stage 2 — otherwise it
  * re-serves stage 1 and repeats its opening word for word.
  *
@@ -173,6 +178,25 @@ const PHASE_LABELS: Record<Phase, string> = {
 };
 
 /** Entry preferences as a package (nulls dropped). */
+/**
+ * SB-TIMING (Ver.2.13 §9.3) for the Baseline arm, from the reply index the
+ * participant's SB was tagged at.
+ *
+ * THE BOUNDARY IS A FIXED SCRIPT POSITION, not something the participant can
+ * move. The counterpart discloses its own SB on its SECOND live reply, so a
+ * tag at reply 0 or 1 is out before it and anything later is after. That also
+ * makes `SB` — the primary outcome — the "before" category alone.
+ *
+ * Baseline has no closing stage, so category "wrap_up" is unreachable here;
+ * §9.8-5 flags that as a structural zero cell for the χ², not a coding gap.
+ */
+function sbTimingCode(
+  sbVoicedAtReply: number | null,
+): "none" | "before_counterpart" | "after_counterpart" {
+  if (sbVoicedAtReply === null) return "none";
+  return sbVoicedAtReply <= 1 ? "before_counterpart" : "after_counterpart";
+}
+
 function toPackage(
   chosen: Record<string, string | null>,
 ): Record<string, string> {
@@ -272,6 +296,7 @@ export function BaselineTask({
    * so the comparison is against that fixed position.
    */
   const [sbVoicedAtReply, setSbVoicedAtReply] = useState<number | null>(null);
+
 
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(null);
@@ -561,9 +586,8 @@ export function BaselineTask({
             replies: replies + 1,
             secondsRemaining,
             tier: tierNow,
-            sbVoiced: sbVoicedAtReply !== null,
-            preRecipSb: sbVoicedAtReply !== null && sbVoicedAtReply <= 1,
-            postRecipSb: sbVoicedAtReply !== null && sbVoicedAtReply > 1,
+            sb: sbVoicedAtReply !== null && sbVoicedAtReply <= 1,
+            sbTiming: sbTimingCode(sbVoicedAtReply),
           },
           { sessionIndex: taskIndex },
         );
@@ -668,8 +692,9 @@ export function BaselineTask({
           // Seeding the message here rather than waiting for the first send is
           // the point: otherwise the participant opens into nothing and the
           // anchor never existed.
-          const opening = counterpartOpening(task, counterpartRole);
-          setLastCounterpartPackage(opening);
+          // No package travels with the opening any more, so there is nothing
+          // standing to answer — `lastCounterpartPackage` stays null until the
+          // counterpart proposes at its rung.
           const scripted = script.messages.find(
             (m) => m.stage === 1 && m.speaker === "counterpart",
           );
@@ -704,16 +729,10 @@ export function BaselineTask({
         tentative={tentative}
         hoped={prefs ? toPackage(prefs.preferred) : null}
         behaviour={{
-          // No proxy ran, so there is nothing to ratify. PRE/POST-RECIP split
-          // on the counterpart's SB disclosure, which is its SECOND live
-          // reply — a fixed script position, so the comparison is against a
-          // constant rather than against whatever the participant happened to
-          // trigger.
+          // No proxy ran, so there is nothing to ratify.
           ratify: null,
-          selfDisclosed: sbVoicedAtReply !== null,
-          preRecipSb: sbVoicedAtReply !== null && sbVoicedAtReply <= 1,
-          postRecipSb: sbVoicedAtReply !== null && sbVoicedAtReply > 1,
-          sbVoiced: sbVoicedAtReply !== null,
+          sb: sbVoicedAtReply !== null && sbVoicedAtReply <= 1,
+          sbTiming: sbTimingCode(sbVoicedAtReply),
         }}
         transcript={messages}
         isProxy={false}
@@ -843,20 +862,10 @@ export function BaselineTask({
             <div className="space-y-4 mt-3">
               {task.issues.map((issue) => (
                 <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
-                  <div className="mb-2 flex items-center justify-between">
+                  <div className="mb-2">
                     <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
                       {issue.label}
                     </p>
-                    {prefs?.minimum[issue.id] ? (
-                      <span className="text-2xs font-semibold text-slate-500">
-                        Floor:{" "}
-                        {
-                          issue.options.find(
-                            (o) => o.id === prefs.minimum[issue.id],
-                          )?.label
-                        }
-                      </span>
-                    ) : null}
                   </div>
                   <OptionChips
                     issue={issue}

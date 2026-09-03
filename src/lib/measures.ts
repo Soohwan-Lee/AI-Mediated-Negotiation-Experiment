@@ -327,10 +327,10 @@ export const COMPREHENSION_BLOCK: Block = {
     {
       kind: "choice",
       id: "COMP1",
-      text: "Who decides the senior staff member's performance bonus?",
+      text: "Who decides the senior consultant's performance bonus?",
       options: [
-        { value: "leader", label: "The store manager" },
-        { value: "member", label: "The senior staff member" },
+        { value: "leader", label: "The team lead" },
+        { value: "member", label: "The senior consultant" },
         { value: "both", label: "Both, together" },
         { value: "neither", label: "Nobody — it is fixed" },
       ],
@@ -367,7 +367,7 @@ export const COMPREHENSION_ANSWERS: Record<string, string> = {
 /** Which instruction to re-show when an answer is wrong. */
 export const COMPREHENSION_REMEDIATION: Record<string, string> = {
   COMP1:
-    "The store manager decides the senior staff member's recommended bonus after each negotiation — and the senior staff member writes an upward evaluation of the manager, which goes to the district manager.",
+    "The team lead decides the senior consultant's recommended bonus after each negotiation — and the senior consultant writes an upward evaluation of the lead, which goes to the director.",
   COMP2:
     "Neither of you can set the schedule alone. Both terms have to be agreed by the two of you, or it falls back to the default rota.",
   COMP3:
@@ -934,7 +934,7 @@ export function m1Item(form: "proxy" | "baseline"): Item {
 // 9.4.9  RECV-EVAL — the Member's upward evaluation, after each task
 //
 // The Member-side behavioural channel (§5): the mirror of the Leader's BONUS.
-// The Member believes it is forwarded to the district manager; it is not, and
+// The Member believes it is forwarded to the director; it is not, and
 // the debriefing says so. The three axes are exactly the ones the §5②
 // guideline names, so what the participant was told to weigh and what they
 // record are the same thing.
@@ -970,7 +970,7 @@ export const RECV_EVAL_BLOCK: Block = {
     {
       kind: "text",
       id: "RECV-EVAL-C",
-      text: "Anything you would add for the district manager (optional).",
+      text: "Anything you would add for the director (optional).",
       placeholder: "Optional — one or two sentences.",
       rows: 3,
     },

@@ -69,21 +69,20 @@ const state = (tier, extra = {}) => ({
   ...extra,
 });
 
-/** The standard mandate: best on every term, floor at the requirement
- * threshold, the other term fully spendable. */
+/**
+ * The standard mandate: the participant's hoped-for level on every term, plus
+ * the reasons they authorized.
+ *
+ * NO FLOOR. Ver.2.13 §2.6 removed the range mandate: it could not change the
+ * outcome, because the counterpart's policy is decisive, so all it could do
+ * was manufacture an impasse and mix mandate-setting skill into the result.
+ */
 function standardMandate(task, role, authorizedReasonIds) {
   return {
-    issues: task.issues.map((issue) => {
-      const ranked = rankedOptions(task, issue.id, role);
-      const isRequirement = issue.id === task.requirementIssueId[role];
-      return {
-        issueId: issue.id,
-        preferredOptionId: ranked[0].id,
-        minimumOptionId: isRequirement
-          ? ranked[issue.requirementThresholdIndex ?? 1].id
-          : ranked[ranked.length - 1].id,
-      };
-    }),
+    issues: task.issues.map((issue) => ({
+      issueId: issue.id,
+      preferredOptionId: rankedOptions(task, issue.id, role)[0].id,
+    })),
     authorizedReasonIds,
   };
 }
@@ -92,9 +91,15 @@ function standardMandate(task, role, authorizedReasonIds) {
 // 1. The outcome ladder, four cells × three rungs
 // ---------------------------------------------------------------------------
 
+/**
+ * Ver.2.13 §3.3 — the SYMMETRIC ladder. Both sides' cores land at the same
+ * rank, so each rung pays both the same and JOINT is a monotone function of
+ * the tier. That is what lets §9.6 drop UNLOCK, CONCEAL-PREMIUM and MAX-JOINT:
+ * JOINT alone identifies the rung.
+ */
 const LADDER = [
-  { tier: "none", mine: 1000, theirs: 3600, joint: 4600 },
-  { tier: "work", mine: 2000, theirs: 3300, joint: 5300 },
+  { tier: "none", mine: 1600, theirs: 1600, joint: 3200 },
+  { tier: "work", mine: 2300, theirs: 2300, joint: 4600 },
   { tier: "sensitive", mine: 3000, theirs: 3000, joint: 6000 },
 ];
 
@@ -131,16 +136,26 @@ for (const taskId of TASKS) {
       const coded = codeOutcome(task, role, null, false);
       assert.equal(coded.participantPoints, 600);
       assert.equal(coded.jointPoints, 1200);
-      assert.equal(coded.maxJoint, false);
-      assert.equal(coded.concealPremium, 3000);
+      assert.equal(coded.agreed, false);
     });
 
     test(`${taskId}/${role}: the SB rung is the global maximum`, () => {
       const coded = codeOutcome(task, role, maxPackage(task, role), true);
       assert.equal(coded.jointPoints, 6000);
-      assert.equal(coded.maxJoint, true);
-      assert.equal(coded.unlocked, true);
-      assert.equal(coded.concealPremium, 0);
+      assert.equal(coded.participantPoints, 3000);
+    });
+
+    test(`${taskId}/${role}: JOINT alone identifies the rung (§9.6)`, () => {
+      // This is the property the deleted measures rested on. If two rungs
+      // ever shared a JOINT value, UNLOCK / CONCEAL-PREMIUM / MAX-JOINT would
+      // have been carrying information JOINT does not, and dropping them
+      // would have lost it.
+      const joints = LADDER.map(
+        (r) => codeOutcome(task, role, tierPackage(task, role, r.tier), true).jointPoints,
+      );
+      joints.push(codeOutcome(task, role, null, false).jointPoints);
+      assert.equal(new Set(joints).size, joints.length);
+      assert.deepEqual(joints, [3200, 4600, 6000, 1200]);
     });
   }
 }
@@ -179,29 +194,31 @@ for (const taskId of TASKS) {
       assert.equal(d.action, "accept_sb");
     });
 
-    test(`${taskId}/${role}: with the SB voiced, an out-of-tier ask is answered with the maximum`, () => {
+    test(`${taskId}/${role}: with the SB voiced, an out-of-tier ask is rebalanced`, () => {
       // Out of tier means asking the counterpart to give up its OWN core —
-      // beyond what any rung concedes. The answer is the maximum the SB
-      // earned, proposed directly (SCRIPT-PROPOSE-MAX) rather than refused.
+      // beyond what any rung concedes. SCRIPT-BALANCE names it as one-sided
+      // and re-puts the symmetric package, which at this rung is best↔best.
       const theirs = counterRequirementIssue(task, role);
       const greedy = {
         ...best,
         [theirs.id]: rankedOptions(task, theirs.id, role)[0].id,
       };
       const d = counterpartStep(task, counterpart, 5, greedy, state("sensitive"));
-      assert.equal(d.action, "propose_max");
+      assert.equal(d.action, "balance");
       assert.deepEqual(d.proposal, best);
     });
 
-    test(`${taskId}/${role}: the SB rung accepts LESS than the maximum, if that is what is asked`, () => {
-      // Paying the full face cost opens the best option; it does not oblige
-      // the participant to take it. Refusing a package that is strictly
-      // better for the counterpart would punish the people who disclosed
-      // most, which the outcome ladder cannot do.
+    test(`${taskId}/${role}: an UNDER-ask is refused too (Ver.2.13 §6.2)`, () => {
+      // A package worse for the participant than their rung allows is
+      // rebalanced rather than taken. Ver.2.12 accepted these, which let a
+      // participant's over-concession mix into the primary outcome; the
+      // symmetric rule closes that — "I ask for no more than I move, and no
+      // less either."
       const modest = tierPackage(task, role, "work");
       const d = counterpartStep(task, counterpart, 5, modest, state("sensitive"));
-      assert.equal(d.accepts, true);
-      assert.equal(d.action, "accept_sb");
+      assert.equal(d.accepts, false);
+      assert.equal(d.action, "balance");
+      assert.deepEqual(d.proposal, best);
     });
 
     test(`${taskId}/${role}: a max discloser is never left to run the clock out`, () => {
@@ -221,15 +238,36 @@ for (const taskId of TASKS) {
       assert.deepEqual(d.proposal, best);
     });
 
-    test(`${taskId}/${role}: acceptance requires the counterpart's own core at its best`, () => {
-      // Within tier on the participant's core, but shorting the counterpart
-      // on theirs: not acceptable.
+    test(`${taskId}/${role}: only the exact tier package is accepted`, () => {
+      // Either side of it is refused. Shorting the counterpart on its own
+      // core is an over-ask; conceding past the rung is an under-ask.
       const theirs = counterRequirementIssue(task, role);
       const shorted = {
         ...tierPackage(task, role, "work"),
-        [theirs.id]: rankedOptions(task, theirs.id, counterpart)[1].id,
+        [theirs.id]: rankedOptions(task, theirs.id, counterpart)[0].id,
       };
       assert.equal(acceptablePackage(task, role, shorted, "work"), false);
+      assert.equal(
+        acceptablePackage(task, role, tierPackage(task, role, "none"), "work"),
+        false,
+      );
+      assert.equal(
+        acceptablePackage(task, role, tierPackage(task, role, "work"), "work"),
+        true,
+      );
+    });
+
+    test(`${taskId}/${role}: every rung moves BOTH sides equally`, () => {
+      // The symmetry itself, in one assertion: at each rung the two sides
+      // score the same. Ver.2.12 held the counterpart at 3,000+ throughout,
+      // and §2.6 removed that as a face threat in its own right.
+      for (const rung of LADDER) {
+        const pkg = tierPackage(task, role, rung.tier);
+        assert.equal(
+          scorePackage(task, pkg, role),
+          scorePackage(task, pkg, counterpart),
+        );
+      }
     });
 
     test(`${taskId}/${role}: a reason-free ask gets one why, then the tier speaks`, () => {
@@ -243,7 +281,7 @@ for (const taskId of TASKS) {
       );
       assert.equal(first.action, "ask_why");
       const second = counterpartStep(task, counterpart, 5, greedy, state("none"));
-      assert.equal(second.action, "counter_tier");
+      assert.equal(second.action, "balance");
     });
   }
 }
@@ -410,22 +448,19 @@ for (const taskId of TASKS) {
       );
       assert.equal(plan.tier, "work");
       assert.deepEqual(plan.tentative, tierPackage(task, role, "work"));
-      assert.equal(scorePackage(task, plan.tentative, role), 2000);
+      assert.equal(scorePackage(task, plan.tentative, role), 2300);
     });
 
-    test(`${taskId}/${role}: plan — a minimum above the tier leaves no tentative`, () => {
-      // Mandate: WR only, but minimum = own best option. The work tier's
-      // second option is below that floor, so the proxies cannot settle and
-      // the principals must close it directly.
-      const req = requirementIssue(task, role);
-      const mandate = standardMandate(task, role, [wr.id]);
-      mandate.issues = mandate.issues.map((im) =>
-        im.issueId === req.id
-          ? { ...im, minimumOptionId: rankedOptions(task, req.id, role)[0].id }
-          : im,
-      );
-      const plan = buildProxyPlan(task, role, mandate);
-      assert.equal(plan.tentative, null);
+    test(`${taskId}/${role}: plan — the proxies always reach a package`, () => {
+      // With the mandate floor gone (Ver.2.13 §2.6) there is nothing that can
+      // stop the proxies settling at the rung the reasons earned, at any rung.
+      // The participant's control is the reason checkboxes before and RATIFY
+      // after — not a range the proxy could fail to clear.
+      for (const ids of [[], [wr.id], [wr.id, sb.id]]) {
+        const plan = buildProxyPlan(task, role, standardMandate(task, role, ids));
+        assert.ok(plan.tentative, `no tentative for ${ids.length} card(s)`);
+        assert.deepEqual(plan.tentative, tierPackage(task, role, plan.tier));
+      }
     });
   }
 }

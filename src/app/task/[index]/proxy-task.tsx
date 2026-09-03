@@ -66,6 +66,7 @@ import {
   useDevMockAi,
 } from "@/lib/dev-mode";
 
+import type { ReasonTier } from "@/lib/negotiation/machine";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
@@ -85,6 +86,7 @@ import type {
   StageId,
   TaskId,
 } from "@/lib/types";
+import { RatifyPhase, type RatifyChoice } from "./ratify";
 import { ReviewPhase } from "./review";
 import {
   DirectNegotiation,
@@ -124,6 +126,7 @@ type Phase =
   | "confirm"
   | "matchmaking"
   | "watching"
+  | "ratify"
   | "handover"
   | "negotiate"
   | "review";
@@ -137,6 +140,7 @@ const PHASES: Phase[] = [
   "confirm",
   "matchmaking",
   "watching",
+  "ratify",
   "handover",
   "negotiate",
   "review",
@@ -154,7 +158,7 @@ const STEP_LABELS = [
   "Check with it",
   "Check and start",
   "Watch",
-  "Talk it through",
+  "Your decision",
   "Review",
 ];
 
@@ -191,10 +195,32 @@ const PHASE_LABELS: Record<Phase, string> = {
   confirm: "Check and start",
   matchmaking: "Connecting",
   watching: "Watch",
+  ratify: "Your decision",
   handover: "Handover",
   negotiate: "Talk it through",
   review: "Review",
 };
+
+/**
+ * SB-TIMING (Ver.2.13 §9.3) for the Proxy arm.
+ *
+ * Two channels, and they are ordered: the proxy's scheduled card lands at
+ * stage 2 — before the counterpart's stage-4 disclosure — so if the proxy
+ * voiced it, the category is "before" whatever else happens later. Only a
+ * participant whose proxy did NOT voice it can reach "wrap_up", by tagging
+ * their own SB in the closing conversation.
+ *
+ * Category "after_counterpart" is unreachable in this arm: a Proxy
+ * participant's only free speech after the disclosure IS the closing, which is
+ * its own category. §9.8-5 flags that structural zero for the χ²'s unit.
+ */
+function proxySbTiming(
+  proxyVoicedTier: ReasonTier,
+  selfDisclosedInClosing: boolean,
+): "none" | "before_counterpart" | "wrap_up" {
+  if (proxyVoicedTier === "sensitive") return "before_counterpart";
+  return selfDisclosedInClosing ? "wrap_up" : "none";
+}
 
 const STEP_OF: Record<Phase, number> = {
   /* The cover is not a counted step — see the note on STEP_LABELS. */
@@ -206,6 +232,7 @@ const STEP_OF: Record<Phase, number> = {
   confirm: 4,
   matchmaking: 5,
   watching: 5,
+  ratify: 6,
   handover: 6,
   negotiate: 6,
   review: 7,
@@ -259,7 +286,6 @@ function emptyMandate(
     issues: task.issues.map<IssueMandate>((issue) => ({
       issueId: issue.id,
       preferredOptionId: null,
-      minimumOptionId: null,
     })),
     // Design §7: every work reason on, every sensitive one off. The defaults
     // are load-bearing and must not be "improved" — pre-checking a sensitive
@@ -275,28 +301,19 @@ function emptyMandate(
  * Written back under every card so the participant can check what they have
  * actually said. Selections are easy to misread; a sentence is not.
  *
- * "Trade down" was the wrong phrase and had to go. Options are listed in the
- * order that favours whichever ROLE the term belongs to, so on the other
- * side's priority term a concession runs UP the list — and the sentence read
- * "I'll trade down to 4 reviews" for a floor that was in fact the most
- * generous position available. It now says which end it will settle at, which
- * is true whichever direction the list runs.
+ * It says what the proxy will OPEN with and nothing about where it will
+ * settle, because the participant no longer sets that (Ver.2.13 §2.6) — and
+ * a sentence promising a floor the mandate does not carry would be worse than
+ * no sentence at all.
  */
 function instructionSentence(issue: Issue, im: IssueMandate): string {
   const label = (id: string | null) =>
     issue.options.find((o) => o.id === id)?.label;
 
   const open = label(im.preferredOptionId);
-  const floor = label(im.minimumOptionId);
-
-  const parts: string[] = [];
-  parts.push(open ? `I'll open by asking for ${open}.` : "I'll open on this term.");
-  if (floor && floor !== open) {
-    parts.push(`I'll settle as far as ${floor}, and no further.`);
-  } else if (floor) {
-    parts.push("I won't move from there.");
-  }
-  return parts.join(" ");
+  return open
+    ? `I'll open by asking for ${open}.`
+    : "I'll open on this term.";
 }
 
 export function ProxyTask({
@@ -366,12 +383,17 @@ export function ProxyTask({
   const [showStopped, setShowStopped] = useState(false);
   /** M1 (§9.3): asked right after the mandate, of non-disclosers only. */
   const [m1Answer, setM1Answer] = useState<string | null>(null);
+  /**
+   * RATIFY (§9.3) — recorded on the decision screen, not inferred afterwards.
+   * A participant who asked for a change and then agreed the very same package
+   * is a modifier, and coding them off the final package would call them an
+   * approver.
+   */
+  const [ratify, setRatify] = useState<RatifyChoice | null>(null);
   /** What the closing conversation produced, for the outcome row (§9.3). */
-  const [closing, setClosing] = useState<{
-    ratify: "approved_as_is" | "modified" | "rejected" | null;
-    selfDisclosed: boolean;
-    postRecipSb: boolean;
-  } | null>(null);
+  const [closing, setClosing] = useState<{ selfDisclosed: boolean } | null>(
+    null,
+  );
 
   const mockAi = useDevMockAi();
   const script = scriptedTask(task, role, policy);
@@ -391,7 +413,10 @@ export function ProxyTask({
         // Only `review` was seeded, which hid it: that screen was the one
         // being checked.
         const needsExchange =
-          p === "handover" || p === "negotiate" || p === "review";
+          p === "ratify" ||
+          p === "handover" ||
+          p === "negotiate" ||
+          p === "review";
         if (needsExchange && transcript.length === 0) {
           setTranscript(
             script.messages.map((m) => ({
@@ -448,18 +473,12 @@ export function ProxyTask({
       ],
       issues: m.issues.map((im) => {
         const issue = task.issues.find((i) => i.id === im.issueId)!;
-        const isRequirement = issue.id === requirement.id;
-        const byValue = [...issue.options].sort(
+        const best = [...issue.options].sort(
           (a, b) => b.points[role] - a.points[role],
-        );
-        const threshold =
-          byValue[issue.requirementThresholdIndex ?? 1] ?? byValue[1];
+        )[0];
         return {
           ...im,
-          preferredOptionId: im.preferredOptionId ?? byValue[0].id,
-          minimumOptionId:
-            im.minimumOptionId ??
-            (isRequirement ? threshold.id : byValue[byValue.length - 1].id),
+          preferredOptionId: im.preferredOptionId ?? best.id,
         };
       }),
     }));
@@ -557,7 +576,7 @@ export function ProxyTask({
         },
         { sessionIndex: taskIndex },
       );
-      setPhase("handover");
+      setPhase("ratify");
       return;
     }
 
@@ -741,7 +760,7 @@ export function ProxyTask({
         },
         { sessionIndex: taskIndex },
       );
-      setPhase("handover");
+      setPhase("ratify");
     } catch (e) {
       console.error(e);
       setError(
@@ -815,9 +834,6 @@ export function ProxyTask({
           preferred: Object.fromEntries(
             mandate.issues.map((im) => [im.issueId, im.preferredOptionId]),
           ),
-          minimum: Object.fromEntries(
-            mandate.issues.map((im) => [im.issueId, im.minimumOptionId]),
-          ),
         }}
         reasons={
           <ReasonMandateSection
@@ -834,7 +850,6 @@ export function ProxyTask({
             issues: m.issues.map((im) => ({
               ...im,
               preferredOptionId: p.preferred[im.issueId] ?? null,
-              minimumOptionId: p.minimum[im.issueId] ?? null,
             })),
           }));
           setPhase("rehearsal");
@@ -1021,9 +1036,6 @@ export function ProxyTask({
                   mandate.authorizedReasonIds,
                 ),
                 authorizedReasonIds: mandate.authorizedReasonIds,
-                requirementMinimum:
-                  mandate.issues.find((i) => i.issueId === requirement.id)
-                    ?.minimumOptionId ?? null,
               },
               { sessionIndex: taskIndex },
             );
@@ -1116,6 +1128,39 @@ export function ProxyTask({
     );
   }
 
+  // --- RATIFY: the decision the participant kept (Ver.2.13 §7) ------------
+  if (phase === "ratify") {
+    return (
+      <RatifyPhase
+        taskIndex={taskIndex}
+        task={task}
+        role={role}
+        steps={STEP_LABELS}
+        stepIndex={STEP_OF.ratify}
+        tentative={tentative}
+        proxyTranscript={transcript}
+        onDecide={(choice) => {
+          setRatify(choice);
+          if (choice === "approved_as_is") {
+            // APPROVING ENDS THE TASK. There is no closing conversation to
+            // hold: the participant has decided, and the package the proxies
+            // reached is the outcome. Sending an approver into a three-minute
+            // chat anyway would make the decision cosmetic — RATIFY would code
+            // an intention that the flow then ignored.
+            setProxyTranscript(transcript);
+            setMessages([]);
+            setPhase("review");
+            return;
+          }
+          // Modify or refuse: three minutes with the other participant. A
+          // refusal starts from nothing — that is what refusing means, and it
+          // is why the choice carries a confirmation step.
+          setPhase("handover");
+        }}
+      />
+    );
+  }
+
   // --- handover -----------------------------------------------------------
   if (phase === "handover") {
     return (
@@ -1203,20 +1248,12 @@ export function ProxyTask({
         setOffer={setOffer}
         onSettled={(pkg, meta) => {
           setTentative(pkg);
-          setClosing(meta);
-          // §9.3: RATIFY (what happened to the proxies' tentative package),
-          // SELF-DISCLOSE (the SB tagged in the participant's own voice), and
-          // POST-RECIP-SB (a new SB after the counterpart's disclosure, which
-          // in this arm happened during the watched exchange).
+          setClosing({ selfDisclosed: meta.selfDisclosed });
           logEvent(
             "task_outcome_recorded",
             {
-              ratify: meta.ratify,
-              selfDisclosed: meta.selfDisclosed,
-              postRecipSb: meta.postRecipSb,
-              preRecipSb: proxyVoicedTier === "sensitive",
-              sbVoiced:
-                proxyVoicedTier === "sensitive" || meta.selfDisclosed,
+              sb: proxyVoicedTier === "sensitive",
+              sbTiming: proxySbTiming(proxyVoicedTier, meta.selfDisclosed),
             },
             { sessionIndex: taskIndex },
           );
@@ -1241,15 +1278,18 @@ export function ProxyTask({
           .map((im) => [im.issueId, im.preferredOptionId as string]),
       )}
       behaviour={{
-        ratify: closing?.ratify ?? null,
-        selfDisclosed: closing?.selfDisclosed ?? false,
-        // PRE-RECIP-SB in this arm is the proxy's own doing: its scheduled
-        // SB lands at the first reason opportunity, before the counterpart's
-        // stage-4 disclosure. `proxyVoicedTier` is what it ACTUALLY voiced.
-        preRecipSb: proxyVoicedTier === "sensitive",
-        postRecipSb: closing?.postRecipSb ?? false,
-        sbVoiced:
-          proxyVoicedTier === "sensitive" || Boolean(closing?.selfDisclosed),
+        ratify,
+        // SB in this arm is the proxy's doing: a checked card is voiced at
+        // its first reason opportunity, which is stage 2 and so always before
+        // the counterpart's stage-4 disclosure. `proxyVoicedTier` is what it
+        // ACTUALLY voiced, never what was authorized — a guardrail block or
+        // an emergency stop can leave an authorized card unsaid, and assuming
+        // otherwise once made the rule inert for a whole arm.
+        sb: proxyVoicedTier === "sensitive",
+        sbTiming: proxySbTiming(
+          proxyVoicedTier,
+          Boolean(closing?.selfDisclosed),
+        ),
       }}
       transcript={messages}
       proxyTranscript={proxyTranscript}

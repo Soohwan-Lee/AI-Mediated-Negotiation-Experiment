@@ -175,8 +175,14 @@ export async function POST(request: Request) {
 
   const decidedAction = ((): string => {
     switch (decision.action) {
-      case "open":
-        return `Open with your own best package on both terms, naming these exact levels: ${levels}.`;
+      case "open": {
+        // SCRIPT-OPEN (Ver.2.13 §6.4): the work reason and the question, and
+        // NO PACKAGE. An opening anchor of "my best, your worst" is itself a
+        // face threat (§2.6), so the first package on the table is always the
+        // symmetric tier one.
+        const wr = cardOfLayer(task, counterpartRole, "work");
+        return `Start the conversation. Give your own reason by conveying exactly this and nothing more: "${wr?.text ?? ""}". Then ask which of the two terms matters most to them, and why. Propose no levels and no package this turn.`;
+      }
       case "state_priority": {
         // The counterpart's WR — fixed and identical for every participant —
         // plus the question that opens their first reason opportunity.
@@ -200,15 +206,25 @@ export async function POST(request: Request) {
       case "ask_why":
         return `Ask them why ${yourRequirement.label.toLowerCase()} matters so much to them — you'd like to hear the reason before moving. Make no new offer this turn and do not agree to anything yet.`;
       case "nonum":
-        return `Remind them, lightly and without accusing, that the two of you are not supposed to talk about scores — keep it to the shift counts — then move on. No new offer this turn.`;
+        return `Remind them, lightly and without accusing, that the two of you are not supposed to talk about scores — keep it to the terms themselves — then move on. No new offer this turn.`;
       case "accept":
         return `Say the package they proposed works for you, naming exactly these levels: ${levels}.`;
       case "accept_sb":
-        return `Agree to exactly these levels: ${levels}. Frame it as: given the situation they shared, this arrangement beats forcing it on either side. React to what they said — do not act newly surprised if you have already acknowledged it.`;
-      case "propose_max":
-        return `Say that given what they've told you, a fuller trade makes more sense — propose exactly these levels and no others: ${levels}. Make clear you're asking for ${theirRequirement.label.toLowerCase()} at your end of it in return.`;
-      case "counter_tier":
-        return `Say that on what you've heard so far you can't go all the way on ${yourRequirement.label.toLowerCase()}, and offer this instead, naming exactly these levels: ${levels}.`;
+        return `Agree to exactly these levels: ${levels}. Frame it as an update: now that you know their situation, this is what makes sense for both of you — not as a favour you are doing them. React to what they said, and do not act newly surprised if you have already acknowledged it.`;
+      case "propose_tier":
+        // SCRIPT-PROPOSE-T1/T2/T3. One move at three depths: "I move as far as
+        // I believe you, and I ask for the same in return." The tier only
+        // changes the framing — how much of an update the reason was.
+        return body.tier === "sensitive"
+          ? `Say you had no idea about that, and that it changes how you see it — propose exactly these levels and no others: ${levels}. Both of you get what you most need. Ask for ${theirRequirement.label.toLowerCase()} at your end of it in return.`
+          : body.tier === "work"
+            ? `Say that on that reasoning you can move further, and propose exactly these levels and no others: ${levels} — asking for the same amount of movement on ${theirRequirement.label.toLowerCase()} in return.`
+            : `Say that neither of you knows much about the other's situation yet, so suggest meeting in the middle for now — propose exactly these levels and no others: ${levels}.`;
+      case "balance":
+        // SCRIPT-BALANCE. Refuses BOTH directions: an over-ask asks for more
+        // credibility than was earned, and an over-concession would drag the
+        // outcome below the rung the participant paid for (§6.2).
+        return `Say that what they proposed has one side moving further than the other, and that you would rather both moved the same amount — put this forward instead, naming exactly these levels: ${levels}.`;
       case "soft_close":
         return `Say time is nearly up and offer to settle on this package rather than run out: ${levels}. Ask if they'll take it.`;
       case "impasse":

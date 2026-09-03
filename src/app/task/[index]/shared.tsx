@@ -246,9 +246,23 @@ export function TaskBrief({
 // Phase: preferences on both terms
 // ---------------------------------------------------------------------------
 
+/**
+ * The participant's hoped-for package (Ver.2.13 §8.6), on both terms, in both
+ * arms.
+ *
+ * THE WALKAWAY LIMIT IS GONE. It was a second level per issue — a floor the
+ * proxy could not cross — and §2.6 removed it for three reasons that all
+ * point the same way. It could not change the outcome, because the
+ * counterpart's policy is decisive; all it could do was manufacture an
+ * impasse. It mixed mandate-SETTING skill into a result that is supposed to
+ * turn on disclosure alone. And it made the entry screen twice the size in
+ * the arm that had it, for a control the other arm did not have.
+ *
+ * What is left is what both arms share: what you hope for, which the review
+ * screen sets beside what was actually agreed.
+ */
 export interface Preferences {
   preferred: Record<string, string | null>;
-  minimum: Record<string, string | null>;
 }
 
 export function PreferenceForm({
@@ -280,12 +294,6 @@ export function PreferenceForm({
       initial?.preferred ??
       Object.fromEntries(task.issues.map((i) => [i.id, null])),
   );
-  const [minimum, setMinimum] = useState<Record<string, string | null>>(
-    () =>
-      initial?.minimum ??
-      Object.fromEntries(task.issues.map((i) => [i.id, null])),
-  );
-
   useDevAutofill(() => {
     const best = (issueId: string) => {
       const issue = task.issues.find((i) => i.id === issueId)!;
@@ -293,36 +301,24 @@ export function PreferenceForm({
         (a, b) => b.points[role] - a.points[role],
       )[0].id;
     };
-    const floor = (issueId: string) => {
-      const issue = task.issues.find((i) => i.id === issueId)!;
-      const ranked = [...issue.options].sort(
-        (a, b) => b.points[role] - a.points[role],
-      );
-      const isRequirement = issueId === task.requirementIssueId[role];
-      return isRequirement
-        ? ranked[issue.requirementThresholdIndex ?? 1].id
-        : ranked[ranked.length - 1].id;
-    };
     setPreferred(
       Object.fromEntries(task.issues.map((i) => [i.id, best(i.id)])),
     );
-    setMinimum(Object.fromEntries(task.issues.map((i) => [i.id, floor(i.id)])));
   }, `prefs-t${taskIndex}`);
 
-  const missing = task.issues.flatMap((i) => [
-    ...(preferred[i.id] ? [] : [`pref-${i.id}`]),
-    ...(minimum[i.id] ? [] : [`min-${i.id}`]),
-  ]);
+  const missing = task.issues
+    .filter((i) => !preferred[i.id])
+    .map((i) => `pref-${i.id}`);
   const canContinue = useDevGate(missing.length === 0 && reasonsComplete);
 
   async function save() {
     if (!canContinue) return;
-    const prefs = { preferred, minimum };
+    const prefs = { preferred };
     if (participantKey) {
       await getStore().saveResponses(
         participantKey,
         `preferences_t${taskIndex}`,
-        { taskId: task.id, role, preferred, minimum },
+        { taskId: task.id, role, preferred },
       );
     }
     logEvent("initial_preference_saved", { taskId: task.id }, {
@@ -339,8 +335,8 @@ export function PreferenceForm({
             taskIndex={taskIndex}
             title={
               isProxy
-                ? "Configure Your Mandate & Permitted Reasons"
-                : "Define Your Initial Preferences"
+                ? "What You Want, and What Your Proxy May Say"
+                : "What You Want From This Negotiation"
             }
             steps={steps}
             current={stepIndex}
@@ -349,31 +345,12 @@ export function PreferenceForm({
           <div className="mb-6">
             <Callout tone="private" title="🔒 Strictly Confidential · Your Negotiation Boundaries">
               <p className="text-xs sm:text-sm leading-relaxed">
+                Choose what you would like on each of the two terms. The other
+                person never sees this.{" "}
                 {isProxy
-                  ? "Tell your AI Proxy where to start and where to stop. It uses these two limits to negotiate safely on your behalf."
-                  : "These selections record your starting priorities to measure your agreement. Your counterpart never sees your points or choices."}
+                  ? "Your AI Proxy opens by asking for it."
+                  : "Afterwards you will see it beside what was actually agreed."}
               </p>
-
-              {isProxy ? (
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-amber-200 text-xs">
-                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2.5 text-emerald-950">
-                    <p className="font-bold flex items-center gap-1.5 mb-1">
-                      <span>🏆</span> 1. Your Best Goal (Opening Ask)
-                    </p>
-                    <p className="text-2xs sm:text-xs text-emerald-900 leading-relaxed">
-                      What you ideally hope to get. Your AI Proxy will ask for this first to aim high.
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-amber-950">
-                    <p className="font-bold flex items-center gap-1.5 mb-1">
-                      <span>🛡️</span> 2. Your Walkaway Limit (Absolute Minimum)
-                    </p>
-                    <p className="text-2xs sm:text-xs text-amber-900 leading-relaxed">
-                      The lowest option you can accept. If the counterpart pushes back, your proxy may compromise, but <strong>will never agree below this limit</strong>.
-                    </p>
-                  </div>
-                </div>
-              ) : null}
 
               <PointsKey
                 issues={task.issues}
@@ -393,71 +370,38 @@ export function PreferenceForm({
                   💡 <strong>Your Context:</strong> {issue.rationale[role]}
                 </div>
 
-                <div className="mb-3.5">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-700">
-                      🏆 1. Your Best Goal (Aim high)
-                    </p>
-                    <span className="text-2xs text-slate-500">Proxy opens asking for this</span>
-                  </div>
-                  <OptionChips
-                    issue={issue}
-                    role={role}
-                    name={`pref-${issue.id}`}
-                    value={preferred[issue.id]}
-                    onChange={(v) =>
-                      setPreferred((prev) => ({ ...prev, [issue.id]: v }))
-                    }
-                  />
-                </div>
-
-                <div id={`q-min-${issue.id}`}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-xs font-extrabold uppercase tracking-wider text-amber-700">
-                      🛡️ 2. Your Walkaway Limit (Lowest acceptable)
-                    </p>
-                    <span className="text-2xs text-slate-500">Proxy will NEVER go below this</span>
-                  </div>
-                  <OptionChips
-                    issue={issue}
-                    role={role}
-                    name={`min-${issue.id}`}
-                    value={minimum[issue.id]}
-                    onChange={(v) =>
-                      setMinimum((prev) => ({ ...prev, [issue.id]: v }))
-                    }
-                  />
-                </div>
+                {/* ONE CONTROL PER TERM, and the two terms look identical.
+                    §5 principle 1: an extra control on one of them would say
+                    which term the study is about without a word. */}
+                <OptionChips
+                  issue={issue}
+                  role={role}
+                  name={`pref-${issue.id}`}
+                  value={preferred[issue.id]}
+                  onChange={(v) =>
+                    setPreferred((prev) => ({ ...prev, [issue.id]: v }))
+                  }
+                />
               </Card>
             ))}
           </div>
 
-          {/* WHAT THESE TWO NUMBERS ARE, AND WHAT THEY ARE NOT. They price
-              the two positions the participant just entered — nothing more.
-              Under the Ver.2.12 ladder what a package is actually worth
-              depends on the reasons that get voiced (§3.3), so labelling the
-              floor's value as an expected outcome would forecast a number
-              the negotiation does not owe them. The labels therefore name
-              the POSITION being priced, and the note says plainly that
-              neither is a prediction. */}
+          {/* WHAT THIS NUMBER IS, AND WHAT IT IS NOT. It prices the package
+              the participant just chose — nothing more. Under the ladder what
+              a package is actually worth depends on the reasons that get
+              voiced (§3.3), so presenting it as an expected outcome would
+              forecast a number the negotiation does not owe them. */}
           <div className="mt-5 space-y-2 rounded-2xl border border-[var(--private-line)] bg-amber-50/50 p-4 sm:p-5 shadow-2xs">
             <PackageValue
               issues={task.issues}
               role={role}
               reservationPoints={task.reservationPoints}
               selection={preferred}
-              label="What your Best Goal is worth to you"
-            />
-            <PackageValue
-              issues={task.issues}
-              role={role}
-              reservationPoints={task.reservationPoints}
-              selection={minimum}
-              label="What your Walkaway Limit is worth to you"
+              label="What this would be worth to you"
             />
             <p className="pt-1 text-xs leading-relaxed text-[var(--private-ink)]">
-              These price the two positions you just set. Where the
-              negotiation actually lands is up to the conversation.
+              This prices the package you just chose. Where the negotiation
+              actually lands is up to the conversation.
             </p>
           </div>
 

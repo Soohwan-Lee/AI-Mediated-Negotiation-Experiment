@@ -167,18 +167,28 @@ export interface ReasonCard {
   /**
    * Which confession a sensitive card carries (analysis metadata).
    *
-   * Ver.2.12 deliberately gives the two tasks DIFFERENT incidents — the same
-   * person repeating the same mistake across tasks would be a tell, and the
-   * counterpart is introduced as a different participant in each task
-   * (Ver.2.12 §3.5). Each SB is a face confession: a self-damaging fact that
-   * contradicts the professional image the role brief sets up, anchored to
-   * one concrete incident, and it is the CAUSE of the role's priority (§4).
+   * The two tasks carry DIFFERENT incidents on purpose — the same person
+   * repeating the same mistake across tasks would be a tell, and each task's
+   * counterpart is introduced as a different participant (§3.5). Task A's
+   * pair is a hidden fault of one's OWN (a promise made alone; freezing in
+   * front of a client); Task B's is a third party's adverse JUDGEMENT (the
+   * director's warning; the client asking for someone else).
+   *
+   * Ver.2.13 §4 principle 5 rewrote all four. The old set — "I have not
+   * learned the new reconciliation procedure yet", "I entered the inventory
+   * wrong" — were SOLVABLE BY ASKING: in a US workplace the natural reply is
+   * "just say so and we'll show you", which makes the face cost small and,
+   * worse, means the fact cannot be the cause of the priority. The types that
+   * survive are the ones disclosure cannot dissolve: something already hidden,
+   * a judgement someone else has already made, or a fear that persists. All
+   * three carry a second admission with them — that it was kept quiet until
+   * now.
    */
   facet?:
-    | "forecast_misses"
-    | "thin_staffing"
-    | "closing_procedure"
-    | "inventory_errors";
+    | "promised_alone"
+    | "froze_in_front_of_client"
+    | "director_warning"
+    | "client_asked_for_someone_else";
 }
 
 export interface NegotiationTask {
@@ -230,18 +240,22 @@ export interface RoleBrief {
 // ---------------------------------------------------------------------------
 
 /**
- * One issue's instruction to the Proxy (Design §8 Proxy task 흐름 step 2).
+ * One issue's instruction to the Proxy (Ver.2.13 §8.6, §8.7).
  *
- * Two fields per issue — what you want, and the least you will take. Design
- * §5 principle 4 is explicit that all three issues are entered the same way,
- * so the UI may not single out the requirement issue with an extra control.
+ * ONE FIELD PER ISSUE — where to open. The "least you will take" is gone:
+ * §2.6 dropped the range mandate because it could not change the outcome
+ * (the counterpart's policy is decisive) and could only manufacture an
+ * impasse while mixing mandate-setting skill into a result meant to turn on
+ * disclosure. The participant's control is the reason checkboxes before and
+ * RATIFY after.
+ *
+ * Both issues are still entered the same way, with no extra control on either
+ * (§5 principle 1) — a per-issue difference would name the requirement issue.
  */
 export interface IssueMandate {
   issueId: string;
   /** Where to open. */
   preferredOptionId: string | null;
-  /** The least the proxy may settle for. Doubles as the hard boundary. */
-  minimumOptionId: string | null;
 }
 
 export interface Mandate {

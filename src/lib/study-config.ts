@@ -20,7 +20,7 @@ export const STUDY = {
    * study takes underpays every participant who is slower than the estimate,
    * and Prolific's fair-pay rate is computed against this number.
    */
-  estimatedMinutes: 60,
+  estimatedMinutes: 58,
   /* ^ Keep in step with `TOTAL_MINUTES` below, which is derived from
      STAGE_MINUTES; `assertTimingConsistent()` fails the build if they part. */
   /**
@@ -35,14 +35,20 @@ export const STUDY = {
   /**
    * Base participation payment, advertised on the consent page.
    *
-   * £8.00 base + £1.00 bonus = £9.00 for a 60-minute study, which is exactly
-   * Prolific's recommended fair-pay rate of £9.00/hour (their hard floor is
-   * £6.00). The recommended rate rather than the floor because this is an
-   * effortful hour: two briefings to read, two negotiations to conduct, and
-   * roughly eighty rating items plus fourteen written answers.
+   * £8.00 base + £1.00 bonus = £9.00 for a 58-minute study, which is £9.31 an
+   * hour — above Prolific's recommended fair-pay rate of £9.00 (their hard
+   * floor is £6.00). The recommended rate rather than the floor because this
+   * is an effortful hour: two briefings to read, two negotiations to conduct,
+   * and roughly eighty rating items plus fourteen written answers.
+   *
+   * THE PAY DID NOT FALL WHEN THE BUDGET DID. Ver.2.13 shortened the flow by
+   * two minutes (the mandate lost a control per issue; the Proxy closing is
+   * now conditional), and the payment stayed where it was rather than being
+   * shaved to match — the study asks the same work of a participant either
+   * way, and the estimate is a cap most people finish inside.
    */
   compensation: "8.00",
-  hourlyEquivalent: "9.00",
+  hourlyEquivalent: "9.31",
   /**
    * The performance bonus (Design §2, §8). £1.00 per participant, across the
    * study — not per task.
@@ -110,8 +116,23 @@ export const STAGE_MINUTES = {
   background: 4,
   instruction: 4,
   practice: 4,
-  /** Briefing, preference or mandate, negotiation, review. */
-  task: 14,
+  /**
+   * Briefing, preference or mandate, negotiation, decision, review.
+   *
+   * 13, down one from Ver.2.12's 14. Two Ver.2.13 changes both shorten the
+   * task and neither is large: the mandate screen lost its second control per
+   * issue (the walkaway limit, §2.6), and in the Proxy arm the three-minute
+   * closing conversation is now reached only by a participant who asks for a
+   * change or refuses — an approver goes straight to review. It is a cap
+   * either way, and the pilot median decides whether it is right.
+   *
+   * NOT the §7 heading's "45-50 minutes". That is the design doc's rough
+   * estimate; this figure is summed from the screens that actually exist, and
+   * the advertised number is computed from it. Adopting the looser figure
+   * would advertise less than the study takes, which underpays anyone slower
+   * than the estimate.
+   */
+  task: 13,
   /**
    * The rating blocks and open-ended after ONE task.
    *

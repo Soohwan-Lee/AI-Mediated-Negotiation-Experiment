@@ -115,7 +115,7 @@ export default function DebriefingPage() {
                   <strong className="text-slate-900">
                     No such decision was ever made about you, by anyone — there was no
                     other participant to make one — and your evaluation was not passed
-                    to any district manager
+                    to any director
                   </strong>
                   ; there is none. Both were recorded only as research data. Nothing you
                   did in either task affected your payment. Every participant is paid the

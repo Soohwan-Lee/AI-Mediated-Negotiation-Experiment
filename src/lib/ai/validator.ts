@@ -164,39 +164,12 @@ export function validateAction(
         continue;
       }
 
-      // Options are listed best-first for the side the issue favours, so
-      // "further along the list" is "further conceded" for the role the issue
-      // belongs to — and the other way round for the other role, which is why
-      // the direction is derived from the opening rather than assumed.
-      const order = issue.options.map((o) => o.id);
-      const proposedIdx = order.indexOf(term.optionId);
-
-      // One limit per issue since Ver.2.12 — the mandate's minimum IS the
-      // hard boundary. This was a parameterised helper taking the code as an
-      // argument, from when a mandate carried a red line and a softer
-      // envelope; with one caller passing one literal, the branch inside it
-      // choosing the wording was unreachable.
-      const limitId = issueMandate.minimumOptionId;
-      if (limitId) {
-        const limitIdx = order.indexOf(limitId);
-        const openIdx = issueMandate.preferredOptionId
-          ? order.indexOf(issueMandate.preferredOptionId)
-          : -1;
-        if (proposedIdx >= 0 && limitIdx >= 0 && openIdx >= 0) {
-          // Option order is role-relative, so which way is "past the limit"
-          // depends on which side of the opening the limit sits.
-          const past =
-            limitIdx >= openIdx
-              ? proposedIdx > limitIdx
-              : proposedIdx < limitIdx;
-          if (past) {
-            violations.push({
-              code: "red_line_violation",
-              detail: `Proposed ${term.optionId} on ${term.issueId} is past the principal's hard boundary.`,
-            });
-          }
-        }
-      }
+      // THERE IS NO CONCESSION LIMIT TO CHECK ANY MORE. Ver.2.13 §2.6 removed
+      // the range mandate, and with it `red_line_violation`: the mandate now
+      // carries an opening level and nothing else, so there is no boundary a
+      // proposal could cross. What the mandate still gates is the issue
+      // itself (above) and the reason cards (below) — a proposal on an issue
+      // the principal never mandated is still a violation.
     }
 
     // An unchecked reason card may inform which package the proxy chooses and

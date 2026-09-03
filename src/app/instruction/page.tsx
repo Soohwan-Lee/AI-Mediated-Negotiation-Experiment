@@ -213,15 +213,16 @@ export default function InstructionPage() {
             </CardTitle>
             <dl className="space-y-2.5 mt-3">
               <Gist term="Where you are">
-                A coffee and bakery shop. You are the{" "}
-                <strong>{isLeader ? "store manager 👑" : "senior staff member 🛠️"}</strong>.
+                A consulting and marketing agency, on a client project team. You
+                are the{" "}
+                <strong>{isLeader ? "team lead 👑" : "senior consultant 🛠️"}</strong>.
               </Gist>
               <Gist term="Who you talk to">
-                One other participant, playing the other role. They want different
-                things from the schedule than you do.
+                One other participant, playing the other role. They want
+                different working conditions than you do.
               </Gist>
               <Gist term="What you settle">
-                <strong>Two things about the schedule</strong> — and you have to agree
+                <strong>Two working conditions</strong> — and you have to agree
                 on both. Neither of you can set them alone.
               </Gist>
               {/* A first-time reader was told the point sheet was private
@@ -251,7 +252,7 @@ export default function InstructionPage() {
                   Your Assigned Role
                 </p>
                 <h2 className="text-2xl font-black tracking-tight text-[var(--ink)] sm:text-3xl">
-                  {isLeader ? "👑 Store Manager" : "🛠️ Senior Staff"}
+                  {isLeader ? "👑 Team Lead" : "🛠️ Senior Consultant"}
                 </h2>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900 shadow-2xs">
@@ -266,42 +267,42 @@ export default function InstructionPage() {
                 items={
                   isLeader
                     ? [
-                        "You set the schedule once it is agreed",
-                        "You decide their recommended bonus after each schedule",
-                        "You answer for how the shop is covered",
+                        "You set the project terms once they are agreed",
+                        "You decide their recommended bonus after each negotiation",
+                        "You answer to the director for how the account runs",
                       ]
                     : [
-                        "You are the only one who can close the shop alone",
-                        "You can refuse a shift pattern, or ask for it to change",
-                        "You write an evaluation of the manager after each schedule — it goes to the district manager",
+                        "You are the one senior who can be put in front of the client alone",
+                        "You can refuse a set of terms, or ask for them to change",
+                        "You write an evaluation of the lead after each negotiation — it goes to the director",
                       ]
                 }
               />
               <PowerBox
                 title={
                   isLeader
-                    ? "What the senior staff member holds"
-                    : "What the store manager holds"
+                    ? "What the senior consultant holds"
+                    : "What the team lead holds"
                 }
                 tone="theirs"
                 items={
                   isLeader
                     ? [
-                        "They are the only one who can close the shop alone",
-                        "They can refuse a shift pattern, or ask for it to change",
-                        "They write an evaluation of you after each schedule — it goes to the district manager",
+                        "They are the one senior who can be put in front of the client alone",
+                        "They can refuse a set of terms, or ask for them to change",
+                        "They write an evaluation of you after each negotiation — it goes to the director",
                       ]
                     : [
-                        "They set the schedule once it is agreed",
-                        "They decide your recommended bonus after each schedule",
-                        "They answer for how the shop is covered",
+                        "They set the project terms once they are agreed",
+                        "They decide your recommended bonus after each negotiation",
+                        "They answer to the director for how the account runs",
                       ]
                 }
               />
             </div>
 
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs sm:text-sm font-semibold leading-relaxed text-slate-800">
-              💡 Neither of you can set the schedule alone — and you each know
+              💡 Neither of you can set these terms alone — and you each know
               the other has been asked to weigh what they learn during the
               negotiation.
             </div>
@@ -380,7 +381,7 @@ export default function InstructionPage() {
                 to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task),
                 weighing the result and what they learned during the
                 negotiation — and you write an evaluation of the manager that
-                goes to the district manager. Any bonus is paid when the study
+                goes to the director. Any bonus is paid when the study
                 ends.
               </p>
             )}

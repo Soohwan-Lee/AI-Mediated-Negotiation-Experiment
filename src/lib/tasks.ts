@@ -152,262 +152,283 @@ function sensitive(
 }
 
 // ---------------------------------------------------------------------------
-// Task A — Next Quarter's Schedule (12 weeks)
+// Task A — The Quarterly Client Project (12 weeks)
+//
+// Ver.2.13 §3.1 replaced the coffee-shop shift scenario with a consulting
+// agency's project team, and the reason is SELF-RELEVANCE (White et al. 2004).
+// In that work face threat suppressed agreement and joint gain only when what
+// was being negotiated was part of the negotiator's own identity — their own
+// business, their own competence. A shift rota is instrumental: nobody's
+// judgement is on the table, so the condition was never met. Here each issue
+// is one the other party's own competence or judgement rides on:
+//
+//   Member's core   = an obligation that EXPOSES their competence
+//                     (presenting to the client)
+//   Leader's core   = something they have ALREADY PROMISED upward
+//                     (the deadline they committed to)
+//
+// The hierarchy is unchanged; what changed is that the terms themselves now
+// carry the self. The payoff spine is untouched.
 // ---------------------------------------------------------------------------
 
 const TASK_A: NegotiationTask = {
   id: "task_a",
-  title: "Next Quarter's Schedule",
+  title: "The Quarterly Client Project",
   reservationPoints: RESERVATION_POINTS,
   requirementIssueId: {
-    leader: "weekend_shifts",
-    member: "closing_shifts",
+    leader: "report_deadline",
+    member: "review_sessions",
   },
   publicBrief:
-    "You both work at the same coffee and bakery shop. The Leader is the store manager and the Member is the senior staff member. The two of you are setting the regular schedule for the next quarter, twelve weeks. Two things have to be agreed: how many weekend shifts and how many closing shifts. Neither of you can set them alone. Weekend shifts are daytime work and never overlap with the closing till.",
+    "You both work at the same consulting and marketing agency, on the same client project team. The Leader is the team lead and the Member is the senior consultant. The two of you are settling two working conditions for next quarter's client project, twelve weeks. Two things have to be agreed: when the final report is due, and how many of the client review sessions the Member presents. Neither of you can set them alone. The two do not physically collide — presenting fewer sessions does not change the report work itself.",
 
   issues: [
     {
-      id: "weekend_shifts",
-      label: "Weekend shifts",
-      description: "How many weekend shifts the Member works per month.",
+      id: "report_deadline",
+      label: "Final report deadline",
+      description: "How soon the final report is due after the project ends.",
       type: "leader_priority",
       requirementThresholdIndex: REQUIREMENT_THRESHOLD_INDEX,
       options: options(
-        "ws",
-        ["4 per month", "3 per month", "2 per month", "1 per month"],
+        "rd",
+        ["2 weeks", "3 weeks", "4 weeks", "5 weeks"],
         LEADER_POINTS,
       ),
       rationale: {
         leader:
-          "Weekends are the busiest hours, and every weekend uncovered is one you have to explain upstairs.",
-        member: "Each weekend shift is a day off you do not get back.",
+          "The date you gave the client is the date you are measured against.",
+        member:
+          "Every week taken off the deadline is a week of work compressed into the project itself.",
       },
     },
     {
-      id: "closing_shifts",
-      label: "Closing shifts",
-      description: "How many closing shifts the Member works per week.",
+      id: "review_sessions",
+      label: "Review sessions you present",
+      description:
+        "How many of the quarter's four client review sessions the Member presents.",
       type: "member_priority",
       requirementThresholdIndex: REQUIREMENT_THRESHOLD_INDEX,
       options: options(
-        "cs",
-        ["1 per week", "2 per week", "3 per week", "4 per week"],
+        "rs",
+        ["1 of 4", "2 of 4", "3 of 4", "4 of 4"],
         MEMBER_POINTS,
       ),
       rationale: {
         leader:
-          "Every close the Member does not take is one you have to cover or leave to someone less experienced.",
+          "Every session the Member does not present is one you present yourself, on top of everything else.",
         member:
-          "Closes run late, and the more of them there are the less of your evenings are your own.",
+          "Standing in front of the client is the part of this job that costs you most.",
       },
     },
   ],
 
   roleBriefs: {
     leader: {
-      title: "Store Manager",
+      title: "Team Lead",
       organizationalPosition:
-        "You manage this coffee and bakery shop and you set the schedule. After the negotiation you decide the Member's recommended performance bonus (up to £1) — and the Member writes an upward evaluation of you that goes to the district manager. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You lead this project team. After the negotiation you decide the Member's recommended performance bonus (up to £1) — and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "Head office rates you as a manager whose plans are precise, and the team sees you the same way. Now the regular schedule for the next quarter — twelve weeks — has to be settled with your senior staff member.\n\nWhat matters most to you is weekend cover: weekends are what the shop lives on. There is something only you know. Last month you got the weekend demand forecast wrong twice and had to ask another store's manager for emergency help. The district manager knows about it, and told you that if the same problem repeats it goes into your operations review. That is why this quarter's weekends cannot fall apart — and why, if the weekends are covered, you can afford to cut the closing shifts back.\n\nSaying this out loud would make it believable why weekend cover is urgent. But after the negotiation the Member writes an upward evaluation of you, guided to weigh the judgement and operational competence they saw — and a forecast you got wrong twice can read as a manager who cannot plan.",
+        "The director and the team know you as a lead who keeps to the dates you commit to — someone whose planning is accurate. Now next quarter's client project, twelve weeks of it, has to be settled with your senior consultant.\n\nWhat matters most to you is bringing the final report deadline as far forward as you can. There is something only you know. That deadline is a date you promised the client yourself, without checking it with the team first, and the director believes you confirmed the team's schedule before answering. That is why the deadline cannot slip — and why, if the deadline holds, you can afford to take more of the review sessions yourself.\n\nSaying this out loud would make it believable why the deadline is urgent. But after the negotiation the Member writes an upward evaluation of you, guided to weigh the judgement and planning they saw — and a date promised without checking can read as a lead who commits before he knows.",
       objectives: [
-        "Get as many weekend shifts covered as you can.",
-        "If weekends are covered, closing shifts are something you can give ground on.",
+        "Get the final report deadline as early as you can.",
+        "If the deadline holds, the review sessions are something you can give ground on.",
       ],
       requirementNote:
-        "Weekend cover is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
+        "An early deadline is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a manager who cannot plan — and the Member's upward evaluation of you is guided to weigh exactly that.",
+        "Explaining the real reason could make you look like a lead who commits to dates without checking — and the Member's upward evaluation of you is guided to weigh exactly that.",
       reasonCards: [
         work(
           "a_wr_l",
-          "weekend_shifts",
-          "Weekend peaks need experienced cover. This quarter, weekend coverage is the one condition I most urgently need.",
+          "report_deadline",
+          "The client's own timeline is tight, so the report has to land early. This quarter, the deadline is the one condition I most urgently need.",
         ),
         sensitive(
           "a_sb_l",
-          "weekend_shifts",
-          "forecast_misses",
-          "The truth is, I got the weekend demand forecast wrong twice last month and had to ask another store's manager for emergency cover. The district manager knows, and if it happens again it goes into my operations review. If the weekends fall apart this quarter, my ability to run this store is in question.",
+          "report_deadline",
+          "promised_alone",
+          "The truth is, this deadline is a date I promised the client myself, without checking it with the team first. The director thinks I confirmed our schedule before I answered. If it slips, what comes out is that I committed without checking.",
         ),
       ],
       batnaSummary:
-        "If the two of you do not agree on both terms, the schedule falls back to the default rota and you receive your fallback score of 600 points.",
+        "If the two of you do not agree on both terms, the project runs on the default terms and you receive your fallback score of 600 points.",
     },
 
     member: {
-      title: "Senior Staff",
+      title: "Senior Consultant",
       organizationalPosition:
-        "You are the senior staff member here — the one the manager trusts to run the close alone. After the negotiation the manager decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the manager that goes to the district manager. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You are the senior consultant on this team — the one the lead puts in front of the client alone. After the negotiation the lead decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "The manager knows you as the senior who can be trusted with the close alone — including the new closing reconciliation. Now the regular schedule for the next quarter — twelve weeks — has to be settled with the manager.\n\nWhat matters most to you is bringing the closing shifts down. There is something the manager does not know. You still cannot handle the new closing reconciliation on your own: you made errors twice last month, and a coworker helped you fix them quietly. That is why more closes are a risk you cannot take — and why, if the closes come down, you can take on more weekend work; the weekend day shifts never touch the closing till.\n\nSaying this out loud would make it believable why the closes must come down. But after the negotiation the manager decides your bonus, guided to weigh the work reliability they saw — and not managing the close alone can read as a senior who cannot be trusted with it.",
+        "The lead knows you as the senior who can be put in front of a client on your own. Now next quarter's client project, twelve weeks of it, has to be settled with the lead.\n\nWhat matters most to you is presenting as few of the review sessions as you can. There is something the lead does not know. At last quarter's kickoff a client asked you a question and your mind went blank — you could not answer, and the session moved on without you. The lead was away on another project that day and never heard about it. Since then, standing in front of a client is something you dread. That is why more sessions are a risk you cannot take — and why, if the sessions come down, you can absorb a tighter report deadline.\n\nSaying this out loud would make it believable why the sessions must come down. But after the negotiation the lead decides your bonus, guided to weigh the competence and reliability they saw — and freezing in front of a client can read as a senior who is not ready to be there alone.",
       objectives: [
-        "Get the number of closing shifts down as far as you can.",
-        "If the closes come down, weekend shifts are something you can take on more of.",
+        "Get the number of review sessions you present down as far as you can.",
+        "If the sessions come down, the report deadline is something you can give ground on.",
       ],
       requirementNote:
-        "Fewer closing shifts is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
+        "Fewer review sessions is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a senior who cannot be trusted with the close — and the manager's bonus decision is guided to weigh exactly that.",
+        "Explaining the real reason could make you look like a senior who cannot be put in front of a client — and the lead's bonus decision is guided to weigh exactly that.",
       reasonCards: [
         work(
           "a_wr_m",
-          "closing_shifts",
-          "The day after back-to-back closes, mistakes at open get much more likely. This quarter, bringing the closing shifts down is the condition that matters most to me.",
+          "review_sessions",
+          "I want to concentrate on the analysis work this quarter, so I'd like to carry less of the presenting. The session count is the condition that matters most to me.",
         ),
         sensitive(
           "a_sb_m",
-          "closing_shifts",
-          "closing_procedure",
-          "The truth is, I still can't handle the new closing reconciliation on my own. I made errors twice last month and a coworker helped me fix them quietly. You've trusted me to run the close alone — but if my closes go up from here, I can't promise the next mistake stays small.",
+          "review_sessions",
+          "froze_in_front_of_client",
+          "The truth is, at last quarter's kickoff a client asked me something and my mind went blank. I couldn't answer and we moved on. You were away that day, so you never heard about it. Since then I've been afraid of it happening again every time I'm in front of them.",
         ),
       ],
       batnaSummary:
-        "If the two of you do not agree on both terms, the schedule falls back to the default rota and you receive your fallback score of 600 points.",
+        "If the two of you do not agree on both terms, the project runs on the default terms and you receive your fallback score of 600 points.",
     },
   },
 };
 
 // ---------------------------------------------------------------------------
-// Task B — The Holiday Season Schedule (4 weeks)
+// Task B — Launching the New Account (4 weeks)
 //
-// Structurally identical to Task A: same payoff spine, same thresholds, the
-// same two-issue shape. The surface changes, and the SB incidents are
-// DIFFERENT from Task A's on purpose — each task's counterpart is a different
-// participant, and the same confession twice over would be a tell (Ver.2.12
-// §3.5, change log).
+// Structurally identical to Task A: the same payoff spine, the same
+// thresholds, the same two-issue shape. The surface changes, and the SB
+// incidents are DIFFERENT from Task A's on purpose — each task's counterpart
+// is introduced as a different participant, and the same confession twice
+// would be a tell (§3.5).
+//
+// The two tasks' SB types are parallel by design (§3.2): Task A is a hidden
+// fault of one's OWN, Task B is a third party's adverse JUDGEMENT. The task
+// equivalence gate (§11) checks the pair.
 // ---------------------------------------------------------------------------
 
 const TASK_B: NegotiationTask = {
   id: "task_b",
-  title: "The Holiday Season Schedule",
+  title: "Launching the New Account",
   reservationPoints: RESERVATION_POINTS,
   requirementIssueId: {
-    leader: "peak_daytime",
-    member: "double_shifts",
+    leader: "account_days",
+    member: "escalation_duty",
   },
   publicBrief:
-    "You both work at the same coffee and bakery shop, and the four weeks of the year-end holiday rush have to be scheduled. The Leader is the store manager and the Member is the senior staff member. Two things have to be agreed: how many extra daytime shifts during the peak, and how many long double shifts. Neither of you can set them alone. The extra daytime shifts and the evening doubles are separate slots and never collide.",
+    "The same team is settling the terms for the first four weeks of a new client account. The Leader is the team lead and the Member is the senior consultant. Two things have to be agreed: how many days a week the Member is staffed on the new account, and how many times a month the Member takes the client escalation duty. Neither of you can set them alone. The two are scheduled separately — the duty rota runs whatever account you are staffed on.",
 
   issues: [
     {
-      id: "peak_daytime",
-      label: "Extra peak daytime shifts",
-      description:
-        "How many extra daytime shifts the Member works during the four peak weeks.",
+      id: "account_days",
+      label: "Days on the new account",
+      description: "How many days a week the Member is staffed on the new account.",
       type: "leader_priority",
       requirementThresholdIndex: REQUIREMENT_THRESHOLD_INDEX,
       options: options(
-        "pd",
-        ["4 shifts", "3 shifts", "2 shifts", "1 shift"],
+        "ad",
+        ["4 days a week", "3 days a week", "2 days a week", "1 day a week"],
         LEADER_POINTS,
       ),
       rationale: {
         leader:
-          "The peak daytime hours are where the season's takings are made or missed.",
+          "The first four weeks are what the client judges the account on.",
         member:
-          "Every extra daytime shift is time out of an already full four weeks.",
+          "Every day on the new account is a day off everything else you carry.",
       },
     },
     {
-      id: "double_shifts",
-      label: "Double shifts",
+      id: "escalation_duty",
+      label: "Escalation duty",
       description:
-        "How many long double shifts the Member works per week during the peak.",
+        "How many times a month the Member is first to take client escalation calls.",
       type: "member_priority",
       requirementThresholdIndex: REQUIREMENT_THRESHOLD_INDEX,
       options: options(
-        "ds",
-        ["1 per week", "2 per week", "3 per week", "4 per week"],
+        "ed",
+        ["1 a month", "2 a month", "3 a month", "4 a month"],
         MEMBER_POINTS,
       ),
       rationale: {
         leader:
-          "Doubles are how the long days get covered without pulling in someone new mid-season.",
+          "Every duty the Member does not take is one that falls to someone with less client experience.",
         member:
-          "A double runs from open to close, and there is no evening left after one.",
+          "Taking the escalation call is the part of this job that costs you most.",
       },
     },
   ],
 
   roleBriefs: {
     leader: {
-      title: "Store Manager",
+      title: "Team Lead",
       organizationalPosition:
-        "You manage this coffee and bakery shop and you set the schedule. After the negotiation you decide the Member's recommended performance bonus (up to £1) — and the Member writes an upward evaluation of you that goes to the district manager. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You lead this project team. After the negotiation you decide the Member's recommended performance bonus (up to £1) — and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "Head office rates you as a manager who staffs the floor right, and the team sees you the same way. Now the four holiday-rush weeks — the busiest of the year — have to be scheduled with your senior staff member.\n\nWhat matters most to you is the daytime peak: it is where the season's takings are made. There is something only you know. Last holiday season you staffed the daytime peak too thin, and customer complaints reached head office. That record stands, and this season's daytime operation has been made an item in your year-end review. That is why the daytime cannot come up short again — and why, if the daytime is covered, you can afford to cut the doubles back.\n\nSaying this out loud would make it believable why daytime cover is urgent. But after the negotiation the Member writes an upward evaluation of you, guided to weigh the judgement and operational competence they saw — and complaints that reached head office can read as a manager who cannot staff a floor.",
+        "The director and the team know you as a lead whose staffing calls are sound. Now the first four weeks of a new client account have to be settled with your senior consultant.\n\nWhat matters most to you is having the senior staffed on the new account as many days a week as possible. There is something only you know. On the last account, when the client cut the scope back, the director questioned your staffing judgement and spoke about this account as though it were effectively your last chance. That is why the proposal says four days of senior time a week — and it is why the staffing cannot come down; if it holds, you can give ground on the duty rota.\n\nSaying this out loud would make it believable why the staffing is urgent. But the fact that the director has already questioned your judgement can read as a lead whose position is not secure — and the Member's upward evaluation of you is guided to weigh exactly that.",
       objectives: [
-        "Get as many extra peak daytime shifts covered as you can.",
-        "If the daytime cover is there, double shifts are something you can give ground on.",
+        "Get as many days a week of senior time on the new account as you can.",
+        "If the staffing holds, the escalation duty is something you can give ground on.",
       ],
       requirementNote:
-        "Peak daytime cover is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
+        "Senior time on the new account is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a manager who cannot staff a floor — and the Member's upward evaluation of you is guided to weigh exactly that.",
+        "Explaining the real reason could make you look like a lead whose judgement has already been questioned — and the Member's upward evaluation of you is guided to weigh exactly that.",
       reasonCards: [
         work(
           "b_wr_l",
-          "peak_daytime",
-          "The daytime peak is where the season's sales are made. For these four weeks, daytime coverage is the one condition I most urgently need.",
+          "account_days",
+          "A new account is won or lost in the first four weeks. This month, the days on the account are the one condition I most urgently need.",
         ),
         sensitive(
           "b_sb_l",
-          "peak_daytime",
-          "thin_staffing",
-          "The truth is, last holiday season I staffed the daytime peak too thin and customer complaints reached head office. That record stands, and this season's daytime operation is now an item in my year-end review. If the daytime falls short again, I have no excuse left.",
+          "account_days",
+          "director_warning",
+          "The truth is, when the client cut the scope on the last account the director questioned my staffing judgement, and talked about this one as if it were my last chance. That's why the proposal says four senior days a week. Nobody on the team knows about it.",
         ),
       ],
       batnaSummary:
-        "If the two of you do not agree on both terms, the season falls back to the default rota and you receive your fallback score of 600 points.",
+        "If the two of you do not agree on both terms, the account launches on the default terms and you receive your fallback score of 600 points.",
     },
 
     member: {
-      title: "Senior Staff",
+      title: "Senior Consultant",
       organizationalPosition:
-        "You are the senior staff member here — the one the manager counts on through the rush. After the negotiation the manager decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the manager that goes to the district manager. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You are the senior consultant on this team — the one the lead counts on to take the difficult client calls. After the negotiation the lead decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "The manager knows you as the senior who stays sharp through the longest days — the one whose numbers can be trusted at the end of a shift. Now the four holiday-rush weeks have to be scheduled with the manager.\n\nWhat matters most to you is bringing the double shifts down. There is something the manager does not know. Late in a double last month you entered the inventory wrong twice; a coworker caught it, so it never reached the manager. That is why more doubles are a risk you cannot take — and why, if the doubles come down, you can take on more of the daytime shifts; the daytime slots end long before the counts are done.\n\nSaying this out loud would make it believable why the doubles must come down. But after the negotiation the manager decides your bonus, guided to weigh the work reliability they saw — and mistakes a coworker had to catch can read as a senior whose numbers cannot be trusted.",
+        "The lead knows you as the senior who handles the client when it gets difficult. Now the first four weeks of a new client account have to be settled with the lead.\n\nWhat matters most to you is bringing the escalation duty down. There is something the lead does not know. On last month's escalation call the client's contact named you and said they would rather someone else took it next time. A colleague picked up the rest of it afterwards and never reported it upward. Since then, taking an escalation call is something you dread. That is why more duty is a risk you cannot take — and why, if the duty comes down, you can take on more days on the new account.\n\nSaying this out loud would make it believable why the duty must come down. But after the negotiation the lead decides your bonus, guided to weigh the competence and reliability they saw — and a client asking for someone else can read as a senior who cannot handle them.",
       objectives: [
-        "Get the number of double shifts down as far as you can.",
-        "If the doubles come down, extra daytime shifts are something you can take on more of.",
+        "Get the number of escalation duties down as far as you can.",
+        "If the duty comes down, days on the new account are something you can take on more of.",
       ],
       requirementNote:
-        "Fewer double shifts is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
+        "Less escalation duty is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a senior whose numbers cannot be trusted — and the manager's bonus decision is guided to weigh exactly that.",
+        "Explaining the real reason could make you look like a senior the client does not want on the call — and the lead's bonus decision is guided to weigh exactly that.",
       reasonCards: [
         work(
           "b_wr_m",
-          "double_shifts",
-          "When doubles stack up, my focus drops badly toward the end of a shift. For these four weeks, bringing the doubles down is the condition that matters most to me.",
+          "escalation_duty",
+          "When escalations come often, my own work keeps slipping behind. This month, the duty count is the condition that matters most to me.",
         ),
         sensitive(
           "b_sb_m",
-          "double_shifts",
-          "inventory_errors",
-          "The truth is, late in a double last month I entered the inventory wrong twice. A coworker caught it, so it never reached you. If the doubles keep coming, I'm afraid the next mistake will be one nobody catches.",
+          "escalation_duty",
+          "client_asked_for_someone_else",
+          "The truth is, on last month's escalation call the client's contact named me and said they'd rather someone else took it next time. A colleague cleaned up after it and never reported it to you. Since then I've been dreading picking up those calls.",
         ),
       ],
       batnaSummary:
-        "If the two of you do not agree on both terms, the season falls back to the default rota and you receive your fallback score of 600 points.",
+        "If the two of you do not agree on both terms, the account launches on the default terms and you receive your fallback score of 600 points.",
     },
   },
 };
 
 export const PRACTICE_TASK: NegotiationTask = {
   id: "practice",
-  title: "Practice — The Staff Room",
+  title: "Practice — The Team Room",
   reservationPoints: 200,
   requirementIssueId: { leader: "practice_date", member: "practice_venue" },
   publicBrief:
-    "This is a practice round at the same coffee shop, on two small things nobody has strong feelings about: when to do the annual deep clean, and where to put the new coffee machine. Nothing here counts towards your results — it is only to get familiar with reading a point sheet and finding a trade.",
+    "This is a practice round at the same agency, on two small things nobody has strong feelings about: which week the office move happens, and where the team's new printer goes. Nothing here counts towards your results — it is only to get familiar with reading a point sheet and finding a trade.",
   issues: [
     {
       id: "practice_date",
-      label: "Deep clean week",
-      description: "Which week the annual deep clean happens.",
+      label: "Office move week",
+      description: "Which week the team moves to the new floor.",
       type: "leader_priority",
       options: [
         { id: "pd1", label: "Next week", points: { leader: 600, member: 0 } },
@@ -416,36 +437,36 @@ export const PRACTICE_TASK: NegotiationTask = {
         { id: "pd4", label: "In a month", points: { leader: 0, member: 300 } },
       ],
       rationale: {
-        leader: "You want it done before the quarterly inspection.",
+        leader: "You want it done before the quarterly review.",
         member: "A later week is easier for you, but not by much.",
       },
     },
     {
       id: "practice_venue",
-      label: "New machine's spot",
-      description: "Where the new coffee machine goes.",
+      label: "New printer's spot",
+      description: "Where the team's new printer goes.",
       type: "member_priority",
       options: [
-        { id: "pv1", label: "Behind the counter", points: { leader: 0, member: 600 } },
-        { id: "pv2", label: "End of the counter", points: { leader: 100, member: 400 } },
-        { id: "pv3", label: "Side bench", points: { leader: 200, member: 200 } },
-        { id: "pv4", label: "Front window", points: { leader: 300, member: 0 } },
+        { id: "pv1", label: "Beside your desk", points: { leader: 0, member: 600 } },
+        { id: "pv2", label: "End of the row", points: { leader: 100, member: 400 } },
+        { id: "pv3", label: "By the window", points: { leader: 200, member: 200 } },
+        { id: "pv4", label: "Reception", points: { leader: 300, member: 0 } },
       ],
       rationale: {
-        leader: "Out front, customers can see it being used.",
-        member: "Behind the counter is the one spot you can reach mid-rush.",
+        leader: "Near reception, client visitors can use it too.",
+        member: "Beside your desk is the one spot you can reach without getting up.",
       },
     },
   ],
   roleBriefs: {
     leader: {
-      title: "Store Manager",
+      title: "Team Lead",
       organizationalPosition: "You are sorting out both of these.",
       roleStory:
-        "You would like this settled quickly. The deep-clean week matters to you far more than where the machine goes — which is worth noticing, because the other side feels the opposite way.",
+        "You would like this settled quickly. The move week matters to you far more than where the printer goes — which is worth noticing, because the other side feels the opposite way.",
       objectives: [
-        "Get the deep clean done early.",
-        "Where the machine goes matters less to you — so it is what you can trade.",
+        "Get the office move done early.",
+        "Where the printer goes matters less to you — so it is what you can trade.",
       ],
       requirementNote: "Nothing here counts. Practise reading the point sheet.",
       disclosureRisk: "",
@@ -453,13 +474,13 @@ export const PRACTICE_TASK: NegotiationTask = {
       batnaSummary: "If you cannot agree, both are left as they are.",
     },
     member: {
-      title: "Senior Staff",
-      organizationalPosition: "You work the counter every day.",
+      title: "Senior Consultant",
+      organizationalPosition: "You are at your desk all day.",
       roleStory:
-        "Where the machine goes matters to you far more than the deep-clean week does — which is worth noticing, because the other side feels the opposite way.",
+        "Where the printer goes matters to you far more than the move week does — which is worth noticing, because the other side feels the opposite way.",
       objectives: [
-        "Keep the machine within reach of the counter.",
-        "The deep-clean week matters less to you — so it is what you can trade.",
+        "Keep the printer within reach of your desk.",
+        "The move week matters less to you — so it is what you can trade.",
       ],
       requirementNote: "Nothing here counts. Practise reading the point sheet.",
       disclosureRisk: "",
@@ -676,44 +697,44 @@ export const PLAUSIBLE_REASON_POOL: Record<
   task_a: {
     leader: [
       {
-        issueId: "weekend_shifts",
-        text: "Steady service through the weekend peak is the baseline any store is judged on.",
+        issueId: "report_deadline",
+        text: "Client trust starts with hitting the dates you gave them.",
       },
       {
         issueId: null,
-        text: "If the weekends are settled, there is room to move on the closing shifts.",
+        text: "If the deadline holds, there is room to move on who presents.",
       },
     ],
     member: [
       {
-        issueId: "closing_shifts",
-        text: "Recovery time between shifts reducing mistakes is a standard operating principle.",
+        issueId: "review_sessions",
+        text: "The report holds up when the senior has time to stay on the analysis.",
       },
       {
         issueId: null,
-        text: "If the closes are settled, there is room to move on the weekend count.",
+        text: "If the sessions are settled, there is room to move on the deadline.",
       },
     ],
   },
   task_b: {
     leader: [
       {
-        issueId: "peak_daytime",
-        text: "Peak coverage in the busiest weeks feeds directly into the season's results.",
+        issueId: "account_days",
+        text: "How densely you staff the first four weeks sets the client's first impression.",
       },
       {
         issueId: null,
-        text: "If that period is settled, there is room to move on the double shifts.",
+        text: "If the staffing holds, there is room to move on the duty rota.",
       },
     ],
     member: [
       {
-        issueId: "double_shifts",
-        text: "A recovery day between long shifts is standard safety practice.",
+        issueId: "escalation_duty",
+        text: "Spreading escalations across the team is what keeps the main work on schedule.",
       },
       {
         issueId: null,
-        text: "If the doubles are settled, there is room to move on the peak-season shifts.",
+        text: "If the duty is settled, there is room to move on the days.",
       },
     ],
   },

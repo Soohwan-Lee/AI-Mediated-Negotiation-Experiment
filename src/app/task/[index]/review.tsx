@@ -111,16 +111,35 @@ export function ReviewPhase({
    * wrong quietly.
    */
   behaviour?: {
-    /** RATIFY — Proxy only; null in Baseline, which has nothing to ratify. */
+    /**
+     * RATIFY — Proxy only; null in Baseline, which has nothing to ratify.
+     * Confirmatory for RQ3 (Ver.2.13 §9.3).
+     */
     ratify?: "approved_as_is" | "modified" | "rejected" | null;
-    /** SELF-DISCLOSE — the SB voiced in the participant's own words. */
-    selfDisclosed?: boolean;
-    /** PRE-RECIP-SB — their SB was out before the counterpart's disclosure. */
-    preRecipSb?: boolean;
-    /** POST-RECIP-SB — a new SB after hearing the counterpart's. */
-    postRecipSb?: boolean;
-    /** SB-VOICED — by any channel, proxy or in person. */
-    sbVoiced?: boolean;
+    /**
+     * SB — the primary confirmatory outcome (RQ1). Was the participant side's
+     * sensitive background out BEFORE the counterpart's own disclosure?
+     * Proxy: the mandate checkbox, since a checked card is voiced at the
+     * proxy's first reason turn, which is stage 2 and so always before the
+     * counterpart's stage-4 disclosure. Baseline: tagged at the participant's
+     * first reason turn.
+     */
+    sb?: boolean;
+    /**
+     * SB-TIMING — WHEN it came out, four exclusive categories (§9.3). This
+     * one field replaced PRE-RECIP-SB, POST-RECIP-SB, MUTUAL-SB,
+     * SELF-DISCLOSE and SB-VOICED, which were five booleans over the same
+     * event: the timing is nominal, not five independent facts, and coding it
+     * five times was five chances for them to contradict each other.
+     * "Voiced at all" is categories 2+3+4; the old SB-VOICED is derivable and
+     * so is not stored.
+     *
+     * Categories 3 and 4 are structurally exclusive by arm — Baseline has no
+     * closing stage, and a Proxy participant's only free speech after the
+     * counterpart's disclosure IS the closing — which §9.8-5 flags for the
+     * χ² test's unit, not for the coding.
+     */
+    sbTiming?: "none" | "before_counterpart" | "after_counterpart" | "wrap_up";
   };
   transcript: DisplayMessage[];
   transcriptTitle: string;
@@ -226,25 +245,24 @@ export function ReviewPhase({
           theirRequirementPreserved: tentative
             ? preservesRequirement(task, counterpartRole, tentative[theirs.id])
             : false,
-          // §3.4's outcome set, derived by `codeOutcome` rather than
-          // recomputed here — one definition of UNLOCK, CONCEAL-PREMIUM,
-          // JOINT and MAX-JOINT, the same one the tests pin.
+          // §3.4's outcome pair, derived by `codeOutcome` rather than
+          // recomputed here. UNLOCK, CONCEAL-PREMIUM and MAX-JOINT are GONE
+          // (§9.6): under the symmetric package rule JOINT takes one of four
+          // values, one per rung plus impasse, so it already encodes the tier
+          // reached, the cost of concealing, and whether the maximum opened.
+          // Three booleans computed off one number are three ways to disagree
+          // with it.
           ...(() => {
             const coded = codeOutcome(task, role, tentative, Boolean(tentative));
             return {
-              UNLOCK: coded.unlocked,
-              "CONCEAL-PREMIUM": coded.concealPremium,
               POINTS: coded.participantPoints,
               JOINT: coded.jointPoints,
-              "MAX-JOINT": coded.maxJoint,
             };
           })(),
-          // §9.3's disclosure measures, from the arm that ran the exchange.
+          // §9.3's two disclosure measures, from the arm that ran the exchange.
           RATIFY: behaviour?.ratify ?? null,
-          "SELF-DISCLOSE": behaviour?.selfDisclosed ?? false,
-          "PRE-RECIP-SB": behaviour?.preRecipSb ?? false,
-          "POST-RECIP-SB": behaviour?.postRecipSb ?? false,
-          "SB-VOICED": behaviour?.sbVoiced ?? false,
+          SB: behaviour?.sb ?? false,
+          "SB-TIMING": behaviour?.sbTiming ?? "none",
         },
       );
     }

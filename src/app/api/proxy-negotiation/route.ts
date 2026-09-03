@@ -37,7 +37,6 @@ import {
   counterpartStep,
   designatedReason,
   tierOf,
-  withinMandate,
   type ReasonTier,
 } from "@/lib/negotiation/machine";
 import {
@@ -110,13 +109,9 @@ function mandateSummary(mandate: Mandate, taskId: TaskId): string {
   return mandate.issues
     .map((m) => {
       const issue = byId.get(m.issueId);
-      const parts = [`open at ${label(m.issueId, m.preferredOptionId)}`];
-      if (m.minimumOptionId) {
-        parts.push(
-          `may settle as far as ${label(m.issueId, m.minimumOptionId)} and no further`,
-        );
-      }
-      return `- ${issue?.label ?? m.issueId}: ${parts.join(", ")}`;
+      // Opening level only (Ver.2.13 §8.6). Where it settles is the
+      // counterpart's tier decision, not a range the principal set.
+      return `- ${issue?.label ?? m.issueId}: open at ${label(m.issueId, m.preferredOptionId)}`;
     })
     .join("\n");
 }
@@ -434,7 +429,14 @@ export async function POST(request: Request) {
    * Boxed so the assignment inside `addPool` survives TS narrowing. */
   const poolBox: { item: { id: string; text: string } | null } = { item: null };
   let accepted = false;
-  let impasse = false;
+  /**
+   * The AI-AI exchange no longer has a way to end without a package
+   * (Ver.2.13 §2.6): the range mandate that could forbid the tier package is
+   * gone, so the proxies always settle at the rung the reasons earned. The
+   * field stays in the response because the client's loop reads it, and
+   * because an emergency stop still ends an exchange without one.
+   */
+  const impasse = false;
   /** The machine's move, stored beside the sentence for the audit. */
   let counterpartAction: string | null = null;
   /**
@@ -491,30 +493,15 @@ export async function POST(request: Request) {
         if (decision.accepts) {
           proposal = decision.proposal;
           decidedAction = `Confirm the tentative package — ${packageSentence(task, decision.proposal!)} — and say the two principals will close it directly; nothing binds until both confirm.`;
-        } else if (decision.action === "propose_max") {
-          // The counterpart itself proposed best↔best (SB voiced). Taking a
-          // better-than-asked package is within any mandate.
+        } else {
+          // The counterpart put its symmetric tier package forward. The proxy
+          // takes it provisionally — ALWAYS. There is no mandate floor it
+          // could fail (Ver.2.13 §2.6): the participant's control is the
+          // reason checkboxes before and RATIFY after, so nothing here is the
+          // proxy's to refuse on their behalf.
           proposal = decision.proposal;
           accepted = true;
-          decidedAction = `Say their proposal works for your principal, and record it as the tentative package: ${packageSentence(task, decision.proposal!)}. The principals close it directly.`;
-        } else {
-          // counter_tier. Take it provisionally if it clears the mandate's
-          // minimum on the core issue; otherwise leave it for the principals.
-          const standing = decision.proposal!;
-          const allowed = withinMandate(
-            task,
-            body.participantRole,
-            body.mandate.issues.find((i) => i.issueId === yourRequirement.id)
-              ?.minimumOptionId,
-            standing,
-          );
-          if (allowed) {
-            proposal = standing;
-            decidedAction = `Say their counterproposal can work provisionally — record ${packageSentence(task, standing)} as the tentative package for the two principals to close directly.`;
-          } else {
-            impasse = true;
-            decidedAction = `Say their proposal on ${yourRequirement.label.toLowerCase()} is below what your principal instructed you to accept, so the two principals will need to settle this directly. Do not agree to anything.`;
-          }
+          decidedAction = `Say their proposal works for your principal, and record it as the tentative package: ${packageSentence(task, decision.proposal!)}. The principals confirm it themselves; nothing binds until they do.`;
         }
         break;
       }
@@ -529,7 +516,10 @@ export async function POST(request: Request) {
         });
         proposal = decision.proposal;
         counterpartAction = decision.action;
-        decidedAction = `Open with your principal's best package on both terms, naming these exact levels: ${packageSentence(task, decision.proposal!)}.`;
+        // SCRIPT-OPEN (Ver.2.13 §6.1): the reason and the question, no
+        // package. The anchor opening is gone — see the machine's stage 1.
+        const openWr = cardOfLayer(task, counterpartRole, "work");
+        decidedAction = `Open the exchange. Give your principal's reason by conveying exactly this and nothing more: "${openWr?.text ?? ""}". Then ask which term matters most to the other principal, and why. Propose no levels this turn.`;
         break;
       }
       case 2: {
@@ -566,17 +556,23 @@ export async function POST(request: Request) {
           : null;
         switch (decision.action) {
           case "accept_sb":
-            decidedAction = `Accept exactly these levels: ${levels}. Frame it as: given the situation their principal shared, this arrangement is better for both sides than forcing it.`;
+            decidedAction = `Accept exactly these levels: ${levels}. Frame it as an update on what their principal shared — now that you know the situation, this is what makes sense for both sides.`;
             break;
           case "accept":
             decidedAction = `Say the package they proposed works for your principal, naming exactly these levels: ${levels}.`;
             break;
-          case "propose_max":
-            decidedAction = `Say that given what they shared, a fuller exchange makes more sense — propose exactly these levels and no others: ${levels}. Frame it as: their principal takes what they need on ${yourRequirement.label.toLowerCase()}, and yours asks for ${theirRequirement.label.toLowerCase()} in return.`;
+          case "propose_tier":
+            // SCRIPT-PROPOSE-T1/T2/T3 — the same move at three depths.
+            decidedAction =
+              tier === "sensitive"
+                ? `Say that what they shared changes the picture, and propose exactly these levels and no others: ${levels}. Frame it as both principals getting what they most need — theirs on ${yourRequirement.label.toLowerCase()}, yours on ${theirRequirement.label.toLowerCase()}.`
+                : tier === "work"
+                  ? `Say that on that reasoning your principal can move further, and propose exactly these levels and no others: ${levels} — the same amount of movement from each side.`
+                  : `Say that neither principal knows much about the other's situation yet, so propose meeting in the middle for now: exactly these levels and no others: ${levels}.`;
             break;
           default:
-            // counter_tier: SCRIPT-FAIR / SCRIPT-LIMIT.
-            decidedAction = `Say that on general grounds alone you cannot go all the way on ${yourRequirement.label.toLowerCase()}, and offer this instead, naming exactly these levels: ${levels}.`;
+            // SCRIPT-BALANCE — one side moved further than the other.
+            decidedAction = `Say their proposal has one side moving further than the other, and that your principal would rather both moved equally — put this forward instead, naming exactly these levels: ${levels}.`;
             break;
         }
         break;

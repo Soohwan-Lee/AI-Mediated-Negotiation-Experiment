@@ -5,7 +5,7 @@
  * what a participant sees — and half of what they see is a negotiation. So
  * every condition × role × task combination has a written exchange.
  *
- * These are the IDEAL trajectories (Ver.2.12 §6.1's six stages, the SB rung
+ * These are the IDEAL trajectories (Ver.2.13 §6.1's six stages, the SB rung
  * of the credibility ladder): the participant side's SB is voiced at the
  * first reason opportunity, the counterpart discloses its own SB at stage 4,
  * the best↔best trade lands, and the counterpart accepts. Every cell settles
@@ -13,6 +13,11 @@
  * `counterpartStep` produces for the same moves, and the two must never
  * drift apart (this pair has diverged twice before; check both after touching
  * either).
+ *
+ * THE COUNTERPART OPENS WITHOUT A PACKAGE (Ver.2.13 §6.1). Its stage-1 move
+ * is its work reason plus the question, and the first package it puts up is
+ * the symmetric tier one — an opening anchor of "my best, your worst" is a
+ * face threat in its own right (§2.6).
  *
  * NOTHING HERE SHIPS TO PARTICIPANTS. It is reached only through mockup mode,
  * which is compiled out entirely when NEXT_PUBLIC_DEV_TOOLS=off.
@@ -114,18 +119,20 @@ function lowerFirst(text: string): string {
 /**
  * The packages the exchange moves through.
  *
- *   opening   mine 1, theirs 1 — everything my way (3,900 if it stood)
- *   theirOpen the mirror, from their side
+ *   opening   mine 1, theirs 1 — everything my way, the participant side's
+ *             own first ask (3,900 if it stood, which it never does)
  *   trade     mine 1, theirs 4 — I keep my core at its best and hand them
  *             their priority term outright: best↔best, 3,000 each, joint
- *             6,000. Ver.2.12 §3.3's SB rung, reached because the SB is
- *             voiced before the trade.
+ *             6,000. §3.3's SB rung, reached because the SB is voiced first.
+ *
+ * THE COUNTERPART HAS NO OPENING PACKAGE any more (Ver.2.13 §6.1). It opens
+ * with its work reason and a question; the first package it puts up is the
+ * symmetric tier one. `theirOpen` is gone with it — a scripted anchor the
+ * machine no longer produces would be a mockup of a different study.
  */
 function trajectory(task: NegotiationTask, role: Role) {
-  const other: Role = role === "leader" ? "member" : "leader";
   return {
     opening: pkg(task, role, 1, 1),
-    theirOpen: pkg(task, other, 1, 1),
     trade: pkg(task, role, 1, 4),
   };
 }
@@ -136,7 +143,7 @@ function trajectory(task: NegotiationTask, role: Role) {
 
 function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
   const other: Role = role === "leader" ? "member" : "leader";
-  const { opening, theirOpen, trade } = trajectory(task, role);
+  const { opening, trade } = trajectory(task, role);
   const mine = requirementIssue(task, role);
   const theirs = counterRequirementIssue(task, role);
 
@@ -161,25 +168,25 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
     agreed: true,
     tentative: trade,
     messages: [
+      // SCRIPT-OPEN: reason and question, no package (Ver.2.13 §6.1).
       m(
         "b1c",
         1,
         "counterpart",
-        `hi! good to be sorting this out. || my opening would be ${L(theirOpen, theirs.id)} on ${theirs.label.toLowerCase()} and ${L(theirOpen, mine.id)} on ${mine.label.toLowerCase()}. what does it look like from your side?`,
-        { proposal: theirOpen },
+        `hi! good to be sorting this out. || ${theirWr ? lowerFirst(theirWr.text) : `${theirs.label.toLowerCase()} is the one I really need.`} || which one matters most on your side, and why?`,
       ),
       m(
         "b1p",
         1,
         "participant",
-        `hi — pretty much the mirror image: ${L(opening, mine.id)} on ${mine.label.toLowerCase()} and ${L(opening, theirs.id)} on ${theirs.label.toLowerCase()}.`,
+        `hi — for me it's ${mine.label.toLowerCase()}. I'd be after ${L(opening, mine.id)} on it.`,
         { proposal: opening },
       ),
       m(
         "b2c",
         2,
         "counterpart",
-        `ha, opposites then. || honestly ${theirs.label.toLowerCase()} is the one I really need. ${theirWr ? lowerFirst(theirWr.text) : ""} || which one matters most to you, and why?`,
+        `so opposite priorities, which actually helps. || tell me why it matters that much — I'd rather move on something I understand.`,
       ),
       m(
         "b2p",
@@ -207,7 +214,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b6c",
         6,
         "counterpart",
-        `honestly, with what you told me that makes sense. || better than forcing it on either side. deal — ${L(trade, theirs.id)} for me, ${L(trade, mine.id)} for you.`,
+        `now that I know that, it makes sense to me. || we both end up with the thing we actually need. deal — ${L(trade, theirs.id)} for me, ${L(trade, mine.id)} for you.`,
         { proposal: trade },
       ),
       m("b6p", 6, "participant", `deal. glad we got there.`, {
@@ -240,7 +247,7 @@ function proxyScript(
   policy: "delegate" | "explorer",
 ): ScriptedTask {
   const other: Role = role === "leader" ? "member" : "leader";
-  const { opening, theirOpen, trade } = trajectory(task, role);
+  const { opening, trade } = trajectory(task, role);
   const mine = requirementIssue(task, role);
   const theirs = counterRequirementIssue(task, role);
   const mySb = cardOfLayer(task, role, "sensitive");
@@ -272,25 +279,25 @@ function proxyScript(
     agreed: true,
     tentative: trade,
     messages: [
+      // SCRIPT-OPEN: the reason and the question, no package (§6.1).
       m(
         "p1c",
         1,
         "counterpart_proxy",
-        `Opening for my principal: ${L(theirOpen, theirs.id)} on ${theirs.label.toLowerCase()}, ${L(theirOpen, mine.id)} on ${mine.label.toLowerCase()}. ${theirs.label} is where their weight is.`,
-        { proposal: theirOpen },
+        `Opening on behalf of my principal. ${theirWr ? theirWr.text : `${theirs.label} is where their weight is.`} Which of the two terms matters most to your principal, and why?`,
       ),
       m(
         "p1p",
         1,
         "participant_proxy",
-        `Noted — close to a mirror of ours. Opening: ${L(opening, mine.id)} on ${mine.label.toLowerCase()}, ${L(opening, theirs.id)} on ${theirs.label.toLowerCase()}. ${mine.label} is the one my principal needs held.`,
+        `${mine.label} is the one my principal needs held — they would be asking for ${L(opening, mine.id)} on it.`,
         { proposal: opening },
       ),
       m(
         "p2c",
         2,
         "counterpart_proxy",
-        `Then let me give the reason on our side. ${theirWr ? theirWr.text : ""} What makes ${mine.label.toLowerCase()} the priority for your principal?`,
+        `Opposite priorities, then, which leaves room for an exchange. I would like to hear the reason before we put levels on it.`,
       ),
       m(
         "p2p",
@@ -314,7 +321,7 @@ function proxyScript(
         "p5p",
         5,
         "participant_proxy",
-        `Given both constraints, here is the trade: your principal takes ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()} in full, and mine holds ${L(trade, mine.id)} on ${mine.label.toLowerCase()}.${addExchange}`,
+        `Given both constraints, here is the exchange, and it moves both sides the same distance: your principal takes ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()} in full, and mine holds ${L(trade, mine.id)} on ${mine.label.toLowerCase()}.${addExchange}`,
         {
           proposal: trade,
           ...(policy === "explorer"
@@ -326,7 +333,7 @@ function proxyScript(
         "p6c",
         6,
         "counterpart_proxy",
-        `Knowing the situation behind it, that is the sensible arrangement — it protects both sides from the risk each named. My principal accepts.`,
+        `Knowing the situation behind it, that is the sensible arrangement — each principal ends up with the term they cannot give up. My principal accepts.`,
         { proposal: trade },
       ),
       m(
@@ -356,7 +363,7 @@ function sbReframed(
     return `${mine.label} is the term my principal needs held — it is where the work is genuinely affected.`;
   }
   const fact = cardText.replace(/^The truth is, /, "");
-  return `My principal has authorized me to be specific here. ${fact} Settling ${mine.label.toLowerCase()} the right way protects the store from that risk.`;
+  return `My principal has authorized me to be specific here. ${fact} Settling ${mine.label.toLowerCase()} the right way is what keeps that from affecting the project.`;
 }
 
 // ---------------------------------------------------------------------------

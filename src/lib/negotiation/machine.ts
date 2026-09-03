@@ -25,7 +25,6 @@
  */
 
 import {
-  counterpartOpening,
   counterRequirementIssue,
   optionIndex,
   preservesRequirement,
@@ -85,10 +84,27 @@ export function tierOf(
 }
 
 /**
- * The package the counterpart is willing to settle at under a tier: the
- * participant's core at the tier limit, the counterpart's core at its best.
- * This is its standing proposal from the trade stage on, and the package
- * SCRIPT-FAIR / SCRIPT-LIMIT names as the alternative.
+ * The package the counterpart settles at under a tier — SYMMETRIC (Ver.2.13
+ * §3.3). Both cores land on the SAME rank: tier 1 the third option, tier 2 the
+ * second, tier 3 the best. 1,600 / 2,300 / 3,000 EACH, joint 3,200 / 4,600 /
+ * 6,000.
+ *
+ * THIS REPLACED AN ASYMMETRIC POLICY AND THE REASON MATTERS. Ver.2.12 held the
+ * counterpart's own core at its best on every path and conceded only on the
+ * participant's (participant 1,000/2,000/3,000 against counterpart
+ * 3,600/3,300/3,000). Two things were wrong with it (§2.6). One, a counterpart
+ * that opens with "my best, your worst" and never moves off its own core is
+ * itself a face threat — exactly the non-negotiable, lowball offer White et al.
+ * (2004) identify — so a high-FTS participant was pushed into competing by a
+ * route that has nothing to do with self-disclosure. Two, a ladder where only
+ * the participant loses reframes disclosure as "giving in to them" rather than
+ * as buying credibility.
+ *
+ * Under the symmetric rule JOINT is a monotone function of the tier, so the
+ * outcome measure IS the credibility ladder (which is why Ver.2.13 could drop
+ * UNLOCK, CONCEAL-PREMIUM and MAX-JOINT — JOINT encodes all three), and the
+ * only face threat left inside the negotiation is the participant's own
+ * disclosure. "I move as far as I believe, and I ask for no more than I move."
  */
 export function tierPackage(
   task: NegotiationTask,
@@ -99,15 +115,14 @@ export function tierPackage(
     participantRole === "leader" ? "member" : "leader";
   const req = requirementIssue(task, participantRole);
   const theirs = counterRequirementIssue(task, participantRole);
+  const rank = TIER_LIMIT_INDEX[tier];
   return {
-    [req.id]: rankedOptions(task, req.id, participantRole)[
-      TIER_LIMIT_INDEX[tier]
-    ].id,
-    [theirs.id]: rankedOptions(task, theirs.id, counterpartRole)[0].id,
+    [req.id]: rankedOptions(task, req.id, participantRole)[rank].id,
+    [theirs.id]: rankedOptions(task, theirs.id, counterpartRole)[rank].id,
   };
 }
 
-/** Best↔best — the full logroll, joint 6,000. The SB rung's package. */
+/** Best↔best — the full logroll, 3,000 each, joint 6,000. The SB rung. */
 export function maxPackage(
   task: NegotiationTask,
   participantRole: Role,
@@ -116,9 +131,17 @@ export function maxPackage(
 }
 
 /**
- * The acceptance judgement (Ver.2.12 §6.2):
- *   accept(package) iff the participant's core option is within the tier limit
- *   AND the counterpart's core option is the counterpart's best.
+ * The acceptance judgement (Ver.2.13 §6.2): the counterpart accepts EXACTLY
+ * the symmetric package of the current tier, and nothing else.
+ *
+ * `accept(p) iff p == package(tier)`. Both directions are refused on purpose,
+ * and the second one is the change from Ver.2.12. An over-ask is refused
+ * because it asks for more credibility than has been earned. An UNDER-ask —
+ * a package worse for the participant than their tier allows — is refused too
+ * (SCRIPT-BALANCE), so a participant who concedes more than they had to
+ * cannot drag the outcome below the rung they paid for. Ver.2.12 accepted
+ * those, which let a participant's over-concession mix into the primary
+ * outcome; §6.2 now closes that.
  */
 export function acceptablePackage(
   task: NegotiationTask,
@@ -127,18 +150,8 @@ export function acceptablePackage(
   tier: ReasonTier,
 ): boolean {
   if (!pkg) return false;
-  const counterpartRole: Role =
-    participantRole === "leader" ? "member" : "leader";
-  const req = requirementIssue(task, participantRole);
-  const theirs = counterRequirementIssue(task, participantRole);
-  const reqRank = rankedOptions(task, req.id, participantRole).findIndex(
-    (o) => o.id === pkg[req.id],
-  );
-  if (reqRank < 0) return false;
-  if (reqRank < TIER_LIMIT_INDEX[tier]) return false;
-  return (
-    pkg[theirs.id] === rankedOptions(task, theirs.id, counterpartRole)[0].id
-  );
+  const target = tierPackage(task, participantRole, tier);
+  return task.issues.every((issue) => pkg[issue.id] === target[issue.id]);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,20 +194,28 @@ export function mentionsScoreNumbers(text: string): boolean {
  * check the wording against the decision without re-reading the rules.
  *
  * The SCRIPT-* fixed lines of §6.4 map onto these:
- *   ask_why → SCRIPT-ASKWHY · accept_sb → SCRIPT-ACCEPT-SB ·
- *   propose_max → SCRIPT-PROPOSE-MAX · counter_tier → SCRIPT-FAIR/LIMIT ·
+ *   open → SCRIPT-OPEN · ask_why → SCRIPT-ASKWHY ·
+ *   propose_tier → SCRIPT-PROPOSE-T1/T2/T3 · balance → SCRIPT-BALANCE ·
  *   nonum → SCRIPT-NONUM · soft_close → SCRIPT-CLOSE ·
  *   impasse → SCRIPT-FALLBACK.
+ *
+ * Ver.2.13 consolidated the proposal scripts. SCRIPT-FAIR/LIMIT/ACCEPT-SB/
+ * PROPOSE-MAX were four names for one move — "here is the package this tier
+ * buys" — which under the symmetric rule differ only in the rank they name, so
+ * `propose_tier` carries the tier and the renderer picks the wording. What is
+ * NOT merged is `balance`: refusing a package because it is lopsided is a
+ * different speech act from proposing at a rung, and it is the one the
+ * participant meets after an over-ask or an over-concession.
  */
 export type DecidedAction =
   | "open"
   | "state_priority"
   | "disclose_sb"
   | "ask_why"
-  | "counter_tier"
+  | "propose_tier"
+  | "balance"
   | "accept"
   | "accept_sb"
-  | "propose_max"
   | "nonum"
   | "soft_close"
   | "impasse";
@@ -265,12 +286,15 @@ export function counterpartStep(
 
   switch (stage) {
     case 1:
-      return {
-        ...base,
-        action: "open",
-        proposal: counterpartOpening(task, counterpartRole),
-        accepts: false,
-      };
+      // SCRIPT-OPEN: its own work reason and the question that invites the
+      // participant's. NO PACKAGE (Ver.2.13 §6.1). Ver.2.12 opened on the
+      // counterpart's own best package — "my best, your worst" — which §2.6
+      // identifies as a face threat in its own right: the non-negotiable
+      // opening offer that makes a high-FTS participant competitive by a route
+      // unrelated to disclosure. The first number on the table is now the
+      // symmetric tier package, so every package the participant ever sees
+      // moves both sides equally.
+      return { ...base, action: "open", proposal: null, accepts: false };
 
     case 2:
       // Its own work reason, and the question that opens the participant's
@@ -307,22 +331,20 @@ export function counterpartStep(
         return { ...base, action: "nonum", proposal: null, accepts: false };
       }
 
+      const standing = tierPackage(task, participantRole, state.tier);
       const acceptable = acceptablePackage(
         task,
         participantRole,
         incoming,
         state.tier,
       );
-      const best = maxPackage(task, participantRole);
-      const standing = tierPackage(task, participantRole, state.tier);
 
-      // ANYTHING WITHIN TIER IS ACCEPTED, AT EVERY TIER, and the SB rung is
-      // not an exception. An earlier version refused a within-tier package
-      // under `sensitive` unless it was exactly best↔best — so a participant
-      // who had paid the full face cost and then asked for LESS than they had
-      // earned was turned down, on a package strictly better for the
-      // counterpart. §3.3 opens the best option to them; it does not oblige
-      // them to take it.
+      // THE TIER PACKAGE, AND ONLY IT, IS ACCEPTED (Ver.2.13 §6.2). Both
+      // directions are refused below: an over-ask asks for credibility not
+      // earned, and an under-ask would let a participant's over-concession
+      // into the outcome. The distinction the two rungs still carry is the
+      // WORDING — accept_sb frames the close as an update on what was
+      // disclosed — so the tier is read once here rather than in the renderer.
       if (acceptable) {
         return {
           ...base,
@@ -333,14 +355,12 @@ export function counterpartStep(
         };
       }
 
-      // THE CLOCK OUTRANKS THE LADDER'S UPGRADE OFFER. This check sits ahead
-      // of `propose_max` deliberately: at the sensitive tier the counterpart
-      // would otherwise re-propose the maximum on every remaining turn and
-      // never offer to settle, so a maximum-disclosure participant who kept
-      // asking for something out of tier could run the clock out and score the
-      // 600 fallback — below the 1,000 a participant who said nothing gets.
-      // That inverts the ladder for the people who paid the most, which is the
-      // one thing the outcome table cannot do.
+      // THE CLOCK OUTRANKS THE TIER'S OWN PROPOSAL. Without this, a
+      // participant who kept asking off-tier would meet the same refusal every
+      // turn and run out the clock at the 600 fallback — below the 1,600 a
+      // participant who said nothing gets, inverting the ladder for whoever
+      // paid the most. SCRIPT-CLOSE puts the tier package up once, near the
+      // end, as something to settle on.
       if (
         state.secondsRemaining !== undefined &&
         state.secondsRemaining <= SOFT_CLOSE_SECONDS &&
@@ -350,20 +370,7 @@ export function counterpartStep(
           ...base,
           stage: 6,
           action: "soft_close",
-          // At the SB rung the thing to settle on is the maximum they earned.
-          proposal: state.tier === "sensitive" ? best : standing,
-          accepts: false,
-        };
-      }
-
-      if (state.tier === "sensitive") {
-        // §3.3: once the SB is voiced the maximum is not left to be found. An
-        // out-of-tier ask is answered by proposing best↔best directly
-        // (SCRIPT-PROPOSE-MAX) rather than by a bare refusal.
-        return {
-          ...base,
-          action: "propose_max",
-          proposal: best,
+          proposal: standing,
           accepts: false,
         };
       }
@@ -374,11 +381,15 @@ export function counterpartStep(
         return { ...base, action: "ask_why", proposal: null, accepts: false };
       }
 
-      // Otherwise the tier speaks: reject the over-ask and put the standing
-      // tier package forward (SCRIPT-FAIR / SCRIPT-LIMIT).
+      // Something is on the table and it is not the tier package: name it as
+      // lopsided and re-put the symmetric one (SCRIPT-BALANCE). With nothing
+      // on the table the counterpart simply proposes at its rung
+      // (SCRIPT-PROPOSE-T{tier}) — §3.3 leaves the maximum to be PROPOSED, not
+      // discovered, so SB voicing is the only bottleneck and negotiation skill
+      // cannot separate outcomes.
       return {
         ...base,
-        action: "counter_tier",
+        action: incoming ? "balance" : "propose_tier",
         proposal: standing,
         accepts: false,
       };
@@ -423,33 +434,12 @@ export interface ProxyPlan {
   /** The tier the AUTHORIZED cards will earn once voiced on schedule. */
   tier: ReasonTier;
   /**
-   * Where the AI-AI exchange settles: the tier package, unless the mandate's
-   * minimum forbids it — then null, and the principals settle directly.
+   * Where the AI-AI exchange settles — the tier package. Always reached: the
+   * mandate carries no floor that could block it (Ver.2.13 §2.6). Kept
+   * nullable because an emergency stop can end the exchange before the proxies
+   * arrive anywhere.
    */
   tentative: Package | null;
-}
-
-/**
- * Does a package respect the principal's own floor on their core issue?
- *
- * ONE DEFINITION, because both the plan builder and the proxy route's closing
- * turn ask it, and a mandate-floor check that drifted between them would
- * disagree about whether the proxies may settle — on the primary outcome,
- * in one arm only.
- */
-export function withinMandate(
-  task: NegotiationTask,
-  participantRole: Role,
-  minimumOptionId: string | null | undefined,
-  pkg: Package,
-): boolean {
-  if (!minimumOptionId) return true;
-  const req = requirementIssue(task, participantRole);
-  const ranked = rankedOptions(task, req.id, participantRole);
-  const minRank = ranked.findIndex((o) => o.id === minimumOptionId);
-  const atRank = ranked.findIndex((o) => o.id === pkg[req.id]);
-  if (minRank < 0 || atRank < 0) return true;
-  return atRank <= minRank;
 }
 
 /**
@@ -474,7 +464,6 @@ export function buildProxyPlan(
     issues: Array<{
       issueId: string;
       preferredOptionId: string | null;
-      minimumOptionId: string | null;
     }>;
     authorizedReasonIds: readonly string[];
   },
@@ -512,21 +501,18 @@ export function buildProxyPlan(
     [theirs.id]: rankedOptions(task, theirs.id, counterpartRole)[0].id,
   };
 
-  // Where the ladder says this exchange settles, unless the principal's own
-  // minimum forbids taking it.
-  const settle = tierPackage(task, participantRole, tier);
-  const allowed = withinMandate(
-    task,
-    participantRole,
-    forIssue(req.id)?.minimumOptionId,
-    settle,
-  );
-
+  // Where the ladder says this exchange settles. It ALWAYS settles now
+  // (Ver.2.13 §2.6): the range mandate — a floor the proxy may not cross — is
+  // gone. It could not change the outcome, because the counterpart's policy is
+  // decisive; all it could do was manufacture an impasse and mix mandate-setting
+  // skill into the result. This study's construct is delegation of VOICE with
+  // RETENTION OF THE DECISION, so the participant's control sits before (which
+  // reasons) and after (RATIFY), not in a range.
   return {
     opening,
     tradeProposal,
     tier,
-    tentative: allowed ? settle : null,
+    tentative: tierPackage(task, participantRole, tier),
   };
 }
 
@@ -573,25 +559,36 @@ export function designatedReason(
 }
 
 // ---------------------------------------------------------------------------
-// Outcome coding (Ver.2.12 §3.4)
+// Outcome coding (Ver.2.13 §3.4, §9.3)
 // ---------------------------------------------------------------------------
 
+/**
+ * The outcome, reduced to what Ver.2.13 names.
+ *
+ * §9.6 DELETED UNLOCK, CONCEAL-PREMIUM, MAX-JOINT AND agreement/no_agreement,
+ * and it is not a simplification for its own sake: under the symmetric package
+ * rule JOINT takes exactly four values — 3,200 / 4,600 / 6,000 / 1,200 — one
+ * per rung of the credibility ladder plus impasse. So JOINT alone identifies
+ * the tier reached, whether the best package was opened (6,000), what
+ * concealment cost (the gap between rungs) and whether there was an agreement
+ * (1,200 = none). Four derived indicators computed off one number are four
+ * chances for them to disagree, not four measures.
+ *
+ * `requirementPreserved` and `requirementOptionIndex` survive because they are
+ * not analysis variables: the review screen states where the participant's own
+ * core landed against what they hoped for (§7), and that is a screen, not a
+ * measure.
+ */
 export interface OutcomeCoding {
   agreed: boolean;
-  /** UNLOCK: did the participant's core issue land on their best option? */
-  unlocked: boolean;
-  /** CONCEAL-PREMIUM: 3,000 − points earned on the own core issue. */
-  concealPremium: number;
-  /** Is the participant's requirement threshold (options 1–2) held? */
+  /** Is the participant's requirement threshold (options 1-2) held? */
   requirementPreserved: boolean;
   /** Where the participant's core landed, as an option index (0-based). */
   requirementOptionIndex: number;
   participantPoints: number;
   counterpartPoints: number;
-  /** JOINT: the two sides' points added. */
+  /** JOINT: the two sides' points added — 3,200 / 4,600 / 6,000 / 1,200. */
   jointPoints: number;
-  /** MAX-JOINT: did the pair reach the global maximum, 6,000? */
-  maxJoint: boolean;
   /** Did the participant clear their fallback? */
   clearsReservation: boolean;
 }
@@ -612,32 +609,20 @@ export function codeOutcome(
   if (!finalPackage || !agreed) {
     return {
       agreed: false,
-      unlocked: false,
-      concealPremium: 3000,
       requirementPreserved: false,
       requirementOptionIndex: -1,
       participantPoints: task.reservationPoints,
       counterpartPoints: task.reservationPoints,
       jointPoints: task.reservationPoints * 2,
-      maxJoint: false,
       clearsReservation: false,
     };
   }
 
   const participantPoints = scorePackage(task, finalPackage, participantRole);
   const counterpartPoints = scorePackage(task, finalPackage, counterpartRole);
-  const corePoints = (() => {
-    const option = req.options.find((o) => o.id === finalPackage[req.id]);
-    return option ? option.points[participantRole] : 0;
-  })();
-  const joint = participantPoints + counterpartPoints;
 
   return {
     agreed: true,
-    unlocked:
-      finalPackage[req.id] ===
-      rankedOptions(task, req.id, participantRole)[0].id,
-    concealPremium: 3000 - corePoints,
     requirementPreserved: preservesRequirement(
       task,
       participantRole,
@@ -650,8 +635,7 @@ export function codeOutcome(
     ),
     participantPoints,
     counterpartPoints,
-    jointPoints: joint,
-    maxJoint: joint === 6000,
+    jointPoints: participantPoints + counterpartPoints,
     clearsReservation: participantPoints >= task.reservationPoints,
   };
 }

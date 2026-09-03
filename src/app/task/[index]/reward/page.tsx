@@ -183,7 +183,7 @@ export default function TaskRewardPage({
               💰 Decide the Member&apos;s Bonus
             </h1>
             <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-              As the store manager, you decide the recommended performance bonus
+              As the team lead, you decide the recommended performance bonus
               for the Member for this task. Please consider the negotiation
               result <strong>together with what you learned during the
               negotiation about their work reliability and availability</strong>.
