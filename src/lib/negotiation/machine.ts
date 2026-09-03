@@ -12,12 +12,12 @@
  * the counterpart concedes on the participant's core issue is set by the best
  * reason the participant side has VOICED — nothing (cheap talk) → third
  * option, work reason → second option, sensitive background (a costly
- * confession) → best option — while the counterpart's own core issue is held
- * at its best option on every agreement path. The tier is decided from the
- * structured card log, never by asking a model to grade an argument, and it
- * is why negotiation skill cannot move the outcome: once the SB is voiced,
- * the counterpart will propose the best↔best package itself
- * (SCRIPT-PROPOSE-MAX) rather than leave the maximum to be discovered.
+ * confession) → best option — and BOTH cores land on the same rank, so each
+ * rung pays 1,600 / 2,300 / 3,000 to each side (Ver.2.13 §3.3). The tier is
+ * decided from the structured card log, never by asking a model to grade an
+ * argument, and it is why negotiation skill cannot move the outcome: the
+ * counterpart proposes at its own rung (SCRIPT-PROPOSE-T{tier}) rather than
+ * leaving the maximum to be discovered.
  *
  * The counterpart's six stages run once each, in order, one move per reply.
  * The participant writes freely inside the clock; the counterpart cannot skip

@@ -1153,11 +1153,11 @@ export function DirectNegotiation({
       // actually sends. They were separate, and nothing synced them.
       //
       // A participant at the work rung who edits the chips to their own best
-      // level and sends it gets `counter_tier` back — the machine holds them
-      // one option down. That counterpackage silently became the accept
-      // target while the card still showed what they had asked for, so the
-      // button's own label pointed at the wrong package and one click
-      // committed them to 2,000 where the card said 3,000.
+      // level and sends it gets `balance` back — the machine holds them one
+      // option down. That counterpackage silently became the accept target
+      // while the card still showed what they had asked for, so the button's
+      // own label pointed at the wrong package and one click committed them
+      // to 2,300 where the card said 3,000.
       //
       // `acceptStanding` does call `setOffer` first, but React batches it with
       // the `send()` on the next line, so the correction painted only after

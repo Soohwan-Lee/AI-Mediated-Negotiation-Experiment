@@ -389,9 +389,9 @@ These are load-bearing. Breaking any one invalidates the data.
    `/debriefing` discloses is that no such decision was ever made about them.
    Do not "restore" a number here for symmetry.
 
-   **The Member's own channel is `RECV-EVAL`** (Ver.2.12 §5): before the wait
-   they write an upward evaluation of the manager, told it goes to the district
-   manager. It does not — there is no district manager — and `/debriefing`
+   **The Member's own channel is `RECV-EVAL`** (§5): before the wait
+   they write an upward evaluation of the lead, told it goes to the director.
+   It does not — there is no director — and `/debriefing`
    retracts that for both roles, since the Leader was told one was being
    written about them. It is the receiver-side mirror of `BONUS`: without it
    the Member has a post-negotiation decision made ABOUT them and none of their
@@ -843,11 +843,12 @@ keeping:
   back to the model.
 - **The counterpart needs its own mandate.** Without one it mirrors whatever
   the participant's Proxy opens with instead of negotiating. It has one by
-  construction: `counterpartOpening` plus the ladder.
-- **Guardrail asymmetry confirmed.** Red lines, fabricated personal facts, and
-  invalid options all block. Two checks are policy-specific: an unchecked
-  reason card may not be voiced under *either* policy, and a `pool:`-prefixed
-  reason is Explorer-only.
+  construction: its own fixed cards plus the ladder.
+- **Guardrail asymmetry confirmed.** Fabricated personal facts and invalid
+  options block. Two checks are policy-specific: an unchecked reason card may
+  not be voiced under *either* policy, and a `pool:`-prefixed reason is
+  Explorer-only. (`red_line_violation` went with the mandate floor it existed
+  to enforce — Ver.2.13 §2.6.)
 - **`stage_mismatch` was demoted to a soft violation, and that was a real
   bug fix.** The model's stage field is an echo, so a mismatch says nothing
   about the move — but as a hard code it replaced the whole message with the
@@ -856,42 +857,59 @@ keeping:
   through). Live runs were losing the acceptance wording for no reason. It is
   still logged for the gate-10 audit.
 
-**Ver.2.12 was re-verified the same way** (`npm run simulate`, ten runs, all
-passing). What the runs are for, beyond the assertions: the ladder produces
-exactly 3,000/3,000 with the SB and 2,000/3,300 without, in live prose; the
-counterpart's own SB disclosure reads as a person volunteering something rather
-than a system reciting a card; and a mid-closing confession really does move
-the counterpart to propose the maximum itself. Three prompt fixes came out of
-reading the transcripts rather than the checks — the bubble-splitting rule for
-over-long turns, dropped duplicate "matters most to me" phrasing when the card
-already says it, and an `accept_sb` frame that no longer acts newly surprised
-by something already acknowledged. Only the first changed the design doc (§12
-P1); the other two are instruction wording, which the doc leaves to the
-implementation.
+**Ver.2.13 was re-verified the same way** (`npm run simulate`, ten runs, all
+passing). What the runs are for, beyond the assertions: the symmetric ladder
+produces exactly 3,000/3,000 with the SB and 2,300/2,300 without, in live
+prose; the counterpart's own SB disclosure reads as a person volunteering
+something rather than a system reciting a card; the four rewritten confessions
+land as things a colleague would actually be reluctant to say; and a
+mid-closing confession really does move the counterpart to put the maximum up
+itself.
 
-## Ver.2.12 migration status
+Two things came out of reading the transcripts rather than the checks. **The
+simulation's seeded opening had diverged from the app** — it was still
+anchoring on the counterpart's own best package after `openingLine` had moved
+to SCRIPT-OPEN, which meant the only automated check on the live prose was
+checking a study nobody runs. `counterpartOpening` is deleted so the two cannot
+drift again. And **SCRIPT-BALANCE needed splitting**: it carries a judgement
+AND a package, and asked as one sentence the model wrote a single 179-character
+bubble, over the 120-char rule that keeps the counterpart reading like a person
+typing.
 
-Migrated in full: the scenario and payoffs, the two-issue shape, the eight
-face-confession reason cards, the **credibility ladder** (§3.3, §6.2), the
-**six-stage script** (§6.1), the **counterpart's fixed SB disclosure** (§6.3),
-the fixed scripts (§6.4), the proxy's first-opportunity SB schedule (§6.5),
-**RECV-EVAL** (§5), the unified closing with `RATIFY` / `SELF-DISCLOSE`, the
-outcome measures `UNLOCK` / `CONCEAL-PREMIUM` / `JOINT` / `MAX-JOINT`, the
-§9 instrument (PERC-F/I, FTS, the seven PCR items, the six OTHER-AI items,
-M1, INCENT1), and prompts P0–P4 (§12).
+## Ver.2.13 migration status
+
+Migrated in full: the **consulting-agency scenario** (§3.1) and its payoffs,
+the two-issue shape, the **four rewritten face-confession SBs** under §4's new
+principles 5 and 6, the **symmetric credibility ladder** (§3.3, §6.2), the
+anchor-free opening and the **six-stage script** (§6.1), the counterpart's
+fixed SB disclosure (§6.3), the **consolidated fixed scripts** (§6.4), the
+proxy's first-opportunity SB schedule (§6.5), the Explorer pool rewritten for
+the new scenario (§6.6), **RECV-EVAL** (§5), **RATIFY as its own screen** with
+the conditional closing conversation (§7), the **four behavioural measures**
+`SB` / `SB-TIMING` / `Points·JOINT` / `RATIFY` (§9.3), the removal of the range
+mandate from both arms (§2.6, §8.6), and the §9 instrument (PERC-F/I, FTS, the
+seven PCR items, the six OTHER-AI items, M1, INCENT1).
+
+The §9 instrument itself is unchanged from Ver.2.12 — §9.4's item set survived
+the revision intact, which is why `lib/measures.ts` needed almost nothing.
 
 Verified against the live model end to end — `npm run simulate`, ten runs
-through the real routes; see "Verified against the live model" below.
+through the real routes; see "Verified against the live model" above.
 
-**Still design-open (Ver.2.12 §13), not implementation gaps:**
+**Still design-open (Ver.2.13 §9.8, §13), not implementation gaps:**
 
-- the working values themselves: the outcome ladder (1,000 / 2,000 / 3,000),
+- the working values themselves: the outcome ladder (1,600 / 2,300 / 3,000),
   the fallback (600), and the strength of the §5② decision guidelines are all
   to be fixed at pilot
-- §13.3: whether the Proxy closing stays a free conversation with card tagging
-  (current) or becomes an approve-only button. The current shape is what makes
-  `SELF-DISCLOSE` measurable at all; an approve-only button would remove the
-  measure along with the contamination risk
+- §9.8-1: the three RECV-EVAL items are `[PROPOSED]` — wording and anchor style
+  (7-point agreement vs evaluation) are not settled
+- §9.8-4: the Baseline operational definition of `SB` when a participant
+  describes the sensitive background WITHOUT tagging the card. §6.2 says the
+  live tier does not move and a post-hoc recoding is reported as a sensitivity
+  analysis; the recoding rule itself is not written
+- §9.8-5: `SB-TIMING`'s categories 3 and 4 are structurally exclusive by arm,
+  so the χ² has zero cells by construction — the test's unit must be
+  pre-specified
 - §13.4: aligning PCR / PNPQ / PNOQ to the SVI's four factors, so a validated
   scale can be cited
 - §13.5: the item wording is written in English against Korean drafts and
@@ -902,12 +920,14 @@ through the real routes; see "Verified against the live model" below.
 Nothing structural. What remains is values to fix and behaviour to observe:
 
 - **Pilot-dependent numbers.** The fallback (600), the outcome ladder
-  (1,000 / 2,000 / 3,000), the strength of the §5② decision guidelines, and
+  (1,600 / 2,300 / 3,000), the strength of the §5② decision guidelines, and
   the Prolific completion code.
 
   **The payment is settled**: £8.00 participation plus a £1.00 bonus is £9.00
-  for a 60-minute study, which is exactly Prolific's recommended fair-pay rate
-  (their hard floor is £6.00/hour). GBP because Prolific pays in it. The pound
+  for a 58-minute study — £9.31 an hour, above Prolific's recommended fair-pay
+  rate of £9.00 (their hard floor is £6.00/hour). The rate rose slightly when
+  Ver.2.13 shortened the flow; the pay was not shaved to match, because the
+  study asks the same work either way. GBP because Prolific pays in it. The pound
   is held back and presented as something a Leader decides and a Member
   receives, and every participant is paid it in full — the third deception
   alongside the counterpart's existence and the upward evaluation, retracted
@@ -919,14 +939,17 @@ Nothing structural. What remains is values to fix and behaviour to observe:
 
   On the impasse target (gate 6, under 10%): the ladder makes impasse much
   harder to reach than the old threshold rule did, because every rung is an
-  acceptable agreement and even the unargued one (1,000) beats the fallback
-  (600). The remaining route to impasse is a participant who sets a minimum
-  above what their voiced reasons earn and then refuses the counterpart's tier
-  package — which is a real behaviour worth measuring, not a bug. Watch the
-  rate rather than pre-emptively widening anything.
+  acceptable agreement and even the unargued one (1,600) beats the fallback
+  (600). The remaining route to impasse is a participant who keeps asking off
+  the ladder and refuses the counterpart's tier package until the clock runs
+  out — a real behaviour worth measuring, not a bug. Ver.2.13 removed the other
+  route (a mandate floor above the tier), so the rate should fall further.
+  Watch it rather than pre-emptively widening anything.
 
-- **Timing.** `STAGE_MINUTES` sums to 61 minutes and the consent page
-  advertises 60. `TOTAL_MINUTES` is derived from those same numbers and
+- **Timing.** `STAGE_MINUTES` sums to 59 minutes and the consent page
+  advertises 58. (Ver.2.13's §7 heading says 45-50; that is the design doc's
+  rough estimate, and this figure is summed from the screens that actually
+  exist. Adopting the looser number would advertise less than the study takes.) `TOTAL_MINUTES` is derived from those same numbers and
   `timingIsHonest()` pins the relation — the advertised figure may round the
   budget DOWN by at most a minute and never further, because a listing that
   promises less than the study takes underpays anyone slower than the estimate
@@ -951,8 +974,7 @@ Nothing structural. What remains is values to fix and behaviour to observe:
   every payoff property above.
 
 - **Whether the counterpart's SB disclosure primes PERC.** This is the known
-  cost of the Ver.2.12 §6.3 change, accepted because `PRE-RECIP-SB` needs a
-  fixed reciprocity point. It is constant across conditions, so it cannot
+  cost of the §6.3 rule, accepted because `SB` needs a fixed reciprocity point. It is constant across conditions, so it cannot
   produce a condition effect — but it can lift PERC and RISK uniformly, and
   RISK is gate 4's task-equivalence instrument. Check both tasks' RISK means
   against gate 4 in the pilot before reading anything into their level.
@@ -960,10 +982,12 @@ Nothing structural. What remains is values to fix and behaviour to observe:
 - **The failure branches now have tests, but only at the machine level.**
   `tests/reason-rules.test.mjs` pins all three ladder rungs in four cells,
   impasse, the one-shot reminders, and script–machine agreement; the live
-  simulation covers the below-mandate branch and a mid-closing disclosure. What
-  is still unexercised automatically is the INTERFACE around the failure
+  simulation covers the WR-only path and a mid-closing disclosure. What is
+  still unexercised automatically is the INTERFACE around the failure
   branches — the emergency stop, and the clock actually running out on a real
-  screen. Both were walked by hand.
+  screen. Both were walked by hand. RATIFY's three branches were walked by
+  hand too: approve goes straight to review, modify keeps the package on the
+  table, refuse clears it.
 
 - Fixed vs. jittered counterpart delay · final IRB language (three deceptions
   now: the counterpart's existence, the bonus, and the upward evaluation being

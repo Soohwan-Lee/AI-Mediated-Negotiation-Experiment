@@ -263,7 +263,7 @@ export async function POST(request: Request) {
     // WHAT THE CLIENT GETS IS THE MINIMUM IT USES. The counterpart is
     // presented as another participant, so `accepts`, `impasse`, the decided
     // action and the validator's verdict all stay server-side — a network
-    // tab showing `action: "counter_tier"` says the other party is
+    // tab showing `action: "propose_tier"` says the other party is
     // machinery. The client re-runs `counterpartStep` itself from the same
     // inputs and gets the same answer, because the machine is deterministic.
     return NextResponse.json({

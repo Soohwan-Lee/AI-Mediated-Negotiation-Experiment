@@ -388,14 +388,14 @@ export function practiceReasonItem(role: Role): Item {
     kind: "choice",
     id: "PRAC1",
     text: leaderSide
-      ? "Your best-scoring option is doing the deep clean next week. Why is that the better option for you?"
-      : "Your best-scoring option is keeping the machine behind the counter. Why is that the better option for you?",
+      ? "Your best-scoring option is moving next week. Why is that the better option for you?"
+      : "Your best-scoring option is the printer beside your desk. Why is that the better option for you?",
     options: [
       {
         value: "reason",
         label: leaderSide
-          ? "It gets done before the quarterly inspection"
-          : "It is the one spot you can reach mid-rush",
+          ? "It gets done before the quarterly review"
+          : "It is the one spot you can reach without getting up",
       },
       { value: "points", label: "Because it is worth the most points" },
       { value: "other_side", label: "Because the other side prefers it" },

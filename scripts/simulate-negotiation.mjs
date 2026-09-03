@@ -455,9 +455,9 @@ let wrOnlyResult;
   const sb = cardOfLayer(task, "member", "sensitive");
   // The confession comes WITH an out-of-tier ask (their core AND ours), so
   // the counterpart cannot simply accept it — which is what makes this the
-  // SCRIPT-PROPOSE-MAX path rather than a plain acceptance. A within-tier ask
-  // after the same confession is accepted as-is, and that is correct: the SB
-  // rung opens the best option, it does not oblige anyone to take it.
+  // SCRIPT-BALANCE path rather than a plain acceptance — the counterpart
+  // names the ask as one-sided and puts the symmetric package up, which at
+  // this rung is best↔best.
   const overAsk = {
     ...best,
     [counterRequirementIssue(task, "member").id]: rankedOptions(

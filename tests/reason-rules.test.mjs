@@ -12,12 +12,13 @@
  *     next, so disclosure is monotonically rewarded and even the unargued
  *     agreement beats walking away.
  *
- *  2. SB VOICING IS THE ONLY BOTTLENECK. Once the SB tier is open the
- *     counterpart proposes best↔best ITSELF (SCRIPT-PROPOSE-MAX) — a
- *     participant does not need negotiation skill to reach the maximum, only
- *     the disclosure. And the maximum is NOT reachable by skill alone: an
- *     over-ask without the SB is countered at the tier package, never
- *     accepted.
+ *  2. SB VOICING IS THE ONLY BOTTLENECK. The counterpart proposes at its own
+ *     rung (SCRIPT-PROPOSE-T{tier}), so a participant does not need
+ *     negotiation skill to reach the maximum, only the disclosure. And the
+ *     maximum is NOT reachable by skill alone: an over-ask without the SB is
+ *     rebalanced to the tier package (SCRIPT-BALANCE), never accepted — and
+ *     nor is an UNDER-ask, so over-conceding cannot drag the outcome below
+ *     the rung that was paid for.
  *
  *  3. THE SCHEDULE. The participant's proxy voices the SB at its FIRST
  *     reason opportunity when authorized (PRE-RECIP-SB depends on the SB
@@ -563,9 +564,9 @@ test("the pool is additive: it rides beside a principal card in one message", ()
     stage: 2,
     reasonsUsed: [],
     reasonKey: "rA",
-    reasonIssueId: "weekend_shifts",
+    reasonIssueId: "report_deadline",
     addedReasonKey: "rPool0",
-    addedReasonIssueId: "weekend_shifts",
+    addedReasonIssueId: "report_deadline",
   });
   assert.equal(result.valid, true);
 });
@@ -577,12 +578,12 @@ test("a second pool reason on the same issue is over budget", () => {
     actorRole: "leader",
     stage: 2,
     reasonsUsed: [
-      { key: "rOld", issueId: "weekend_shifts", source: "pool" },
+      { key: "rOld", issueId: "report_deadline", source: "pool" },
     ],
     reasonKey: "rA",
-    reasonIssueId: "weekend_shifts",
+    reasonIssueId: "report_deadline",
     addedReasonKey: "rPool0",
-    addedReasonIssueId: "weekend_shifts",
+    addedReasonIssueId: "report_deadline",
   });
   assert.equal(result.valid, false);
   assert.equal(result.violations[0].code, "rationale_budget_exceeded");
@@ -595,11 +596,11 @@ test("a third pool reason in the task is over budget", () => {
     actorRole: "leader",
     stage: 2,
     reasonsUsed: [
-      { key: "rOld1", issueId: "weekend_shifts", source: "pool" },
+      { key: "rOld1", issueId: "report_deadline", source: "pool" },
       { key: "rOld2", issueId: null, source: "pool" },
     ],
     reasonKey: "rA",
-    reasonIssueId: "weekend_shifts",
+    reasonIssueId: "report_deadline",
     addedReasonKey: "rPool2",
     addedReasonIssueId: null,
   });

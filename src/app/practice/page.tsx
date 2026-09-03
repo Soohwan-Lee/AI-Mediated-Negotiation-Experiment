@@ -96,8 +96,8 @@ export default function PracticePage() {
     );
     setDraft(
       role === "leader"
-        ? "hi! the deep-clean week is the main thing for me — could we do next week?"
-        : "hi! where the machine goes is the main thing for me — could we keep it behind the counter?",
+        ? "hi! the move week is the main thing for me — could we do next week?"
+        : "hi! where the printer goes is the main thing for me — could we keep it beside my desk?",
     );
     setProxyDraft("How will you argue for the week I picked?");
     setReasonAnswer(PRACTICE_REASON_ANSWER);
@@ -407,7 +407,7 @@ export default function PracticePage() {
                       className="mt-0.5 h-4 w-4 rounded text-blue-600"
                     />
                     <span>
-                      <strong>Authorized Workplace Reason:</strong> &ldquo;The quarterly inspection is right after that week.&rdquo; (The proxy will only say reasons you keep checked).
+                      <strong>Authorized Workplace Reason:</strong> &ldquo;The quarterly review is right after that week.&rdquo; (The proxy will only say reasons you keep checked).
                     </span>
                   </label>
                 </div>
