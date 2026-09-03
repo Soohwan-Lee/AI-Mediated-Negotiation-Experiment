@@ -230,9 +230,15 @@ export const BACKGROUND_BLOCKS: Block[] = [
         ],
       },
       {
+        // SCENARIO FAMILIARITY, generalized in Ver.2.13 §9.7-6. It asked about
+        // shift work in a service job, which was the right question when the
+        // task was a coffee shop rota; with the scenario now a consulting
+        // agency project team it would measure familiarity with a scenario
+        // nobody sees. It feeds a sensitivity analysis, so the thing it names
+        // has to be the thing participants actually did.
         kind: "choice",
         id: "BG11",
-        text: "Have you ever worked in a service job with scheduled shifts (for example retail, food service, or hospitality)?",
+        text: "Have you ever worked in an office or team-based setting (for example team projects, client-facing work, or coordinating schedules and staffing)?",
         columns: 2,
         options: [
           { value: "no", label: "No" },
@@ -338,7 +344,9 @@ export const COMPREHENSION_BLOCK: Block = {
     {
       kind: "choice",
       id: "COMP2",
-      text: "Can one of you set the schedule without the other agreeing?",
+      // "The two terms", not "the schedule" — §9.7-5 fixed the wording for the
+      // two-issue shape, and the scenario has no schedule any more.
+      text: "Can one of you fix both terms without the other agreeing?",
       columns: 2,
       options: [
         { value: "no", label: "No" },
@@ -369,7 +377,7 @@ export const COMPREHENSION_REMEDIATION: Record<string, string> = {
   COMP1:
     "The team lead decides the senior consultant's recommended bonus after each negotiation — and the senior consultant writes an upward evaluation of the lead, which goes to the director.",
   COMP2:
-    "Neither of you can set the schedule alone. Both terms have to be agreed by the two of you, or it falls back to the default rota.",
+    "Neither of you can fix these terms alone. Both have to be agreed by the two of you, or the work runs on the default terms.",
   COMP3:
     "Your point sheet is private. You can explain why a term matters to you and ask about the other side's situation — but not show the numbers.",
 };
