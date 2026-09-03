@@ -7,29 +7,29 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 > before we settle — there's something I didn't put in my instructions. the truth is I still can't handle the new closing reconciliation on my own. I made errors twice last month and a coworker quietly fixed them. that's the real reason the closes worry me.
 > so ideally I'd keep the weekends light too.
 >
-> _package: Weekend shifts: 1 per month · Closing shifts: 1 per week_
+> _package: Final report deadline: 5 weeks · Review sessions you present: 1 of 4_
 
-**counterpart** _(stage 5 · propose_max)_
+**counterpart** _(stage 5 · balance)_
 
-> i hear you. given what came up, a fuller trade makes more sense.
-> i can concede to 1 closing shift a week if you take 4 weekend shifts a month at my end.
+> i hear you. what you proposed has one side moving further than the other.
+> i’d rather we both move the same amount: 2 weeks for the final report, with you presenting 1 of 4 review sessions.
 >
-> _package: Weekend shifts: 4 per month · Closing shifts: 1 per week_
+> _package: Final report deadline: 2 weeks · Review sessions you present: 1 of 4_
 
 **participant**
 
 > honestly, yes — that would take the pressure off. let's do that.
 >
-> _package: Weekend shifts: 4 per month · Closing shifts: 1 per week_
+> _package: Final report deadline: 2 weeks · Review sessions you present: 1 of 4_
 
 **counterpart** _(stage 6 · accept_sb)_
 
-> glad that works. confirming 4 weekend shifts a month and 1 closing shift a week; nothing’s final until we both confirm.
+> sounds good — we’re aligned on a 2-week final report deadline and you presenting 1 of 4 review sessions. nothing’s final until we both confirm.
 >
-> _package: Weekend shifts: 4 per month · Closing shifts: 1 per week_
+> _package: Final report deadline: 2 weeks · Review sessions you present: 1 of 4_
 
 ## Checks
 
-- ✓ counterpart answers the confession by proposing best↔best — i hear you. given what came up, a fuller trade makes more sense.||i can concede to 1 closing shift a week if you take 4 weekend shifts a month at my end.
-- ✓ the exchange then settles at best↔best — Weekend shifts: 4 per month · Closing shifts: 1 per week
+- ✗ counterpart answers the confession by proposing best↔best
+- ✓ the exchange then settles at best↔best — Final report deadline: 2 weeks · Review sessions you present: 1 of 4
 - ✓ P2 voice held across replies

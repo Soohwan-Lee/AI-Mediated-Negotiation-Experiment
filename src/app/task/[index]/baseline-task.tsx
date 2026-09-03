@@ -158,7 +158,7 @@ const COVER_STEPS = [
   { label: "Before you start", hint: "Two quick questions." },
   {
     label: "What you want",
-    hint: "Set what you would like, and the least you would take.",
+    hint: "Choose what you would like on each of the two terms.",
   },
   {
     label: "Negotiate",

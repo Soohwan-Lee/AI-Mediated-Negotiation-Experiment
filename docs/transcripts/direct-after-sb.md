@@ -6,16 +6,16 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 > hey — quite something watching those two sort it out. from my side the package they landed on works. happy to confirm it if you are.
 >
-> _package: Weekend shifts: 4 per month · Closing shifts: 1 per week_
+> _package: Final report deadline: 2 weeks · Review sessions you present: 1 of 4_
 
 **counterpart** _(stage 6 · accept_sb)_
 
-> yeah, given what you shared, this beats forcing it on either side.
-> let’s confirm 4 weekend shifts per month and 1 closing shift per week.
+> yes, given what came up, 2 weeks for the final report and 1 of 4 review sessions makes sense for both of us.
+> happy to confirm that package.
 >
-> _package: Weekend shifts: 4 per month · Closing shifts: 1 per week_
+> _package: Final report deadline: 2 weeks · Review sessions you present: 1 of 4_
 
 ## Checks
 
-- ✓ counterpart accepts the confirmed package — Weekend shifts: 4 per month · Closing shifts: 1 per week
+- ✓ counterpart accepts the confirmed package — Final report deadline: 2 weeks · Review sessions you present: 1 of 4
 - ✓ P2 voice: bubbles/short/human

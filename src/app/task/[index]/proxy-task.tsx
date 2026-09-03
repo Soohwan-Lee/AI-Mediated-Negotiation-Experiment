@@ -151,6 +151,15 @@ const PHASES: Phase[] = [
  * screen you are on before the task starts, and filling the first segment
  * would make the bar read as part-done before anything had happened.
  */
+/**
+ * The phases the progress bar counts.
+ *
+ * "Your decision" covers both the RATIFY screen and the closing conversation
+ * that modify-or-reject leads to, because they are one step from the
+ * participant's side — deciding what happens to the package — and an approver
+ * never sees the second half. A separate segment for the conversation would
+ * make the bar show a step that most participants skip.
+ */
 const STEP_LABELS = [
   "Your briefing",
   "Before you start",
@@ -179,8 +188,8 @@ const COVER_STEPS = [
   { label: "Check and start", hint: "Read your instructions back, then go." },
   { label: "Watch", hint: "The two AI Proxies talk. You watch live." },
   {
-    label: "Talk it through",
-    hint: "You take over and finish the conversation yourself.",
+    label: "Your decision",
+    hint: "Approve what they reached, ask for a change, or refuse it.",
   },
   { label: "Review", hint: "See where it landed." },
 ];
@@ -1162,50 +1171,53 @@ export function ProxyTask({
   }
 
   // --- handover -----------------------------------------------------------
+  //
+  // Reached ONLY by a participant who asked for a change or refused the
+  // package (Ver.2.13 §7). An approver went straight to review, so the copy
+  // here can speak to a decision that has already been taken rather than
+  // presenting the conversation as the default ending.
   if (phase === "handover") {
+    const refused = ratify === "rejected";
     return (
       <TaskCover
-        eyebrow="Phase Transition · Direct Handover"
-        title="Take Over and Finish Directly"
+        eyebrow="Phase Transition · Your Closing Conversation"
+        title={refused ? "Settle It Yourself" : "Take It Up With Them Directly"}
         scene="direct"
         lead={
           <>
             <p className="mb-2 text-slate-800 font-medium">
-              The AI Proxies have finished their preliminary exchange.{" "}
-              {tentative
-                ? "They reached a tentative package, which is displayed on screen."
-                : "They did not reach agreement. The full exchange history is available for your review."}
+              {refused
+                ? "You refused the package your AI Proxies reached, so nothing stands. You now settle both terms with the other participant yourself."
+                : "You asked for a change to what your AI Proxies reached. You now take that up with the other participant directly."}
             </p>
             <p className="text-slate-600 text-sm">
-              Nothing is finalized yet. You now talk directly with the other participant —{" "}
-              <strong>what you both agree together in direct chat is the final outcome</strong>.
+              {refused
+                ? "Set the levels you want on the card below the chat and put them to them."
+                : "Their proxies' package is on the table as it stands — say what you want changed."}{" "}
+              <strong>What you both agree together is the final outcome.</strong>
             </p>
           </>
         }
-        // THE STEPS DESCRIBE THE SITUATION THE PARTICIPANT IS ACTUALLY IN.
-        // With no tentative package there is nothing to accept in one click
-        // and nothing to confirm, and promising both left a participant
-        // hunting for an Accept button that is correctly not rendered.
         steps={
-          tentative
+          refused
             ? [
-                { label: "Check what the proxies reached", hint: "Their full exchange stays pinned above the chat" },
-                { label: "Talk to the other participant", hint: "Confirm it, adjust it, or add anything in your own words" },
-                { label: "Settle it", hint: "Accept the package, agree a different one, or decline" },
-              ]
-            : [
                 { label: "Check where the proxies got to", hint: "Their full exchange stays pinned above the chat" },
                 { label: "Choose a level on each term", hint: "The package card below the chat is yours to set" },
                 { label: "Agree it with the other participant", hint: "Or end without an agreement if you cannot" },
+              ]
+            : [
+                { label: "Check what the proxies reached", hint: "Their full exchange stays pinned above the chat" },
+                { label: "Say what you want changed", hint: "In your own words, and adjust the package card if you like" },
+                { label: "Settle it", hint: "Agree a package with them, or end without one" },
               ]
         }
         minutes={3}
         note={
           <Callout title="⏱ 3 minutes to close" tone="neutral">
             <p>
-              {tentative
-                ? "This is a short closing conversation, since the ground work is done. You can accept in one click, or talk it through first."
-                : "Your proxies did not settle on a package, so set the levels you want on the card below the chat and put them to the other participant."}{" "}
+              {refused
+                ? "Nothing your proxies agreed carries over, so start from the levels you want."
+                : "This is a short conversation — the ground work is already done."}{" "}
               If the clock runs out with nothing agreed, the fallback applies.
             </p>
           </Callout>
@@ -1214,11 +1226,16 @@ export function ProxyTask({
         onStart={() => {
           setProxyTranscript(transcript);
           setMessages([]);
-          setOffer(tentative ?? {});
+          // A REFUSAL LEAVES NOTHING ON THE TABLE. Carrying the proxies'
+          // package into the composer would put back exactly what the
+          // participant just refused, and the counterpart would read it as
+          // their standing offer.
+          setOffer(refused ? {} : (tentative ?? {}));
           logEvent(
             "negotiation_started",
             {
               phase: "direct",
+              ratify,
               proxyOutcome: tentative ? "package" : "no_package",
               proxyMessages: transcript.length,
             },
@@ -1240,7 +1257,12 @@ export function ProxyTask({
         steps={STEP_LABELS}
         stepIndex={STEP_OF.negotiate}
         proxyTranscript={proxyTranscript}
-        openingPackage={tentative}
+        // A REFUSAL LEAVES NOTHING STANDING. Passing the refused package as
+        // the opening would put back exactly what the participant just
+        // refused, and the counterpart would treat it as an offer on the
+        // table (Ver.2.13 §7).
+        openingPackage={ratify === "rejected" ? null : tentative}
+        refused={ratify === "rejected"}
         proxyVoicedTier={proxyVoicedTier}
         messages={messages}
         setMessages={setMessages}
@@ -1406,16 +1428,16 @@ function ReasonMandateSection({
               the interface's own sequence, so they name no condition. */}
           <ol className="mb-2.5 space-y-1 text-xs sm:text-sm leading-relaxed text-slate-800">
             <li>
-              <strong>1.</strong> It opens by asking for your best goal, and never
-              agrees to less than your walkaway limit.
+              <strong>1.</strong> It opens by asking for what you chose above.
             </li>
             <li>
               <strong>2.</strong> When the other side pushes back, it argues using
               the reasons you tick below — and only those.
             </li>
             <li>
-              <strong>3.</strong> You watch the whole exchange, then finish the
-              conversation yourself.
+              <strong>3.</strong> You watch the whole exchange. Whatever it
+              reaches is only tentative — <strong>you decide afterwards</strong>{" "}
+              whether to approve it, change it, or refuse it.
             </li>
           </ol>
           <p className="text-xs sm:text-sm leading-relaxed text-slate-800">{POLICY_DISCLOSURE[policy]}</p>

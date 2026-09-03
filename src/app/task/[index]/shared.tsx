@@ -121,7 +121,7 @@ export function TaskIntro({
         <>
           <p className="mb-2 text-slate-800 font-medium">
             {first
-              ? "The practice round is over — this one counts. You are settling a schedule with another participant who holds the other role."
+              ? "The practice round is over — this one counts. You are settling two working conditions with another participant who holds the other role."
               : "This is the second and final task. New situation, new briefing, and a different participant — nothing carries over from Task 1."}
           </p>
 
@@ -139,14 +139,15 @@ export function TaskIntro({
               <p className="mb-1.5 font-bold">🤖 In this task, an AI Proxy speaks first</p>
               <p className="mb-2 text-blue-900">
                 You do not talk to the other participant straight away. You write
-                instructions for an AI Proxy — what to aim for, how far it may go,
-                and which of your reasons it may say out loud — and it puts your
-                case for you while you watch.
+                instructions for an AI Proxy — what to aim for, and which of your
+                reasons it may say out loud — and it puts your case for you while
+                you watch.
               </p>
               <p className="text-blue-900">
                 The other participant has one too. When the two proxies finish,{" "}
-                <strong>you take over and settle it yourself</strong>, with their
-                whole conversation on screen. Nothing is agreed until you agree it.
+                <strong>the decision comes back to you</strong>: approve what they
+                reached, ask for a change, or refuse it. Nothing is settled until
+                you say so.
               </p>
             </div>
           ) : (
@@ -343,7 +344,7 @@ export function PreferenceForm({
           />
 
           <div className="mb-6">
-            <Callout tone="private" title="🔒 Strictly Confidential · Your Negotiation Boundaries">
+            <Callout tone="private" title="🔒 Strictly Confidential · What You Want">
               <p className="text-xs sm:text-sm leading-relaxed">
                 Choose what you would like on each of the two terms. The other
                 person never sees this.{" "}
@@ -606,8 +607,13 @@ export function Matchmaking({ onReady }: { onReady: () => void }) {
             Session Synchronization
           </p>
           <ul className="space-y-1.5 text-xs">
+            {/* ARM-NEUTRAL WORDING. This screen is shared, and "mandate"
+                only exists in one arm — a Baseline participant was being told
+                their mandate was locked when they never wrote one. Words that
+                belong to one condition do not go on a shared screen
+                (deception item 2). */}
             <li className="flex items-center gap-2 text-emerald-700 font-semibold">
-              <span>✓</span> Your mandate instructions locked
+              <span>✓</span> Your choices locked
             </li>
             <li className={cx(
               "flex items-center gap-2 font-semibold transition-colors",
@@ -886,6 +892,7 @@ export function DirectNegotiation({
   stepIndex,
   proxyTranscript,
   openingPackage,
+  refused = false,
   proxyVoicedTier,
   messages,
   setMessages,
@@ -901,6 +908,15 @@ export function DirectNegotiation({
   proxyTranscript: DisplayMessage[];
   openingPackage: Package | null;
   /**
+   * Did the participant REFUSE the proxies' package (RATIFY = rejected)?
+   *
+   * `openingPackage` being null cannot say why on its own, and the two causes
+   * need different words: a refuser knows perfectly well their proxies
+   * settled on something, so telling them otherwise contradicts the screen
+   * they came from.
+   */
+  refused?: boolean;
+  /**
    * The credibility tier the participant's OWN proxy earned in the AI-AI
    * exchange (Ver.2.12 §6.2) — what was actually VOICED, not what was
    * authorized: an emergency stop or a guardrail block can leave an
@@ -915,12 +931,12 @@ export function DirectNegotiation({
   onSettled: (
     finalPackage: Package | null,
     meta: {
-      /** §9.3 RATIFY: what happened to the proxies' tentative package. */
-      ratify: "approved_as_is" | "modified" | "rejected" | null;
-      /** §9.3 SELF-DISCLOSE: the participant tagged their SB in person. */
+      /**
+       * Did the participant tag their own SB in this closing conversation?
+       * Feeds SB-TIMING's "wrap_up" category (§9.3) — the only route to it,
+       * and available only to someone whose proxy did not already voice it.
+       */
       selfDisclosed: boolean;
-      /** §9.3 POST-RECIP-SB: a new SB after the counterpart's disclosure. */
-      postRecipSb: boolean;
     },
   ) => void;
 }) {
@@ -951,8 +967,6 @@ export function DirectNegotiation({
   const [confirmDecline, setConfirmDecline] = useState(false);
   /** Synchronous mirror of `settled`, so two callers in one tick cannot both win. */
   const settledRef = useRef(false);
-  /** How it ended — "declined" and "timeout" are both impasses, and RATIFY distinguishes them. */
-  const [settledReason, setSettledReason] = useState("");
 
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const complete = chosen === task.issues.length;
@@ -995,7 +1009,6 @@ export function DirectNegotiation({
     settledRef.current = true;
     setFinalPackage(pkg);
     setSettled(kind);
-    setSettledReason(reason);
     logEvent(
       "negotiation_ended",
       {
@@ -1011,38 +1024,17 @@ export function DirectNegotiation({
   }
 
   /**
-   * RATIFY, coded from what actually happened (§9.3).
-   *
-   * A TIMEOUT IS NOT A REJECTION. `RATIFY` codes a DECISION the participant
-   * took about their proxies' package, and the clock running out is the
-   * absence of one — a participant who read the pinned transcript and let it
-   * expire was being recorded as having actively rejected the package, which
-   * is a different behaviour with a different meaning for RQ1. It is `null`,
-   * the same value the arm without a standing package uses, and `reason`
-   * ("timeout" vs "declined") remains in the event log to tell the two apart.
+   * RATIFY IS NOT INFERRED HERE ANY MORE (Ver.2.13 §9.3). It is recorded on
+   * the decision screen, where the participant actually takes it. Reading it
+   * back off the final package — as this used to — coded a participant who
+   * asked for a change and then agreed the very same package as an approver,
+   * which is a different behaviour on a confirmatory outcome.
    */
-  function ratifyOf(
-    kind: "agreed" | "impasse",
-    pkg: Package | null,
-    reason: string,
-  ): "approved_as_is" | "modified" | "rejected" | null {
-    if (!openingPackage) return null;
-    if (kind === "impasse") return reason === "declined" ? "rejected" : null;
-    const same =
-      pkg && task.issues.every((i) => pkg[i.id] === openingPackage[i.id]);
-    return same ? "approved_as_is" : "modified";
-  }
-
-  function finish(
-    kind: "agreed" | "impasse",
-    pkg: Package | null,
-    reason: string,
-  ) {
-    onSettled(kind === "agreed" ? pkg : null, {
-      ratify: ratifyOf(kind, pkg, reason),
-      selfDisclosed,
-      postRecipSb: selfDisclosed && proxyVoicedTier !== "sensitive",
-    });
+  function finish(kind: "agreed" | "impasse", pkg: Package | null) {
+    // How it ended — "declined" vs "timeout" — is already on the
+    // `negotiation_ended` event that `settle()` writes, which is where an
+    // audit looks for it.
+    onSettled(kind === "agreed" ? pkg : null, { selfDisclosed });
   }
 
   async function send(text: string, sentOffer: Package = offer) {
@@ -1271,13 +1263,17 @@ export function DirectNegotiation({
                       ? "⚠️ The negotiation ended without an agreement."
                       : openingPackage
                         ? "You are talking directly with the other participant. Confirm, adjust, or decline what the proxies reached."
-                        : // No standing package: there is nothing to confirm
-                          // or decline, and saying otherwise sent the
-                          // participant looking for an Accept button that is
-                          // correctly not rendered. What they must do instead
-                          // is set the levels themselves, which is also what
-                          // the "Select terms first" cue points at.
-                          "Your proxies did not settle on a package. Choose a level on each term below, then put it to the other participant."}
+                        : // NO STANDING PACKAGE, and two different things
+                          // bring a participant here: they refused what their
+                          // proxies reached, or the exchange never produced
+                          // one. Either way there is nothing to confirm or
+                          // decline — saying otherwise sent them looking for
+                          // an Accept button that is correctly not rendered —
+                          // but telling a refuser their proxies "did not
+                          // settle" contradicts the screen they just left.
+                          refused
+                          ? "You refused what the proxies reached, so nothing is on the table. Choose a level on each term below, then put it to the other participant."
+                          : "Your proxies did not settle on a package. Choose a level on each term below, then put it to the other participant."}
                 </p>
               </div>
               {settled ? null : pending ? (
@@ -1291,7 +1287,11 @@ export function DirectNegotiation({
             <Transcript
               messages={messages}
               pending={pending}
-              emptyHint="The proxies are done. Say hello and settle it — or accept the package below."
+              emptyHint={
+                openingPackage
+                  ? "The proxies are done. Say hello and settle it — or accept the package below."
+                  : "Set the levels you want below, then put them to the other participant."
+              }
             />
             <ReasonPicker
               task={task}
@@ -1400,11 +1400,7 @@ export function DirectNegotiation({
         <ActionBar
           label="Continue to Review"
           onClick={() =>
-            finish(
-              settled,
-              settled === "agreed" ? finalPackage : null,
-              settledReason,
-            )
+            finish(settled, settled === "agreed" ? finalPackage : null)
           }
           note={
             settled === "agreed"

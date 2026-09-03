@@ -357,8 +357,8 @@ export default function InstructionPage() {
                 <p className="text-xs text-blue-900 leading-relaxed">
                   In one, you talk to the other person yourself from the start.
                   In the other, you write instructions for an AI Proxy, watch it
-                  put your case, and then finish the conversation yourself. Each
-                  task explains itself before it begins.
+                  put your case, and then decide what happens to what it
+                  reached. Each task explains itself before it begins.
                 </p>
               </div>
             </div>

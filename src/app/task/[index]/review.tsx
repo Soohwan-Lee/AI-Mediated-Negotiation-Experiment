@@ -395,7 +395,10 @@ export function ReviewPhase({
             <OutcomeValue task={task} terms={tentative} role={role} />
           </div>
 
-          {isProxy ? (
+          {/* Only when the two principals actually spoke. An approver never
+              opened a closing conversation (Ver.2.13 §7), so a "post-negotiation
+              message" from the other side would be a message nobody sent. */}
+          {isProxy && transcript.length > 0 ? (
             <Card className="mb-6 border-slate-200 bg-white">
               <CardTitle hint="Post-negotiation message:">👤 Counterpart Reaction</CardTitle>
               <div className="mt-2">
@@ -417,28 +420,34 @@ export function ReviewPhase({
             <ProxyTranscriptPanel transcript={proxyTranscript} />
           ) : null}
 
-          <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
-            <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-3.5 flex items-center justify-between">
-              <div>
-                <h2 className="text-xs sm:text-sm font-bold text-[var(--ink)]">{transcriptTitle}</h2>
-                <p className="text-xs text-[var(--ink-2)]">
-                  {transcriptHint}{" "}
-                  {needsRequirementResponse
-                    ? "(Please scroll to the end to unlock the reflection question below)"
-                    : ""}
-                </p>
+          {/* THE PARTICIPANT'S OWN CONVERSATION — when there was one.
+              A Proxy participant who approved the package straight off never
+              spoke to the other side, and an empty panel captioned "your
+              conversation" invites them to look for words they never wrote.
+              The proxies' exchange above IS what they are judging in that
+              case, and it is already on the screen. The end marker moves with
+              the panel so the reflection question still unlocks either way. */}
+          {transcript.length > 0 ? (
+            <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
+              <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-3.5 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xs sm:text-sm font-bold text-[var(--ink)]">{transcriptTitle}</h2>
+                  <p className="text-xs text-[var(--ink-2)]">
+                    {transcriptHint}{" "}
+                    {needsRequirementResponse
+                      ? "(Please scroll to the end to unlock the reflection question below)"
+                      : ""}
+                  </p>
+                </div>
+                <span className="text-2xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
+                  {transcript.length} turns
+                </span>
               </div>
-              <span className="text-2xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
-                {transcript.length} turns
-              </span>
-            </div>
-            <Transcript
-              messages={transcript}
-              emptyHint="No messages were exchanged."
-              flow
-              endRef={transcriptEndRef}
-            />
-          </Card>
+              <Transcript messages={transcript} flow endRef={transcriptEndRef} />
+            </Card>
+          ) : (
+            <div ref={transcriptEndRef} />
+          )}
 
           {theirOption ? (
             <Card

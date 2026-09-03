@@ -60,7 +60,6 @@ export default function PracticePage() {
 
   // Proxy practice states
   const [proxyPreferred, setProxyPreferred] = useState<Record<string, string>>({});
-  const [proxyMinimum, setProxyMinimum] = useState<Record<string, string>>({});
   const [proxyReasonChecked, setProxyReasonChecked] = useState(true);
   const [proxyChatMessages, setProxyChatMessages] = useState<DisplayMessage[]>([]);
   const [proxyDraft, setProxyDraft] = useState("");
@@ -92,14 +91,6 @@ export default function PracticePage() {
         PRACTICE_TASK.issues.map((i) => [
           i.id,
           [...i.options].sort((a, b) => b.points[role] - a.points[role])[0].id,
-        ]),
-      ),
-    );
-    setProxyMinimum(
-      Object.fromEntries(
-        PRACTICE_TASK.issues.map((i) => [
-          i.id,
-          [...i.options].sort((a, b) => a.points[role] - b.points[role])[0].id,
         ]),
       ),
     );
@@ -161,7 +152,7 @@ export default function PracticePage() {
       {
         id: `pr-ai-${m.length}`,
         speaker: "participant_proxy",
-        text: "I will open by proposing your Best Goal on both terms. If the counterpart pushes back, I will defend your position and will never compromise below your Walkaway Limit, using the work reasons you authorized.",
+        text: "I will open by asking for what you chose on both terms, and I will argue for it using only the reasons you authorized. Whatever the two proxies reach is tentative — you decide afterwards whether to approve it, change it, or refuse it.",
       },
     ]);
     setProxyPending(false);
@@ -171,8 +162,7 @@ export default function PracticePage() {
   const baselineOfferChosen = Object.keys(offer).length >= task.issues.length;
   const baselineMessageSent = messages.length > 0;
   const proxyMandateChosen =
-    Object.keys(proxyPreferred).length >= task.issues.length &&
-    Object.keys(proxyMinimum).length >= task.issues.length;
+    Object.keys(proxyPreferred).length >= task.issues.length;
   const proxyRehearsalDone = proxyChatMessages.length > 0;
 
   const currentStep = isProxy
@@ -207,7 +197,7 @@ export default function PracticePage() {
             </p>
             <p className="text-slate-600 text-sm">
               {isProxy
-                ? "In your first task, an AI Proxy will negotiate from your instructions before you finish the conversation yourself. This practice shows you those controls: setting goals, writing instructions, and checking them."
+                ? "In your first task, an AI Proxy will negotiate from your instructions, and then the decision comes back to you. This practice shows you those controls: setting goals, writing instructions, and checking them."
                 : "In your first task you will chat with the other participant directly. This practice shows you those controls: building an offer package and sending messages."}
             </p>
           </>
@@ -216,7 +206,7 @@ export default function PracticePage() {
           isProxy
             ? [
                 { label: "Step 1: Check your practice goals", hint: "Review the private situation in the sidebar" },
-                { label: "Step 2: Set your negotiation boundaries", hint: "Choose your best goal (aim high) and walkaway limit (lowest acceptable)" },
+                { label: "Step 2: Say what you want", hint: "Choose the option you would like on each of the two terms" },
                 { label: "Step 3: Consult your AI Proxy", hint: "Ask a test question to see how it will defend your position" },
                 { label: "Step 4: Quick 1-question check", hint: "Confirm that points and reasons are clear" },
               ]
@@ -338,32 +328,28 @@ export default function PracticePage() {
                   </span>
                   {proxyMandateChosen ? (
                     <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      ✓ Bounds Set
+                      ✓ Set
                     </span>
                   ) : null}
                 </div>
-                <CardTitle hint="Set your boundaries: where to start aiming high, and where to stop conceding:">
-                  🎯 Step 1: Configure Your AI Proxy Instructions
+                <CardTitle hint="Choose the option you would like on each of the two practice terms:">
+                  🎯 Step 1: Tell Your AI Proxy What You Want
                 </CardTitle>
 
-                {/* Helpful Mini Guide */}
-                <div className="mt-2.5 mb-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-xl border border-blue-200 bg-blue-50/60 p-2.5 text-xs text-blue-950">
-                  <div>
-                    <span className="font-bold flex items-center gap-1 text-emerald-800">
-                      <span>🏆</span> 1. Your Best Goal:
-                    </span>
-                    <p className="text-2xs text-slate-600 mt-0.5">
-                      The best option you hope to get. Proxy will open asking for this first.
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-bold flex items-center gap-1 text-amber-800">
-                      <span>🛡️</span> 2. Your Walkaway Limit:
-                    </span>
-                    <p className="text-2xs text-slate-600 mt-0.5">
-                      The lowest option you can tolerate. Proxy will <strong>never go below this</strong>.
-                    </p>
-                  </div>
+                {/* THE PRACTICE MUST MIRROR THE REAL SCREEN. It used to teach a
+                    second control per term — a walkaway limit the proxy would
+                    never cross — which Ver.2.13 §2.6 removed. A practice round
+                    that rehearses a control the task does not have is worse
+                    than no practice: the participant arrives looking for it. */}
+                <div className="mt-2.5 mb-3.5 rounded-xl border border-blue-200 bg-blue-50/60 p-2.5 text-xs text-blue-950">
+                  <span className="font-bold flex items-center gap-1 text-emerald-800">
+                    <span>🏆</span> What you want
+                  </span>
+                  <p className="text-2xs text-slate-600 mt-0.5">
+                    The option you would like on each term. Your proxy opens by
+                    asking for it — and whatever it reaches, you decide
+                    afterwards whether to accept it.
+                  </p>
                 </div>
 
                 <div className="space-y-4 mt-3">
@@ -374,37 +360,13 @@ export default function PracticePage() {
                         <span className="text-2xs text-slate-500">{issue.rationale[role]}</span>
                       </div>
 
-                      <div className="mb-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-2xs font-extrabold uppercase tracking-wider text-emerald-700">
-                            🏆 1. Your Best Goal (Aim high)
-                          </p>
-                          <span className="text-2xs text-slate-500">Proxy opens with this</span>
-                        </div>
-                        <OptionChips
-                          issue={issue}
-                          role={role}
-                          name={`practice-proxy-pref-${issue.id}`}
-                          value={proxyPreferred[issue.id] ?? null}
-                          onChange={(v) => setProxyPreferred((p) => ({ ...p, [issue.id]: v }))}
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-2xs font-extrabold uppercase tracking-wider text-amber-700">
-                            🛡️ 2. Your Walkaway Limit (Absolute minimum)
-                          </p>
-                          <span className="text-2xs text-slate-500">Proxy will NEVER compromise below this</span>
-                        </div>
-                        <OptionChips
-                          issue={issue}
-                          role={role}
-                          name={`practice-proxy-min-${issue.id}`}
-                          value={proxyMinimum[issue.id] ?? null}
-                          onChange={(v) => setProxyMinimum((p) => ({ ...p, [issue.id]: v }))}
-                        />
-                      </div>
+                      <OptionChips
+                        issue={issue}
+                        role={role}
+                        name={`practice-proxy-pref-${issue.id}`}
+                        value={proxyPreferred[issue.id] ?? null}
+                        onChange={(v) => setProxyPreferred((p) => ({ ...p, [issue.id]: v }))}
+                      />
                     </div>
                   ))}
                 </div>
