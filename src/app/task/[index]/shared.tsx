@@ -1135,7 +1135,10 @@ export function DirectNegotiation({
   return (
     <>
       <Page width="wide">
-        <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
+        <TaskLayout
+          composerBelow
+          briefing={<BriefingPanel task={task} role={role} />}
+        >
           <TaskHeader
             taskIndex={taskIndex}
             title={task.title}
@@ -1492,7 +1495,10 @@ export function RehearsalChat({
   return (
     <>
       <Page width="wide">
-        <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
+        <TaskLayout
+          composerBelow
+          briefing={<BriefingPanel task={task} role={role} />}
+        >
           <TaskHeader
             taskIndex={taskIndex}
             title="Q&A with Your AI Proxy (Optional)"

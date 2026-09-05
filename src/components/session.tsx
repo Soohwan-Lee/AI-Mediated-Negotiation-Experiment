@@ -689,9 +689,28 @@ export function IssueReasonGroups({
 export function TaskLayout({
   briefing,
   children,
+  /**
+   * Lift the floating briefing button clear of a composer.
+   *
+   * Below `lg` the briefing is behind one tap, and that trigger is a FIXED
+   * overlay sitting one action-bar's height off the bottom. On screens that
+   * END in a sticky action bar that is the right place — it rides just above
+   * the Continue button. THE NEGOTIATION SCREENS HAVE NO ACTION BAR: their
+   * last element is the composer, in normal flow, so the trigger landed
+   * squarely on top of it. Measured at 390px it covered the textarea's right
+   * edge AND the whole Send button (button 237-374px, Send 258-359px), so a
+   * mobile participant could read their own half-hidden draft and had no way
+   * to send it.
+   *
+   * That is the negotiation, lost on the one viewport with no fallback: rule 5
+   * says the briefing is never taken away, but it may not take the composer
+   * away either.
+   */
+  composerBelow = false,
 }: {
   briefing: ReactNode;
   children: ReactNode;
+  composerBelow?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -708,7 +727,14 @@ export function TaskLayout({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-[calc(var(--actionbar-h)+1rem)] right-4 z-20 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-400 px-5 py-3 text-xs sm:text-sm font-extrabold text-slate-900 shadow-xl lg:hidden cursor-pointer hover:scale-105 active:scale-95 transition-all"
+        className={cx(
+          "fixed right-4 z-20 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-400 px-5 py-3 text-xs sm:text-sm font-extrabold text-slate-900 shadow-xl lg:hidden cursor-pointer hover:scale-105 active:scale-95 transition-all",
+          // Above the action bar where there is one; well clear of the
+          // composer where there is not.
+          composerBelow
+            ? "bottom-[calc(var(--actionbar-h)+6.5rem)]"
+            : "bottom-[calc(var(--actionbar-h)+1rem)]",
+        )}
       >
         <span>📋</span>
         <span>Your Briefing</span>
