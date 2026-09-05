@@ -232,10 +232,10 @@ export const BACKGROUND_BLOCKS: Block[] = [
       {
         // SCENARIO FAMILIARITY, generalized in Ver.2.13 §9.7-6. It asked about
         // shift work in a service job, which was the right question when the
-        // task was a coffee shop rota; with the scenario now a consulting
-        // agency project team it would measure familiarity with a scenario
-        // nobody sees. It feeds a sensitivity analysis, so the thing it names
-        // has to be the thing participants actually did.
+        // task was a coffee shop rota; with the scenario now a company project
+        // team it would measure familiarity with a scenario nobody sees. It
+        // feeds a sensitivity analysis, so the thing it names has to be the
+        // thing participants actually did.
         kind: "choice",
         id: "BG11",
         text: "Have you ever worked in an office or team-based setting (for example team projects, client-facing work, or coordinating schedules and staffing)?",

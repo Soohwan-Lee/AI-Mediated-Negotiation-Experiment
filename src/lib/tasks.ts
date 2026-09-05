@@ -200,15 +200,23 @@ function sensitive(
 }
 
 // ---------------------------------------------------------------------------
-// Task A — The Quarterly Client Project (12 weeks)
+// Task A — Next Quarter's Working Arrangements (12 weeks)
 //
-// Ver.2.13 §3.1 replaced the coffee-shop shift scenario with a consulting
-// agency's project team, and the reason is SELF-RELEVANCE (White et al. 2004).
-// In that work face threat suppressed agreement and joint gain only when what
-// was being negotiated was part of the negotiator's own identity — their own
-// business, their own competence. A shift rota is instrumental: nobody's
-// judgement is on the table, so the condition was never met. Here each issue
-// is one the other party's own competence or judgement rides on:
+// Ver.2.13 §3.1 replaced the coffee-shop shift scenario, and the reason is
+// SELF-RELEVANCE (White et al. 2004). In that work face threat suppressed
+// agreement and joint gain only when what was being negotiated was part of the
+// negotiator's own identity — their own business, their own competence. A
+// shift rota is instrumental: nobody's judgement is on the table, so the
+// condition was never met. Here each issue is one the other party's own
+// competence or judgement rides on:
+//
+// VER.2.15 THEN TOOK THE INDUSTRY VOCABULARY BACK OUT. The first attempt was a
+// consulting agency with accounts, deliverables and escalations, and a US
+// office-work sample should not have to decode a sector to read its own
+// briefing. The structure that carries the design — hierarchy, self-relevant
+// terms, the four cards — is unchanged; the words are ones anyone who has
+// worked in an office already has (office days, client meetings, project days,
+// urgent calls).
 //
 //   Member's core   = an obligation that EXPOSES their competence
 //                     (presenting to the client)
@@ -499,7 +507,7 @@ export const PRACTICE_TASK: NegotiationTask = {
   reservationPoints: 200,
   requirementIssueId: { leader: "practice_date", member: "practice_venue" },
   publicBrief:
-    "This is a practice round at the same agency, on two small things nobody has strong feelings about: which week the office move happens, and where the team's new printer goes. Nothing here counts towards your results — it is only to get familiar with reading a point sheet and finding a trade.",
+    "This is a practice round at the same company, on two small things nobody has strong feelings about: which week the office move happens, and where the team's new printer goes. Nothing here counts towards your results — it is only to get familiar with reading a point sheet and finding a trade.",
   issues: [
     {
       id: "practice_date",

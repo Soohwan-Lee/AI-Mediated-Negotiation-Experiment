@@ -143,15 +143,60 @@ export default function DebriefingPage() {
             </p>
           </Card>
 
+          {/* DECEPTION ITEM 4 (§6.8 rule 5, §13-6). The comment was the last
+              thing either role read after each task, it was mildly critical,
+              and it was written to be believed — so it is the one item a
+              participant is most likely to still be carrying when they reach
+              this page. It is disclosed as its own numbered item rather than
+              folded into item 1, because "the other participant was simulated"
+              does not obviously reach a sentence that arrived AFTER the
+              negotiation was over and read as a personal aside.
+
+              It also says the wording was identical for everyone. Without that
+              a participant can reasonably conclude the criticism was earned —
+              that they in particular came on strong — which is exactly the
+              inference ATTR1 measures and exactly the one that should not
+              survive the debriefing. */}
+          <Card className="border-slate-200 bg-white">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-xl">💬</span>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                3. The Comment After Each Task Was Scripted
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm leading-relaxed text-slate-700">
+              After each task you were shown a short comment presented as a note
+              from the other participant, saying that things came on a little
+              strong at the start.{" "}
+              <strong className="text-slate-900">
+                That comment was written in advance and was the same for every
+                participant
+              </strong>{" "}
+              — it was not a reaction to anything you or your AI Proxy actually
+              said, and nobody formed an opinion of you. It was included to
+              study how feedback lands differently when it arrives after you
+              spoke for yourself and when it arrives after an AI Proxy spoke for
+              you.
+            </p>
+          </Card>
+
           <Card className="border-slate-200 bg-white">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-xl">🔀</span>
               <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                3. Purpose: Direct vs. AI-Mediated Delegation
+                4. Purpose: Direct vs. AI-Mediated Delegation
               </h2>
             </div>
             <p className="text-xs sm:text-sm leading-relaxed text-slate-700">
-              We study how delegating to an AI Proxy (under <em>User-Specified</em> vs. <em>AI-Supplemented</em> policies) helps people overcome social hesitation when advocating for sensitive workplace priorities.
+              Some workplace requests are hard to justify without saying
+              something that reflects badly on you. This study asks what
+              changes when an AI Proxy makes that case on your behalf instead
+              of you making it yourself — whether people are more willing to
+              have a sensitive reason used, and how it feels afterwards either
+              way. Participants were assigned one proxy that passed their
+              chosen reasons on as they were, or one that summarised a
+              sensitive reason and said it among other reasons. Both were
+              described to you before your proxy negotiated.
             </p>
           </Card>
 
@@ -159,7 +204,7 @@ export default function DebriefingPage() {
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-xl">❓</span>
               <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                4. Why Prior Disclosure Was Withheld
+                5. Why Prior Disclosure Was Withheld
               </h2>
             </div>
             <p className="text-xs sm:text-sm leading-relaxed text-slate-700">
