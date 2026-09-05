@@ -377,73 +377,16 @@ export function BriefingSummary({
  * written with a different number of paragraphs this falls back to rendering
  * it whole rather than mislabelling it.
  */
-const STORY_HEADINGS = [
-  "How you are seen",
-  "What you want — and what you are not saying",
-  "Why saying it is hard",
-];
-
-function RoleStory({ story }: { story: string }) {
-  const paragraphs = story
-    .split("\n\n")
-    .map((p) => p.trim())
-    .filter(Boolean);
-
-  if (paragraphs.length !== STORY_HEADINGS.length) {
-    return (
-      <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed text-slate-700">
-        {story}
-      </p>
-    );
-  }
-
-  const BEAT_META = [
-    {
-      badge: "1. Public Image",
-      icon: "🌟",
-      heading: "How You Are Seen",
-      style: "border-blue-100 bg-blue-50/40 text-slate-800",
-    },
-    {
-      badge: "2. The Secret",
-      icon: "🤫",
-      heading: "What You Want — And What You Kept Quiet",
-      style: "border-amber-200/70 bg-amber-50/50 text-slate-800",
-    },
-    {
-      badge: "3. The Dilemma",
-      icon: "⚖️",
-      heading: "Why Saying It Out Loud Is Risky",
-      style: "border-purple-100 bg-purple-50/40 text-slate-800",
-    },
-  ];
-
-  return (
-    <div className="space-y-3">
-      {paragraphs.map((paragraph, i) => (
-        <div
-          key={STORY_HEADINGS[i]}
-          className={cx(
-            "rounded-xl border p-3.5 sm:p-4 shadow-2xs transition-all",
-            BEAT_META[i]?.style ?? "border-slate-200 bg-white",
-          )}
-        >
-          <div className="mb-1.5 flex items-center gap-2">
-            <span className="text-sm">{BEAT_META[i]?.icon ?? "•"}</span>
-            <p className="text-xs font-bold text-slate-900">
-              {BEAT_META[i]?.heading ?? STORY_HEADINGS[i]}
-            </p>
-            <span className="ml-auto rounded-full border border-slate-200 bg-white px-2 py-0.5 text-2xs font-semibold text-slate-500 shadow-2xs">
-              {BEAT_META[i]?.badge}
-            </span>
-          </div>
-          <p className="text-xs sm:text-sm leading-relaxed text-slate-700">
-            {paragraph}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
+/** Headings follow the four paragraphs in the current design's role story. */
+export function RoleStory({ story }: { story: string }) {
+  const paragraphs = story.split("\n\n").map(p => p.trim()).filter(Boolean);
+  const headings = ["Your role on the team", "What matters to you", "Your work situation", "What sharing could mean"];
+  return <div className="space-y-5">
+    {paragraphs.map((paragraph, index) => <section key={index}>
+      {paragraphs.length === 4 ? <h3 className="mb-2 text-sm font-bold text-[var(--private-strong)]">{headings[index]}</h3> : null}
+      <p className="text-sm leading-7 text-[var(--private-ink)]">{paragraph}</p>
+    </section>)}
+  </div>;
 }
 
 export function BriefingPanel({
@@ -472,7 +415,7 @@ export function BriefingPanel({
             Your Role in this Scenario
           </p>
           <span className="rounded-full border border-amber-300 bg-amber-100/80 px-2.5 py-0.5 text-2xs font-bold text-amber-900">
-            {role === "leader" ? "👑 Team Lead" : "🛠️ Senior Consultant"}
+            {role === "leader" ? "👑 Team Lead" : "Senior Team Member"}
           </span>
         </div>
         <p className="text-lg font-black text-[var(--ink)]">
@@ -483,7 +426,7 @@ export function BriefingPanel({
         </p>
       </div>
 
-      <BriefingSummary task={task} role={role} />
+
 
       <div className="space-y-3">
         <Fold title="📄 Your Situation" defaultOpen={defaultOpen}>
@@ -507,7 +450,7 @@ export function BriefingPanel({
         </Fold>
 
         {brief.reasonCards.length ? (
-          <Fold title="💬 Permitted Reasons" defaultOpen>
+          <Fold title="💬 Reasons you can share" defaultOpen>
             <p className="mb-2.5 rounded-lg border border-[var(--private-line)] bg-amber-100/60 p-2.5 text-xs leading-relaxed font-medium">
               {brief.requirementNote}
             </p>

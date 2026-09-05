@@ -49,6 +49,8 @@ next-env.d.ts
 
 # Browser-automation scratch output (snapshots, screenshots, console logs)
 .playwright-mcp/
+.playwright-cli/
+/output/playwright/
 simulation-report.json
 scripts/simulation-report.json
 

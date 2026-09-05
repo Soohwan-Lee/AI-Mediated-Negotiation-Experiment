@@ -164,17 +164,9 @@ const STEP_LABELS = [
 
 /** The cover's glossed step list — see the note in proxy-task.tsx. */
 const COVER_STEPS = [
-  { label: "Your briefing", hint: "Read your side of the project." },
-  { label: "Before you start", hint: "Two quick questions." },
-  {
-    label: "What you want",
-    hint: "Choose what you would like on each of the two terms.",
-  },
-  {
-    label: "Negotiate",
-    hint: "Chat with the other participant and settle both terms.",
-  },
-  { label: "Review", hint: "See where it landed." },
+  { label: "Prepare", hint: "Read your briefing, answer two questions, and choose your starting goals." },
+  { label: "Chat directly", hint: "Discuss the two conditions with the other participant." },
+  { label: "Review", hint: "Check your final outcome, then answer questions about the task." },
 ];
 
 const PHASE_LABELS: Record<Phase, string> = {

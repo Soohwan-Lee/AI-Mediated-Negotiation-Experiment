@@ -55,14 +55,17 @@ import {
 } from "@/lib/negotiation/machine";
 import {
   BriefingPanel,
+  RoleStory,
+  IssueReasonGroups,
   TaskCover,
   type CoverScene,
   TaskHeader,
   TaskLayout,
 } from "@/components/session";
-import { OptionChips, PackageValue, PointsKey } from "@/components/issues";
+import { OptionChips, PackageValue, PointsKey, IssueValueTable } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Cue, Page, cx } from "@/components/ui";
+import { WorkplaceScene, ReadingProgress, PreviousReading } from "@/components/briefing-guide";
+import { Callout, Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { dummyAnswer, riskBlock } from "@/lib/measures";
 import { useParticipant } from "@/lib/participant-context";
@@ -121,7 +124,7 @@ export function TaskIntro({
           <p className="mb-2 text-slate-800 font-medium">
             {first
               ? "The practice round is over — this one counts. You are settling two working conditions with another participant who holds the other role."
-              : "This is the second and final task. New situation, new briefing, and a different participant — nothing carries over from Task 1."}
+              : "This is the second and final task. You keep your role, with a new situation, new private information, and a different participant."}
           </p>
 
           {/* WHAT AN AI PROXY IS, ON THE FIRST SCREEN THAT MENTIONS ONE.
@@ -178,12 +181,9 @@ export function TaskIntro({
 // Phase: scenario brief
 // ---------------------------------------------------------------------------
 
+/** All pages are read in both modes before RISK or any mandate decision. */
 export function TaskBrief({
-  taskIndex,
-  task,
-  role,
-  steps,
-  onContinue,
+  taskIndex, task, role, steps, onContinue,
 }: {
   taskIndex: 1 | 2;
   task: NegotiationTask;
@@ -191,52 +191,79 @@ export function TaskBrief({
   steps: string[];
   onContinue: () => void;
 }) {
+  const [page, setPage] = useState(0);
+  const { logEvent } = useParticipant();
+  const brief = task.roleBriefs[role];
+  const labels = ["The task", "Your situation", "Your points", "Your reasons"];
+  function move(next: number) {
+    logEvent("page_complete", { briefingPage: page + 1 }, { sessionIndex: taskIndex });
+    setPage(next);
+    window.scrollTo({ top: 0 });
+  }
   return (
     <>
-      <Page width="wide">
-        <TaskHeader
-          taskIndex={taskIndex}
-          title={task.title}
-          steps={steps}
-          current={0}
-        />
-
-        {/* Shared Public Scenario */}
-        <Card className="mb-6 border-blue-100/80 bg-gradient-to-br from-white to-blue-50/20">
-          <CardTitle hint="What you and your colleague both know about this project:">
-            📋 The Project Setting: {task.title}
-          </CardTitle>
-          <p className="text-sm sm:text-base leading-relaxed text-slate-700 mt-2">
-            {task.publicBrief}
-          </p>
-          <div className="mt-3.5 flex items-center gap-2.5 rounded-xl bg-blue-50/80 p-3 text-xs font-semibold text-blue-900 border border-blue-200/60">
-            <span className="text-base">🌐</span>
-            <span>Shared Workplace Setting: Both you and your colleague share the project background above. Your personal goals and private story below are confidential to you.</span>
+      <Page>
+        <TaskHeader taskIndex={taskIndex} title={labels[page]} steps={steps} current={0} />
+        <ReadingProgress labels={labels} current={page} />
+        {page === 0 ? (
+          <div className="space-y-5">
+            <div className="mx-auto max-w-xs"><WorkplaceScene scene="terms" /></div>
+            <Card>
+              <CardTitle>{task.title}</CardTitle>
+              <p className="mt-3 text-base leading-relaxed text-slate-700">{task.publicBrief}</p>
+              <p className="mt-3 text-sm text-slate-500">Both people know this project background.</p>
+            </Card>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {task.issues.map(issue => <Card key={issue.id}>
+                <CardTitle>{issue.label}</CardTitle>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{issue.description}</p>
+              </Card>)}
+            </div>
+            <p className="text-sm text-slate-600">You need one agreed option for each condition. Next, read the information only you know.</p>
           </div>
-        </Card>
-
-        {/* THE WHOLE BRIEFING, EXPANDED, AND ONLY HERE.
-            `defaultOpen` exists for this one screen: it is the phase where the
-            briefing is READ for the first time, and a section folded shut is a
-            section a participant may not know exists at all.
-
-            Do not replace this with a hand-built summary. It was once cut down
-            to the role story and the objectives, which dropped the payoff
-            table, the fallback, and every reason card off the screen — and
-            since the sidebar's own folds were collapsed at the time, a
-            participant could reach the mandate screen having never seen their
-            own numbers or their cards anywhere. Interface rule 5: anything a
-            participant is expected to negotiate from belongs in the briefing,
-            and it is never taken away. */}
-        <div className="mb-6">
-          <BriefingPanel task={task} role={role} defaultOpen />
-        </div>
+        ) : page === 1 ? (
+          <Card tone="private">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>{brief.title} · Your private situation</CardTitle><PrivateTag />
+            </div>
+            <RoleStory story={brief.roleStory} />
+          </Card>
+        ) : page === 2 ? (
+          <Card tone="private">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>Your goals and point sheet</CardTitle><PrivateTag />
+            </div>
+            <ul className="mb-5 list-disc space-y-2 pl-5 text-sm leading-relaxed">
+              {brief.objectives.map(objective => <li key={objective}>{objective}</li>)}
+            </ul>
+            <IssueValueTable issues={task.issues} role={role} reservationPoints={task.reservationPoints} />
+            <p className="mt-5 text-sm leading-relaxed">{brief.batnaSummary}</p>
+            <p className="mt-3 text-sm font-semibold">The other person cannot see these values. Do not share point numbers in the conversation.</p>
+          </Card>
+        ) : (
+          <Card tone="private">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>What you can explain</CardTitle><PrivateTag />
+            </div>
+            <p className="mb-4 text-sm leading-relaxed">{brief.requirementNote}</p>
+            <IssueReasonGroups task={task} role={role} />
+            <p className="mt-4 text-sm leading-relaxed">{brief.disclosureRisk}</p>
+            <p className="mt-4 text-sm leading-relaxed">You choose what to share. Sensitive background is optional: you can negotiate and agree without sharing it. These are the facts of your role; you do not need to use the exact wording.</p>
+          </Card>
+        )}
       </Page>
-
       <ActionBar
-        label="I have read my briefing"
-        onClick={onContinue}
-        note="💡 It stays pinned in the sidebar for the whole task."
+        label={page === 3 ? "Continue to two short questions" : `Next: ${labels[page + 1].toLowerCase()}`}
+        onClick={() => {
+          if (page < 3) move(page + 1);
+          else {
+            logEvent("page_complete", { briefingPage: 4 }, { sessionIndex: taskIndex });
+            onContinue();
+            window.scrollTo({ top: 0 });
+          }
+        }}
+        secondary={page > 0 ? <PreviousReading onClick={() => move(page - 1)} /> : undefined}
+        note={`Briefing ${page + 1} of 4 · Available throughout the task`}
       />
     </>
   );
@@ -335,8 +362,8 @@ export function PreferenceForm({
             taskIndex={taskIndex}
             title={
               isProxy
-                ? "What You Want, and What Your Proxy May Say"
-                : "What You Want From This Negotiation"
+                ? "Set your goals and choose what to share"
+                : "Choose your starting goals"
             }
             steps={steps}
             current={stepIndex}
@@ -345,10 +372,9 @@ export function PreferenceForm({
           <div className="mb-6">
             <Callout tone="private" title="🔒 Private to You · Set Your Goals">
               <p className="text-xs sm:text-sm leading-relaxed">
-                Select the option you would like to aim for on each of the two terms. The other
-                person never sees your selections.{" "}
+                Select the option you would like to aim for on each condition. This form is private.{" "}
                 {isProxy
-                  ? "Your AI Proxy opens by asking for these choices."
+                  ? "Your AI Proxy uses these choices to negotiate for you."
                   : "Afterwards, you will see your original goals beside the final agreed package."}
               </p>
 

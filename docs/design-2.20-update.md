@@ -22,4 +22,5 @@ Source: `N - Experimental Design (Ver.2.20).md`, including the 2026-09-06 correc
 - Source also adds COMP4 (optional disclosure and later evaluation); included in the common comprehension check.
 - Payment aligned to £7.50 base + £1 per task (£9.50 fixed total). Retained a conservative 61-minute screen budget after removing mandatory closing, rather than claiming the document's 45–50 minute target is measured. Pilot timing must settle the final advertised duration.
 - Stage 1: production build and ESLint passed. Unit checks include all four task/role cells with neither reason authorized.
-- Browser flow review pending.
+- Stage 2: common guide split into three pages with a neutral four-panel workplace illustration. Task briefings split into four pages (setting, private story, points, reasons) shared by both modes; all precede RISK. Back navigation is limited to the reading sequence. Production build and ESLint passed.
+- Full audit found two further live-route mismatches: counterpart AI-Supplemented turns were missing their fixed abstraction inputs; WR-only Proxy exchanges skipped MISREAD and cover 1. Correct these in a separate protocol commit before final browser review.

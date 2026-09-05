@@ -178,24 +178,9 @@ const STEP_LABELS = [
  * that gap costs something.
  */
 const COVER_STEPS = [
-  { label: "Your briefing", hint: "Read your side of the project." },
-  { label: "Before you start", hint: "Two quick questions." },
-  {
-    label: "Your instructions",
-    hint: "Tell your AI Proxy what you want, and what it may say for you.",
-  },
-  { label: "Check with it", hint: "Ask it anything — optional." },
-  { label: "Check and start", hint: "Read your instructions back, then go." },
-  { label: "Watch", hint: "The two AI Proxies talk. You watch live." },
-  {
-    label: "Your decision",
-    hint: "Approve what they reached, ask for a change, or refuse it.",
-  },
-  {
-    label: "Talk it through",
-    hint: "Only if you ask for a change or refuse: talk directly for up to 3 minutes.",
-  },
-  { label: "Review", hint: "See where it landed." },
+  { label: "Prepare", hint: "Read your briefing, answer two questions, then set your goals and sharing choices." },
+  { label: "Watch your AI Proxy", hint: "You can ask it questions before it speaks to the other Proxy." },
+  { label: "Decide", hint: "Approve the proposed agreement, or request changes/refuse and talk directly for up to 3 minutes." },
 ];
 
 /** Readable names for the dev panel's phase jumps. */
@@ -1195,76 +1180,25 @@ export function ProxyTask({
     );
   }
 
-  // --- handover -----------------------------------------------------------
-  //
-  // Reached by EVERY Proxy participant now, whatever they chose at RATIFY, so
-  // the copy has three cases rather than two. The decision still shows: it
-  // decides what they carry to the table, and the screen names it back to them
-  // so the conversation reads as a continuation of their own choice rather
-  // than something that happened to them.
+  // Only modification/refusal leads here (Design §7).
   if (phase === "handover") {
     const refused = ratify === "rejected";
-    const approved = ratify === "approved_as_is";
     return (
       <TaskCover
-        eyebrow="Phase Transition · Your Closing Conversation"
-        title={
-          refused
-            ? "Settle It Yourself"
-            : approved
-              ? "Confirm It With Them Directly"
-              : "Take It Up With Them Directly"
-        }
+        eyebrow="Your closing conversation"
+        title={refused ? "Discuss a new package" : "Discuss your changes"}
         scene="direct"
-        lead={
-          <>
-            <p className="mb-2 text-slate-800 font-medium">
-              {refused
-                ? "You refused the package your AI Proxies reached, so nothing stands. You now settle both terms with the other participant yourself."
-                : approved
-                  ? "You approved the package your AI Proxies reached. You now speak with the other participant yourself to settle it between you."
-                  : "You asked for a change to what your AI Proxies reached. You now take that up with the other participant directly."}
-            </p>
-            <p className="text-slate-600 text-sm">
-              {refused
-                ? "Set the levels you want on the card below the chat and put them to them."
-                : approved
-                  ? "The package your proxies reached is already on the table — you can put it to them as it stands, or change it if you decide to."
-                  : "Their proxies' package is on the table as it stands — say what you want changed."}{" "}
-              <strong>What you both agree together is the final outcome.</strong>
-            </p>
-          </>
-        }
-        steps={
-          refused
-            ? [
-                { label: "Check where the proxies got to", hint: "Their full exchange stays pinned above the chat" },
-                { label: "Choose a level on each term", hint: "The package card below the chat is yours to set" },
-                { label: "Agree it with the other participant", hint: "Or end without an agreement if you cannot" },
-              ]
-            : approved
-              ? [
-                  { label: "Check what the proxies reached", hint: "Their full exchange stays pinned above the chat" },
-                  { label: "Put it to the other participant", hint: "It is already on the package card — change it if you decide to" },
-                  { label: "Settle it", hint: "Agree a package with them, or end without one" },
-                ]
-              : [
-                { label: "Check what the proxies reached", hint: "Their full exchange stays pinned above the chat" },
-                { label: "Say what you want changed", hint: "In your own words, and adjust the package card if you like" },
-                { label: "Settle it", hint: "Agree a package with them, or end without one" },
-              ]
-        }
+        lead={<p className="text-base leading-relaxed text-slate-700">
+          {refused
+            ? "You refused the proposed package. Nothing is agreed. You will now discuss both conditions with the other participant yourself."
+            : "You asked to change the proposed package. Tell the other participant what you would like to change."}
+        </p>}
+        steps={[
+          { label: "Review the exchange", hint: "The AI Proxies' conversation stays available above your chat." },
+          { label: "Make your proposal", hint: "Choose one option for each condition and write your message." },
+          { label: "Agree on both conditions", hint: "If time runs out without agreement, you receive the fallback score." },
+        ]}
         minutes={3}
-        note={
-          <Callout title="⏱ 3 minutes to close" tone="neutral">
-            <p>
-              {refused
-                ? "Nothing your proxies agreed carries over, so start from the levels you want."
-                : "This is a short conversation — the ground work is already done."}{" "}
-              If the clock runs out with nothing agreed, the fallback applies.
-            </p>
-          </Callout>
-        }
         actionLabel="Start the closing conversation"
         onStart={() => {
           setProxyTranscript(transcript);
