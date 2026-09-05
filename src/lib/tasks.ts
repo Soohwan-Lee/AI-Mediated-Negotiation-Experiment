@@ -358,7 +358,7 @@ const TASK_A: NegotiationTask = {
 };
 
 // ---------------------------------------------------------------------------
-// Task B — Launching the New Account (4 weeks)
+// Task B — Starting the New Project (4 weeks)
 //
 // Structurally identical to Task A: the same payoff spine, the same
 // thresholds, the same two-issue shape. The surface changes, and the SB

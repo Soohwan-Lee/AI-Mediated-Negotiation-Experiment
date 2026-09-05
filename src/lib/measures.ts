@@ -498,12 +498,13 @@ const PERC_ITEMS: Item[] = [
  * in every condition — a version that mentioned an assistant would be
  * unanswerable in Direct.
  *
- * PCR4–7 are the receiver-side face judgement — competence, independence,
+ * PCR4–6 are the receiver-side face judgement — competence,
  * honesty, and wanting to work together — made AFTER hearing the
  * counterpart's SB disclosure, which every participant now receives (§6.3).
- * Competence/independence and honesty are deliberately separate: a confession
- * can lower one while raising the other, and pooling them would hide exactly
- * that.
+ * Competence and honesty are deliberately separate: a confession can lower one
+ * while raising the other, and pooling them would hide exactly that. (Ver.2.14
+ * dropped a third, independence — PCR4 carries the competence judgement and
+ * the two moved together.)
  */
 const PCR_ITEMS: Item[] = [
   {
@@ -587,7 +588,7 @@ const PNOQ_ITEMS: Item[] = [
 /**
  * 9.4.5 — your own AI Proxy. Proxy task only.
  *
- * OWN-AI5 is the sender half of the delegation–protection gap. PERC alone
+ * OWN-AI4 is the sender half of the delegation–protection gap. PERC alone
  * cannot tell whether a drop in worry came from not having said it yourself or
  * from feeling the responsibility was shared, and those are different
  * mechanisms with different design implications. Measured only in the Proxy
@@ -805,7 +806,7 @@ const OPEN_PROXY: Item[] = [
     rows: 4,
   },
   {
-    // → PCR1-2, OTHER-AI4, OTHER-AI5
+    // → PCR1-2, OTHER-AI2, OTHER-AI3
     kind: "text",
     id: "OE-P4",
     text: "From what the other AI Proxy said, and from talking to the other person afterwards, what did you think they actually wanted? Who did you feel was responsible for those requests being made? Please point to the specific part that made you think so.",

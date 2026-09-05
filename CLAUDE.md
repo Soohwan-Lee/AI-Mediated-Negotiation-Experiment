@@ -140,9 +140,7 @@ project × urgent-call duty). The point of §3.1's self-relevance requirement is
 unchanged and is what the terms still carry: each issue is one the other
 party's own competence or judgement rides on, which is the condition White et
 al. (2004) needed for face threat to suppress joint gain. The payoff spine is
-untouched by the rewrite. (The `TASK_B` block comment in `lib/tasks.ts` still
-says "Launching the New Account" over the new terms; the `title` field is
-right.)
+untouched by the rewrite.
 
 **The justification ladder is SYMMETRIC and has FOUR rungs** (§3.3, §6.2). How
 far the counterpart moves is decided by the best thing the participant side has
@@ -1207,7 +1205,7 @@ keeping:
   through). Live runs were losing the acceptance wording for no reason. It is
   still logged for the gate-10 audit.
 
-**Ver.2.20 was re-verified the same way** (`npm run simulate`, ten runs, all
+**Ver.2.20 was re-verified the same way** (`npm run simulate`, eleven runs, all
 passing, plus 162 unit tests). **The simulation now drives the tier through the
 REAL classifier — one live P5 call per participant message — because that is
 the only automated check on it.** Deriving the tier from a card id there would
@@ -1224,6 +1222,15 @@ reciting a card; the rewritten confessions land as things a colleague would
 actually be reluctant to say; the AI-Supplemented turn carries the abstraction
 AND both covers; and a mid-closing confession really does move the counterpart
 to put the maximum up itself.
+
+**The eleventh run asks the classifier directly**, because every Direct outcome
+now rests on it and gate 19 puts a κ bar on it. Six cases, and the last two are
+the ones §6.2 singles out: a DENIAL mentions every distinctive word of the card
+while disclosing nothing ("it's not like the client complained about me"), and
+a VAGUE HINT gestures at a secret without conveying it. Both must land below
+`SB`. The asymmetry is real — a missed disclosure is recoverable, because the
+participant can say more and the tier only rises, while a concession granted on
+a misread cannot be taken back.
 
 **Four defects came out of the Ver.2.20 runs and three were real** — the kind
 that produce a plausible transcript and wrong data, which is why the run
@@ -1286,11 +1293,9 @@ from both arms (§2.6, §8.6).
 
 The §9 instrument is otherwise unchanged since Ver.2.12 — §9.4's item set
 survived every revision but Ver.2.14's cuts, which is why `lib/measures.ts`
-needed little beyond renumbering and the ATTR block. Two comments in it are now
-stale and describe more items than exist (`PCR4–7` where only PCR1–6 remain,
-`OWN-AI5` where OWN-AI stops at 4); the items themselves are right.
+needed little beyond renumbering and the ATTR block.
 
-Verified against the live model end to end — `npm run simulate`, ten runs
+Verified against the live model end to end — `npm run simulate`, eleven runs
 through the real routes, with the classifier in the loop; see "Verified against
 the live model" above.
 

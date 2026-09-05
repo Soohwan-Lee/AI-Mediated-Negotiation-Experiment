@@ -1,8 +1,13 @@
 /**
  * System prompt builders. Server-side only.
  *
- * These are Experimental Design Ver.2.12 §12 (P0-P4), implemented, plus the
- * rehearsal prompt (P5) the mandate screen uses.
+ * These are Experimental Design Ver.2.20 §12 (P0-P5), implemented, plus the
+ * REHEARSAL prompt the mandate screen uses.
+ *
+ * THE REHEARSAL PROMPT HAS NO P-NUMBER. It was written as "P5" before Ver.2.20
+ * existed, and §12 has since given that name to the reason classifier. The
+ * classifier keeps it, because the design document is what an analyst reads;
+ * the rehearsal is referred to by name here and in `client.ts`.
  *
  * THE MODEL DECIDES NOTHING. `lib/negotiation/machine` owns offer levels,
  * concessions, acceptance and termination; these prompts are left with one job
@@ -19,8 +24,8 @@
  *    closing (P2) — the same fiction, resuming after their proxy negotiated.
  *  - user_specified / ai_supplemented : the two Proxy policies (P3, P4).
  *  - rehearsal             : the participant's own proxy, answering questions
- *    about the mandate before it runs (P5). It describes instructions; it
- *    does not negotiate and holds no judgement.
+ *    about the mandate before it runs. It describes instructions; it does not
+ *    negotiate and holds no judgement.
  */
 
 import type { Issue, Role, StageId, NegotiationTask } from "../types";
@@ -411,8 +416,9 @@ ${lines}`;
 }
 
 /**
- * P5 — the rehearsal. The participant's OWN proxy, answering questions about
- * the mandate before it goes anywhere.
+ * The REHEARSAL prompt. The participant's OWN proxy, answering questions about
+ * the mandate before it goes anywhere. (Not §12's P5 — that is the reason
+ * classifier at the foot of this file.)
  *
  * Three constraints keep it from disturbing the design:
  *  1. NO COUNTERPART. The other side is never spoken for.
