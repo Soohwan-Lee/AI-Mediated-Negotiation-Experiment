@@ -569,9 +569,30 @@ that a guardrail fired. `voicedTier` travels as a rung name for the same
 reason: it describes the participant's own side's rung and is identical under
 both policies.
 
-**`voicedTier` must carry the proxy's floor.** It did not, once, so a closing
-conversation would have started below what the participant had just watched the
-proxies reach — a 2,300 package on screen, then a 1,600 offer.
+**`voicedTier` must carry the proxy's floor — AND SO MUST THE CLIENT THAT
+RECEIVES IT. This wire has now broken TWICE, once at each end.** A closing
+conversation that loses the floor starts below what the participant just
+watched the proxies reach: a 2,300 package on screen, then a 1,600 offer.
+
+The first break was the route's, which sent `work`. The second was
+`proxy-task.tsx`, which was still throwing the floor away after the route was
+fixed, in three places at once: the state was typed `"none" | "work" |
+"sensitive"`, the response was RE-DECLARED INLINE without `"priority"` — which
+is why `tsc --noEmit` stayed clean and never saw the mismatch with the route's
+own union — and the fold was a ternary collapsing everything below `sensitive`
+to `work`. `TIER_LIMIT_INDEX` puts `work` at 2 and `priority` at 1, so those
+are different option indices and different payoffs.
+
+**Nothing in the test suite or the simulation could catch it**, and the reason
+is worth remembering: `scripts/simulate-negotiation.mjs` preserves the value
+correctly and asserts `voicedTier === "priority"`, so the app and the
+simulation implemented DIFFERENT logic at the same point and only the
+simulation was right. Every automated check passed while the Proxy arm quietly
+paid a rung too little, on Points/JOINT, along the primary contrast.
+
+Both ends use `foldTier` and the shared `ReasonTier` now. Do not re-type this
+value locally, and do not fold it by hand — the type is the only thing that
+makes the two ends agree, and a local union silently opts out of it.
 
 ## The parting comment: REMARK and ATTR
 
