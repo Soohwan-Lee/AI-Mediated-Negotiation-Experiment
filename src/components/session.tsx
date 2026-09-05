@@ -333,31 +333,29 @@ export function BriefingSummary({
           At a Glance · Your 3 Key Priorities
         </p>
       </div>
-      <div className="grid gap-2.5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5">
         {rows.map((row) => (
           <div
             key={row.label}
-            className="rounded-xl border border-amber-200/60 bg-white/90 p-3 shadow-2xs flex flex-col justify-between"
+            className="rounded-xl border border-amber-200/60 bg-white/90 p-2.5 sm:p-3 shadow-2xs"
           >
-            <div>
-              <div className="flex items-center justify-between gap-1 mb-1.5">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                  <span>{row.icon}</span>
-                  <span>{row.label}</span>
-                </span>
-                <span
-                  className={cx(
-                    "rounded-full border px-1.5 py-0.5 text-2xs font-extrabold",
-                    row.badgeClass,
-                  )}
-                >
-                  {row.badge}
-                </span>
-              </div>
-              <p className="text-xs leading-relaxed text-slate-700 font-medium">
-                {row.body}
-              </p>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-slate-900 min-w-0">
+                <span className="shrink-0">{row.icon}</span>
+                <span className="truncate">{row.label}</span>
+              </span>
+              <span
+                className={cx(
+                  "rounded-full border px-2 py-0.5 text-2xs font-extrabold shrink-0 whitespace-nowrap",
+                  row.badgeClass,
+                )}
+              >
+                {row.badge}
+              </span>
             </div>
+            <p className="text-xs leading-relaxed text-slate-700 font-medium break-words">
+              {row.body}
+            </p>
           </div>
         ))}
       </div>
@@ -571,7 +569,9 @@ function Fold({
       )}
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3.5 text-xs sm:text-sm font-bold tracking-tight text-[var(--ink)] hover:bg-amber-50/60 select-none [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2">{title}</span>
+        <span className="flex items-center gap-2 min-w-0 font-bold">
+          <span className="truncate">{title}</span>
+        </span>
         <span
           aria-hidden
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100/70 text-xs font-black text-[var(--private-strong)] transition-transform duration-200 group-open:rotate-90"
@@ -629,7 +629,7 @@ export function ReasonBox({
             {children ? (
               children(card)
             ) : (
-              <p className="text-xs sm:text-sm leading-relaxed">
+              <p className="text-xs sm:text-sm leading-relaxed break-words">
                 {card.text}
               </p>
             )}

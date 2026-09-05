@@ -203,7 +203,7 @@ export function Transcript({
                   flow ? undefined : { animationDelay: `${i * 0.45}s` }
                 }
                 className={cx(
-                  "max-w-[85%] sm:max-w-[78%] px-4 py-3 text-sm sm:text-[0.9375rem] leading-relaxed shadow-2xs",
+                  "max-w-[85%] sm:max-w-[78%] px-4 py-3 text-sm sm:text-[0.9375rem] leading-relaxed shadow-2xs break-words [overflow-wrap:anywhere]",
                   flow ? undefined : "bubble-in",
                   ownProxy
                     ? "rounded-2xl border-2 border-blue-500 bg-blue-50/80 text-slate-900 font-medium"

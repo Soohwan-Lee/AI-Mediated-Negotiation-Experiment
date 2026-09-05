@@ -133,15 +133,15 @@ export function CardTitle({
 }) {
   return (
     <div className="mb-4 flex items-start justify-between gap-4">
-      <div>
-        <h2 className="text-base font-bold tracking-tight text-[var(--ink)] sm:text-lg">
+      <div className="min-w-0 flex-1">
+        <h2 className="text-base font-bold tracking-tight text-[var(--ink)] sm:text-lg break-words leading-snug">
           {children}
         </h2>
         {hint ? (
-          <p className="mt-1 text-sm leading-relaxed text-[var(--ink-3)]">{hint}</p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--ink-3)] break-words">{hint}</p>
         ) : null}
       </div>
-      {aside}
+      {aside ? <div className="shrink-0">{aside}</div> : null}
     </div>
   );
 }
@@ -608,8 +608,8 @@ export function Scale({
           </div>
 
           <div className="mt-2 flex items-start justify-between gap-3 text-xs font-medium text-[var(--ink-3)]">
-            <span className="max-w-[48%]">{lowAnchor}</span>
-            <span className="max-w-[48%] text-right">{highAnchor}</span>
+            <span className="max-w-[48%] leading-tight break-words">{lowAnchor}</span>
+            <span className="max-w-[48%] text-right leading-tight break-words">{highAnchor}</span>
           </div>
         </div>
       </div>
