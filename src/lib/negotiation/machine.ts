@@ -270,7 +270,7 @@ export const SOFT_CLOSE_SECONDS = 60;
  * screen is the right tool because the reminder is cheap and one-shot.
  */
 export function mentionsScoreNumbers(text: string): boolean {
-  return /\b\d{3,}\b/.test(text) || /\b(?:points?|score(?:s|board|sheet)?)\b/i.test(text);
+  return /\b\d{3,}\b/.test(text) || /\b(?:points|score(?:s|board|sheet)?)\b/i.test(text) || /\b(?:\d+|one)\s+point\b/i.test(text);
 }
 
 // ---------------------------------------------------------------------------

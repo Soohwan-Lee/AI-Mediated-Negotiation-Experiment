@@ -271,6 +271,7 @@ function proxyScript(
   // among its two covers and never the card itself. Drawn from the REAL card
   // so the mockup shows what the live system actually produces.
   const abstracted = mySb ? abstractedReason(mySb) : null;
+  const theirAbstracted = theirSb ? abstractedReason(theirSb) : null;
   const principal = role === "leader" ? "the team lead" : "the team member";
   const otherPrincipal = role === "leader" ? "the team member" : "the team lead";
 
@@ -316,10 +317,13 @@ function proxyScript(
         "p4c",
         4,
         "counterpart_proxy",
-        theirSb?.relayed
+        policy === "ai_supplemented" && theirAbstracted
+          ? `To sum up where ${otherPrincipal} I represent stands — ${theirAbstracted.cover[0]} ${theirAbstracted.abstract} ${theirAbstracted.cover[1]}`
+          : theirSb?.relayed
           ? `On their side as well — ${otherPrincipal} I represent tells me this. ${theirSb.relayed}`
           : `The constraint on ${theirs.label.toLowerCase()} for ${otherPrincipal} I represent is firm.`,
       ),
+      m("p5c", 5, "counterpart_proxy", `Given that situation, here is a package: ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()}, and ${L(trade, mine.id)} on ${mine.label.toLowerCase()}.`, { proposal: trade }),
       m(
         "p5p",
         5,

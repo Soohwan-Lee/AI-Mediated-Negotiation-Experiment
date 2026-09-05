@@ -259,7 +259,7 @@ const TASK_A: NegotiationTask = {
     },
     {
       id: "client_presentations",
-      label: "Client meetings you present at",
+      label: "Client meetings the Member presents at",
       description:
         "How many of the quarter's four client meetings the Member presents at.",
       type: "member_priority",

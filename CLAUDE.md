@@ -9,6 +9,7 @@ The user explicitly requested alignment to Design Ver.2.20 including its Septemb
 - REMARK evaluates the demands (participant / demands relayed by their Proxy), never generated tone or an asserted opening behavior.
 - Leader abstractions retain prior coordination/staffing judgment per the current §6.6 table.
 - COMP4 checks that disclosure is optional and may enter later evaluations.
+- Both Proxy policies share nine turns (`proxy-protocol.ts`): counterpart disclosure stays separate from its offer; WR-only receives MISREAD before the Proxy's explicit priority clarification. AI-Supplemented uses fixed cover 1 at that clarification, and both sides use the fixed summary plus two covers for an authorized sensitive disclosure.
 - Payment: £7.50 base + £1 per task = £9.50 fixed full payout. Current conservative screen budget is 61 minutes, pending pilot evidence for the design's 45–50 minute target.
 - See `docs/design-2.20-update.md` for the staged implementation and verification record.
 

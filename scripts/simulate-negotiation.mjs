@@ -46,13 +46,14 @@ import path from "node:path";
 const ROOT = process.cwd();
 const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), "simulation-report.json");
 const TRANSCRIPT_DIR = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "docs", "transcripts");
-const BASE = "http://localhost:3000";
+const BASE = process.env.SIMULATION_BASE_URL ?? "http://localhost:3100";
 
-const { getTask, scorePackage, requirementIssue, counterRequirementIssue, rankedOptions, reasonCards, cardOfLayer } =
+const { getTask, scorePackage, counterRequirementIssue, rankedOptions, reasonCards, cardOfLayer } =
   await import(path.join(ROOT, "src/lib/tasks.ts"));
-const { counterpartStep, counterpartStageAfter, buildProxyPlan, tierPackage, maxPackage, misreadPackage, mentionsScoreNumbers, foldTier, LABEL_TIER, DIRECT_STAGE_OFFSET } =
+const { counterpartStep, counterpartStageAfter, tierPackage, maxPackage, mentionsScoreNumbers, foldTier, LABEL_TIER, DIRECT_STAGE_OFFSET } =
   await import(path.join(ROOT, "src/lib/negotiation/machine.ts"));
 const { leaksForbiddenReason } = await import(path.join(ROOT, "src/lib/ai/reason-leak.ts"));
+const { PROXY_TOTAL_TURNS } = await import(path.join(ROOT, "src/lib/negotiation/proxy-protocol.ts"));
 
 const env = readFileSync(path.join(ROOT, ".env.local"), "utf8");
 const KEY = env.match(/^OPENAI_API_KEY=(.+)$/m)[1].trim();
@@ -80,7 +81,7 @@ function humanVoiceIssues(text) {
     if (b.length > 170) issues.push(`bubble ${b.length} chars`);
   }
   if (/\bAs an AI\b|\blanguage model\b|\bI'm an AI\b/i.test(text)) issues.push("AI self-reference");
-  if (/\b\d{3,}\b|\bpoints?\b|\bscore\b/i.test(text)) issues.push("score talk");
+  if (mentionsScoreNumbers(text)) issues.push("score talk");
   if (/^\s*[-*•]/m.test(text)) issues.push("bullet list");
   return issues;
 }
@@ -170,7 +171,7 @@ async function proxyRun(name, taskId, role, policy, mandateOpts) {
   let settledPkg = null;
   let voicedTier = "none";
 
-  for (let turn = 0; turn < 8; turn += 1) {
+  for (let turn = 0; turn < PROXY_TOTAL_TURNS; turn += 1) {
     const res = await fetch(`${BASE}/api/proxy-negotiation`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -341,7 +342,7 @@ function writeTranscript(run, task) {
   }
   const results = run.checks.map((c) => `- ${c.ok ? "✓" : "✗"} ${c.name}${c.detail ? ` — ${c.detail}` : ""}`);
   lines.push(`## Checks`, ``, ...results, ``);
-  writeFileSync(path.join(TRANSCRIPT_DIR, `${run.name}.md`), lines.join("\n"));
+  writeFileSync(path.join(TRANSCRIPT_DIR, `${run.name}.md`), lines.map(line => line.trimEnd()).join("\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -359,7 +360,6 @@ const T_B = getTask("task_b");
   check(run, "settles at best↔best (3,000/3,000)", tentative && task.issues.every((i) => tentative[i.id] === best[i.id]), fmtPackage(task, tentative));
   check(run, "SB tier voiced by own proxy", voicedTier === "sensitive", voicedTier);
   const t3 = messages.find((m) => m.turn === 3);
-  const sb = cardOfLayer(task, "member", "sensitive");
   // task_a / member's SB (Ver.2.18): after the quarterly walkthrough the
   // client contact asked, in the corridor, that the team lead present from
   // now on — and it was never repeated upward. Matched by SUBSTANCE, not
@@ -378,10 +378,8 @@ const T_B = getTask("task_b");
 }
 
 // 2. Delegate, WR only -----------------------------------------------------
-let wrOnlyResult;
 {
   const r = await proxyRun("proxy-delegate-wr", "task_a", "member", "user_specified", { sb: false });
-  wrOnlyResult = r;
   const { run, task, messages, tentative, voicedTier } = r;
   // TIER 2 IS THE PROXY'S FLOOR (§6.5, §6.9 #1). The proxy holds the preferred
   // package, so it always states which term matters more — it declines the
@@ -480,7 +478,6 @@ let wrOnlyResult;
   const task = T_A;
   const partial = tierPackage(task, "member", "priority");
   const best = maxPackage(task, "member");
-  const sb = cardOfLayer(task, "member", "sensitive");
   // The confession comes WITH an out-of-tier ask (their core AND ours), so
   // the counterpart cannot simply accept it — which is what makes this the
   // SCRIPT-BALANCE path rather than a plain acceptance — the counterpart

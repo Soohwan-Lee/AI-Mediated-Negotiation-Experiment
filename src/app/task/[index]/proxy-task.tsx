@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Proxy task (Experimental Design Ver.2.4 §8 "Proxy task 흐름").
+ * Proxy task (Experimental Design Ver.2.20 §7–8).
  *
  * Flow: cover → brief → RISK → mandate (levels + reasons) → confirm →
- *       matchmaking → WATCH the two AI Proxies negotiate → handover →
- *       negotiate directly → review.
+ *       matchmaking → WATCH the two AI Proxies negotiate → ratify → review.
+ *       Modification/refusal instead leads through a three-minute closing.
  *
  * Four things in that line are recent and easy to write back the old way:
  *
@@ -19,11 +19,9 @@
  *    used to be two screens in sequence; deciding a position and deciding what
  *    may be said for it is one act, and that the second half was never asked
  *    is the gap this study is about.
- *  - The proxies run ONCE. There is no revision and no second run; the
- *    participant takes over and finishes the negotiation themselves, and what
- *    the two people agree is the result.
- *  - The review does not ratify. Both arms now end with the participant
- *    agreeing a package in conversation, so there is nothing left to approve.
+ *  - The proxies run ONCE. There is no revision or second AI-AI run.
+ *  - Ratification is separate from review. Approval finalizes the tentative
+ *    package; only modification/refusal starts a direct closing conversation.
  *
  * DECEPTION INTEGRITY: User-Specified and AI-Supplemented render the SAME interface. The
  * only difference is what the backend permits the proxies to do. The
@@ -44,6 +42,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { PROXY_TOTAL_TURNS as TOTAL_TURNS } from "@/lib/negotiation/proxy-protocol";
 import {
   SpectatorBanner,
   Transcript,
@@ -242,7 +241,7 @@ const STEP_OF: Record<Phase, number> = {
  * script — it is what makes their conversations comparable; the clock applies
  * to the participant's own closing conversation afterwards.
  */
-const TOTAL_TURNS = 8;
+
 
 /**
  * What each principal is told about the policy in force (Design §7, last

@@ -42,10 +42,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+const { compactChatBubbles } = await import("../src/lib/ai/validator.ts");
+
+test("chat compaction preserves disclosure facts and order", () => {
+  const parts = ["I appreciate that.", "I planned with too few people.", "It only works if you stay four days.", "I have not told the director."];
+  const compact = compactChatBubbles(parts.join(" || "));
+  assert.equal(compact.split("||").length, 3);
+  assert.equal(compact.replaceAll(" || ", " "), parts.join(" "));
+  const long = Array(4).fill("x".repeat(100)).join(" || ");
+  assert.equal(compactChatBubbles(long), long, "never drop disclosure to meet a visual target");
+});
+
 const {
   getTask,
   reasonCards,
-  requirementIssue,
   counterRequirementIssue,
   rankedOptions,
   scorePackage,
@@ -413,6 +423,9 @@ test("mentionsScoreNumbers catches score talk and passes shift counts", () => {
   assert.equal(mentionsScoreNumbers("my score sheet says otherwise"), true);
   assert.equal(mentionsScoreNumbers("could we do 3 per week?"), false);
   assert.equal(mentionsScoreNumbers("4 per month is a lot"), false);
+  assert.equal(mentionsScoreNumbers("that is the key point for me"), false);
+  assert.equal(mentionsScoreNumbers("I see your point"), false);
+  assert.equal(mentionsScoreNumbers("that earns one point"), true);
 });
 
 /**
@@ -782,3 +795,25 @@ for (const taskId of ["task_a", "task_b"]) {
     });
   }
 }
+
+test("both sides of an AI-Supplemented exchange use their own fixed summary and both covers", async () => {
+  const { scriptedTask } = await import("../src/lib/negotiation/script.ts");
+  const { PROXY_TURN_ORDER } = await import("../src/lib/negotiation/proxy-protocol.ts");
+  for (const taskId of ["task_a", "task_b"]) {
+    for (const role of ["leader", "member"]) {
+      const task = getTask(taskId);
+      const exchange = scriptedTask(task, role, "ai_supplemented");
+      assert.equal(exchange.messages.length, PROXY_TURN_ORDER.length);
+      for (const [speaker, speakerRole] of [
+        ["participant_proxy", role],
+        ["counterpart_proxy", other(role)],
+      ]) {
+        const card = cardOfLayer(task, speakerRole, "sensitive");
+        const message = exchange.messages.find(m => m.speaker === speaker && m.text.includes(card.abstract));
+        assert.ok(message, `${taskId}/${role}/${speaker} has its fixed summary`);
+        assert.ok(card.cover.every(sentence => message.text.includes(sentence)));
+        assert.ok(!message.text.includes(card.text));
+      }
+    }
+  }
+});

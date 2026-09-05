@@ -87,8 +87,7 @@ export interface PromptContext {
 const STAGE_BRIEF: Record<StageId, string> = {
   1: `STAGE 1 — OPENING. Put a complete two-issue package on the table. No
 concessions yet.`,
-  2: `STAGE 2 — FIRST REASON OPPORTUNITY. Say which issue matters most on your
-side with the reason you are given, and ask for their top issue and reason.`,
+  2: `STAGE 2 — FIRST REASON OPPORTUNITY. Give the reason designated by your instructed move. State a priority only when the move explicitly calls for it.`,
   3: `STAGE 3 — LOCK. (System recording moment; you will not be asked to speak
 here.)`,
   4: `STAGE 4 — DISCLOSURE. Render the designated background you are given,

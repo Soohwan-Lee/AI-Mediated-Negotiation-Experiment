@@ -6,29 +6,25 @@
  * concedes, and where the exchange settles. The model is asked only to say
  * that move in the right voice.
  *
- * THE EXCHANGE IS EIGHT TURNS, four per side, walking Ver.2.12 §6.1's six
- * stages (stage 3 is the lock, a recording moment, not a message):
+ * The exchange has nine turns shared by both policies (Ver.2.20 §6).
+ * Stage 3 is the decision lock, not a message.
  *
  *   0 counterpart opens            1 participant proxy opens
- *   2 counterpart WR + asks        3 participant proxy voices its designated
- *                                    reason — the SB if authorized (§6.5),
- *                                    which is what makes PRE-RECIP-SB true
- *                                    for a participant who checked it
- *   4 counterpart discloses SB     5 participant proxy proposes the trade
- *   6 counterpart evaluates        7 participant proxy closes
+ *   2 counterpart WR + asks        3 participant's authorized reason
+ *   4 counterpart discloses SB     5 counterpart offers (MISREAD if WR-only)
+ *   6 participant clarifies/trades 7 counterpart evaluates
+ *   8 participant closes provisionally for the principal's review
  *
- * The counterpart's evaluation at turn 6 is the credibility ladder: the tier
- * earned by the reasons ACTUALLY voiced (recovered from the carried tokens,
- * pool arguments never counting) sets how far it concedes on the
- * participant's core issue. Fixed turn order is what keeps User-Specified and
- * AI-Supplemented matched on message count (pilot gate 9); the AI-Supplemented's two pool
- * clauses ride INSIDE turns 3 and 5, never as extra turns.
+ * Only voiced principal reasons raise the disclosure tier. Fixed summaries
+ * and covers change wording, not the order or number of turns. A WR-only
+ * AI-Supplemented proxy uses cover 1 with its priority clarification at turn 6.
  *
  * ONE TURN PER REQUEST: the client drives the sequence, each request stays
  * well inside Vercel's 60s limit, and the waiting screen shows real progress.
  */
 
 import { NextResponse } from "next/server";
+import { PROXY_TURN_ORDER as TURN_ORDER, PROXY_TOTAL_TURNS as TOTAL_TURNS } from "@/lib/negotiation/proxy-protocol";
 import { generateAction } from "@/lib/ai/client";
 import { capMessageLength, validateAction } from "@/lib/ai/validator";
 import { NEGOTIATION } from "@/lib/study-config";
@@ -84,20 +80,6 @@ interface RequestBody {
   reasonsUsed?: string[];
 }
 
-type Turn = { stage: StageId; side: "counterpart" | "participant" };
-
-const TURN_ORDER: Turn[] = [
-  { stage: 1, side: "counterpart" },
-  { stage: 1, side: "participant" },
-  { stage: 2, side: "counterpart" },
-  { stage: 2, side: "participant" },
-  { stage: 4, side: "counterpart" },
-  { stage: 5, side: "participant" },
-  { stage: 5, side: "counterpart" },
-  { stage: 6, side: "participant" },
-];
-
-const TOTAL_TURNS = TURN_ORDER.length;
 
 /** The mandate, written out for the proxy's prompt. */
 function mandateSummary(mandate: Mandate, taskId: TaskId): string {
@@ -353,29 +335,16 @@ export async function POST(request: Request) {
     (r) => r.issueId === yourRequirement.id,
   );
   const voicedCardIds = resolvedHistory.map((r) => r.sourceId);
-  /**
-   * THE PROXY'S FLOOR IS TIER 2, AND IT APPLIES HERE TOO (§6.5, §6.9 #1).
-   *
-   * A proxy is handed its principal's preferred package, so it always knows
-   * which term matters more and says so. `buildProxyPlan` folds `priority` in
-   * for the same reason; this line has to agree with it, because the two are
-   * read by the same exchange — the plan decides where the proxies settle and
-   * this decides what the counterpart offers on the way.
-   *
-   * WITHOUT IT THE COUNTERPART MISREADS ITS OWN PROXY. A WR-only mandate left
-   * this at `work`, which is the misread's trigger condition, so the
-   * counterpart proposed the wrong-term package to a proxy that had already
-   * stated the priority — and the proxy, whose instructions say to accept the
-   * counterpart's package, took 600 instead of 2,300. Caught by `npm run
-   * simulate`; the AI-AI exchange has no participant to notice it.
-   */
+  // A WR-only disclosure stays at work for the one-time MISREAD, then the
+  // proxy explicitly states priority at turn 6. With no authorized reason,
+  // turn 3 already states priority. Approved SB remains the highest tier.
   const tier: ReasonTier = foldTier(
     tierOf(voicedCards.map((c) => ({ layer: c.layer ?? "work" }))),
-    "priority",
+    turn >= 6 || voicedCards.length === 0 ? "priority" : "none",
   );
 
   /**
-   * The counterpart's turn-6 evaluation — recomputed identically at turn 7,
+   * The counterpart's turn-7 evaluation — recomputed identically at turn 8,
    * because the route is stateless and the participant proxy's close has to
    * answer the same decision the counterpart just rendered.
    */
@@ -404,6 +373,7 @@ export async function POST(request: Request) {
    * so the abstraction's position carries no signal.
    */
   let abstractedSentences: string[] | null = null;
+  let supplementalReason: string | null = null;
   let accepted = false;
   /**
    * The AI-AI exchange no longer has a way to end without a package
@@ -427,7 +397,7 @@ export async function POST(request: Request) {
     switch (turn) {
       case 1:
         proposal = plan.opening;
-        decidedAction = `Open with your principal's preferred package, naming these exact levels: ${packageSentence(task, plan.opening)}.`;
+        decidedAction = `Open with your principal's preferred package, naming these exact levels: ${packageSentence(task, plan.opening)}. Do not name a priority or give any reason yet.`;
         break;
       case 3: {
         // The first reason opportunity (§6.5): the SB if the principal
@@ -462,19 +432,28 @@ export async function POST(request: Request) {
           : designatedCard
             ? ` To make credible why, give exactly this authorized reason and no other: "${designatedCard.text}"`
             : " Give no reason beyond naming the priority — none has been authorized.";
-        decidedAction = `Answer their question: say that ${yourRequirement.label.toLowerCase()} is your principal's priority.${reasonClause}`;
+        decidedAction = designatedCard?.layer === "work"
+          ? `Answer their question using only this work reason, without naming a priority yet: "${designatedCard.text}".`
+          : `Answer their question: say that ${yourRequirement.label.toLowerCase()} is your principal's priority.${reasonClause}`;
         break;
       }
-      case 5:
+      case 6:
         proposal = plan.tradeProposal;
         decidedAction = `Propose this conditional exchange, naming these exact levels and no others: ${packageSentence(task, plan.tradeProposal)}. Say plainly that your principal offers ${theirRequirement.label.toLowerCase()} at that level in exchange for holding ${yourRequirement.label.toLowerCase()}.`;
+        if (tier !== "sensitive" && voicedCards.some(c => c.layer === "work")) {
+          decidedAction = `Decline the previous offer and clarify that ${yourRequirement.label.toLowerCase()} matters more to your principal. ` + decidedAction;
+          if (body.policy === "ai_supplemented") {
+            supplementalReason = cardOfLayer(task, body.participantRole, "sensitive")?.cover?.[0] ?? null;
+            if (supplementalReason) decidedAction += ` Include this fixed work-related reason: "${supplementalReason}". Do not add any private fact.`;
+          }
+        }
         break;
       default: {
-        // Turn 7 — the close, answering the counterpart's turn-6 decision.
+        // Turn 8 — the close, answering the counterpart's turn-7 decision.
         const decision = evaluate();
         if (decision.accepts) {
           proposal = decision.proposal;
-          decidedAction = `Confirm the tentative package — ${packageSentence(task, decision.proposal!)} — and say the two principals will close it directly; nothing binds until both confirm.`;
+          decidedAction = `Confirm the tentative package — ${packageSentence(task, decision.proposal!)} — and say the principal will review and decide whether to approve it; nothing binds until approval.`;
         } else {
           // The counterpart put its symmetric tier package forward. The proxy
           // takes it provisionally — ALWAYS. There is no mandate floor it
@@ -519,15 +498,34 @@ export async function POST(request: Request) {
         // participant, never mirrored to what the participant side said, and
         // carrying no package and no demand.
         const sb = cardOfLayer(task, counterpartRole, "sensitive");
+        designatedCard = sb ?? null;
         counterpartAction = "disclose_sb";
         decidedAction = `Share your principal's own background: they have authorized you to say exactly this, in your own words, keeping every fact: "${sb?.text ?? ""}". Attach no demand and no package to it, and do not ask the other side to reciprocate.`;
+        if (body.policy === "ai_supplemented" && sb) {
+          const summarized = abstractedReason(sb);
+          if (summarized) {
+            abstractedSentences = shuffle([summarized.abstract, ...summarized.cover]);
+            decidedAction = "Share your principal's background using only the three supplied sentences, in their supplied order. Do not restore the full private story. Attach no package or request.";
+          }
+        }
         // The proxy register is plain sentences rather than chat bubbles, so
         // no split instruction here — see the counterpart route for why the
         // human-voiced disclosure needs one.
         break;
       }
+      case 5: {
+        const decision = counterpartStep(task, counterpartRole, 5, null, {
+          tier, askedWhy: true, numbersReminded: true,
+        });
+        proposal = decision.proposal;
+        counterpartAction = decision.action;
+        decidedAction = decision.action === "misread"
+          ? `Respond to the work reason by offering its apparent solution: ${packageSentence(task, proposal!)}. Do not label this a misunderstanding; your principal sincerely thinks it addresses the other person's workload or project concerns.`
+          : `Based on the explanation, offer exactly this package: ${packageSentence(task, proposal!)}. Do not ask for more private details.`;
+        break;
+      }
       default: {
-        // Turn 6 — the evaluation, by the ladder.
+        // Turn 7 — the evaluation, by the ladder.
         const decision = evaluate();
         proposal = decision.proposal;
         accepted = decision.accepts;
@@ -639,13 +637,12 @@ export async function POST(request: Request) {
      * so checking for the card's own words there would fail every correct
      * message and retry until it produced a wrong one.
      */
-    const requiredText = abstractedSentences
+    const requiredText = supplementalReason ?? (abstractedSentences
       ? (designatedCard?.abstract ?? null)
-      : (designatedCard?.text ?? null);
+      : (designatedCard?.text ?? null));
 
     let { action, stubbed } = await generate();
     if (
-      isParticipantSide &&
       requiredText &&
       !mentionsCard(action.rationale, requiredText)
     ) {
@@ -725,7 +722,7 @@ export async function POST(request: Request) {
               (b === abstractText ? 1 : 0) - (a === abstractText ? 1 : 0)
             );
           })
-        : [designatedCard?.text ?? null];
+        : [designatedCard?.text ?? null, supplementalReason];
 
     const text = capMessageLength(
       blocked
@@ -809,7 +806,7 @@ export async function POST(request: Request) {
             ? "sensitive"
             : "work"
           : "none",
-        isParticipantSide ? "priority" : "none",
+        isParticipantSide && (turn >= 6 || (turn === 3 && !designatedCard)) ? "priority" : "none",
       ),
       // Violation CODES only — details name red lines and withheld cards.
       guardrailViolations: validation.valid

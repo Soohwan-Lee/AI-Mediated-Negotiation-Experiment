@@ -323,6 +323,27 @@ function clauseOverlap(text: string, clause: string): number {
   return hits / want.size;
 }
 
+/** Merge short adjacent bubbles without deleting or reordering any facts.
+ * If three short bubbles cannot hold the text, preserve its disclosure content.
+ */
+export function compactChatBubbles(text: string): string {
+  const bubbles = text.split("||").map((part) => part.trim()).filter(Boolean);
+  while (bubbles.length > 3) {
+    let best = -1;
+    let shortest = 171;
+    for (let i = 0; i < bubbles.length - 1; i += 1) {
+      const length = bubbles[i].length + 1 + bubbles[i + 1].length;
+      if (length < shortest) {
+        best = i;
+        shortest = length;
+      }
+    }
+    if (best < 0) break;
+    bubbles.splice(best, 2, `${bubbles[best]} ${bubbles[best + 1]}`);
+  }
+  return bubbles.join(" || ");
+}
+
 /**
  * Trim one generated message to the study's exposure cap, at a bubble seam.
  *
