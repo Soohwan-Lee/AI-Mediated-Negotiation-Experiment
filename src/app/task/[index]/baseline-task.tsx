@@ -819,11 +819,11 @@ export function BaselineTask({
 
           <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
                   💬 Live Direct Negotiation
                 </p>
-                <p className="text-xs text-[var(--ink-2)]">
+                <p className="text-xs text-[var(--ink-2)] leading-relaxed break-words">
                   {settled === "agreed"
                     ? "✓ Both parties agreed on a complete package!"
                     : settled === "impasse"
@@ -831,12 +831,16 @@ export function BaselineTask({
                       : "Messages are sent directly to the other participant in real time."}
                 </p>
               </div>
-              {settled ? null : pending ? (
-                <Cue tone="quiet">Waiting for reply…</Cue>
-              ) : yourTurn ? (
-                <Cue>Your Turn</Cue>
-              ) : (
-                <Cue tone="quiet">Select terms first</Cue>
+              {settled ? null : (
+                <div className="shrink-0">
+                  {pending ? (
+                    <Cue tone="quiet">Waiting for reply…</Cue>
+                  ) : yourTurn ? (
+                    <Cue>Your Turn</Cue>
+                  ) : (
+                    <Cue tone="quiet">Select terms first</Cue>
+                  )}
+                </div>
               )}
             </div>
             <Transcript

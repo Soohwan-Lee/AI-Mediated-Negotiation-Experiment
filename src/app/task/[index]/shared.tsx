@@ -696,11 +696,11 @@ export function OutcomeValue({
 
   return (
     <Card tone="private" className="text-[var(--private-ink)] border-amber-300 bg-amber-50/60 shadow-2xs">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <span className="text-xs font-extrabold uppercase tracking-wider text-amber-900">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-xs font-extrabold uppercase tracking-wider text-amber-900 min-w-0">
           🏆 Your Score & Payoff
         </span>
-        <span className="text-xl sm:text-2xl font-black text-amber-950 font-mono">
+        <span className="tabular text-xl sm:text-2xl font-black text-amber-950 font-mono shrink-0 whitespace-nowrap">
           {mine.toLocaleString()} pts
         </span>
       </div>
@@ -1154,11 +1154,11 @@ export function DirectNegotiation({
 
           <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
                   💬 Close It Together
                 </p>
-                <p className="text-xs text-[var(--ink-2)]">
+                <p className="text-xs text-[var(--ink-2)] leading-relaxed break-words">
                   {settled === "agreed"
                     ? "✓ You have reached a mutual agreement!"
                     : settled === "impasse"
@@ -1178,12 +1178,16 @@ export function DirectNegotiation({
                           : "Your proxies did not settle on a package. Choose a level on each term below, then put it to the other participant."}
                 </p>
               </div>
-              {settled ? null : pending ? (
-                <Cue tone="quiet">Waiting for reply…</Cue>
-              ) : yourTurn ? (
-                <Cue>Your Turn</Cue>
-              ) : (
-                <Cue tone="quiet">Select terms first</Cue>
+              {settled ? null : (
+                <div className="shrink-0">
+                  {pending ? (
+                    <Cue tone="quiet">Waiting for reply…</Cue>
+                  ) : yourTurn ? (
+                    <Cue>Your Turn</Cue>
+                  ) : (
+                    <Cue tone="quiet">Select terms first</Cue>
+                  )}
+                </div>
               )}
             </div>
             <Transcript

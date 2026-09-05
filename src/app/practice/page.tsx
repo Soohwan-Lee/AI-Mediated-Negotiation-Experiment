@@ -249,49 +249,49 @@ export default function PracticePage() {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <div className={cx(
-                "rounded-xl border p-2 text-center transition-all",
+                "min-w-0 rounded-xl border p-2 text-center transition-all flex items-center justify-center",
                 currentStep > 1
                   ? "border-emerald-300 bg-emerald-50 text-emerald-900 font-bold"
                   : currentStep === 1
                     ? "border-blue-500 bg-white text-blue-900 font-extrabold ring-2 ring-blue-400/40 shadow-xs"
                     : "border-slate-200 bg-white/70 text-slate-500",
               )}>
-                <span className="text-xs">{currentStep > 1 ? "✓ 1. Set Terms" : "👉 1. Set Terms"}</span>
+                <span className="text-xs leading-tight break-words">{currentStep > 1 ? "✓ 1. Set Terms" : "👉 1. Set Terms"}</span>
               </div>
 
               <div className={cx(
-                "rounded-xl border p-2 text-center transition-all",
+                "min-w-0 rounded-xl border p-2 text-center transition-all flex items-center justify-center",
                 currentStep > 2
                   ? "border-emerald-300 bg-emerald-50 text-emerald-900 font-bold"
                   : currentStep === 2
                     ? "border-blue-500 bg-white text-blue-900 font-extrabold ring-2 ring-blue-400/40 shadow-xs"
                     : "border-slate-200 bg-white/70 text-slate-500",
               )}>
-                <span className="text-xs">
+                <span className="text-xs leading-tight break-words">
                   {currentStep > 2 ? "✓ 2. Test Exchange" : currentStep === 2 ? "👉 2. Test Exchange" : "2. Test Exchange"}
                 </span>
               </div>
 
               <div className={cx(
-                "rounded-xl border p-2 text-center transition-all",
+                "min-w-0 rounded-xl border p-2 text-center transition-all flex items-center justify-center",
                 currentStep > 3
                   ? "border-emerald-300 bg-emerald-50 text-emerald-900 font-bold"
                   : currentStep === 3
                     ? "border-blue-500 bg-white text-blue-900 font-extrabold ring-2 ring-blue-400/40 shadow-xs"
                     : "border-slate-200 bg-white/70 text-slate-500",
               )}>
-                <span className="text-xs">
+                <span className="text-xs leading-tight break-words">
                   {currentStep > 3 ? "✓ 3. Quick Check" : currentStep === 3 ? "👉 3. Quick Check" : "3. Quick Check"}
                 </span>
               </div>
 
               <div className={cx(
-                "rounded-xl border p-2 text-center transition-all",
+                "min-w-0 rounded-xl border p-2 text-center transition-all flex items-center justify-center",
                 canContinue
                   ? "border-emerald-400 bg-emerald-100 text-emerald-950 font-black shadow-xs"
                   : "border-slate-200 bg-white/70 text-slate-400",
               )}>
-                <span className="text-xs">{canContinue ? "🎉 4. Start Task 1" : "4. Start Task 1"}</span>
+                <span className="text-xs leading-tight break-words">{canContinue ? "🎉 4. Start Task 1" : "4. Start Task 1"}</span>
               </div>
             </div>
           </div>
@@ -355,9 +355,9 @@ export default function PracticePage() {
                 <div className="space-y-4 mt-3">
                   {task.issues.map((issue) => (
                     <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5">
-                      <div className="flex items-baseline justify-between gap-2 mb-1">
+                      <div className="mb-2">
                         <p className="text-xs sm:text-sm font-bold text-slate-900">{issue.label}</p>
-                        <span className="text-2xs text-slate-500">{issue.rationale[role]}</span>
+                        <p className="mt-0.5 text-xs text-slate-600 font-medium leading-relaxed">💡 {issue.rationale[role]}</p>
                       </div>
 
                       <OptionChips
@@ -478,9 +478,9 @@ export default function PracticePage() {
                 <div className="space-y-4 mt-3">
                   {task.issues.map((issue) => (
                     <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5">
-                      <div className="flex items-baseline justify-between gap-2 mb-1">
+                      <div className="mb-2">
                         <p className="text-xs sm:text-sm font-bold text-slate-900">{issue.label}</p>
-                        <span className="text-2xs text-slate-500">💡 {issue.rationale[role]}</span>
+                        <p className="mt-0.5 text-xs text-slate-600 font-medium leading-relaxed">💡 {issue.rationale[role]}</p>
                       </div>
                       <OptionChips
                         issue={issue}

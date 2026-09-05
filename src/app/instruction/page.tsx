@@ -411,7 +411,7 @@ export default function InstructionPage() {
                 </p>
               </div>
 
-              <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 shadow-2xs">
+              <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 shadow-2xs sm:col-span-2">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-lg">🤖</span>
                   <p className="text-xs sm:text-sm font-bold text-blue-950">The two tasks work differently</p>

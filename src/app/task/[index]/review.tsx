@@ -429,17 +429,17 @@ export function ReviewPhase({
               the panel so the reflection question still unlocks either way. */}
           {transcript.length > 0 ? (
             <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
-              <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-3.5 flex items-center justify-between">
-                <div>
-                  <h2 className="text-xs sm:text-sm font-bold text-[var(--ink)]">{transcriptTitle}</h2>
-                  <p className="text-xs text-[var(--ink-2)]">
+              <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-3.5 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xs sm:text-sm font-bold text-[var(--ink)] leading-snug">{transcriptTitle}</h2>
+                  <p className="text-xs text-[var(--ink-2)] leading-relaxed break-words">
                     {transcriptHint}{" "}
                     {needsRequirementResponse
                       ? "(Please scroll to the end to unlock the reflection question below)"
                       : ""}
                   </p>
                 </div>
-                <span className="text-2xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
+                <span className="shrink-0 text-2xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
                   {transcript.length} turns
                 </span>
               </div>

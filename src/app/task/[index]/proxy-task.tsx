@@ -1383,7 +1383,7 @@ function ReasonMandateSection({
           onChange={() => onToggle(card.id)}
           className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 accent-blue-600"
         />
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <span
             className={cx(
               "mb-1.5 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold",
