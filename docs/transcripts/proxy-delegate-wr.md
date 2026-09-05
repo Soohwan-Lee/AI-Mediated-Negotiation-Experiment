@@ -4,54 +4,55 @@ Model: gpt-5.6-terra · task: task_a · participant role: member · policy: user
 
 **counterpart_proxy** _(stage 1 · open)_
 
-> I represent the team lead in this discussion.
-> This project has high expectations from the client, so getting the early execution right matters. We need to be on it properly from the start.
-> Which term matters most to the member you represent, and why?
+> I represent the team lead in this exchange.
+> This project has high client expectations, so early execution needs to be right from the start.
+> Which term matters most to the team member you represent, and why?
 
 **participant_proxy** _(stage 1)_
 
-> I am the AI Proxy negotiating for the team member I represent.
-> They propose 1 office day a week and presenting at 1 of the 4 client meetings.
-> The presentation workload matters most; can the lead consider this full package?
+> I represent the team member in these talks.
+> I hear the need for strong early execution.
+> They propose 1 office day a week and presenting at 1 of 4 client meetings.
 >
 > _package: Days a week in the office: 1 day · Client meetings you present at: 1 of 4_
 
 **counterpart_proxy** _(stage 2 · state_priority)_
 
-> Thanks for setting out the package.
-> What makes the presentation workload especially important to the member you represent?
+> I note the proposed levels.
+> This project has high expectations from the client, so getting the early execution right matters. We need to be on it properly from the start.
+> What makes that priority important to the team member you represent?
 
 **participant_proxy** _(stage 2)_
 
-> It is the member’s priority.
-> Their analysis scope is wide this quarter, so the workload is heavy and they need time to concentrate on it.
-> Which term is the lead’s top priority, and why?
+> I understand the concern about early execution.
+> Client presentations are their priority: their analysis scope is wide this quarter, so the workload is heavy and they need time to concentrate on it.
+> Which term is your top priority, and why?
 
 **counterpart_proxy** _(stage 4 · disclose_sb)_
 
-> On the lead’s priority: the team lead I represent told the director that four days a week was doable before checking with the team.
-> The director has already passed that answer upward.
-> The team does not know about it.
+> I understand presentations are their priority.
+> The team lead I represent told the director four office days were doable before checking with the team.
+> The director has already passed that answer upward, and the team does not know.
 
 **participant_proxy** _(stage 5)_
 
-> I understand four office days is important to the lead.
-> The team member I represent offers 4 days a week in the office in exchange for holding their client presentations at 1 of 4.
+> I understand the office commitment already made.
+> The team member offers 4 office days a week, provided they present at 1 of 4 client meetings.
 >
 > _package: Days a week in the office: 4 days · Client meetings you present at: 1 of 4_
 
 **counterpart_proxy** _(stage 5 · balance)_
 
-> That proposal has one side moving further than the other.
-> Instead, the team lead I represent can agree to 3 office days if the member presents at 2 of 4 client meetings.
+> I see their offer, but one side is moving further than the other.
+> Instead, the team lead I represent proposes 3 days in the office and 2 of 4 client meetings presented by the team member, as a balanced exchange.
 >
 > _package: Days a week in the office: 3 days · Client meetings you present at: 2 of 4_
 
 **participant_proxy** _(stage 6)_
 
-> That proposal works for the team member I represent.
+> That balanced exchange works for the team member I represent.
 > Tentative package: 3 office days and 2 of 4 client meetings presented.
-> The principals must confirm it themselves; nothing binds until they do.
+> Both principals must confirm; nothing binds until they do.
 >
 > _package: Days a week in the office: 3 days · Client meetings you present at: 2 of 4_
 

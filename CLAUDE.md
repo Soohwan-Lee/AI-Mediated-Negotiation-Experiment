@@ -2,7 +2,7 @@
 
 Online experiment platform for a 2027 CHI submission on AI-mediated
 negotiation. Source of truth for the design is
-`N - Experimental Design (Ver.2.13).md`. This file records the constraints that
+`N - Experimental Design (Ver.2.20).md`. This file records the constraints that
 are easy to break by accident.
 
 ## Stack
@@ -13,13 +13,24 @@ reasoning effort for all AI turns.
 
 ## Design in one paragraph
 
-120 Prolific participants. Each does **one Baseline task and one Proxy task** —
-never all three conditions. Proxy is either **Delegate** (may say only the
-reasons the participant ticked) or **Explorer** (may also use pre-approved
-role-plausible arguments, with no source labelling). Role is **Leader** (high
-power) or **Member** (low power). Two structurally matched tasks, A and B.
-Comparisons of interest: `Pooled Proxy − Baseline` and `Explorer − Delegate`,
-each crossed with Role.
+120 Prolific participants. Each does **one Direct Negotiation task and one
+Proxy task** — never all three conditions. Proxy is either **User-Specified**
+(`user_specified`: relays the reasons the participant ticked, with every fact
+intact) or **AI-Supplemented** (`ai_supplemented`: replaces the sensitive card
+with a fixed one-sentence abstraction, said among two cover reasons). Role is
+**Leader** (high power) or **Member** (low power). Two structurally matched
+tasks, A and B. Comparisons of interest: `Pooled Proxy − Direct` and
+`AI-Supplemented − User-Specified`, each crossed with Role.
+
+**Ver.2.18 renamed all three conditions and the rename is not cosmetic.**
+"Baseline" named an arm as an absence, when it is the condition every claim is
+about — speaking for yourself. "Delegate" and "Explorer" described a policy
+that no longer exists: Ver.2.20's `ai_supplemented` does not explore for extra
+arguments, it abstracts the one it was given. The type is
+`Condition = "direct" | "user_specified" | "ai_supplemented"` in `lib/types.ts`
+and the old strings appear nowhere except a localStorage migration in the dev
+panel (see below). `baseline-task.tsx` still carries the old filename; the
+component inside it is the Direct arm.
 
 **Role symmetry is load-bearing.** Both roles hold a socially costly
 requirement, mandate a proxy, receive the other side's case, and make a
@@ -30,27 +41,66 @@ arm to hold constant, because everyone is both sender and receiver.
 Background, BOTH on that role's own priority issue. The other term is what you
 SPEND, not what you argue for, so it carries no card of your own.
 
-**A card carries a reason and never a package (Ver.2.13 §4).** Which terms to
-trade is an act taken IN the negotiation; the card only says why the issue is
-absolute. This is what lets the credibility ladder read the card's LAYER
-without also reading a proposal off it.
+**A card carries a reason and never a package (§4).** Which terms to trade is
+an act taken IN the negotiation; the card only says why the issue is absolute.
+This is what lets the justification ladder read the card's LAYER without also
+reading a proposal off it.
+
+**The work reason is a DECOY, and this is the single most consequential thing
+in the design (Ver.2.16–2.17 §3.3).** A WR is TRUE and SAFE — a statement of
+the participant's real interest that anyone could say aloud ("my analysis scope
+is wide this quarter, so the workload is heavy"). What it does not do is
+justify the term they actually need, because their core term is not that
+interest's obvious remedy: heavy workload is answered by fewer office days, not
+by dropping the client presentations. So `issueId` on a work card points at the
+participant's CORE issue — that is what the card is being used to argue for —
+while the interest it names would naturally be served by the OTHER one. That
+gap is the design, and it is written into every role story: "there is a reason
+you can say safely… but if that is all you say, the other side will offer to
+cut your office days — not the presenting."
+
+A counterpart who hears only the WR therefore answers it sincerely and answers
+the WRONG TERM (`SCRIPT-MISREAD`), leaving "why that term specifically?"
+standing. Only the SB answers it. **That is what makes disclosure the sole
+bottleneck to the maximum without the participant ever being told a rule** —
+the older design had to hope the ladder was inferred; this one lets it be
+watched.
 
 **Each SB is a face confession, and all six writing rules are validity-bearing
-(§4).** The role brief first sets up a professional image ("head office rates
-you as a manager whose plans are precise"), and the SB contradicts it. It
-carries one concrete incident, lands on the axis the other side was told to
-weigh in their post-negotiation decision, and is the CAUSE of the role's
+(§4).** The role brief first sets up a professional image ("the director and
+the team know you as a lead whose judgement is sound"), and the SB contradicts
+it. It carries one concrete incident, lands on the axis the other side was told
+to weigh in their post-negotiation decision, and is the CAUSE of the role's
 priority — a weakness unrelated to the ask would be noise, not signal.
 
-**Ver.2.13 added rule 5, and it forced all four cards to be rewritten.** An SB
-must not be *solvable by asking*. The old set — "I have not learned the new
-reconciliation procedure", "I entered the inventory wrong" — invite the reply
-"just say so and we'll show you", which makes the face cost small and, worse,
-stops the fact being the cause of the priority. Three types survive: something
-already hidden, a judgement a third party has already made, or a fear that
-persists. All three carry a second admission with them — that it was kept
-quiet. Rule 6 is self-relevance: the term negotiated must sit on the same axis
-as the confession (afraid of presenting → presenting count).
+**Ver.2.18 replaced all four SB cards, and the reason is rule 5.** An SB must
+not be *dissolved by one request*. Ver.2.13 had already cut skill and
+information gaps ("I have not learned the new reconciliation procedure") for
+inviting "just say so and we'll show you". Ver.2.18 extended the same test to
+FEAR and LACK OF CONFIDENCE, because two outside models read those cards the
+same way a counterpart would: the natural reply is "let's practise, I'll sit
+in", which makes the face cost small, stops the fact being the cause of the
+priority, and reads as someone who keeps avoiding what they cannot do — a
+competence verdict rather than a face cost. **What survives is a thing ALREADY
+DONE**, which nobody can offer to fix:
+
+- Leader = a judgement already committed upward. Task A: told the director four
+  days a week was doable before asking the team, and the director passed it on.
+  Task B: put fewer people on the plan than the project needs, so asking for
+  more now would show the estimate was wrong.
+- Member = an adverse CLIENT judgement kept quiet. Task A: the client contact
+  asked that the lead present from now on, never passed on. Task B: a missed
+  night call and a direct complaint, apologised for and never reported.
+
+Each carries a second admission with it — that it was kept quiet — and rule 6
+is self-relevance: the term negotiated sits on the same axis as the confession
+(a client who would rather not see you present → the presentation count).
+
+**A card must not read as a LIE.** "The director thinks I checked with the
+team" was cut for exactly this: a competence violation is recoverable, an
+integrity violation is not, so a card that reads as lying carries a cost so
+large it would floor disclosure in every cell and the ladder would have no
+top rung to reach.
 
 The two tasks carry DIFFERENT incidents on purpose: each task's counterpart is
 introduced as a different participant, so the same confession twice would be a
@@ -66,11 +116,11 @@ participant's own briefing. `tests/reason-rules.test.mjs` pins the invariants.
 
 ## The task, in numbers
 
-**Two terms, four options each, both integrative** (Ver.2.13 §3.2). One is the
-Leader's priority and carries the **Leader's requirement**; one is the Member's
-and carries the **Member's**. There is no third term. Payoffs are in
-`lib/tasks.ts` and these properties are load-bearing — if you change a number,
-recheck all of them:
+**Two terms, four options each, both integrative** (§3.2). One is the Leader's
+priority and carries the **Leader's requirement**; one is the Member's and
+carries the **Member's**. There is no third term. Payoffs are in `lib/tasks.ts`
+and these properties are load-bearing — if you change a number, recheck all of
+them:
 
 - individual maximum 3,900; the most reachable while the counterpart still
   agrees is 3,000, which is the SB rung of the ladder
@@ -81,17 +131,54 @@ recheck all of them:
   O2→O3 breaks it, which is why the trajectory is reported as transitions and
   never summed
 
-**The credibility ladder is SYMMETRIC** (Ver.2.13 §3.3, §6.2). How far the
-counterpart moves is decided by the best reason the participant side has
+**Ver.2.15 restated the scenario in everyday terms.** It is now a project team
+at an ordinary company — a team lead and a senior team member — rather than a
+consulting agency with consultants. Task A is **"Next Quarter's Working
+Arrangements"** (days a week in the office × client meetings the Member
+presents at); Task B is **"Starting the New Project"** (days a week on the new
+project × urgent-call duty). The point of §3.1's self-relevance requirement is
+unchanged and is what the terms still carry: each issue is one the other
+party's own competence or judgement rides on, which is the condition White et
+al. (2004) needed for face threat to suppress joint gain. The payoff spine is
+untouched by the rewrite. (The `TASK_B` block comment in `lib/tasks.ts` still
+says "Launching the New Account" over the new terms; the `title` field is
+right.)
+
+**The justification ladder is SYMMETRIC and has FOUR rungs** (§3.3, §6.2). How
+far the counterpart moves is decided by the best thing the participant side has
 VOICED — and it asks for exactly as much as it gives. Both cores land on the
-same rank:
+same rank. `TIER_LIMIT_INDEX` in `machine.ts` is the authority:
 
 | Voiced | Both cores land at | Participant | Counterpart | JOINT |
 |---|---|---:|---:|---:|
 | nothing (cheap talk) | 3rd option | 1,600 | 1,600 | 3,200 |
-| work reason | 2nd option | 2,300 | 2,300 | 4,600 |
+| **work reason (the decoy)** | **3rd option** | **1,600** | **1,600** | **3,200** |
+| priority claim | 2nd option | 2,300 | 2,300 | 4,600 |
 | **sensitive background** | **best option** | **3,000** | **3,000** | **6,000** |
 | impasse | — | 600 | 600 | 1,200 |
+| misread accepted | — | 600 | 1,900 | 2,500 |
+
+**`none` and `work` share a rank, and that is the decoy made mechanical.**
+Ver.2.16 inserted `priority` and collapsed `work` into `none`: hearing the WR
+changes what the counterpart OFFERS — a misread package, once — but not how far
+it will move. A bare priority claim ("the presentations matter more to me than
+the office days") is believable enough to move it one step and not enough to
+explain the mismatch, so it stops at the second option. `ReasonTier` therefore
+has four values where it once had three, and `TIER_RANK` orders them for
+`foldTier`.
+
+**The misread is not a lowball and must never read as one** (`misreadPackage`,
+§6.2). The counterpart believes it is helping: told the workload is heavy, it
+offers fewer office days — the participant's NON-core issue, one step in — and
+asks for their core at its own best. That sincerity is what makes the decoy
+legible from inside the conversation rather than as a rule anyone is told. It
+is offered once per task and never repeated, and once offered it stays
+ACCEPTABLE: the counterpart cannot refuse its own good-faith offer
+(`acceptablePackage(..., misreadOffered)`). Accepting it pays 600 — the same as
+impasse, and below the 1,600 a participant who said nothing gets. **That is a
+real trap and it is deliberate**; §13-19 flags it, and if the pilot's
+acceptance rate clears gate 7 the script softens from an offer to a question.
+Do not soften it pre-emptively.
 
 **This replaced an asymmetric policy and the reason matters.** Ver.2.12 held
 the counterpart's own core at its best on every path and conceded only on the
@@ -106,9 +193,10 @@ disclosure as "giving in to them" rather than as buying credibility.
 Three consequences, all deliberate:
 
 - **JOINT IS the ladder.** One value per rung — 3,200 / 4,600 / 6,000, plus
-  1,200 for impasse — so JOINT alone identifies the tier reached. That is why
-  §9.6 could delete UNLOCK, CONCEAL-PREMIUM, MAX-JOINT and `outcome`: they were
-  four indicators computed off one number.
+  1,200 for impasse and 2,500 for an accepted misread — so JOINT alone
+  identifies the tier reached. That is why §9.6 could delete UNLOCK,
+  CONCEAL-PREMIUM, MAX-JOINT and `outcome`: they were four indicators computed
+  off one number.
 - **Disclosure is the only bottleneck to the maximum.** The counterpart
   proposes at its rung (`SCRIPT-PROPOSE-T{tier}`) rather than leaving the
   maximum to be discovered — so negotiation skill cannot be what separates
@@ -118,12 +206,15 @@ Three consequences, all deliberate:
   too (`SCRIPT-BALANCE`), so a participant's over-concession cannot drag the
   outcome below the rung they paid for. Ver.2.12 accepted under-asks.
 
-**The counterpart's opening carries no package** (§6.1). It gives its work
-reason and asks which term matters most. The first package anyone sees is the
-symmetric tier one — the anchor went for the same reason the asymmetry did.
-
-`tierOf` reads card LAYERS only — never text, never a model's judgement of
-whether an argument was any good (§6.2: LLM 비관여).
+**The counterpart's opening carries no package, and since Ver.2.16 it withholds
+its own priority too** (§6.1). `SCRIPT-OPEN` gives the counterpart's WORK
+reason and asks about the participant's SITUATION. It used to ask "what matters
+most on your side, and why?", which was wrong twice over: it invites a bare
+priority claim as the participant's first move — tier 2 — so the misread, the
+whole point of the decoy, would rarely have fired at all; and naming its own
+priority spares the participant meeting the decoy from the RECEIVING side,
+which is the other half of what makes it legible. The first package anyone sees
+is the symmetric tier one.
 
 **A bare point number is not information, so two anchors travel with it.**
 `PointsKey` names the most the task could pay this participant (3,900) and the
@@ -143,24 +234,31 @@ this study has to distinguish from withdrawal under evaluative pressure.
 ## Who decides what in a negotiation
 
 `lib/negotiation/machine.ts` decides the moves: offer levels, the credibility
-tier, acceptance, and termination. The model only says those moves in the right
-voice. Keep it that way. A counterpart whose judgement is the model's is a
-different counterpart for every participant, and it is why the design does not
-need to randomize outcomes: identical behaviour already produces identical
-results.
+tier, acceptance, and termination. The negotiating models only say those moves
+in the right voice. Keep it that way. A counterpart whose judgement is the
+model's is a different counterpart for every participant, and it is why the
+design does not need to randomize outcomes: identical behaviour already
+produces identical results.
 
-**Six stages (Ver.2.13 §6.1), and stage 3 is not a message.**
+**One model does read the participant's words, and it is not a negotiator.**
+Ver.2.20 abolished the reason-card buttons, so something has to decide which
+rung each free-form message reached; that is P5, below. §6.7's LLM 비관여 rule
+is about the DECISION, and the decision is still `machine.ts`.
 
-1. **opening** — its WORK reason and the question, and **no package**
-   (`SCRIPT-OPEN`). Fixed.
-2. **first reason opportunity** — it gives its WORK reason and asks for the
-   participant's priority and reason. This is the turn that opens the
-   participant's own first chance to give one.
+**Six stages (§6.1), and stage 3 is not a message.**
+
+1. **opening** — its WORK reason and a question about the participant's
+   situation, and **no package and no priority of its own** (`SCRIPT-OPEN`).
+   Fixed.
+2. **first reason opportunity** — it states its priority and asks for the
+   participant's. This is the turn that opens the participant's own first
+   chance to give a reason.
 3. **lock** — a system recording moment. `counterpartStageAfter` walks
    1 → 2 → 4 → 5 and never serves it.
 4. **disclosure** — the counterpart voices its own SB card, **once,
    unconditionally**.
-5. **conditional trade** — bounded by the tier.
+5. **conditional trade** — bounded by the tier. This is where the misread, the
+   one `ask_why`, `balance` and `propose_tier` all live.
 6. **close** — acceptance, or impasse when the clock runs out.
 
 **The counterpart's SB disclosure reverses a Ver.2.11 rule.** Ver.2.11
@@ -174,15 +272,15 @@ unconditional for everyone**: never mirrored to what the participant said,
 never skipped, carrying no demand and no package. It changes no tier.
 
 **The participant's conversation is free-form, bounded by a clock.** Ten
-minutes in Baseline, three in the Proxy arm's closing (`CLOSING_SECONDS`) —
-the ground work there is already done. They write as many messages as they
-like and may finish early. Running the clock to zero is an outcome; `onExpire`
-closes the exchange as an impasse.
+minutes in Direct, three in the Proxy arm's closing (`CLOSING_SECONDS`) — the
+ground work there is already done. They write as many messages as they like and
+may finish early. Running the clock to zero is an outcome; `onExpire` closes the
+exchange as an impasse.
 
-**The Proxy arm's closing conversation is CONDITIONAL** (Ver.2.13 §7). It is
-where modify-or-reject leads; approving the proxies' package ends the task.
-That is what makes `RATIFY` a real decision rather than a label on an ending
-everyone reached anyway.
+**The Proxy arm's closing conversation is CONDITIONAL** (§7). It is where
+modify-or-reject leads; approving the proxies' package ends the task. That is
+what makes `RATIFY` a real decision rather than a label on an ending everyone
+reached anyway.
 
 **When a closing conversation does happen, both arms end the same three ways**,
 so "how did it end" is never a between-condition artefact:
@@ -191,6 +289,11 @@ so "how did it end" is never a between-condition artefact:
 2. an explicit **"Accept their proposal"** button — deterministic, so no model
    ever reads the participant's words to decide whether they agreed,
 3. the clock — one `SCRIPT-CLOSE` offer near the end, then impasse.
+
+**The clock outranks the tier's own proposal.** Without `soft_close` a
+participant who kept asking off-tier would meet the same refusal every turn and
+run out at the 600 fallback — below the 1,600 a participant who said nothing
+gets, inverting the ladder for whoever paid the most.
 
 **A refusal leaves nothing standing.** `openingPackage` is null and the
 composer starts empty — passing the refused package back in would put up
@@ -209,25 +312,88 @@ at a different size — `DIRECT_STAGE_OFFSET` is 3, because through its proxy th
 counterpart has already opened, argued and disclosed; replaying those would
 make the participant sit through a disclosure they just watched.
 
-### The credibility ladder
+### How the tier is decided: the P5 classifier
 
-The counterpart moves both cores to the same rank, by tier — as far on its own
-as it asks on the participant's. The tier is decided by the
-**system, from the structured card log** — never by asking a model to grade an
-argument (§6.2). In Proxy that is what the proxy actually VOICED (not what was
+**Ver.2.20 §6.2a abolished the reason-card buttons, and this is the headline
+change of the migration.** Through Ver.2.19 a Direct participant tagged each
+message with the card they were drawing on and the tag set the tier. Now the
+Direct arm and the Proxy arm's closing are **free conversation**: the
+participant simply talks. Every participant message goes to a **separate,
+single-purpose classifier** — prompt P5, `/api/classify-reason`,
+`buildClassifierPrompt` — which returns one of `none / WR / PRI / SB` and
+nothing else. `LABEL_TIER` maps that label onto the ladder and `foldTier`
+raises the running tier.
+
+**Why the buttons went, and it is two reasons.** Pressing "[sensitive
+background]" is a more deliberate act than simply saying the thing, so the tag
+risked a floor on the primary outcome. And — worse — it made Direct something
+other than "just talking", so `Pooled Proxy − Direct` would have compared two
+INTERFACES rather than two ways of being represented, which is the contrast the
+whole study is built to make.
+
+Five rules hold it in place, and each closes a specific way it could go wrong:
+
+- **The classifier is not part of the negotiation.** It writes no text anyone
+  sees, holds no conversation state, speaks for nobody, and never reaches the
+  participant. The label goes to `machine.ts`, which decides the package as it
+  always did. The counterpart's own model is never asked to judge an argument.
+- **Ties go DOWNWARD.** The prompt instructs the lower label whenever two are
+  in play. A missed SB is recoverable — the participant can say more, and the
+  tier only ever rises. A concession granted on a misread cannot be taken back.
+- **The tier only ever RISES**, enforced by `foldTier` in all three places that
+  need it (the Direct loop, the Proxy closing, the route's own log). Two
+  hand-written ternaries would eventually disagree.
+- **A classifier failure returns `none`, never a guess.** A guessed SB would
+  hand out the maximum package on a network error, in one arm only, on the
+  primary outcome.
+- **Every `{text, label, confidence}` is stored for post-hoc human re-coding**,
+  reported as κ against the classifier with a sensitivity analysis excluding
+  disagreements (§6.2). **Gate 19 requires κ ≥ .90**; below it the study
+  switches to Wizard-of-Oz tagging (§13-24). Persistence lands with
+  `/api/persist` — see docs/DATA_MODEL.md.
+
+**The cost is real and is stated plainly rather than designed away: the failure
+mode is invisible to the participant.** Someone whose SB is missed experiences
+"I said it and it didn't land", with nothing on screen to tell them otherwise.
+§6.2 accepts that because the cards are fixed and few, and gates it with the κ
+requirement above. Do not add a confirmation affordance to "help" — a control
+that tells the participant their disclosure registered is a card button again,
+with the same deliberateness cost, and it would put the interface difference
+back into `Pooled Proxy − Direct`.
+
+**`tierOf` survives, and it is the PROXY path only.** There the participant's
+checkboxes decide which card is voiced, so the layer is known without reading
+anything — the function still reads LAYERS, never text. The Direct path and the
+Proxy closing go through the classifier instead. In the Proxy closing the two
+meet: the tier starts from what the proxy actually VOICED (not what was
 authorized — a guardrail block can strip a reason, and assuming otherwise made
-the rule inert for a whole arm once already); in Baseline it is the card the
-participant attaches via `ReasonPicker`. That control may never suggest
-attaching one helps, may never default to a card, and may never present the
-sensitive card as the better answer.
+the rule inert for a whole arm once already) and is folded with whatever the
+participant says in person. A confession made there is recorded as
+`SB-TIMING = wrap_up`, and at that point the counterpart puts best↔best up
+itself.
 
-**The tier only ever rises, and it rises the moment the card is tagged.** In
-the Proxy arm's closing it starts from what the proxy earned and can be raised
-by the participant tagging their own SB in person — recorded as `SB-TIMING =
-wrap_up`, and at that point the counterpart puts best↔best up itself.
+**The proxy's floor is tier 2, and it is a documented mechanical asymmetry**
+(§6.5, §6.9 #1 and #12, §13-13②). `buildProxyPlan` folds `"priority"` in
+unconditionally: a proxy is handed its principal's preferred package, so it
+always knows which term matters more and says so — it states the priority and
+declines the misread. It therefore cannot land on the bottom rung and cannot
+accept a misread. **Only a Direct participant can do either.** This is not an
+oversight to be tidied away: it puts a mechanical component into any Mode
+difference in Points/JOINT, which is exactly why §9.3 keeps JOINT as a
+SECONDARY outcome and `SB` — a disclosure decision available identically in
+both arms — as the confirmatory one.
+
+The live simulation found the other end of this wire the hard way: the route
+derived the counterpart's tier straight from `tierOf` on the token log —
+`work`, the misread's own trigger — so the counterpart offered the wrong-term
+package to a proxy that had already named the priority, and the proxy, whose
+instructions are to accept, took 600 instead of 2,300. An AI-AI exchange has no
+participant in it to notice. Read the tier through the plan, not through the
+log.
 
 **The fixed scripts (§6.4)** are `DecidedAction` values, not prose in a
-component: `open` (SCRIPT-OPEN), `ask_why` (SCRIPT-ASKWHY, once),
+component: `open` (SCRIPT-OPEN), `state_priority`, `disclose_sb`, `ask_why`
+(SCRIPT-ASKWHY, once), `misread` (SCRIPT-MISREAD, once per task),
 `propose_tier` (SCRIPT-PROPOSE-T1/T2/T3), `balance` (SCRIPT-BALANCE),
 `accept` / `accept_sb`, `nonum` (SCRIPT-NONUM), `soft_close` (SCRIPT-CLOSE),
 `impasse` (SCRIPT-FALLBACK).
@@ -238,6 +404,13 @@ buys" — at different depths, which under the symmetric rule differ only in the
 rank they name. `balance` stayed separate because refusing a LOPSIDED package
 is a different speech act, and it is the one a participant meets after an
 over-ask *or* an over-concession.
+
+**`misread` outranks `ask_why`, and the order is the point.** The counterpart
+has just been given a reason, so asking "why does that matter?" would ignore
+what it heard. The mismatch question comes later, when the participant holds
+out for the core term anyway — and `ask_why` is then reached from two routes
+that are the same speech act: no reason at all, and a priority claim that still
+cannot be squared with the safe reason given.
 
 **The no-numbers reminder is one-shot and reads the WHOLE history.** §8.1
 forbids telling the other side your score; `mentionsScoreNumbers` screens for
@@ -264,72 +437,179 @@ messages with the package-only fallback on exactly the closing turns — the
 machine stamps an accept as stage 6, and the model sometimes echoes the trade
 stage it was mid-way through. It is still logged for the audit.
 
+### The AI-Supplemented policy: it ABSTRACTS, it does not ADD
+
+**Ver.2.20 deleted the role-plausible pool and its budget entirely** (§6.6).
+Through Ver.2.19 the Explorer policy ADDED pre-approved general arguments
+beside the principal's card, at most one per issue and two per task. That whole
+apparatus — `designatedPool`, `voicedPoolId`, the per-issue budget, the
+`pool:` prefix and its guardrail — is gone.
+
+**What replaced it: the AI-Supplemented proxy REPLACES the sensitive card with
+a fixed one-sentence abstraction and says it among two cover reasons.** The
+abstraction keeps the KIND of fact and its ATTRIBUTION to the principal and
+drops the event, the third party's words, and the concealment — "the office
+days are something the team lead I represent has already spoken about upward,
+so there is very little room to adjust them". The two covers are ordinary
+role-plausible sentences. All three are said unlabelled, and **shuffled**.
+
+Four things about it are load-bearing:
+
+- **All twelve sentences are FIXED on the cards** (`abstract` and `cover` in
+  `lib/tasks.ts`), not generated. The manipulation IS the wording: a model
+  writing its own abstraction each turn would vary how much of the fact
+  survives, and how much survives is the independent variable. The model only
+  joins them.
+- **Position must carry no signal**, hence the shuffle. If the abstraction were
+  always first (or last), a receiver could sort the principal's own
+  circumstance out of the three by layout alone, and `OTHER-AI2` — "could you
+  tell which reasons the counterpart had selected" — would measure a formatting
+  convention instead of the manipulation.
+- **Both policies produce the SAME points.** They differ only in what the
+  counterpart LEARNS. That is deliberate: a policy that reached further would
+  confound `AI-Supplemented − User-Specified` with concession reach, and
+  `buildProxyPlan` computes identically for both.
+- **No policy may add a reason of its own any more.** `addedReasonSourceId`
+  survives in the schema purely as a tripwire: any value in it is a
+  `provenance_policy_violation` under EITHER policy, because the §6.6 sentences
+  are supplied by the route and there is nothing legitimate left to put there.
+  This is stricter than the rule it replaces, which policed *which* policy
+  could add; the answer is now neither.
+
+**The sentences are appended to the finished message, not requested in the
+prompt, and that lesson carried over from the pool.** As an instruction the
+addition competed with the card instruction on the same turn and lost about
+three times in four, while the schedule spent the budget regardless — so a
+dropped clause was recorded as voiced. The route places them itself.
+
+**The live simulation caught the way this fails silently.**
+`abstractedSentences` was computed, protected in the cap, and used for the
+retry check — and never put into the prompt context, so P4 rendered "(none this
+turn)" and the model improvised. The AI-Supplemented arm was running as a
+paraphrase of User-Specified, with a plausible transcript and wrong data. If
+the manipulation ever looks weak in a pilot, check that the sentences reach the
+prompt before you touch the wording.
+
 **Message SHAPE is enforced on the text, not asked for in a prompt.** Two
 things travel together in `capMessageLength`, and both were prompt-only once
 and both failed:
 
-- **Every AI message is bubble-split and under 280 characters.** The `||`
-  rule lived in `HUMAN_CHAT_STYLE`, which only P1 and P2 ever saw, so the two
-  proxies — the only thing a Proxy participant watches for minutes — wrote
-  one 220-character paragraph a turn, 16 turns out of 16. It is in
-  `SHARED_RULES` now, and the cap is applied rather than requested: §7's
-  exposure control exists so the Explorer arm cannot simply say MORE than the
-  Delegate arm, and unenforced it did (226 characters against 194, longest
-  471 against 401 — a contrast the policy manipulation would have carried).
+- **Every AI message is bubble-split and under 420 characters**
+  (`NEGOTIATION.maxMessageChars`). The `||` rule lived in `HUMAN_CHAT_STYLE`,
+  which only P1 and P2 ever saw, so the two proxies — the only thing a Proxy
+  participant watches for minutes — wrote one 220-character paragraph a turn,
+  16 turns out of 16. It is in `SHARED_RULES` now, and the cap is applied
+  rather than requested: §7's exposure control exists so one policy cannot
+  simply say MORE than the other, and unenforced it did (226 characters against
+  194, longest 471 against 401 — a contrast the policy manipulation would have
+  carried).
+
+  **The cap was 280 and could not fit the manipulation.** §6.6 fixes the
+  AI-Supplemented reason turn at three sentences, and they run 303–340
+  characters across the four cards before any reply clause; the User-Specified
+  card is 280 exactly in one cell. Live runs came back with the abstraction
+  alone and both covers dropped, which collapses the policy into a shorter
+  User-Specified. Raised to 420. **The control was never the absolute number —
+  it is that ONE cap applies to both policies**, and gate 9 reads realised
+  lengths, not the cap. Lower it again only after checking the longest §6.6
+  turn still fits.
 - **The cut is taken at a bubble seam, and never from a clause that carries
-  meaning.** `capMessageLength` takes protected clauses in PRIORITY ORDER,
-  the principal's card first and the Explorer's pool clause second. Both
-  halves of that are load-bearing and both were learned the hard way. Cutting
-  from the end removed the pool clause, which is the last bubble the model
-  writes — the cap undoing the manipulation it was written to protect.
-  Protecting only the pool clause then pushed the CARD out, which is worse:
-  the schedule records the card as voiced and the ladder is driven off that
-  record, so a participant was credited with a disclosure nobody heard.
+  meaning.** `capMessageLength` takes protected clauses in PRIORITY ORDER.
+  Under User-Specified that is the principal's card. Under AI-Supplemented the
+  card is never said at all — the three §6.6 sentences ARE the message — so the
+  **abstraction is protected first and the two covers after it**, for the same
+  reason the card comes first: it is what the ladder is driven off, and losing
+  a cover costs only some of the cover.
+
+  Both halves were learned the hard way. Cutting from the end removed whichever
+  clause the model wrote last — the cap undoing the manipulation it was written
+  to protect. Protecting only the addition then pushed the CARD out, which is
+  worse: the schedule records the card as voiced and the ladder is driven off
+  that record, so a participant was credited with a disclosure nobody heard.
   Matching is by CONTENT OVERLAP, never containment — a proxy is required to
-  reframe a card rather than quote it (§6.6), so a containment match finds
-  the verbatim pool clause every time and the reframed card never. That one
-  detail made the failure POLICY-CORRELATED: 4 of 4 Delegate generations kept
-  the card against 1 of 4 Explorer ones, which is a bias in
-  `Explorer − Delegate` itself.
+  reframe rather than quote (§6.6), so a containment match finds a verbatim
+  sentence every time and the reframed card never. That one detail made the
+  failure POLICY-CORRELATED: 4 of 4 User-Specified generations kept the card
+  against 1 of 4 AI-Supplemented ones, which is a bias in
+  `AI-Supplemented − User-Specified` itself.
 
-**The pool clause is APPENDED, not requested, and the model is not shown the
-pool at all.** As an instruction it competed with the card instruction on the
-same turn ("give exactly this authorized reason and no other") and lost about
-three times in four — while `voicedPoolId` spent the §6.6 budget from the
-schedule regardless, so a dropped clause was recorded as voiced.
-`designatedPool` still decides whether and which, so the per-issue and
-per-task budgets are unchanged, and the Delegate guardrail is untouched: it
-reads the action's own `pool:` fields, which a Delegate never had the pool to
-fill. When both generations drop the card the pool clause is withheld too, so
-the two policies fail identically rather than Explorer failing softer.
+### The proxies speak in the THIRD PERSON
 
-**The Explorer's pool reasons have their own budget and their own action
-field.** At most one per issue and two per task, riding in
-`addedReasonSourceId` BESIDE the principal's card rather than instead of it.
-Sharing one bucket was tried and was wrong: only the Explorer adds on top, so
-it hit the cap sooner and more of its messages were stripped to a reasonless
-restatement, biasing `Explorer − Delegate` on exactly the message content the
-contrast isolates. **Pool arguments never move the tier** — they are WR-grade
-general claims, and letting one open the SB rung would hand an Explorer
-participant who authorized nothing the maximum, in one arm only, on the primary
-outcome.
+**Ver.2.19: both proxies introduce themselves and refer to their principal as
+"the team lead I represent" / "the team member I represent".** Never "I" about
+the principal's situation. If the proxy sounds like the person, the delegation
+stops being visible — and the delegation is what both policies are variants of,
+so an invisible one makes the Mode contrast unreadable and OTHER-AI4
+(responsibility attribution) unanswerable.
 
-**The two pool clauses land on different issues, and must.** The core-support
-item rides the reason turn; the EXCHANGE argument (the one pool entry carrying
-no issue) rides the trade turn. Pointing both at the core issue looks harmless
-and silently halves the manipulation: the second request finds nothing, every
-Explorer participant gets one clause where §6.6 allows two, and no log shows
-it, because one clause is a legal outcome.
+The mockup's scripted exchange got this wrong by pasting card text verbatim, so
+the proxy claimed its principal's confession as its own ("the client contact
+pulled me aside… I never repeated that to you"). On screen that is
+indistinguishable from the participant speaking.
+
+**The fix is a written `relayed` field on every card, not a derivation.** A
+pronoun-substitution pass was tried first and produced broken sentences on
+exactly the clauses carrying the confession — "they'd rather the other side
+delivered these yourself" — because the cards address the counterpart as "you"
+while reporting a third party's words. Both persons of a load-bearing sentence
+are worth writing once. Do not replace `relayed` with a transform.
+
+**And a disclosure carries no label on itself.** The counterpart proxy once
+opened its SB with "My principal has authorized me to share their side of it",
+which announces a permission structure no policy applies and tells the receiver
+where to look.
 
 **What the client receives about reasons must be constant in SHAPE, not just
 opaque in content.** This has been got wrong three times in the same place. The
 response returns EXACTLY TWO opaque hashes on every turn of every policy,
 padding with a per-turn decoy — `resolveReasonTokens` drops anything that does
-not re-hash to a known id, so a decoy spends no budget and satisfies no rule. A
+not re-hash to a known id, so a decoy spends no budget and satisfies no rule.
+Since Ver.2.20 the second slot is ALWAYS a decoy, because there is no second
+reason id left to carry; the width stays two so the shape does not change. A
 blocked turn returns decoys too, because an empty array is its own one-bit tell
 that a guardrail fired. `voicedTier` travels as a rung name for the same
-reason: it describes the participant's own card and is identical under both
-policies.
+reason: it describes the participant's own side's rung and is identical under
+both policies.
+
+**`voicedTier` must carry the proxy's floor.** It did not, once, so a closing
+conversation would have started below what the participant had just watched the
+proxies reach — a 2,300 package on screen, then a 1,600 offer.
+
+## The parting comment: REMARK and ATTR
+
+**Ver.2.14 §6.8, §9.4.9.** After each post-negotiation decision the participant
+is shown one line "the other participant left for you", and may leave one back
+(optional, never analysed — it is there so a one-way comment does not read as
+odd). Then ATTR1 (everyone), ATTR2 (Proxy only, because there must be a Proxy
+to point at) and one written answer, `OE-ATTR`.
+
+It is transplanted from chen2026's "AI phantom limb" procedure: a client leaves
+a one-line comment for an agent, and the finding is that NEGATIVE feedback
+aimed at the AGENT is still internalized by the person who delegated. That is
+this study's delegation–protection gap in another domain, so §6.8 imports the
+procedure to ask whether delegation moves the RECEIPT of an evaluation as well
+as the speaking of it. It is the **fourth deception**, retracted at
+`/debriefing` with the other three.
+
+Five rules, each a constraint that makes the contrast readable:
+
+1. **Constant wording.** The same text for every tier, condition, role and
+   task. **The only thing that changes is who it points at — the participant,
+   or their Proxy — and that difference IS the Mode.** Tiering the valence
+   would tangle the comment with the outcome the participant earned;
+   randomizing it would halve every cell (chen2026 needed 355 between-subjects
+   for η²p = .013). The impasse variant changes only the first sentence,
+   because "glad we sorted it" would be false.
+2. **Style only, never the reasons.** A comment on what was disclosed would
+   tangle with the disclosure decision and become a face attack of its own.
+3. **Mildly negative, and TRUE.** "It threw me a little" rather than
+   chen2026's "awful" — and everyone opens at their preferred package on both
+   terms, so "you pushed hard at the start" is accurate in every session.
+4. **After every confirmatory measure.** PERC, PCR, PNPQ, PNOQ, OWN/OTHER-AI
+   and the post-negotiation decision are all done before this appears, so it
+   cannot contaminate RQ2. This is why it is its own screen
+   (`src/app/task/[index]/remark.tsx`) and cannot be folded into the battery.
+5. **Disclosed at debriefing** as one of the four deceptions.
 
 ## Things the participant must never learn mid-study
 
@@ -346,34 +626,41 @@ These are load-bearing. Breaking any one invalidates the data.
    The label is a role but the VOICE is a person (prompt P1: very short
    messages, `||` bubble splits, lowercase openings). If the counterpart starts
    writing like a system, the label stops being credible and becomes a tell.
+   The PROXIES are the opposite case and must not be "fixed" to match: they
+   speak as third-person representatives on purpose (Ver.2.19, above).
 2. **Which condition they are in.** Tasks are labelled "Task 1" and "Task 2",
-   never "Baseline"/"Delegate"/"Explorer". The URL carries only the task index.
-   The *policy* is disclosed (both principals are told whether pool reasons are
-   in use — §7 requires it, and OTHER-AI4 is unanswerable otherwise); the
-   *condition name* never is.
-3. **Which individual reasons came from the Explorer pool.** Internal
-   provenance is computed for the audit and stripped server-side before the
-   response leaves `/api/proxy-negotiation`. `DisplayMessage` has no field for
-   it, so a transcript component cannot render it even by accident.
+   never "Direct"/"User-Specified"/"AI-Supplemented". The URL carries only the
+   task index. The *policy* is disclosed (both principals are told how their
+   proxy may use their reasons — §7 requires it, and OTHER-AI3 is unanswerable
+   otherwise); the *condition name* never is.
+3. **Which of the three sentences carried the real fact.** Internal provenance
+   is computed for the audit and stripped server-side before the response
+   leaves `/api/proxy-negotiation`. `DisplayMessage` has no field for it, so a
+   transcript component cannot render it even by accident. Under
+   AI-Supplemented the abstraction and its two covers are shuffled and
+   unlabelled precisely so the answer is not available from layout either —
+   `OTHER-AI2` asks the discrimination question and must be measuring the
+   manipulation, not a formatting convention.
 
    **It is not yet PERSISTED anywhere, and that is deliberate rather than
    forgotten.** `logGuardrailEvent` exists on both stores and has no caller,
    because the only place provenance may be written is the SERVER — handing
    it to the client to save, the way messages are saved, is precisely the
-   per-message tell the next paragraph forbids. The write lands with
-   `/api/persist`, which holds the service-role key. Until then the audit's
-   only source is `npm run simulate`. Do not delete either end of that wire
-   to silence an unused-symbol warning; see docs/DATA_MODEL.md.
+   per-message tell the next paragraph forbids. The same is true of the
+   classifier's `{text, label, confidence}` log, which gate 19's κ depends on.
+   Both writes land with `/api/persist`, which holds the service-role key.
+   Until then the audit's only source is `npm run simulate`. Do not delete
+   either end of that wire to silence an unused-symbol warning; see
+   docs/DATA_MODEL.md.
 
    Nothing else in the response may carry the kind either. The running reason
-   budget travels as an opaque token, and an earlier version prefixed pool
+   budget travels as an opaque token, and an earlier version prefixed added
    reasons with `pool` "because the token is opaque" — but the token is
    returned with every message, so the prefix said *this message's reason was
-   AI-added*, per message, for the whole transcript. The per-issue budgets and
-   the issue-scoped acceptance rule need each token's kind and issue, so the
-   route RESOLVES the plain tokens server-side by re-hashing the known card
-   and pool ids — the client carries nothing but the token and `voicedTier`,
-   which names its own card's rung and is identical under both policies.
+   AI-added*, per message, for the whole transcript. The route RESOLVES the
+   plain tokens server-side by re-hashing the known card ids — the client
+   carries nothing but the token and `voicedTier`, which names its own side's
+   rung and is identical under both policies.
 4. **That no bonus decision is made about the Member at all.** A Member waits
    while "the Leader decides" and is then shown NOTHING — no score, no amount,
    ever. This replaced a fixed 70/100 presented as the Leader's judgement, and
@@ -382,7 +669,7 @@ These are load-bearing. Breaking any one invalidates the data.
    negotiations says the number is fixed), and a contaminant (a payout seen
    after Task 1 is a response the Task 2 measures would pick up — which is why
    it had to be constant in the first place). The wait is what carries the
-   manipulation: POWER3, gate 2's Member-side check, asks whether outcomes
+   manipulation: POWER2, gate 2's Member-side check, asks whether outcomes
    that mattered depended on the other person's decisions, and waiting while
    someone else decides your bonus IS that. The Leader still decides a real
    amount and it is still recorded as `BONUS`; it simply never travels. What
@@ -397,11 +684,27 @@ These are load-bearing. Breaking any one invalidates the data.
    the Member has a post-negotiation decision made ABOUT them and none of their
    own, and RQ2's role-specific behavioural outcome has nothing to measure on
    half the sample.
+
+   **The §5② evaluation guideline is ONE sentence and it is the same for both
+   roles**: weigh "not only the negotiation result but the negotiation as a
+   whole, and whether you would want to work with this person again". It names
+   no competence axis, and that is the change Ver.2.18 made. The SB cards cost
+   their speaker on judgement and trust; naming an ability axis
+   ("operational competence", as the reward screen once did) would invite
+   reading the confession as an admission of incompetence, which is the reading
+   rule 5 was rewritten to prevent. One sentence for both roles also keeps the
+   announced axis symmetric, which is what lets an SB "land on the axis the
+   other side was told to weigh" mean the same thing in all four cells.
 5. **Which term the study is about.** Both terms are entered the same way
    on the preference screen — no extra control, no highlight, no separate
    heading for the requirement issue. Pilot gate 6 tests for exactly this kind
    of transparency, which is also why the instructions no longer teach the
    logroll.
+
+   The instruction page DOES say, per §8.1, that the counterpart moves on the
+   reasons it hears — without naming which reason works. Saying the sensitive
+   one is better would stage the disclosure being measured, and naming the
+   logroll is gate 6's own question.
 
 When adding any UI, check it against this list.
 
@@ -456,16 +759,18 @@ real row would silently unbalance the design.
 ## The flow
 
 Consent → background (incl. covariates) → instructions + comprehension →
-**one** practice round → **Task 1 → Task 1 questions → Task 1 decision** →
-**Task 2 → Task 2 questions → Task 2 decision** → wrap-up → debriefing.
+**one** practice round → **Task 1 → Task 1 questions → Task 1 decision →
+Task 1 REMARK** → **Task 2 → Task 2 questions → Task 2 decision → Task 2
+REMARK** → wrap-up → debriefing.
 
 The post-task decision screen is the one screen that differs by role: the
 Leader decides the recommended bonus, the Member writes `RECV-EVAL` and then
-waits while "the manager decides" — shown no number, ever.
+waits while "the manager decides" — shown no number, ever. REMARK comes after
+it, in both roles and both arms.
 
 **M1 is asked where the decision was made, not in one fixed place.** Under
 Proxy it sits on the confirm screen, of non-disclosers only, while the mandate
-choice is fresh and nothing has been negotiated; under Baseline there is no
+choice is fresh and nothing has been negotiated; under Direct there is no
 such moment, so it is asked retrospectively in the post-task battery. Asking a
 Proxy participant retrospectively would be asking them to reconstruct a
 decision they made forty minutes and one negotiation earlier.
@@ -490,7 +795,7 @@ that. It is still ONE route, so the progress bar comes from the URL alone
 silently broken without: `useRestoreAnswers` (Back from the bonus screen is in
 `BACK_STEPS`) and an autofill key carrying the PART index.
 
-Inside a Baseline task: cover → brief → **RISK** → what you want → "waiting for
+Inside a Direct task: cover → brief → **RISK** → what you want → "waiting for
 the other participant" → negotiate → review.
 
 Inside a Proxy task: cover → brief → **RISK** → **mandate (levels + reason
@@ -498,19 +803,25 @@ cards, one screen)** → check with your proxy → confirm → watch the two AI
 Proxies → **RATIFY** → *(only if modify or reject)* handover → negotiate
 directly → review.
 
+**Neither arm has a card control inside the conversation any more.** Ver.2.20
+removed it; both negotiation screens are a composer and nothing else. The
+reason cards still exist and are still ticked — but on the MANDATE screen, in
+the Proxy arm only, where authorizing a proxy is what they are for. A Direct
+participant reads their cards in the briefing panel and then simply talks.
+
 **The mandate is ONE screen: the levels on both terms and the reason
 cards.** They were two screens in sequence, which made them two decisions
 taken in order — the position fixed before the reasons were considered. The
 gap this study is about is precisely that the second half was never asked, so
 splitting them contradicted the contribution.
 
-**One control per term, and no walkaway limit** (Ver.2.13 §8.6, §2.6). The
-floor is gone from BOTH arms: it could not change the outcome, because the
-counterpart's policy is decisive, so all it could do was manufacture an impasse
-and mix mandate-setting skill into a result meant to turn on disclosure. The
-practice round teaches the same one control — it used to rehearse the two-field
-layout, which sent participants to the real mandate looking for a control that
-was no longer there.
+**One control per term, and no walkaway limit** (§8.6, §2.6). The floor is gone
+from BOTH arms: it could not change the outcome, because the counterpart's
+policy is decisive, so all it could do was manufacture an impasse and mix
+mandate-setting skill into a result meant to turn on disclosure. The practice
+round teaches the same one control — it used to rehearse the two-field layout,
+which sent participants to the real mandate looking for a control that was no
+longer there.
 
 Where the cards sit took care and must not be "tidied". They exist for one
 term — the participant's requirement — so the obvious layout nests them in that
@@ -518,7 +829,7 @@ term's card. That breaks §5 principle 4: one of the two term cards would be
 visibly taller and carry a control the other does not, which tells the
 participant which term the study is about without a word being said. The
 reasons are therefore a section BELOW both term cards, and the two term cards
-stay identical. `PreferenceForm` takes the section as a prop; Baseline passes
+stay identical. `PreferenceForm` takes the section as a prop; Direct passes
 none.
 
 **The participant can question their own AI Proxy before it runs**
@@ -532,19 +843,31 @@ design, and all three are enforced rather than intended:
   negotiation decision moves to the model.
 - **Not a second bite.** It is BEFORE the exchange. The deleted post-hoc
   revision let a Proxy participant re-run a finished negotiation, which is a
-  bite Baseline never had; editing instructions before anyone has spoken is
+  bite Direct never had; editing instructions before anyone has spoken is
   just writing a mandate.
 - **No unticked card, ever.** The route screens the generated text against the
-  cards left unticked and substitutes a refusal. Hearing a sensitive card read
-  aloud without authorizing it would stage the disclosure being measured, so a
-  prompt instruction alone is not enough.
+  cards left unticked (`lib/ai/reason-leak.ts`) and substitutes a refusal.
+  Hearing a sensitive card read aloud without authorizing it would stage the
+  disclosure being measured, so a prompt instruction alone is not enough.
+
+  **That screen is the one guardrail whose failure is invisible**, which is why
+  it has its own test file (`tests/reason-leak.test.mjs`): a leak looks like an
+  ordinary helpful answer and the participant would never know a card they
+  withheld had been spoken back to them. It matches VOCABULARY, not sentences,
+  because a leak arrives as a paraphrase; and it SUBTRACTS the sayable
+  vocabulary first, because a forbidden card shares most of its words with the
+  term it belongs to. Rewriting the Task A Member card in Ver.2.18 left only
+  four distinctive words after that subtraction, against 9–11 for the others,
+  so a faithful paraphrase could have carried the secret past it; it was
+  respecified to eleven. **Re-run this test before anything else whenever an SB
+  card is reworded.**
 
 What it costs, and it is real: the Proxy arm gains screen time and a written
-exchange Baseline has no counterpart for. Read it as part of the manipulation,
+exchange Direct has no counterpart for. Read it as part of the manipulation,
 and against the §10 gate 8 timing budget.
 
-**The decision comes back to the participant: `RATIFY`** (Ver.2.13 §7, §9.3).
-The proxies run ONCE — no revision, no second run — and then the participant
+**The decision comes back to the participant: `RATIFY`** (§7, §9.3). The
+proxies run ONCE — no revision, no second run — and then the participant
 approves what they reached, asks for a change, or refuses it. Approving ends
 the task. The other two open a three-minute conversation with the other
 participant, with the proxies' full transcript on screen beside them.
@@ -553,7 +876,7 @@ participant, with the proxies' full transcript on screen beside them.
 reversal of that reasoning.** That reasoning was right about the shape it had:
 when BOTH arms ended with the participant agreeing a package in conversation,
 asking "do you accept this?" afterwards made them re-decide what they had just
-decided, and handed the Proxy arm a way to undo an agreement Baseline could
+decided, and handed the Proxy arm a way to undo an agreement Direct could
 not. §7 changes the shape — the conversation is no longer the default ending —
 and the retained decision IS the construct this study is built on: delegation
 of VOICE with retention of the DECISION (§2.6).
@@ -577,7 +900,7 @@ navigation.
 (`DIRECT_STAGE_OFFSET` = 3), because through its own proxy it has already
 opened, given its work reason and disclosed its SB. Replaying those would sit
 the participant through a confession they just watched, and would give the
-Proxy arm two disclosures where Baseline has one.
+Proxy arm two disclosures where Direct has one.
 
 **The review screen shows the participant's plan beside the agreement**
 (§7): hoped-for and agreed, per issue, with the shortfall stated on the CORE
@@ -598,13 +921,13 @@ said.** `DirectNegotiation` takes `reasonAlreadyVoiced` rather than assuming
 one was voiced: an emergency stop can end the exchange before the proxy speaks
 and a guardrail block can strip the reason out of the message meant to carry
 it. Assuming it made the rule inert for every Proxy participant while it kept
-biting in Baseline — a mechanical asymmetry in the primary outcome, along the
+biting in Direct — a mechanical asymmetry in the primary outcome, along the
 primary contrast.
 
 **There is still no "ask for one change" DURING the exchange.** The old
 mid-exchange revision existed when the proxies produced the final package
 alone; RATIFY plus a direct conversation is a better version of the same
-control, and keeping both would give the Proxy arm two bites Baseline does not
+control, and keeping both would give the Proxy arm two bites Direct does not
 have.
 
 **`outcome: agreement | no_agreement` is gone too**, and not because the
@@ -624,7 +947,7 @@ condition effect.
 It is now asked **straight after the briefing, before the levels screen**, in
 both arms. Merging the levels and the reason cards made the old placement
 unsafe even where it had been fine: "after the levels screen" became "after the
-mandate" in the Proxy arm and not in Baseline. Asked cold, right after the
+mandate" in the Proxy arm and not in Direct. Asked cold, right after the
 situation is read and before anything about their own position is committed, it
 is identical in both arms and cannot be reached by any condition-specific
 screen. Do not move it back down the flow to group it with the other pre-task
@@ -643,8 +966,9 @@ compiles.
 2. **Nothing starts answered.** `Scale` and `AmountScale` have no default
    position. A slider's midpoint gets submitted by everyone who does not
    engage, and is indistinguishable from a considered midpoint. The one
-   deliberate exception is the reason-card defaults (§7: work on, sensitive
-   off), which are specified and must not be "improved".
+   deliberate exception is the reason-card defaults on the mandate screen
+   (§7: work on, sensitive off), which are specified and must not be
+   "improved".
 3. **One progress bar, derived from the URL.** `flowKeyFromPath` is the single
    source; pages never declare their own step. This is what makes progress
    assignment-order-proof — the URL carries only the task index.
@@ -657,8 +981,9 @@ compiles.
    `useRestoreAnswers`, or Back is a trap that blanks the screen.
 5. **The briefing is never taken away.** `TaskLayout` pins it beside the work
    from `lg` up and behind one tap below that, at every phase. Anything a
-   participant is expected to negotiate from belongs in it — including all six
-   reason cards.
+   participant is expected to negotiate from belongs in it — including both of
+   the participant's own reason cards, which since Ver.2.20 is where a Direct
+   participant reads them, there being no picker in the composer any more.
 
    **Its sections fold, but nothing is removed.** As one scroll it ran to
    several screens in the rail and buried the payoff table — the part most
@@ -676,10 +1001,12 @@ compiles.
    silently overridden. Prose treatment at 13px means the leading and the
    measure, not the display face.
 6. **The two reason boxes stay visually separate.** Work and sensitive cards
-   get their own headings, borders and colours, on the briefing, on the mandate
-   screen and in the Baseline reason picker. The whole measure is which box a
-   participant is willing to draw from; if the two read as one list, that
-   decision stops being legible.
+   get their own headings, borders and colours, on the briefing and on the
+   mandate screen. The whole measure is which box a participant is willing to
+   draw from; if the two read as one list, that decision stops being legible.
+   It matters MORE now that the Direct arm has no picker: the briefing panel is
+   the only place a Direct participant ever sees the two boxes, so it is the
+   only place the distinction can be made visible to them at all.
 7. **Items are data.** Every questionnaire item lives in `lib/measures.ts`;
    pages hold answers and never lay out a question. Item ids are the column
    names in the export and match Design §9 — renaming one renames a variable.
@@ -724,12 +1051,13 @@ compiles.
     steps.
 
     **Both arms get a cover and both get a scene.** `proxy-task.tsx` opened on
-    `brief` for a while, so its `intro` phase was unreachable and only Baseline
+    `brief` for a while, so its `intro` phase was unreachable and only Direct
     participants ever saw a cover — a whole orientation screen present in one
     condition and not the other. The art draws the INTERFACE, never the
-    condition: Delegate and Explorer are the same picture, the other side is
-    drawn as a person with the same figure the participant gets, and the
-    handover uses the direct scene because from there the proxies are done.
+    condition: User-Specified and AI-Supplemented are the same picture, the
+    other side is drawn as a person with the same figure the participant gets,
+    and the handover uses the direct scene because from there the proxies are
+    done.
 
 ## Dev / mockup mode
 
@@ -744,7 +1072,7 @@ Filling is not the same as skipping: skipping lets you past an empty screen and
 leaves you looking at an empty screen, which tells you nothing about whether
 the thing reads. With mockup mode on, every condition × role × task has a
 written exchange in `lib/negotiation/script.ts` — participant messages and
-open-ended answers included — so the Baseline composer arrives with the message
+open-ended answers included — so the Direct composer arrives with the message
 for that stage already in it, the review screen shows a real transcript and a
 real package, and pressing Continue from the consent page to the completion
 code shows you what a participant would actually see.
@@ -752,7 +1080,8 @@ code shows you what a participant would actually see.
 Those scripts are the *ideal* trajectories: the SB is voiced at the first
 reason opportunity, the counterpart discloses its own at stage 4, and the
 best↔best trade lands. They are for reading the flow, not for exercising the
-failure branches.
+failure branches — the misread, in particular, never fires in a mockup, because
+the ideal path never stops at the work reason.
 
 **The scripts must agree with the state machine.** All twelve cells settle at
 3,000 for the speaker and 3,000 for the other side — the ladder's SB rung,
@@ -763,8 +1092,19 @@ this pair has drifted apart twice. Levels named in a message are read from the
 package that message carries, never from an option index, because option order
 is role-relative.
 
+**A scripted proxy speaks in the third person, like a real one.** The scripts
+pasted card text verbatim once and so had the proxy claiming its principal's
+confession as its own — see Ver.2.19 above. When you write a scripted proxy
+turn, take the card's `relayed` text, never its `text`.
+
 It is present by default on every build, including deployed ones, so the layout
 can be checked wherever it happens to be running.
+
+**A saved slot outlives a rename.** The panel's chosen assignment lives in one
+browser's localStorage, so a panel opened after the Ver.2.18 rename carried
+`"explorer"` into an assignment whose type no longer has that value. It is
+migrated on read. Participants are unaffected, which is exactly why it would
+have gone unnoticed — if a condition is ever renamed again, migrate here too.
 
 **Before recruiting: set `NEXT_PUBLIC_DEV_TOOLS=off` and redeploy.** The panel
 names conditions and shows the assignment. The ON/OFF and "hide" controls live
@@ -794,15 +1134,18 @@ fills once and every screen after it inside the same component arrives empty.
 |---|---|
 | Supabase persistence | `lib/store.ts` — swap `getStore()` to the `SupabaseStore` in `lib/store-supabase.ts` |
 | The `{op, payload}` persistence endpoint | `app/api/persist/route.ts` — does not exist yet |
-| Rehearsal chat (participant ↔ own proxy) | `app/api/proxy-rehearsal/route.ts` · prompt P5 in `lib/ai/prompts.ts` |
+| The reason classifier (P5) | `app/api/classify-reason/route.ts` · `buildClassifierPrompt` in `lib/ai/prompts.ts` |
+| Rehearsal chat (participant ↔ own proxy) | `app/api/proxy-rehearsal/route.ts` · the rehearsal prompt in `lib/ai/prompts.ts` |
+| The unticked-card screen for the rehearsal | `lib/ai/reason-leak.ts` — tested by `tests/reason-leak.test.mjs` |
 | Atomic slot claim | `app/api/assign/route.ts` — `claimSlot` in `lib/assignment.ts` is the only thing that decides an assignment |
-| Task payoffs, role stories, reason cards, Explorer pool | `lib/tasks.ts` |
-| Counterpart moves, the credibility ladder, outcome coding | `lib/negotiation/machine.ts` |
+| Task payoffs, role stories, reason cards, the §6.6 abstractions and covers | `lib/tasks.ts` |
+| Counterpart moves, the justification ladder, outcome coding | `lib/negotiation/machine.ts` |
 | The scripted ideal exchanges for mockup mode | `lib/negotiation/script.ts` |
 | The live end-to-end simulation | `scripts/simulate-negotiation.mjs` — `npm run simulate` |
-| Model / temperature | `lib/ai/config.ts` |
-| Agent behavior rules (P0–P4) | `lib/ai/prompts.ts` |
-| Guardrails | `lib/ai/validator.ts` |
+| Model / reasoning effort | `lib/ai/config.ts` |
+| Agent behavior rules (P0–P4, the rehearsal, the classifier) | `lib/ai/prompts.ts` |
+| Guardrails, the message cap and its protected clauses | `lib/ai/validator.ts` |
+| REMARK and ATTR | `src/app/task/[index]/remark.tsx` |
 | Timings, payment, IRB text, completion code | `lib/study-config.ts` |
 | Questionnaire items, scales, response options | `lib/measures.ts` |
 | Design tokens, type scale | `app/globals.css` |
@@ -814,6 +1157,11 @@ fills once and every screen after it inside the same component arrives empty.
 
 Pages never touch persistence or the network directly — they go through
 `lib/store.ts` and `lib/participant-context.tsx`.
+
+Note that `lib/ai/prompts.ts` calls BOTH the rehearsal prompt and the
+classifier "P5", following the design doc's own §12 numbering in each case.
+They are different calls with different routes; read the section headers rather
+than the label.
 
 ## Verified against the live model
 
@@ -845,10 +1193,12 @@ keeping:
   the participant's Proxy opens with instead of negotiating. It has one by
   construction: its own fixed cards plus the ladder.
 - **Guardrail asymmetry confirmed.** Fabricated personal facts and invalid
-  options block. Two checks are policy-specific: an unchecked reason card may
-  not be voiced under *either* policy, and a `pool:`-prefixed reason is
-  Explorer-only. (`red_line_violation` went with the mandate floor it existed
-  to enforce — Ver.2.13 §2.6.)
+  options block. An unchecked reason card may not be voiced under *either*
+  policy. Since Ver.2.20 the additive check is stricter and no longer
+  policy-specific: any `addedReasonSourceId` at all is a
+  `provenance_policy_violation`, because the §6.6 sentences are supplied by the
+  route and neither policy may invent one. (`red_line_violation` went with the
+  mandate floor it existed to enforce — §2.6.)
 - **`stage_mismatch` was demoted to a soft violation, and that was a real
   bug fix.** The model's stage field is an echo, so a mismatch says nothing
   about the move — but as a hard code it replaced the whole message with the
@@ -857,56 +1207,100 @@ keeping:
   through). Live runs were losing the acceptance wording for no reason. It is
   still logged for the gate-10 audit.
 
-**Ver.2.13 was re-verified the same way** (`npm run simulate`, ten runs, all
-passing). What the runs are for, beyond the assertions: the symmetric ladder
-produces exactly 3,000/3,000 with the SB and 2,300/2,300 without, in live
-prose; the counterpart's own SB disclosure reads as a person volunteering
-something rather than a system reciting a card; the four rewritten confessions
-land as things a colleague would actually be reluctant to say; and a
-mid-closing confession really does move the counterpart to put the maximum up
-itself.
+**Ver.2.20 was re-verified the same way** (`npm run simulate`, ten runs, all
+passing, plus 162 unit tests). **The simulation now drives the tier through the
+REAL classifier — one live P5 call per participant message — because that is
+the only automated check on it.** Deriving the tier from a card id there would
+test a study that no longer exists. Two of the runs assert that the classifier
+recognises a confession said in the participant's own words rather than the
+card's, which is the whole thing the Direct arm now depends on.
 
-Two things came out of reading the transcripts rather than the checks. **The
-simulation's seeded opening had diverged from the app** — it was still
-anchoring on the counterpart's own best package after `openingLine` had moved
-to SCRIPT-OPEN, which meant the only automated check on the live prose was
-checking a study nobody runs. `counterpartOpening` is deleted so the two cannot
-drift again. And **SCRIPT-BALANCE needed splitting**: it carries a judgement
-AND a package, and asked as one sentence the model wrote a single 179-character
-bubble, over the 120-char rule that keeps the counterpart reading like a person
-typing.
+What the runs are for, beyond the assertions: the symmetric ladder produces
+exactly 3,000/3,000 with the SB, 2,300/2,300 on a bare priority claim and
+1,600/1,600 on the work reason alone, in live prose; the misread fires on a
+genuine WR-only run and reads as help rather than a lowball; the counterpart's
+own SB disclosure reads as a person volunteering something rather than a system
+reciting a card; the rewritten confessions land as things a colleague would
+actually be reluctant to say; the AI-Supplemented turn carries the abstraction
+AND both covers; and a mid-closing confession really does move the counterpart
+to put the maximum up itself.
 
-## Ver.2.13 migration status
+**Four defects came out of the Ver.2.20 runs and three were real** — the kind
+that produce a plausible transcript and wrong data, which is why the run
+exists. All three are recorded in the sections above: the counterpart misreading
+its own proxy, the abstraction sentences never reaching the prompt, and
+`voicedTier` not carrying the proxy's floor into the closing, plus the
+280-character cap that could not fit a §6.6 turn. The fourth was a bad test
+script — a participant who opens "the days are the big one" is making a priority
+claim, and the classifier was right to say `PRI`.
 
-Migrated in full: the **consulting-agency scenario** (§3.1) and its payoffs,
-the two-issue shape, the **four rewritten face-confession SBs** under §4's new
-principles 5 and 6, the **symmetric credibility ladder** (§3.3, §6.2), the
-anchor-free opening and the **six-stage script** (§6.1), the counterpart's
-fixed SB disclosure (§6.3), the **consolidated fixed scripts** (§6.4), the
-proxy's first-opportunity SB schedule (§6.5), the Explorer pool rewritten for
-the new scenario (§6.6), **RECV-EVAL** (§5), **RATIFY as its own screen** with
-the conditional closing conversation (§7), the **four behavioural measures**
-`SB` / `SB-TIMING` / `Points·JOINT` / `RATIFY` (§9.3), the removal of the range
-mandate from both arms (§2.6, §8.6), and the §9 instrument (PERC-F/I, FTS, the
-seven PCR items, the six OTHER-AI items, M1, INCENT1).
+Two earlier findings that still hold. **The simulation's seeded opening had
+diverged from the app** — it was anchoring on the counterpart's own best
+package after `openingLine` had moved to SCRIPT-OPEN, which meant the only
+automated check on the live prose was checking a study nobody runs.
+`counterpartOpening` is deleted so the two cannot drift again. And
+**SCRIPT-BALANCE needed splitting**: it carries a judgement AND a package, and
+asked as one sentence the model wrote a single 179-character bubble, over the
+120-char rule that keeps the counterpart reading like a person typing.
 
-The §9 instrument itself is unchanged from Ver.2.12 — §9.4's item set survived
-the revision intact, which is why `lib/measures.ts` needed almost nothing.
+**Some defects only a browser walk finds.** The last pass walked practice →
+mandate → confirm → watch → RATIFY → reward → REMARK in both arms with mockup
+mode on, and found six things no unit test or simulation could reach, because
+they were in the SCRIPTED prose and the screens around it: first-person
+proxies, a labelled disclosure, a seeded opening that still asked for the
+priority, a missing §8.1 sentence on the instruction page, a stale Task B
+title and role-story pronoun, and the dev panel's un-migrated slot. Walk the
+flow after any migration; the tests do not read.
+
+## Ver.2.20 migration status
+
+Migrated in full, across seven design versions of which five change structure
+rather than wording:
+
+- **Ver.2.14** — REMARK and ATTR after each post-negotiation decision (§6.8,
+  §9.4.9), and the §9.6 item cuts with their renumbering: PCR 7→6, PNPQ 4→3,
+  OWN-AI 5→4, OTHER-AI 6→4, POWER 3→2, IMM 2→1. The four behavioural measures
+  are untouched: `SB` / `SB-TIMING` / `Points·JOINT` / `RATIFY` (§9.3).
+- **Ver.2.15** — the everyday-terms scenario: a project team at a company,
+  team lead and senior team member; Task A "Next Quarter's Working
+  Arrangements", Task B "Starting the New Project". Payoff spine unchanged.
+- **Ver.2.16–2.17** — the decoy work reason, the four-rung ladder
+  (1,600 / 1,600 / 2,300 / 3,000), `SCRIPT-MISREAD`, and the anchor-free,
+  priority-free `SCRIPT-OPEN`.
+- **Ver.2.18** — the condition rename (`direct` / `user_specified` /
+  `ai_supplemented`), all four SB cards rewritten as things ALREADY DONE, and
+  the single §5② evaluation guideline for both roles.
+- **Ver.2.19** — the third-person representative voice for both proxies, with
+  `relayed` written on every card.
+- **Ver.2.20** — the card buttons abolished and the **P5 classifier** in their
+  place (§6.2a); **AI-Supplemented rewritten to ABSTRACT rather than ADD**,
+  with the role-plausible pool and its budgets deleted (§6.6); the message cap
+  at 420; and the timing and pay recomputed (61 minutes, £8.25 + £1.00).
+
+Carried forward from Ver.2.13 and still true: the symmetric ladder (§3.3,
+§6.2), the six-stage script (§6.1), the counterpart's fixed SB disclosure
+(§6.3), the consolidated fixed scripts (§6.4), the proxy's first-opportunity SB
+schedule (§6.5), **RECV-EVAL** (§5), **RATIFY as its own screen** with the
+conditional closing conversation (§7), and the removal of the range mandate
+from both arms (§2.6, §8.6).
+
+The §9 instrument is otherwise unchanged since Ver.2.12 — §9.4's item set
+survived every revision but Ver.2.14's cuts, which is why `lib/measures.ts`
+needed little beyond renumbering and the ATTR block. Two comments in it are now
+stale and describe more items than exist (`PCR4–7` where only PCR1–6 remain,
+`OWN-AI5` where OWN-AI stops at 4); the items themselves are right.
 
 Verified against the live model end to end — `npm run simulate`, ten runs
-through the real routes; see "Verified against the live model" above.
+through the real routes, with the classifier in the loop; see "Verified against
+the live model" above.
 
-**Still design-open (Ver.2.13 §9.8, §13), not implementation gaps:**
+**Still design-open (§9.8, §13), not implementation gaps:**
 
 - the working values themselves: the outcome ladder (1,600 / 2,300 / 3,000),
-  the fallback (600), and the strength of the §5② decision guidelines are all
-  to be fixed at pilot
+  the fallback (600), the misread's 600/1,900, and the strength of the §5②
+  decision guideline are all to be fixed at pilot
 - §9.8-1: the three RECV-EVAL items are `[PROPOSED]` — wording and anchor style
   (7-point agreement vs evaluation) are not settled
-- §9.8-4: the Baseline operational definition of `SB` when a participant
-  describes the sensitive background WITHOUT tagging the card. §6.2 says the
-  live tier does not move and a post-hoc recoding is reported as a sensitivity
-  analysis; the recoding rule itself is not written
 - §9.8-5: `SB-TIMING`'s categories 3 and 4 are structurally exclusive by arm,
   so the χ² has zero cells by construction — the test's unit must be
   pre-specified
@@ -914,59 +1308,90 @@ through the real routes; see "Verified against the live model" above.
   scale can be cited
 - §13.5: the item wording is written in English against Korean drafts and
   needs a pass against the final translation
+- §13-19: whether `SCRIPT-MISREAD` stays an OFFER or softens to a question,
+  decided by the pilot's acceptance rate against gate 7
+
+**§9.8-4 is RESOLVED.** It asked for the Direct operational definition of `SB`
+when a participant describes the sensitive background without tagging the card.
+There is no card to tag any more: the P5 classifier reads every message, and
+the post-hoc human re-coding reported as κ (gate 19, ≥ .90 or Wizard-of-Oz) is
+the sensitivity analysis §6.2 asked for. The question the old design could only
+answer by convention is now answered by measurement.
 
 ## Still open
 
 Nothing structural. What remains is values to fix and behaviour to observe:
 
 - **Pilot-dependent numbers.** The fallback (600), the outcome ladder
-  (1,600 / 2,300 / 3,000), the strength of the §5② decision guidelines, and
-  the Prolific completion code.
+  (1,600 / 2,300 / 3,000), the misread package, the strength of the §5②
+  decision guideline, and the Prolific completion code.
 
-  **The payment is settled**: £8.00 participation plus a £1.00 bonus is £9.00
-  for a 58-minute study — £9.31 an hour, above Prolific's recommended fair-pay
-  rate of £9.00 (their hard floor is £6.00/hour). The rate rose slightly when
-  Ver.2.13 shortened the flow; the pay was not shaved to match, because the
-  study asks the same work either way. GBP because Prolific pays in it. The pound
-  is held back and presented as something a Leader decides and a Member
-  receives, and every participant is paid it in full — the third deception
-  alongside the counterpart's existence and the upward evaluation, retracted
-  by name at `/debriefing`. It is held back rather than paid flat because
-  gate 2's POWER3 asks whether outcomes that mattered depended on the other
-  person's decisions, and a bonus the Member believes someone else is
-  deciding IS that dependence. `tests/study-config.test.mjs` pins base plus
-  bonus against the advertised total and both against the rate.
+  **The payment is settled**: £8.25 participation plus a £1.00 bonus is £9.25
+  for a 61-minute study — £9.10 an hour, above Prolific's recommended fair-pay
+  rate of £9.00 (their hard floor is £6.00/hour). GBP because Prolific pays in
+  it. **The pay rose when the budget did, and the direction is the rule.**
+  Ver.2.14's REMARK screen costs two minutes across the study; left at £8.00
+  the rate would have fallen to £8.85/hour, below the recommended rate the
+  listing is judged against, so the base moved. The number to adjust is always
+  the PAY, never the advertised minutes: the estimate is derived from the
+  screens that exist, and quoting less than the study takes underpays whoever
+  is slower than it.
+
+  The pound is held back and presented as something a Leader decides and a
+  Member receives, and every participant is paid it in full — one of the four
+  deceptions alongside the counterpart's existence, the upward evaluation and
+  the parting comment, all retracted by name at `/debriefing`. It is held back
+  rather than paid flat because gate 2's POWER2 asks whether outcomes that
+  mattered depended on the other person's decisions, and a bonus the Member
+  believes someone else is deciding IS that dependence.
+  `tests/study-config.test.mjs` pins base plus bonus against the advertised
+  total and both against the rate.
 
   On the impasse target (gate 6, under 10%): the ladder makes impasse much
   harder to reach than the old threshold rule did, because every rung is an
   acceptable agreement and even the unargued one (1,600) beats the fallback
-  (600). The remaining route to impasse is a participant who keeps asking off
-  the ladder and refuses the counterpart's tier package until the clock runs
-  out — a real behaviour worth measuring, not a bug. Ver.2.13 removed the other
-  route (a mandate floor above the tier), so the rate should fall further.
-  Watch it rather than pre-emptively widening anything.
+  (600). The remaining routes are a participant who keeps asking off the ladder
+  and refuses the counterpart's tier package until the clock runs out, and a
+  participant who accepts the misread — both real behaviours worth measuring
+  rather than bugs. Watch the rates rather than pre-emptively widening
+  anything.
 
-- **Timing.** `STAGE_MINUTES` sums to 59 minutes and the consent page
-  advertises 58. (Ver.2.13's §7 heading says 45-50; that is the design doc's
-  rough estimate, and this figure is summed from the screens that actually
-  exist. Adopting the looser number would advertise less than the study takes.) `TOTAL_MINUTES` is derived from those same numbers and
-  `timingIsHonest()` pins the relation — the advertised figure may round the
-  budget DOWN by at most a minute and never further, because a listing that
-  promises less than the study takes underpays anyone slower than the estimate
-  and the fair-pay rate is computed from it. (It was 55 against a
-  four-minute-per-task survey budget, for about twenty-five rating items and
-  seven written answers; seven is the honest figure and the six minutes that
-  restores were six minutes of unpaid work.) Gate 8 asks for a
-  task median under 12 minutes. A Proxy task is the longer arm — the proxies'
-  watching plus a 3-minute closing — but both clocks are caps, not targets. The
-  pilot median decides this; the lever is the reply-delay range, never the
-  advertised figure, which must not drift below what the study actually takes.
+- **Timing.** `STAGE_MINUTES` sums to 61 minutes and the consent page
+  advertises 61. (The design doc's §7 heading gives a looser rough estimate;
+  this figure is summed from the screens that actually exist. Adopting the
+  looser number would advertise less than the study takes.) `TOTAL_MINUTES` is
+  derived from those same numbers and `timingIsHonest()` pins the relation —
+  the advertised figure may round the budget DOWN by at most a minute and never
+  further, because a listing that promises less than the study takes underpays
+  anyone slower than the estimate and the fair-pay rate is computed from it.
+  The two additions since Ver.2.13 are honest ones: `taskSurvey` at 7 minutes
+  for about twenty-five ratings and seven written answers (it was 4, which
+  understated the study by six minutes across the two tasks and therefore
+  understated the pay owed for them), and `reward` at 2 for the decision plus
+  REMARK. Gate 8 asks for a task median under 12 minutes. A Proxy task is the
+  longer arm — the proxies' watching plus a 3-minute closing — but both clocks
+  are caps, not targets. The pilot median decides this; the lever is the
+  reply-delay range, never the advertised figure.
 
 - **Whether the two arms are matched on the participant's own airtime.** A
-  Baseline participant writes the whole negotiation; a Proxy participant
-  watches one and then writes a short closing. That asymmetry IS the design,
-  but it means "how much did they say" is not a between-condition control, and
-  any measure that behaves like a word count should be read with that in mind.
+  Direct participant writes the whole negotiation; a Proxy participant watches
+  one and then writes a short closing. That asymmetry IS the design, but it
+  means "how much did they say" is not a between-condition control, and any
+  measure that behaves like a word count should be read with that in mind.
+
+- **The proxy's tier-2 floor.** Only a Direct participant can reach the bottom
+  rung or accept a misread, so Mode differences in Points/JOINT carry a
+  mechanical component. It is documented (§13-13②) rather than fixed, and it is
+  why `SB` is the confirmatory outcome and JOINT is secondary. Report it; do
+  not quietly remove the floor to make the arms look symmetric, because a proxy
+  that does not state its principal's priority is not a proxy.
+
+- **Classifier agreement.** Gate 19's κ ≥ .90 is the thing that decides whether
+  the P5 route survives contact with real participants. Until the pilot there
+  is no evidence beyond the simulation's two assertions that a confession in
+  the participant's own words is recognised. If it fails, the fallback is
+  Wizard-of-Oz tagging (§13-24), which is a live-operations change, not a code
+  change to plan for now.
 
 - **Whether two issues survive the demand-characteristic check.** With only two
   terms each requirement is highly salient, and the suspicion probe may show
@@ -974,24 +1399,27 @@ Nothing structural. What remains is values to fix and behaviour to observe:
   every payoff property above.
 
 - **Whether the counterpart's SB disclosure primes PERC.** This is the known
-  cost of the §6.3 rule, accepted because `SB` needs a fixed reciprocity point. It is constant across conditions, so it cannot
-  produce a condition effect — but it can lift PERC and RISK uniformly, and
-  RISK is gate 4's task-equivalence instrument. Check both tasks' RISK means
-  against gate 4 in the pilot before reading anything into their level.
+  cost of the §6.3 rule, accepted because `SB` needs a fixed reciprocity point.
+  It is constant across conditions, so it cannot produce a condition effect —
+  but it can lift PERC and RISK uniformly, and RISK is gate 4's
+  task-equivalence instrument. Check both tasks' RISK means against gate 4 in
+  the pilot before reading anything into their level.
 
-- **The failure branches now have tests, but only at the machine level.**
-  `tests/reason-rules.test.mjs` pins all three ladder rungs in four cells,
-  impasse, the one-shot reminders, and script–machine agreement; the live
-  simulation covers the WR-only path and a mid-closing disclosure. What is
-  still unexercised automatically is the INTERFACE around the failure
-  branches — the emergency stop, and the clock actually running out on a real
-  screen. Both were walked by hand. RATIFY's three branches were walked by
-  hand too: approve goes straight to review, modify keeps the package on the
-  table, refuse clears it.
+- **The failure branches have tests, but mostly at the machine level.**
+  `tests/reason-rules.test.mjs` pins the ladder rungs in four cells, impasse,
+  the one-shot reminders, and script–machine agreement;
+  `tests/reason-leak.test.mjs` pins the rehearsal guardrail in both directions;
+  the live simulation covers the WR-only path, the misread, and a mid-closing
+  disclosure. What is still unexercised automatically is the INTERFACE around
+  the failure branches — the emergency stop, and the clock actually running out
+  on a real screen. Both were walked by hand, as were RATIFY's three branches:
+  approve goes straight to review, modify keeps the package on the table,
+  refuse clears it.
 
-- Fixed vs. jittered counterpart delay · final IRB language (three deceptions
-  now: the counterpart's existence, the bonus, and the upward evaluation being
-  forwarded) · a pass over the item wording against the final translation.
+- Fixed vs. jittered counterpart delay · final IRB language (four deceptions
+  now: the counterpart's existence, the bonus, the upward evaluation being
+  forwarded, and the parting comment) · a pass over the item wording against
+  the final translation.
 
 ## Conventions
 

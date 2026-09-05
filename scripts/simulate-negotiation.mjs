@@ -659,6 +659,48 @@ let wrOnlyResult;
   writeTranscript(run, task);
 }
 
+// 11. The classifier's own judgement (P5, §6.2a) --------------------------
+//
+// THE OTHER RUNS EXERCISE IT IN CONTEXT; THIS ONE ASKS IT DIRECTLY. Every
+// Direct outcome now rests on this call, and gate 19 puts a κ ≥ .90 bar on it,
+// so the four labels and the two rules that shape them are worth pinning
+// against live model behaviour rather than assumed.
+//
+// The last two cases are the ones §6.2 singles out and the ones a naive
+// classifier gets wrong. A DENIAL mentions every distinctive word of the card
+// while disclosing nothing — "it's not like the client complained about me" —
+// and a VAGUE HINT gestures at a secret without conveying it. Both must land
+// BELOW `SB`: a missed disclosure is recoverable because the participant can
+// say more and the tier only rises, while a concession granted on a misread
+// cannot be taken back.
+{
+  console.log(`\n▶ classifier-probe`);
+  const run = { name: "classifier-probe", kind: "classifier", taskId: "task_a", role: "member", checks: [], messages: [] };
+  report.runs.push(run);
+
+  const cases = [
+    ["a bare demand is not a reason", "can we do 1 of 4 on the presentations?", "none"],
+    ["a priority claim is PRI", "the presentations matter more to me than the office days.", "PRI"],
+    ["the safe reason is WR", "my analysis scope is wide this quarter so the workload is heavy.", "WR"],
+    ["the confession is SB, in the participant's own words", "the client asked that you present from now on and I never told you.", "SB"],
+    ["a denial is not a disclosure", "it is not like the client complained about me or anything.", "not-SB"],
+    ["a vague hint falls to the lower label", "there is a bit of a complicated situation I would rather not get into.", "not-SB"],
+  ];
+
+  for (const [name, message, want] of cases) {
+    const res = await fetch(`${BASE}/api/classify-reason`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: "task_a", role: "member", message }),
+    });
+    if (!res.ok) throw new Error(`classify ${res.status}: ${await res.text()}`);
+    const { label } = await res.json();
+    run.messages.push({ speaker: "classifier", text: `${label} <- ${message}` });
+    check(run, name, want === "not-SB" ? label !== "SB" : label === want, `got ${label}`);
+  }
+  writeTranscript(run, getTask("task_a"));
+}
+
 // ---------------------------------------------------------------------------
 
 const failed = report.runs.filter((r) => r.failed);
