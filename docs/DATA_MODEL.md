@@ -63,7 +63,7 @@ it — so pilot gate 9's rationale audit had no source. `logGuardrailEvent` now
 exists.
 
 **`logGuardrailEvent` STILL HAS NO CALLER, and that is a gap, not dead code.**
-The validator's verdict and the Explorer's `internalProvenance` are both
+The validator's verdict and the proxy's `internalProvenance` are both
 computed on every turn in `/api/proxy-negotiation` and both are discarded
 there. They cannot be handed to the client to persist the way messages are:
 rule 3 of "Things the participant must never learn" forbids the response
@@ -105,7 +105,7 @@ per block (2 policies × 2 roles × 4 sequences), 120 participants ≈ 8 blocks.
 create table assignment_slots (
   id              bigserial primary key,
   slot_index      integer not null unique,
-  proxy_policy    text    not null check (proxy_policy in ('delegate','explorer')),
+  proxy_policy    text    not null check (proxy_policy in ('user_specified','ai_supplemented')),
   role            text    not null check (role in ('leader','member')),
   sequence_id     text    not null check (sequence_id in ('seq1','seq2','seq3','seq4')),
   claimed         boolean not null default false,
@@ -200,9 +200,21 @@ tamper-resistant record.
 
 One row per block per participant. Blocks: `background`, `instruction_check`,
 `practice`, `preferences_t{1,2}`, `risk_t{1,2}`, `m1_t{1,2}` (Proxy only —
-Baseline answers M1 inside `post_task_t{n}`), `post_task_t{1,2}`,
+Direct answers M1 inside `post_task_t{n}`), `post_task_t{1,2}`,
 `task_outcome_t{1,2}`, `recv_eval_t{1,2}` (Member only), `reward_t{1,2}`,
-`wrap_up`, `debriefing`.
+`attr_t{1,2}`, `wrap_up`, `debriefing`.
+
+`attr_t{n}` is Ver.2.14's addition (§6.8, §9.4.9): after the post-negotiation
+decision the counterpart leaves one fixed line, and the participant answers
+`ATTR1` (everyone), `ATTR2` (Proxy only) and `OE-ATTR`.
+
+**It is written LAST on that screen, and the ordering is the measure.** The
+comment is mildly negative, so showing it before PERC, PCR, PNPQ, PNOQ,
+OWN/OTHER-AI or the bonus decision would contaminate every confirmatory answer
+in RQ2. The wording is a constant — the only thing that varies is whether it
+points at the participant or at their Proxy, and that difference IS the Mode,
+which is what makes `ATTR1`'s `Proxy − Direct` contrast a clean test of whether
+delegation moves the RECEIPT of an evaluation as well as the speaking of it.
 
 **Everything measured about a negotiation is scoped `_t1` / `_t2`.** The same
 construct measured after two differently conditioned tasks is two observations,
@@ -228,9 +240,9 @@ and the four behavioural measures of Ver.2.13 §9.3:
 | Key | Meaning |
 |---|---|
 | `POINTS` · `JOINT` | own total, and both totals summed |
-| `SB` | the participant side's SB was out BEFORE the counterpart's fixed disclosure — **RQ1's confirmatory outcome**. Proxy: the mandate checkbox, since a checked card is voiced at the proxy's first reason turn (stage 2, always before the counterpart's stage 4). Baseline: tagged at the participant's first reason turn |
-| `SB-TIMING` | WHEN it came out: `none` / `before_counterpart` / `after_counterpart` (Baseline only) / `wrap_up` (Proxy only) |
-| `RATIFY` | what the participant decided about the proxies' package (`approved_as_is` / `modified` / `rejected`) — **confirmatory for RQ3**; `null` in Baseline, which has nothing to ratify |
+| `SB` | the participant side's SB was out BEFORE the counterpart's fixed disclosure — **RQ1's confirmatory outcome**. Proxy: the mandate checkbox, since a checked card is voiced at the proxy's first reason turn (stage 2, always before the counterpart's stage 4). Direct: the P5 classifier's verdict on the participant's own messages (§6.2a), confirmed against post-hoc human coding |
+| `SB-TIMING` | WHEN it came out: `none` / `before_counterpart` / `after_counterpart` (Direct only) / `wrap_up` (Proxy only) |
+| `RATIFY` | what the participant decided about the proxies' package (`approved_as_is` / `modified` / `rejected`) — **confirmatory for RQ3**; `null` in Direct, which has nothing to ratify |
 
 **Ver.2.13 cut this from nine measures to four, and the cut is not tidying.**
 
@@ -242,11 +254,26 @@ opened (6,000), what concealment cost (the gap between rungs) and whether there
 was an agreement (1,200 = none). Four indicators computed off one number are
 four chances for them to disagree with it, not four measures.
 
+**Ver.2.16 added a fifth value, and it is not a rung.** A participant who gives
+only the safe work reason may be offered — and may accept — the MISREAD
+package, which pays them 600 and the counterpart 1,900, so `JOINT` = 2,500.
+That is below the unargued rung and level with impasse for the participant, and
+it is a real behaviour rather than a coding artefact: the counterpart sincerely
+offered the obvious remedy for the interest it was given, and the participant
+took it. §13-19 flags the acceptance rate for the pilot; if it clears gate 7
+the script softens from an offer to a question.
+
+**`JOINT` also stopped separating `none` from `work`.** Under the decoy design
+the work reason buys nothing — 3,200 either way — because the participant's
+core term is not that interest's obvious remedy. The rung reached is therefore
+`none-or-WR` / `PRI` / `SB`, and which of the first two a session was is
+recovered from the classifier log below, not from the outcome row.
+
 `PRE-RECIP-SB`, `POST-RECIP-SB`, `MUTUAL-SB`, `SELF-DISCLOSE` and `SB-VOICED`
 are gone because they coded ONE nominal event five times. `SB` inherits
 PRE-RECIP-SB's definition unchanged; `SB-TIMING` carries the rest as exclusive
 categories, and "voiced at all" is categories 2+3+4. Categories 3 and 4 are
-structurally exclusive by arm — Baseline has no closing stage, and a Proxy
+structurally exclusive by arm — Direct has no closing stage, and a Proxy
 participant's only free speech after the disclosure IS the closing — which
 §9.8-5 flags for the χ²'s unit, not for the coding.
 
@@ -334,10 +361,12 @@ create table messages (
   speaker             text not null,
   text                text not null,
   proposal            jsonb,          -- the package on the table, if any
-  reason_card_id      text,           -- which reason this message voiced
+  reason_card_id      text,           -- Proxy: which card the proxy voiced
+  reason_label        text,           -- Direct: P5's verdict, none|WR|PRI|SB
+  reason_confidence   real,           -- Direct: P5's own confidence, 0-1
   decided_action      text,           -- what the state machine chose this turn
   structured_action   jsonb,          -- NegotiationAction
-  internal_provenance text,           -- 'principal_reason' | 'pool_reason'
+  internal_provenance text,           -- 'principal_reason'
   validator_result    jsonb,
   created_at          timestamptz not null default now()
 );
@@ -345,20 +374,41 @@ create table messages (
 create index on messages (participant_key, task_index, turn_index);
 ```
 
-`internal_provenance`, `structured_action` and `decided_action` are audit
-fields. Never select them into a participant-facing response — the Explorer
-condition is defined by the participant being unable to tell a pool reason from
-one of their own, and OTHER-AI4 asks them to try, so a leak here is not a
-privacy bug but a destroyed manipulation.
+`internal_provenance`, `structured_action`, `decided_action`, `reason_label`
+and `reason_confidence` are audit fields. Never select them into a
+participant-facing response — the AI-Supplemented condition is defined by the
+participant being unable to tell which of three sentences carries the other
+side's own circumstance, and `OTHER-AI2` asks them to try, so a leak there is
+not a privacy bug but a destroyed manipulation. `reason_label` leaks in the
+other direction: it is the tier the system read off the participant's own
+words, and showing it would tell them which things "count".
 
 `decided_action` beside `text` is what pilot gate 9 reads: the pair shows the
 model said what the state machine decided and nothing else.
 
-`reason_card_id` is not decoration. The reason-linked acceptance rule (Design
-§4) needs a deterministic answer to "has a reason been given for this
-requirement", and it is decided from this column rather than by asking a model
-to grade an argument. In Baseline it is what the participant attached to the
-message; in Proxy it is the card the proxy voiced.
+**`reason_card_id` and `reason_label` are the two input channels of §6.2a, and
+they are recorded separately because they are different kinds of evidence.**
+
+In the Proxy arm the participant's checkboxes decide which card is voiced, so
+`reason_card_id` is a fact about the schedule: no judgement is involved and
+nothing can disagree with it.
+
+In Direct and the Proxy closing there are no longer any buttons (Ver.2.20). The
+participant simply talks, and a separate single-purpose classifier — P5, which
+writes nothing anyone sees and never speaks for either party — reads each
+message into `none / WR / PRI / SB`. That label sets the tier. It is a
+MEASUREMENT rather than a record, so its confidence is kept beside it and the
+whole Direct transcript is re-coded by hand afterwards: the analysis reports κ
+between the two and a sensitivity analysis excluding disagreements. Gate 19
+requires κ ≥ .90; below it the study switches to Wizard-of-Oz tagging (§13-24).
+
+This is what resolved §9.8-4, which had been open since Ver.2.13: the Direct
+operational definition of `SB` is the classifier's verdict, with the post-hoc
+coding as the reported value and κ as the evidence for it.
+
+The negotiating models still decide nothing (§6.7). P1–P4 render moves the
+state machine chose; P5 never generates a negotiation sentence. Keeping the two
+apart is what makes the counterpart identical for every participant.
 
 `stage` and `proposal` are what make the trajectory recoverable: the
 requirement level at stage 1 is opening advocacy, at stage 4 is retention after

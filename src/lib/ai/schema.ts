@@ -62,8 +62,16 @@ export interface NegotiationAction {
   /**
    * Audit-only. Stored in the backend, never rendered to participants in the
    * AI-Supplemented condition (Design §7 "이유 출처 표시").
+   *
+   * ONE VALUE SINCE VER.2.20. The role-plausible pool is gone (§6.6): the
+   * AI-Supplemented policy no longer ADDS a reason beside the principal's
+   * card, it REPLACES the card with the fixed abstraction and two covers, all
+   * three supplied by the route. So every message draws on the principal, and
+   * a model that wanted to claim otherwise no longer has a value to claim it
+   * with — which is the point of narrowing the enum rather than leaving a
+   * dead one in place.
    */
-  internalProvenance: "principal_reason" | "pool_reason";
+  internalProvenance: "principal_reason";
 }
 
 /** JSON Schema passed to the model for structured output. */
@@ -115,7 +123,7 @@ export const NEGOTIATION_ACTION_SCHEMA = {
     unresolved: { type: "boolean" },
     internalProvenance: {
       type: "string",
-      enum: ["principal_reason", "pool_reason"],
+      enum: ["principal_reason"],
     },
   },
 } as const;

@@ -938,6 +938,7 @@ export function DirectNegotiation({
     // from THIS turn, because a confession should land the moment it is made.
     type ReasonLabel = "none" | "WR" | "PRI" | "SB";
     let label: ReasonLabel = "none";
+    let confidence: number | undefined;
     if (!mockAi) {
       try {
         const res = await fetch("/api/classify-reason", {
@@ -945,8 +946,12 @@ export function DirectNegotiation({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ taskId: task.id, role, message: text }),
         });
-        const data = (await res.json()) as { label?: ReasonLabel };
+        const data = (await res.json()) as {
+          label?: ReasonLabel;
+          confidence?: number;
+        };
         if (data.label) label = data.label;
+        confidence = data.confidence;
       } catch (error) {
         console.warn("[classify-reason] failed", error);
       }
@@ -979,6 +984,11 @@ export function DirectNegotiation({
         createdAt: new Date().toISOString(),
         stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET),
         proposal: Object.keys(sentOffer).length > 0 ? sentOffer : undefined,
+        // Same audit trail as the Direct arm: this is the other place a
+        // participant speaks for themselves, so it is the other place the
+        // classifier can be wrong (§6.2a, §6.9 #15-16).
+        reasonLabel: label,
+        reasonConfidence: confidence,
       });
     }
 

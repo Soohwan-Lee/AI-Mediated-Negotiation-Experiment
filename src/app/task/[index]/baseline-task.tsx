@@ -417,6 +417,7 @@ export function BaselineTask({
      * would hand out the maximum package on a network error.
      */
     let label: "none" | "WR" | "PRI" | "SB" = "none";
+    let confidence: number | undefined;
     if (!mockAi) {
       try {
         const res = await fetch("/api/classify-reason", {
@@ -424,8 +425,12 @@ export function BaselineTask({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ taskId, role, message: text }),
         });
-        const data = (await res.json()) as { label?: typeof label };
+        const data = (await res.json()) as {
+          label?: typeof label;
+          confidence?: number;
+        };
         if (data.label) label = data.label;
+        confidence = data.confidence;
       } catch (error) {
         console.warn("[classify-reason] failed", error);
       }
@@ -471,6 +476,12 @@ export function BaselineTask({
         createdAt: new Date().toISOString(),
         stage: counterpartStageAfter(replies),
         proposal: Object.keys(sentOffer).length > 0 ? sentOffer : undefined,
+        // The classifier's verdict on THIS message, stored per message. It is
+        // the source of the post-hoc κ that gate 19 turns on (§6.2a) — and it
+        // is never rendered, because showing a participant which of their
+        // sentences "counted" tells them what the study rewards mid-study.
+        reasonLabel: label,
+        reasonConfidence: confidence,
       });
     }
 

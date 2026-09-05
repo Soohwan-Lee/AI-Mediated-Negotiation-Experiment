@@ -420,17 +420,38 @@ export interface TranscriptMessage {
   /** The package proposed with this message, if any. */
   proposal?: Package;
   /**
-   * Which reason card this message voiced, if any. Design §4 makes reason
-   * delivery mechanically consequential — the counterpart will not concede on
-   * a requirement no reason was ever given for — so this is read by the state
-   * machine, not just logged.
+   * PROXY ARM ONLY: which reason card the proxy voiced (§6.2a). The
+   * participant's checkboxes decide it, so it is a fact about the schedule —
+   * no judgement is involved and nothing can disagree with it.
    */
   reasonCardId?: string;
   /**
-   * Internal provenance for the AI-Supplemented condition — stored for audit but
-   * NEVER rendered to the participant (Design §7 "이유 출처 표시").
+   * DIRECT ARM AND THE PROXY CLOSING: the P5 classifier's verdict on this
+   * message, and its own confidence (§6.2a).
+   *
+   * Ver.2.20 removed the reason-card buttons, so the participant simply talks
+   * and this label is what sets the tier. It is a MEASUREMENT rather than a
+   * record, which is why the confidence travels with it: the whole Direct
+   * transcript is re-coded by hand afterwards, and the analysis reports κ
+   * between the two plus a sensitivity analysis excluding disagreements. Gate
+   * 19 requires κ ≥ .90, below which the study switches to Wizard-of-Oz
+   * tagging (§13-24).
+   *
+   * NEVER RENDERED. Showing a participant which of their sentences "counted"
+   * would tell them what the study rewards, mid-study.
    */
-  internalProvenance?: "principal_reason" | "pool_reason";
+  reasonLabel?: "none" | "WR" | "PRI" | "SB";
+  reasonConfidence?: number;
+  /**
+   * Internal provenance — stored for audit but NEVER rendered to the
+   * participant (Design §7 "이유 출처 표시").
+   *
+   * `pool_reason` is gone with the pool itself (Ver.2.20 §6.6): the
+   * AI-Supplemented policy no longer adds a reason beside the principal's
+   * card, it replaces the card with the fixed abstraction. Every message is a
+   * principal reason now, and what differs is how much of it survived.
+   */
+  internalProvenance?: "principal_reason";
   /**
    * The move the state machine chose for this turn, stored beside the rendered
    * sentence. Design §4 requires the pair so an audit can show the model never

@@ -60,7 +60,7 @@ export interface ScriptedMessage {
    * added, and never rendered — `DisplayMessage` has no field for provenance,
    * so a transcript component cannot show it even by accident.
    */
-  internalProvenance?: "principal_reason" | "pool_reason";
+  internalProvenance?: "principal_reason";
 }
 
 export interface ScriptedTask {
