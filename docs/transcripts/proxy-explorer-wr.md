@@ -4,55 +4,56 @@ Model: gpt-5.6-terra · task: task_b · participant role: member · policy: ai_s
 
 **counterpart_proxy** _(stage 1 · open)_
 
-> I represent the team lead in this discussion.
-> The team lead they represent says the first four weeks matter, and early problems cannot be allowed.
-> Which term matters most to the member you represent, and why?
+> I’m the proxy for the team lead I represent.
+> The first four weeks matter most; early problems must be avoided.
+> Which term matters most to the other side, and why?
 
 **participant_proxy** _(stage 1)_
 
-> I am the AI Proxy negotiating for the team member I represent.
-> The first four weeks matter.
-> They propose 1 day a week on the new project and 1 urgent-call duty a month.
+> I’m the AI Proxy negotiating for the team member I represent.
+> Urgent-call duty matters most on their side.
+> They propose 1 day a week on the project and 1 urgent-call duty a month, subject to review.
 >
 > _package: Days a week on the new project: 1 day a week · Urgent-call duty: 1 a month_
 
 **counterpart_proxy** _(stage 2 · state_priority)_
 
-> Thanks for setting out both terms.
-> Could the member’s side say whether either term could move as part of a linked trade?
+> I note their proposed levels.
+> The first four weeks matter most; early problems must be avoided.
+> What makes urgent-call duty so important to the team member they represent?
 
 **participant_proxy** _(stage 2)_
 
-> On a linked trade, urgent-call duty is their priority.
-> Two projects they are already on have deadlines in the same month; they have almost no capacity.
-> Which term is the lead's priority, and why?
+> I understand that early problems are the lead’s concern.
+> Urgent-call duty is their priority: two projects already have deadlines in the same month, leaving almost no capacity.
+> Which term is the lead’s top priority, and why?
 
 **counterpart_proxy** _(stage 4 · disclose_sb)_
 
-> I appreciate the question.
-> The team lead I represent estimated fewer people than this project actually needs.
-> The plan works only with four days weekly; more staff alerts the director, and the team does not know.
+> Thanks for explaining their priority.
+> The team lead I represent estimated fewer people than this project needs.
+> It works as planned only with 4 days weekly; asking for more staff reveals the wrong estimate to the director, and the team does not know.
 
 **participant_proxy** _(stage 5)_
 
-> That explains why four days matters.
+> I understand the need for four days weekly.
 > The team member I represent offers 4 days a week on the new project in exchange for holding urgent-call duty at 1 a month.
-> This would be tentative pending their review.
+> This would remain tentative for their review.
 >
 > _package: Days a week on the new project: 4 days a week · Urgent-call duty: 1 a month_
 
 **counterpart_proxy** _(stage 5 · balance)_
 
-> That proposal has one side moving further than the other.
-> Instead, the team lead I represent puts forward 3 days a week on the new project and 2 urgent-call duties a month.
+> Their proposal has one side moving further than the other.
+> Instead, the team lead I represent proposes 3 days a week on the new project and 2 urgent-call duties a month.
 >
 > _package: Days a week on the new project: 3 days a week · Urgent-call duty: 2 a month_
 
 **participant_proxy** _(stage 6)_
 
 > That proposal works for the team member I represent.
-> Tentative package: 3 days a week and 2 urgent-call duties a month.
-> The principals confirm it themselves; nothing binds until they do.
+> Tentative package: 3 days a week on the new project and 2 urgent-call duties a month.
+> The principals must confirm it themselves; nothing binds until they do.
 >
 > _package: Days a week on the new project: 3 days a week · Urgent-call duty: 2 a month_
 

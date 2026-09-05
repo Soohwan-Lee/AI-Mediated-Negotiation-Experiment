@@ -112,22 +112,37 @@ export default function ConsentPage() {
     setBusy(true);
     setUnavailable(false);
     try {
+      // THE READINESS CHECK IS ITS OWN TRY, and the scope is the point: a
+      // failure inside `beginStudy` (storage, say) is a different fault with a
+      // different remedy, and answering it with "the study is not available"
+      // would send a participant away from a study that is in fact running.
+      //
       // The server is the only side that can see the env, so it is asked.
       // `gate=1` returns one boolean and nothing else — naming the model or
       // the environment here would tell a participant reading their network
       // tab what the other party is.
-      const res = await fetch("/api/preflight?gate=1");
-      if (!res.ok) {
+      let ready: boolean;
+      try {
+        const res = await fetch("/api/preflight?gate=1", { cache: "no-store" });
+        ready = res.ok;
+      } catch {
+        // FAILING CLOSED ON A NETWORK ERROR IS THE DELIBERATE CHOICE, and it
+        // is not free: a transient blip turns a willing participant away, and
+        // they are paid people whose time this wastes. It is still the right
+        // way round. The alternative admits them to a study that may be
+        // serving placeholder text, which produces a full set of measures
+        // about a counterpart that never spoke — unusable data, and no way to
+        // tell those sessions from good ones afterwards. A refused
+        // participant can retry in a minute; a silently void session cannot
+        // be recovered at all.
+        ready = false;
+      }
+      if (!ready) {
         setUnavailable(true);
         return;
       }
       await beginStudy();
       router.push(nextHref("welcome"));
-    } catch {
-      // A study that cannot confirm it is ready does not start. Failing open
-      // here would be indistinguishable, to the participant, from a study
-      // that works — and that is the whole problem.
-      setUnavailable(true);
     } finally {
       setBusy(false);
     }
