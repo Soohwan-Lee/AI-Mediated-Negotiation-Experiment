@@ -67,6 +67,24 @@ export async function POST(request: Request) {
     return NextResponse.json({
       label: result.label,
       confidence: result.confidence,
+      // SURFACED BECAUSE `none` MEANS TWO THINGS AND κ CANNOT TELL THEM APART.
+      // With no key, `classifyReason` answers `{label:"none", confidence:0,
+      // stubbed:true}` — byte-identical to a genuine "no reason given" and to
+      // the error branch below. Dropping the flag made a misconfigured
+      // deployment look like a study where every participant happened to say
+      // nothing: tier pinned at `none` (1,600) for the whole Direct arm, with
+      // the stored {text,label,confidence} log showing no trace of why.
+      //
+      // Gate 19's κ ≥ .90 is computed off that log, and the Wizard-of-Oz
+      // fallback (§13-24) is triggered by it — so the one signal that would
+      // ever fire the fallback was the one being discarded. Both sibling AI
+      // routes already return this; this was the only one that did not, and
+      // it is the one the primary outcome rests on.
+      //
+      // Not a leak: it says a model did not run, never which condition the
+      // participant is in, and in a live study the guard makes this
+      // unreachable anyway (503 above).
+      stubbed: result.stubbed,
     });
   } catch (error) {
     // A MISCONFIGURED STUDY IS NOT A FAILED CLASSIFICATION, and the two must

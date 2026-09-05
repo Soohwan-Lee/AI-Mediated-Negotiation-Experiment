@@ -66,7 +66,7 @@ import {
   useDevMockAi,
 } from "@/lib/dev-mode";
 
-import type { ReasonTier } from "@/lib/negotiation/machine";
+import { foldTier, type ReasonTier } from "@/lib/negotiation/machine";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
@@ -374,9 +374,7 @@ export function ProxyTask({
    * or a guardrail block can leave an authorized card unsaid, and the ladder
    * has to see the same fact the transcript shows.
    */
-  const [proxyVoicedTier, setProxyVoicedTier] = useState<
-    "none" | "work" | "sensitive"
-  >("none");
+  const [proxyVoicedTier, setProxyVoicedTier] = useState<ReasonTier>("none");
   const [tentative, setTentative] = useState<Package | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: TOTAL_TURNS });
@@ -661,7 +659,11 @@ export function ProxyTask({
           done: boolean;
           totalTurns?: number;
           reasonTokens?: string[];
-          voicedTier?: "none" | "work" | "sensitive";
+          // THE FULL LADDER, `priority` INCLUDED. This was re-declared here
+          // without it, so the compiler never saw the mismatch with the
+          // server's own union and the fold below silently downgraded the
+          // proxy's floor. Typed off `ReasonTier` now so the two cannot drift.
+          voicedTier?: ReasonTier;
           decidedAction?: string;
           stage?: number;
           requirementOption?: string | null;
@@ -685,11 +687,21 @@ export function ProxyTask({
           data.voicedTier &&
           data.voicedTier !== "none"
         ) {
-          setProxyVoicedTier((prev) =>
-            prev === "sensitive" || data.voicedTier === "sensitive"
-              ? "sensitive"
-              : "work",
-          );
+          // `foldTier`, NOT A HAND-WRITTEN TERNARY. The ternary collapsed
+          // everything that was not `sensitive` down to `work`, which threw
+          // away the proxy's tier-2 floor (§6.5, §6.9 #1): `TIER_LIMIT_INDEX`
+          // puts `work` at 2 and `priority` at 1, so they are different rungs.
+          //
+          // WHAT IT COST, and the server's own comment beside `voicedTier`
+          // describes it: a participant who authorized no sensitive card
+          // watched their proxies settle at 2,300/2,300, took over at RATIFY,
+          // and was offered 1,600 — below the package still on screen. The
+          // server half of this was fixed; this half was not, and no type
+          // error could show it because the response was re-declared above
+          // without `priority`. CLAUDE.md warns that two hand-written
+          // ternaries would eventually disagree; they did.
+          const voiced = data.voicedTier;
+          if (voiced) setProxyVoicedTier((prev) => foldTier(prev, voiced));
         }
 
         if (

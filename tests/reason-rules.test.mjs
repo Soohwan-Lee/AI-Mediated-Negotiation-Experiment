@@ -1,16 +1,19 @@
 /**
- * The Ver.2.12 credibility ladder, tested against the shipped state machine
+ * The Ver.2.20 credibility ladder, tested against the shipped state machine
  * and validator (imported directly via tests/ts-register.mjs).
  *
  * WHAT IS LOAD-BEARING HERE (Design §3.3, §6.2, CLAUDE.md):
  *
- *  1. THE LADDER'S THREE RUNGS, in all four task × role cells: nothing voiced
- *     settles at 1,000 / 3,600 (joint 4,600), the work reason at
- *     2,000 / 3,300 (5,300), the sensitive background at 3,000 / 3,000
- *     (6,000 — the global maximum). Impasse pays 600 each. These exact
- *     numbers are §3.3's outcome ladder, and every one of them is below the
- *     next, so disclosure is monotonically rewarded and even the unargued
- *     agreement beats walking away.
+ *  1. THE LADDER'S FOUR RUNGS, SYMMETRIC, in all four task × role cells.
+ *     Both sides land on the same rank: nothing voiced settles at
+ *     1,600 / 1,600 (joint 3,200), the WORK REASON at the same 1,600 / 1,600
+ *     — it is a DECOY and shares its rank with silence — a bare PRIORITY
+ *     claim at 2,300 / 2,300 (4,600), and the sensitive background at
+ *     3,000 / 3,000 (6,000, the global maximum). Impasse pays 600 each
+ *     (1,200); an accepted misread pays 600 / 1,900 (2,500).
+ *
+ *     Every rung is above the 600 fallback, so even an unargued agreement
+ *     beats walking away, and JOINT alone identifies the tier reached.
  *
  *  2. SB VOICING IS THE ONLY BOTTLENECK. The counterpart proposes at its own
  *     rung (SCRIPT-PROPOSE-T{tier}), so a participant does not need
@@ -21,13 +24,19 @@
  *     the rung that was paid for.
  *
  *  3. THE SCHEDULE. The participant's proxy voices the SB at its FIRST
- *     reason opportunity when authorized (PRE-RECIP-SB depends on the SB
- *     landing before the counterpart's stage-4 disclosure), the WR otherwise,
- *     and no card twice. The Explorer pool keeps its separate allowance of
- *     one per issue and two per task on its own action field.
+ *     reason opportunity when authorized (`SB` depends on the SB landing
+ *     before the counterpart's stage-4 disclosure), the WR otherwise, and no
+ *     card twice. Ver.2.20 DELETED the role-plausible pool and its per-issue
+ *     allowance: AI-Supplemented now REPLACES the sensitive card with a fixed
+ *     one-sentence abstraction said among two covers, so neither policy may
+ *     add a reason of its own.
  *
  *  4. SCRIPT AND MACHINE AGREE. The mockup's ideal trajectory settles at
  *     exactly the package the machine would accept, in every cell.
+ *
+ *  5. THE PROXY'S TIER-2 FLOOR survives the trip to the closing conversation.
+ *     `work` and `priority` are DIFFERENT rungs, and folding them together
+ *     costs the participant a full option step — see the tests at the end.
  */
 
 import { test } from "node:test";
@@ -55,6 +64,8 @@ const {
   acceptablePackage,
   mentionsScoreNumbers,
   codeOutcome,
+  foldTier,
+  TIER_LIMIT_INDEX,
 } = await import("../src/lib/negotiation/machine.ts");
 const { validateAction } = await import("../src/lib/ai/validator.ts");
 const { scriptedTask } = await import("../src/lib/negotiation/script.ts");
@@ -717,4 +728,44 @@ test("an unchecked card may not be voiced under either policy", () => {
       `${policy} must block the unchecked card`,
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// The proxy's tier-2 floor, on the wire between the route and the closing.
+//
+// THIS REGRESSION HAS NOW HAPPENED TWICE, in the two halves of the same wire.
+// The server was fixed first (`voicedTier` folds `"priority"` in
+// unconditionally, api/proxy-negotiation). The CLIENT kept a hand-written
+// ternary that collapsed everything below `sensitive` to `work` — and it typed
+// the response inline without `"priority"`, so `tsc` could not see the
+// mismatch with the server's own union.
+//
+// The cost is the one the server's comment names: a participant who authorized
+// no sensitive card watches the proxies settle at 2,300/2,300, takes over at
+// RATIFY, and is offered 1,600 — below the package still on screen. It lands
+// on Points/JOINT in the Proxy arm only, i.e. along the primary contrast.
+//
+// `foldTier` is the fix in both places. These pin WHY it cannot be a ternary.
+// ---------------------------------------------------------------------------
+
+test("work and priority are different rungs, so collapsing them costs points", () => {
+  assert.notEqual(
+    TIER_LIMIT_INDEX.work,
+    TIER_LIMIT_INDEX.priority,
+    "if these ever match, the ternary that collapsed them was harmless — " +
+      "and the decoy ladder has lost its middle rung",
+  );
+  assert.equal(TIER_LIMIT_INDEX.work, 2);
+  assert.equal(TIER_LIMIT_INDEX.priority, 1);
+});
+
+test("foldTier carries priority through, where a ternary dropped it", () => {
+  // The exact folds the proxy closing performs as each turn's voicedTier
+  // arrives. A `sensitive`-or-`work` ternary gets the middle two wrong.
+  assert.equal(foldTier("none", "priority"), "priority");
+  assert.equal(foldTier("work", "priority"), "priority");
+  assert.equal(foldTier("priority", "priority"), "priority");
+  assert.equal(foldTier("priority", "work"), "priority");
+  assert.equal(foldTier("priority", "sensitive"), "sensitive");
+  assert.equal(foldTier("sensitive", "priority"), "sensitive");
 });

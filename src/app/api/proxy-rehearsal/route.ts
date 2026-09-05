@@ -76,8 +76,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  // The guard the other four routes have and this one did not. `getTask`
+  // returns `undefined` for an unknown id, so the next line dereferenced it
+  // OUTSIDE the try below — an unhandled exception and a bare 500 with no JSON
+  // body, where every sibling answers a clean 400.
   const task = getTask(body.taskId);
-  const cards = task.roleBriefs[body.role].reasonCards;
+  if (!task) {
+    return NextResponse.json({ error: "Unknown task" }, { status: 400 });
+  }
+  const brief = task.roleBriefs[body.role];
+  if (!brief) {
+    return NextResponse.json({ error: "Unknown role" }, { status: 400 });
+  }
+  const cards = brief.reasonCards;
   const authorized = cards.filter((c) =>
     body.mandate.authorizedReasonIds.includes(c.id),
   );

@@ -982,7 +982,20 @@ export function DirectNegotiation({
         speaker: "participant",
         text,
         createdAt: new Date().toISOString(),
-        stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET),
+        // THE PARTICIPANT'S OWN SLOT, ONE BEHIND THE COUNTERPART'S. They are
+        // replying TO the counterpart's current move, so their message belongs
+        // to the stage before it — which is exactly what the Direct arm
+        // records (`counterpartStageAfter(replies)` there, with its own
+        // seeded-opening offset already inside `replies`).
+        //
+        // Without the -1 this stored the COUNTERPART's stage, the same
+        // expression used below for the counterpart's own turn. The first
+        // participant message came out as stage 1 in Direct and stage 5 here:
+        // the same act, labelled differently, and differing BY ARM in the
+        // export. CLAUDE.md records this conflation as having "broke it twice
+        // before" — those were machine calls, where it changed behaviour; this
+        // one is the audit trail, where it quietly mislabels the data instead.
+        stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET - 1),
         proposal: Object.keys(sentOffer).length > 0 ? sentOffer : undefined,
         // Same audit trail as the Direct arm: this is the other place a
         // participant speaks for themselves, so it is the other place the
