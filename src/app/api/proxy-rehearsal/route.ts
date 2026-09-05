@@ -127,11 +127,20 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ text, blocked: false, stubbed });
   } catch (error) {
+    // THE MESSAGE GOES ON A PARTICIPANT'S SCREEN, so it cannot be the
+    // exception's own. `RehearsalChat` renders `data.error` verbatim
+    // (shared.tsx), and the strings reaching here are written for operators:
+    // "OPENAI_API_KEY is not configured and this is a live study…" from the
+    // live-study guard, and "LLM request failed: 401 …" with the provider's
+    // body from the client. Either one tells the reader that their
+    // counterpart's side of this study is a language model — the first item on
+    // the "must never learn mid-study" list — and the second can carry
+    // provider detail with it.
+    //
+    // The real message is logged instead, where the operator needs it.
+    console.error("[proxy-rehearsal]", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Rehearsal turn failed",
-      },
+      { error: "Your proxy could not answer just now. Please try again." },
       { status: 502 },
     );
   }

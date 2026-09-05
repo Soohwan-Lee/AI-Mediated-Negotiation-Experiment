@@ -138,8 +138,13 @@ export async function GET(request: Request) {
       checks,
       blocking: readiness.reason,
     },
-    // 503 when a participant could not be served, so a uptime check or a
-    // curl in a script fails on it rather than having to parse the body.
-    { status: readiness.ready ? 200 : 503 },
+    // THE STATUS FOLLOWS EVERY CHECK, not just the model. It used to follow
+    // `readiness.ready` alone, so a deployment with the dev panel still
+    // loaded and the completion code still `TBD` answered `"ready": false`
+    // with HTTP 200 — and the comment right here promised a script could fail
+    // on the status without parsing the body. It could not. The point of this
+    // route is `curl -f` in a launch checklist, so the status has to mean what
+    // the body says.
+    { status: ready ? 200 : 503 },
   );
 }

@@ -415,6 +415,14 @@ export default function PracticePage() {
                 <Transcript
                   messages={proxyChatMessages}
                   pending={proxyPending}
+                  // THE PARTICIPANT'S OWN PROXY, and the default would be
+                  // wrong in the most damaging way here. `pendingSpeaker`
+                  // defaults to `counterpart`, so this showed "👤 Other
+                  // Participant · typing" while the participant waited for the
+                  // proxy they are being taught to distinguish — on the one
+                  // screen whose whole job is to establish who is who, and in
+                  // a conversation the design says is private to them.
+                  pendingSpeaker="participant_proxy"
                   emptyHint="Ask your AI Proxy anything, e.g. &ldquo;What will you open with?&rdquo; or click the suggestion below."
                 />
 
