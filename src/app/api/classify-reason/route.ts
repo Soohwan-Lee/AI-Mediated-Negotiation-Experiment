@@ -33,6 +33,7 @@
 import { NextResponse } from "next/server";
 
 import { classifyReason } from "@/lib/ai/client";
+import { ModelNotConfiguredError } from "@/lib/ai/config";
 import { getTask } from "@/lib/tasks";
 import type { Role, TaskId } from "@/lib/types";
 
@@ -68,6 +69,19 @@ export async function POST(request: Request) {
       confidence: result.confidence,
     });
   } catch (error) {
+    // A MISCONFIGURED STUDY IS NOT A FAILED CLASSIFICATION, and the two must
+    // not share an answer. `none` is right for a model call that failed —
+    // recoverable, because the tier only rises and the participant can say it
+    // again. Returning `none` because there is NO MODEL AT ALL would floor
+    // every message of every session in silence, which is precisely the
+    // invisible failure the guard exists to break. It surfaces as a 503.
+    if (error instanceof ModelNotConfiguredError) {
+      console.error("[classify-reason] model not configured", error);
+      return NextResponse.json(
+        { error: "Classifier unavailable" },
+        { status: 503 },
+      );
+    }
     // A FAILED CLASSIFICATION IS `none`, NEVER A GUESS. The tier only ever
     // rises (§6.2), so a floor here costs the participant nothing they cannot
     // recover by saying more — while a guessed SB would hand out the maximum

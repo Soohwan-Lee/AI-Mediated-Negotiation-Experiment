@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
 import {
+  Callout,
   Card,
   CardTitle,
   Checkbox,
@@ -82,6 +83,22 @@ export default function ConsentPage() {
   const [agreed, setAgreed] = useState(false);
   const [isAdult, setIsAdult] = useState(false);
   const [busy, setBusy] = useState(false);
+  /**
+   * Set when the deployment cannot actually run a participant.
+   *
+   * THE FAILURE THIS CATCHES IS SILENT. With no model key configured the
+   * counterpart serves a canned "[SCAFFOLD] No model configured…" line and
+   * every route still answers 200, so the study would run to a coded outcome
+   * against a counterpart that never spoke — and nothing downstream would mark
+   * the session as void.
+   *
+   * Checked HERE, before consent, because it is the only place refusing is
+   * free: the participant has given nothing up yet. A per-turn check cannot
+   * carry it (a 503 from the classifier is swallowed into a `none` tier, and
+   * the Direct arm has no error state at all, so it would simply have the
+   * counterpart apologise forever mid-negotiation).
+   */
+  const [unavailable, setUnavailable] = useState(false);
 
   useDevAutofill(() => {
     setIsAdult(true);
@@ -93,9 +110,24 @@ export default function ConsentPage() {
   async function handleConsent() {
     if (!canProceed) return;
     setBusy(true);
+    setUnavailable(false);
     try {
+      // The server is the only side that can see the env, so it is asked.
+      // `gate=1` returns one boolean and nothing else — naming the model or
+      // the environment here would tell a participant reading their network
+      // tab what the other party is.
+      const res = await fetch("/api/preflight?gate=1");
+      if (!res.ok) {
+        setUnavailable(true);
+        return;
+      }
       await beginStudy();
       router.push(nextHref("welcome"));
+    } catch {
+      // A study that cannot confirm it is ready does not start. Failing open
+      // here would be indistinguishable, to the participant, from a study
+      // that works — and that is the whole problem.
+      setUnavailable(true);
     } finally {
       setBusy(false);
     }
@@ -317,6 +349,23 @@ export default function ConsentPage() {
             </Checkbox>
           </div>
         </Card>
+
+        {unavailable ? (
+          /*
+           * NO TECHNICAL DETAIL, and that is deliberate on two counts. The
+           * reader is a paid worker who needs to know whether to wait or to
+           * return the submission — not to debug someone else's deployment —
+           * and naming a model or an API key would disclose the counterpart's
+           * nature to every participant who ever saw this screen, which is the
+           * first item on the "must never learn mid-study" list.
+           */
+          <Callout tone="warning" title="The study is not available right now">
+            Something on our side is not ready, so we cannot start your session.
+            Please close this page and try again in a few minutes. If it still
+            does not work, return your submission on Prolific — you will not be
+            penalised for it, and nothing has been recorded.
+          </Callout>
+        ) : null}
       </Page>
 
       <ActionBar

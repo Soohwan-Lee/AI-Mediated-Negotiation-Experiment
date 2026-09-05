@@ -44,8 +44,35 @@ interface Check {
 
 export async function GET(request: Request) {
   const readiness = modelReadiness();
+  const url = new URL(request.url);
+
+  /**
+   * THE ENTRY GATE, and it is deliberately a different shape from the report.
+   *
+   * `?gate=1` answers one boolean and nothing else — no model id, no env, no
+   * check list — so the consent page can refuse to start an unservable study
+   * without telling the participant anything about the machinery. It needs no
+   * token for exactly that reason: there is nothing in the answer to protect.
+   *
+   * IT IS AT ENTRY RATHER THAN PER-TURN because of what the clients do with a
+   * failure. A 503 from /api/classify-reason is SWALLOWED — both callers read
+   * `if (data.label) label = data.label` inside a try/catch, so a body with no
+   * label silently leaves the tier at `none`, which is the very silence this
+   * guard exists to break. And the Direct arm has no error state at all: its
+   * counterpart fetch has no catch and falls through to "sorry, lost my train
+   * of thought there", so a mid-negotiation refusal would have a participant
+   * watch the counterpart apologise forever, forty minutes in, with half their
+   * data already recorded. Refusing before consent costs them nothing.
+   */
+  if (url.searchParams.get("gate") === "1") {
+    return NextResponse.json(
+      { ready: readiness.ready },
+      { status: readiness.ready ? 200 : 503 },
+    );
+  }
+
   const expected = process.env.PREFLIGHT_TOKEN?.trim();
-  const supplied = new URL(request.url).searchParams.get("token")?.trim();
+  const supplied = url.searchParams.get("token")?.trim();
 
   // Gate: a configured token must match. With no token set, the route is
   // available only while this is not a live study — so forgetting to set one

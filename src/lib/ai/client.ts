@@ -8,7 +8,12 @@
  * structured output against NEGOTIATION_ACTION_SCHEMA.
  */
 
-import { AI_CONFIG, getApiKey } from "./config";
+import {
+  AI_CONFIG,
+  getApiKey,
+  isLiveStudy,
+  ModelNotConfiguredError,
+} from "./config";
 import { NEGOTIATION_ACTION_SCHEMA, type NegotiationAction } from "./schema";
 import {
   buildClassifierPrompt,
@@ -31,6 +36,35 @@ export interface GenerateResult {
   /** True when the canned fallback was used instead of a real model call. */
   stubbed: boolean;
   raw?: unknown;
+}
+
+/**
+ * Refuse to hand back scaffold output when a participant might be reading it.
+ *
+ * THE SCAFFOLD IS A DEVELOPMENT AFFORDANCE and stays exactly that: with no key
+ * configured the whole flow is walkable, which is how the interface gets
+ * reviewed without credentials. What it must never do is reach a participant,
+ * because it does not announce itself — the routes answer 200, the negotiation
+ * settles a package, and the study records judgements about a counterpart that
+ * never spoke.
+ *
+ * The primary guard is at ENTRY (the consent page asks /api/preflight?gate=1
+ * before `beginStudy`), because that is the only point where refusing costs
+ * the participant nothing. This is the BACKSTOP for the case entry cannot
+ * cover: the environment changing after a participant is already inside.
+ *
+ * It throws rather than returning a value. Every caller of these functions
+ * sits inside a try/catch that answers 500, so a thrown error becomes a
+ * visible failure — while a returned one would be swallowed by exactly the
+ * `if (data.label)` pattern that makes this class of bug invisible.
+ */
+function assertNotLiveWithoutModel(): void {
+  if (isLiveStudy()) {
+    throw new ModelNotConfiguredError(
+      `${AI_CONFIG.apiKeyEnvVar} is not configured and this is a live study — ` +
+        `refusing to return placeholder text to a participant.`,
+    );
+  }
 }
 
 /** Used when no API key is configured, so the UI is still exercisable. */
@@ -57,6 +91,7 @@ export async function generateAction(
 ): Promise<GenerateResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
+    assertNotLiveWithoutModel();
     return { action: stubAction(args.ctx), stubbed: true };
   }
 
@@ -126,6 +161,7 @@ export async function generateText(args: {
 }): Promise<{ text: string; stubbed: boolean }> {
   const apiKey = getApiKey();
   if (!apiKey) {
+    assertNotLiveWithoutModel();
     return {
       text: "[SCAFFOLD] No model configured, so I cannot answer properly yet. With a key set I would tell you what I will open with, how far I will go, and which of your reasons I may use.",
       stubbed: true,
@@ -233,7 +269,14 @@ export async function classifyReason(args: {
   ctx: ClassifierContext;
 }): Promise<ReasonClassification> {
   const apiKey = getApiKey();
-  if (!apiKey) return { label: "none", confidence: 0, stubbed: true };
+  if (!apiKey) {
+    // NOT a silent `none` here. That contract is for a model call that FAILED
+    // mid-study — recoverable, because the participant can say it again and
+    // the tier only rises. A study running with no model at all is not that,
+    // and floored tiers would be the only trace it ever left.
+    assertNotLiveWithoutModel();
+    return { label: "none", confidence: 0, stubbed: true };
+  }
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
