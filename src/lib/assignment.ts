@@ -31,31 +31,31 @@ import type {
 /** The 4 counterbalanced sequences from Methods §Experimental Design. */
 const SEQUENCES: Record<
   SequenceId,
-  { order: SessionOrder; first: { condition: "baseline" | "proxy"; task: TaskId }; second: { condition: "baseline" | "proxy"; task: TaskId } }
+  { order: SessionOrder; first: { condition: "direct" | "proxy"; task: TaskId }; second: { condition: "direct" | "proxy"; task: TaskId } }
 > = {
   seq1: {
-    order: "baseline_first",
-    first: { condition: "baseline", task: "task_a" },
+    order: "direct_first",
+    first: { condition: "direct", task: "task_a" },
     second: { condition: "proxy", task: "task_b" },
   },
   seq2: {
     order: "proxy_first",
     first: { condition: "proxy", task: "task_a" },
-    second: { condition: "baseline", task: "task_b" },
+    second: { condition: "direct", task: "task_b" },
   },
   seq3: {
-    order: "baseline_first",
-    first: { condition: "baseline", task: "task_b" },
+    order: "direct_first",
+    first: { condition: "direct", task: "task_b" },
     second: { condition: "proxy", task: "task_a" },
   },
   seq4: {
     order: "proxy_first",
     first: { condition: "proxy", task: "task_b" },
-    second: { condition: "baseline", task: "task_a" },
+    second: { condition: "direct", task: "task_a" },
   },
 };
 
-const PROXY_POLICIES: ProxyPolicy[] = ["delegate", "explorer"];
+const PROXY_POLICIES: ProxyPolicy[] = ["user_specified", "ai_supplemented"];
 const ROLES: Role[] = ["leader", "member"];
 const SEQUENCE_IDS: SequenceId[] = ["seq1", "seq2", "seq3", "seq4"];
 
@@ -88,8 +88,8 @@ export function resolveAssignment(
 ): Assignment {
   const seq = SEQUENCES[slot.sequenceId];
 
-  const toCondition = (c: "baseline" | "proxy"): Condition =>
-    c === "baseline" ? "baseline" : slot.proxyPolicy;
+  const toCondition = (c: "direct" | "proxy"): Condition =>
+    c === "direct" ? "direct" : slot.proxyPolicy;
 
   const sessions: [SessionPlan, SessionPlan] = [
     { index: 1, condition: toCondition(seq.first.condition), taskId: seq.first.task },
@@ -137,5 +137,5 @@ export function sessionPlan(
 }
 
 export function isProxyCondition(condition: Condition): boolean {
-  return condition === "delegate" || condition === "explorer";
+  return condition === "user_specified" || condition === "ai_supplemented";
 }

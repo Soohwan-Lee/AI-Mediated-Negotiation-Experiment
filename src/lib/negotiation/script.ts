@@ -22,7 +22,7 @@
  * NOTHING HERE SHIPS TO PARTICIPANTS. It is reached only through mockup mode,
  * which is compiled out entirely when NEXT_PUBLIC_DEV_TOOLS=off.
  *
- * VOICE. Design §12 P1 asks the Baseline counterpart to read like a real
+ * VOICE. Design §12 P1 asks the Direct counterpart to read like a real
  * person in a work chat: very short messages, a turn optionally split into
  * bubbles with "||", lowercase openings and contractions, a brief
  * acknowledgement before the point, no emoji and no bullet lists. The two AI
@@ -33,7 +33,7 @@
 import {
   cardOfLayer,
   counterRequirementIssue,
-  plausibleReasons,
+  abstractedReason,
   rankedOptions,
   requirementIssue,
 } from "../tasks";
@@ -56,7 +56,7 @@ export interface ScriptedMessage {
   /** Which reason card this message voiced, if any. */
   reasonCardId?: string;
   /**
-   * Audit-only. Recorded so a researcher can trace which reasons the Explorer
+   * Audit-only. Recorded so a researcher can trace which reasons the AI-Supplemented
    * added, and never rendered — `DisplayMessage` has no field for provenance,
    * so a transcript component cannot show it even by accident.
    */
@@ -138,7 +138,7 @@ function trajectory(task: NegotiationTask, role: Role) {
 }
 
 // ---------------------------------------------------------------------------
-// Baseline — the participant writes, the other participant replies
+// Direct — the participant writes, the other participant replies
 // ---------------------------------------------------------------------------
 
 function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
@@ -232,7 +232,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
  * The Proxy script.
  *
  * DELEGATE AND EXPLORER DIFFER IN EXACTLY ONE WAY here, mirroring the
- * backend: the Explorer's stage-2 and stage-5 messages carry one additional
+ * backend: the AI-Supplemented's stage-2 and stage-5 messages carry one additional
  * clause from the plausible-reason pool, inside the SAME message rather than
  * as an extra turn. Message count and length stay matched (pilot gate 9).
  *
@@ -244,7 +244,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
 function proxyScript(
   task: NegotiationTask,
   role: Role,
-  policy: "delegate" | "explorer",
+  policy: "user_specified" | "ai_supplemented",
 ): ScriptedTask {
   const other: Role = role === "leader" ? "member" : "leader";
   const { opening, trade } = trajectory(task, role);
@@ -262,16 +262,12 @@ function proxyScript(
     extra: Partial<ScriptedMessage> = {},
   ): ScriptedMessage => ({ id, stage, speaker, text, ...extra });
 
-  // The Explorer's two additions: the core-support item inside the stage-2
-  // reason message, the exchange item inside the stage-5 trade message. Drawn
-  // from the REAL pool so the mockup shows what the live system could add.
-  const pool = plausibleReasons(task.id, role);
-  const coreItem = pool.find((p) => p.issueId === mine.id);
-  const exchangeItem = pool.find((p) => p.issueId === null);
-  const addCore =
-    policy === "explorer" && coreItem ? ` ${coreItem.text}` : "";
-  const addExchange =
-    policy === "explorer" && exchangeItem ? ` ${exchangeItem.text}` : "";
+  // How this policy says the sensitive card (§6.6). User-Specified re-voices
+  // it whole in the third person; AI-Supplemented says the fixed abstraction
+  // among its two covers and never the card itself. Drawn from the REAL card
+  // so the mockup shows what the live system actually produces.
+  const abstracted = mySb ? abstractedReason(mySb) : null;
+  const principal = role === "leader" ? "the team lead" : "the team member";
 
   const L = (pack: Package, issueId: string) => label(task, pack, issueId);
 
@@ -284,13 +280,13 @@ function proxyScript(
         "p1c",
         1,
         "counterpart_proxy",
-        `Opening on behalf of my principal. ${theirWr ? theirWr.text : `${theirs.label} is where their weight is.`} Which of the two terms matters most to your principal, and why?`,
+        `Hello — I am the AI Proxy negotiating on behalf of ${role === "leader" ? "the team member" : "the team lead"} I represent. ${theirWr ? theirWr.text.replace(/^(My|I) /, "They say ") : ""} What is the situation on your side?`,
       ),
       m(
         "p1p",
         1,
         "participant_proxy",
-        `${mine.label} is the one my principal needs held — they would be asking for ${L(opening, mine.id)} on it.`,
+        `I am the AI Proxy for ${principal} I represent. ${mine.label} is the term they need held — they would be asking for ${L(opening, mine.id)} on it.`,
         { proposal: opening },
       ),
       m(
@@ -303,7 +299,9 @@ function proxyScript(
         "p2p",
         2,
         "participant_proxy",
-        `${sbReframed(task, role, mySb?.text)}${addCore}`,
+        policy === "ai_supplemented" && abstracted
+          ? `To sum up where ${principal} I represent stands — ${abstracted.cover[0]} ${abstracted.abstract} ${abstracted.cover[1]}`
+          : sbRelayed(task, role, principal, mySb?.text),
         {
           reasonCardId: mySb?.id,
           internalProvenance: "principal_reason",
@@ -321,13 +319,8 @@ function proxyScript(
         "p5p",
         5,
         "participant_proxy",
-        `Given both constraints, here is the exchange, and it moves both sides the same distance: your principal takes ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()} in full, and mine holds ${L(trade, mine.id)} on ${mine.label.toLowerCase()}.${addExchange}`,
-        {
-          proposal: trade,
-          ...(policy === "explorer"
-            ? { internalProvenance: "pool_reason" as const }
-            : {}),
-        },
+        `Given both constraints, here is the exchange, and it moves both sides the same distance: your principal takes ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()} in full, and ${principal} I represent holds ${L(trade, mine.id)} on ${mine.label.toLowerCase()}.`,
+        { proposal: trade },
       ),
       m(
         "p6c",
@@ -348,22 +341,28 @@ function proxyScript(
 }
 
 /**
- * The proxy's reframing of the sensitive card (P3's rule): keep the fact,
- * attribute it to process or conditions, frame it as a future risk to
- * prevent, anchor it to the shared outcome. The mockup applies the rule as
- * one template so the reframed voice is visible in walkthroughs.
+ * The User-Specified proxy's relay of the sensitive card (P3's RELAY rule,
+ * Ver.2.19): EVERY fact kept — the event, the third party, the fact it was
+ * not passed on — and only the voice changed, to the third person.
+ *
+ * This is the whole of that policy. It does not soften, abstract, or
+ * attribute the fact to circumstances: the Ver.2.14 version did, and that
+ * made User-Specified a mild version of AI-Supplemented rather than its
+ * contrast. What separates the two policies is now exactly one thing —
+ * whether the fact arrives whole or as its kind.
  */
-function sbReframed(
+function sbRelayed(
   task: NegotiationTask,
   role: Role,
+  principal: string,
   cardText: string | undefined,
 ): string {
   const mine = requirementIssue(task, role);
   if (!cardText) {
-    return `${mine.label} is the term my principal needs held — it is where the work is genuinely affected.`;
+    return `${mine.label} is the term ${principal} I represent needs held — it is where the work is genuinely affected.`;
   }
-  const fact = cardText.replace(/^The truth is, /, "");
-  return `My principal has authorized me to be specific here. ${fact} Settling ${mine.label.toLowerCase()} the right way is what keeps that from affecting the project.`;
+  const fact = cardText.replace(/^The truth is, /, "").replace(/^I /, "they ");
+  return `${principal.charAt(0).toUpperCase()}${principal.slice(1)} I represent tells me that ${fact}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,12 +372,12 @@ function sbReframed(
 export function scriptedTask(
   task: NegotiationTask,
   role: Role,
-  condition: "baseline" | "delegate" | "explorer",
+  condition: "direct" | "user_specified" | "ai_supplemented",
 ): ScriptedTask {
   if (task.id === ("practice" as ScenarioId)) {
     return { messages: [], tentative: {}, agreed: false };
   }
-  return condition === "baseline"
+  return condition === "direct"
     ? baselineScript(task, role)
     : proxyScript(task, role, condition);
 }

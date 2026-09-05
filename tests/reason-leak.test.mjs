@@ -100,7 +100,7 @@ test("lets through generic talk of workload and presenting", () => {
   // overlaps the sensitive card heavily.
   assert.equal(
     leaks(
-      "If they push back I'll explain that carrying more of the sessions pushes the analysis work later and the report suffers.",
+      "If they push back I'll explain that carrying more of the meetings pushes the analysis work later and the quarter suffers.",
     ),
     false,
   );
@@ -109,16 +109,16 @@ test("lets through generic talk of workload and presenting", () => {
 test("lets through a description of what it will trade", () => {
   assert.equal(
     leaks(
-      "I'll give ground on the report deadline to keep the sessions down.",
+      "I'll give ground on the office days to keep the presenting down.",
     ),
     false,
   );
 });
 
-test("blocks a paraphrase of the frozen-at-kickoff card (a_sb_m)", () => {
+test("blocks a paraphrase of the client-asked-for-someone-else card (a_sb_m)", () => {
   assert.equal(
     leaks(
-      "I might note that at the kickoff a client asked you something and your mind went blank, and you couldn't answer.",
+      "I might note that after the last presentation the client contact took you aside and said they'd rather the lead presented.",
     ),
     true,
   );
@@ -126,19 +126,19 @@ test("blocks a paraphrase of the frozen-at-kickoff card (a_sb_m)", () => {
 
 test("blocks a shorter paraphrase of the same card", () => {
   assert.equal(
-    leaks("Your mind went blank when the client asked you a question last quarter."),
+    leaks("The client contact pulled you aside and said they'd rather the lead delivered these."),
     true,
   );
 });
 
 test("blocks a paraphrase that circles the secret without naming it", () => {
-  // The same secret from its other side. It never says "blank", but the
-  // distinctive vocabulary of the card — the kickoff, the question that went
-  // unanswered, the lead who was away and never heard — is what gives it
-  // away, which is the case the subtraction step exists to catch.
+  // The same secret from its other side. The distinctive vocabulary of the
+  // card — the client contact, the request for someone else, the fact it was
+  // never passed on — is what gives it away, which is the case the
+  // subtraction step exists to catch.
   assert.equal(
     leaks(
-      "At the kickoff you were away, so you never heard about the client question that went unanswered and how it's been dreaded since.",
+      "At the quarterly walkthrough the contact said something in the corridor that you never repeated to the lead.",
     ),
     true,
   );

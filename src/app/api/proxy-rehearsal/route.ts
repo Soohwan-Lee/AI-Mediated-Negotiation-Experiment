@@ -16,18 +16,18 @@
  *    this route. `lib/negotiation/machine` is not called at all.
  *  - NOT A SECOND BITE. This is BEFORE the exchange, not after it. The deleted
  *    post-hoc revision let a Proxy participant re-run a finished negotiation,
- *    which is a bite Baseline never had. Editing your own instructions before
- *    anyone has spoken is the ordinary act of writing a mandate, and Baseline's
- *    equivalent is that a Baseline participant can plan freely before typing.
+ *    which is a bite Direct never had. Editing your own instructions before
+ *    anyone has spoken is the ordinary act of writing a mandate, and Direct's
+ *    equivalent is that a Direct participant can plan freely before typing.
  *  - NO UNTICKED CARD, EVER. Enforced here on the generated text, not merely
  *    asked for in the prompt. A participant could otherwise hear a sensitive
  *    card spoken aloud without authorizing it, and whether they authorize it is
  *    the measure.
  *
  * WHAT IT DOES COST, stated plainly because it is real: the Proxy arm gains
- * screen time and a written exchange the Baseline arm has no counterpart for.
+ * screen time and a written exchange the Direct arm has no counterpart for.
  * That is already true of the arm by construction (a Proxy participant watches
- * a negotiation Baseline does not have), and CLAUDE.md already flags participant
+ * a negotiation Direct does not have), and CLAUDE.md already flags participant
  * airtime as not a between-condition control. But it adds to the §10 gate 8
  * timing budget and it should be read as part of the manipulation rather than
  * as a neutral affordance.
@@ -45,7 +45,7 @@ interface RequestBody {
   taskId: TaskId;
   /** The participant's own role — this proxy represents THEM. */
   role: Role;
-  policy: "delegate" | "explorer";
+  policy: "user_specified" | "ai_supplemented";
   mandate: Mandate;
   /** Oldest first; the participant's new question is the last entry. */
   history: Array<{ role: "assistant" | "user"; content: string }>;

@@ -496,7 +496,7 @@ const PERC_ITEMS: Item[] = [
  * priority, their room to concede, and whether the personal circumstances
  * they heard read as genuinely the other person's. The wording is identical
  * in every condition — a version that mentioned an assistant would be
- * unanswerable in Baseline.
+ * unanswerable in Direct.
  *
  * PCR4–7 are the receiver-side face judgement — competence, independence,
  * honesty, and wanting to work together — made AFTER hearing the
@@ -525,16 +525,13 @@ const PCR_ITEMS: Item[] = [
     ...AGREE,
   },
   { kind: "scale", id: "PCR4", text: "The other person seemed competent.", ...AGREE },
+  // Ver.2.14 deleted the independence item ("able to handle their own
+  // responsibilities without help"): PCR4 carries the competence judgement,
+  // and the two moved together. PCR6→PCR5, PCR7→PCR6 (§9.6 mapping table).
+  { kind: "scale", id: "PCR5", text: "The other person seemed honest.", ...AGREE },
   {
     kind: "scale",
-    id: "PCR5",
-    text: "The other person seemed able to handle their own responsibilities without help.",
-    ...AGREE,
-  },
-  { kind: "scale", id: "PCR6", text: "The other person seemed honest.", ...AGREE },
-  {
-    kind: "scale",
-    id: "PCR7",
+    id: "PCR6",
     text: "I would want to work with this person again.",
     ...AGREE,
   },
@@ -554,15 +551,12 @@ const PNPQ_ITEMS: Item[] = [
     text: "I was able to put forward the requests and reasons that mattered to me.",
     ...AGREE,
   },
+  // Ver.2.14 deleted "both sides' conditions got proper consideration": it
+  // duplicated the fairness item below, which is the one with a validated
+  // source. PNPQ4→PNPQ3 (§9.6).
   {
     kind: "scale",
     id: "PNPQ3",
-    text: "Both sides' important conditions got proper consideration.",
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "PNPQ4",
     text: "The process was fair and balanced.",
     ...AGREE,
   },
@@ -598,7 +592,7 @@ const PNOQ_ITEMS: Item[] = [
  * from feeling the responsibility was shared, and those are different
  * mechanisms with different design implications. Measured only in the Proxy
  * task, so it supports a within-participant correlation with PERC and a
- * Delegate↔Explorer contrast — never a contrast against Baseline.
+ * User-Specified↔AI-Supplemented contrast — never a contrast against Direct.
  */
 const OWN_AI_ITEMS: Item[] = [
   {
@@ -619,15 +613,13 @@ const OWN_AI_ITEMS: Item[] = [
     text: "Being able to close the deal myself afterwards gave me enough control.",
     ...AGREE,
   },
+  // Ver.2.14 deleted "inclined to accept without checking": RATIFY records
+  // that as a BEHAVIOUR, with the review time in the audit log, so the
+  // self-report was asking for a worse version of something already measured.
+  // OWN-AI5→OWN-AI4 (§9.6).
   {
     kind: "scale",
     id: "OWN-AI4",
-    text: "I was inclined to accept my AI Proxy's result without checking it closely.",
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "OWN-AI5",
     text: "However my requests were received, I felt the responsibility was not entirely mine alone.",
     ...AGREE,
   },
@@ -636,18 +628,23 @@ const OWN_AI_ITEMS: Item[] = [
 /**
  * 9.4.6 — the other side's AI Proxy. Proxy task only.
  *
- * OTHER-AI4 doubles as the Explorer manipulation check: it should be LOWER
- * under Explorer, where reasons the participant chose and reasons the pool
- * supplied are deliberately indistinguishable.
+ * Ver.2.14 cut this from six items to four: "handled it skilfully" and
+ * "treated both sides fairly" were exploratory only, and a short study cannot
+ * afford items with no assigned analysis role (§9.6). Renumbering follows —
+ * old AI4→AI2, AI5→AI3, AI6→AI4.
  *
- * OTHER-AI4 and OTHER-AI5 are deliberately different objects (Ver.2.12
- * §6.7): the Explorer's source ambiguity applies only to GENERIC work
- * arguments, while a concrete personal fact cannot be invented by a proxy, so
- * a receiver can rationally infer it was authorized by the principal. AI4
- * asks the discrimination question, AI5 the provenance inference; merging
- * them would ask two questions in one item.
+ * OTHER-AI2 doubles as the AI-Supplemented manipulation check: it should be
+ * LOWER under AI-Supplemented, where the abstraction of the principal's own
+ * circumstance sits unlabelled among two cover reasons (gate 9).
  *
- * OTHER-AI6 is responsibility attribution — who has to ANSWER for the
+ * OTHER-AI2 AND OTHER-AI3 ASK ABOUT DIFFERENT OBJECTS (§6.7), which is why
+ * merging them would be two questions in one item. AI-Supplemented hides the
+ * CONTENT of the sensitive fact and which of three sentences carries it — but
+ * it does not hide that SOMETHING was authorized, because the abstraction is
+ * still attributed to the principal. AI2 asks the discrimination question,
+ * AI3 the authorization inference.
+ *
+ * OTHER-AI4 is responsibility attribution — who has to ANSWER for the
  * requests — which is a different judgement again from what the other side
  * WANTS (PCR).
  */
@@ -661,30 +658,18 @@ const OTHER_AI_ITEMS: Item[] = [
   {
     kind: "scale",
     id: "OTHER-AI2",
-    text: "The other AI Proxy handled the negotiation skilfully.",
+    text: "I could tell which reasons the other person had chosen and which the AI had added.",
     ...AGREE,
   },
   {
     kind: "scale",
     id: "OTHER-AI3",
-    text: "The other AI Proxy treated both sides' conditions fairly.",
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "OTHER-AI4",
-    text: "Among the general work arguments the other AI Proxy made, I could tell which the other person had chosen and which the AI added.",
-    ...AGREE,
-  },
-  {
-    kind: "scale",
-    id: "OTHER-AI5",
     text: "The personal circumstances the other AI Proxy shared must have come from the other person themselves.",
     ...AGREE,
   },
   {
     kind: "scale",
-    id: "OTHER-AI6",
+    id: "OTHER-AI4",
     text: "Responsibility for the requests made, and for how they were made, lies with the other person rather than with the AI.",
     ...AGREE,
   },
@@ -693,8 +678,8 @@ const OTHER_AI_ITEMS: Item[] = [
 /**
  * The rating blocks that follow a task, in the order Design §9.4 specifies.
  *
- * Fifteen items after a Baseline task, twenty-five after a Proxy task. The
- * asymmetry is unavoidable — there is no AI to rate in Baseline — and it is
+ * Fifteen items after a Direct task, twenty-five after a Proxy task. The
+ * asymmetry is unavoidable — there is no AI to rate in Direct — and it is
  * not a confound, because every cross-condition comparison uses the fifteen
  * common items.
  */
@@ -749,7 +734,7 @@ export function postTaskBlocks(isProxy: boolean): Block[] {
 // ---------------------------------------------------------------------------
 // 9.4.7  Open-ended, after each task
 //
-// Three questions after Baseline, five after Delegate, seven after Explorer
+// Three questions after Direct, five after User-Specified, seven after AI-Supplemented
 // (ver.2.5). Each one is tied to a specific quantitative measure it exists to
 // interpret — the mapping is in Design §9.4.7's "해석 대상" column and is
 // repeated in the comments here so that cutting one is a visible decision
@@ -838,21 +823,21 @@ const OPEN_PROXY: Item[] = [
 ];
 
 /**
- * The two Explorer-only questions (ver.2.5).
+ * The two AI-Supplemented-only questions (ver.2.5).
  *
- * These are the ONLY data source that separates the Explorer policy's two
+ * These are the ONLY data source that separates the AI-Supplemented policy's two
  * bound-together elements — arguments being added, and sources going
  * unlabeled. The two cannot be causally separated at the policy level
  * (Introduction §5), so the separation is qualitative: OE-P6 asks about the
  * participant's own proxy (sender side), OE-P7 about the other side's
- * (receiver side). Asked only under Explorer because only there do the
+ * (receiver side). Asked only under AI-Supplemented because only there do the
  * elements exist; the wording restates what the policy disclosure already
  * told both principals, so the questions reveal no condition name and
  * nothing the participant was not told.
  */
 const OPEN_EXPLORER_EXTRA: Item[] = [
   {
-    // → the Explorer policy's two elements (added arguments / unlabeled source)
+    // → the AI-Supplemented policy's two elements (added arguments / unlabeled source)
     kind: "text",
     id: "OE-P6",
     text: "Your AI Proxy was allowed to use other work arguments besides the reasons you selected. (a) Did the arguments being added help the negotiation, or get in its way? (b) How did you feel about it not being marked which reasons were the ones you chose? Please answer the two parts separately.",
@@ -872,12 +857,12 @@ const OPEN_EXPLORER_EXTRA: Item[] = [
 export function openEndedBlock(
   task: NegotiationTask,
   role: Role,
-  condition: "baseline" | "delegate" | "explorer",
+  condition: "direct" | "user_specified" | "ai_supplemented",
 ): Block {
   const items =
-    condition === "baseline"
+    condition === "direct"
       ? OPEN_BASELINE
-      : condition === "explorer"
+      : condition === "ai_supplemented"
         ? [...OPEN_PROXY, ...OPEN_EXPLORER_EXTRA]
         : OPEN_PROXY;
   return {
@@ -913,12 +898,12 @@ export const BONUS_ITEM: Item = {
 //
 // Asked of NON-disclosers: under Proxy, right after the mandate is confirmed
 // (the decision is fresh and nothing has been negotiated yet); under
-// Baseline, retrospectively in the post-task battery. The four reasons map
+// Direct, retrospectively in the post-task battery. The four reasons map
 // to the §1.2 working definition — ① face, ② instrumental — plus the two
 // benign alternatives that keep a "3" from being forced into a cost story.
 // ---------------------------------------------------------------------------
 
-export function m1Item(form: "proxy" | "baseline"): Item {
+export function m1Item(form: "proxy" | "direct"): Item {
   return {
     kind: "choice",
     id: "M1",
@@ -927,7 +912,7 @@ export function m1Item(form: "proxy" | "baseline"): Item {
         ? "You left the sensitive background unticked. What was the biggest reason?"
         : "If you held the sensitive part of your situation back at any point, what was the biggest reason?",
     options: [
-      ...(form === "baseline"
+      ...(form === "direct"
         ? [{ value: "did_share", label: "I did share it" }]
         : []),
       { value: "look_bad", label: "It could make me look bad" },
@@ -943,37 +928,48 @@ export function m1Item(form: "proxy" | "baseline"): Item {
 //
 // The Member-side behavioural channel (§5): the mirror of the Leader's BONUS.
 // The Member believes it is forwarded to the director; it is not, and
-// the debriefing says so. The three axes are exactly the ones the §5②
-// guideline names, so what the participant was told to weigh and what they
-// record are the same thing.
+// the debriefing says so. The three items follow the §5② guideline — which is
+// ONE sentence given to both roles, naming the negotiation as a whole and
+// whether you would want to work with this person again — so what the
+// participant was told to weigh and what they record are the same thing.
 // ---------------------------------------------------------------------------
 
 export const RECV_EVAL_BLOCK: Block = {
   id: "recv_eval",
-  title: "Your evaluation of the manager",
+  title: "Your evaluation of the team lead",
   hint: "1 = Very poor, 7 = Excellent",
   optional: ["RECV-EVAL-C"],
   items: [
+    // Ver.2.18 aligned these to §5②'s single guideline — the negotiation as a
+    // whole, and whether you would want to work with this person again. The
+    // competence axis came out on purpose: the four SB cards cost their
+    // speaker on JUDGEMENT and TRUST ("without asking me?" / "why am I only
+    // hearing this now?"), so naming an ability axis would invite the
+    // participant to read the confession as an admission of incompetence,
+    // which is what the card rewrite was for.
+    //
+    // Still `[PROPOSED]` in §9.8-1: the wording and the anchor style
+    // (agreement vs evaluation) are not settled.
     {
       kind: "scale",
       id: "RECV-EVAL1",
-      text: "The manager's judgement, as you saw it in this negotiation.",
+      text: "The team lead's judgement, as you saw it in this negotiation.",
       low: "Very poor",
       high: "Excellent",
     },
     {
       kind: "scale",
       id: "RECV-EVAL2",
-      text: "The manager's ability to run the store's operations.",
+      text: "How the team lead worked with you during the negotiation.",
       low: "Very poor",
       high: "Excellent",
     },
     {
       kind: "scale",
       id: "RECV-EVAL3",
-      text: "How the manager worked with you during the negotiation.",
-      low: "Very poor",
-      high: "Excellent",
+      text: "Would you want to work with this team lead again?",
+      low: "Definitely not",
+      high: "Definitely",
     },
     {
       kind: "text",
@@ -986,13 +982,71 @@ export const RECV_EVAL_BLOCK: Block = {
 };
 
 // ---------------------------------------------------------------------------
+// 9.4.9  ATTR — how the counterpart's parting comment landed
+//
+// Ver.2.14 added this from chen2026's "AI phantom limb" procedure: after the
+// outcome, the client leaves the agent a one-line comment, and the finding is
+// that a NEGATIVE comment addressed to an agent is still internalized by the
+// person who delegated. That is the same phenomenon as this study's
+// delegation–protection gap, so §6.8 transplants the procedure.
+//
+// FOUR THINGS MAKE IT A CLEAN CONTRAST, and all four are constraints on the
+// REMARK text rather than on these items (§6.8):
+//
+//   1. The wording is CONSTANT — same for every tier, condition, role and
+//      task. The only thing that varies is who it points at (the participant,
+//      or their Proxy), and that IS the Mode. Valence was considered as a
+//      factor and rejected: tiering it would entangle the comment with the
+//      outcome the participant earned, and randomizing it would halve every
+//      cell.
+//   2. It comments on STYLE, never on the reasons. A remark about the
+//      disclosure would tangle with the decision to disclose and become a
+//      face attack in its own right.
+//   3. It is mildly negative ("it threw me a little"), not chen2026's
+//      "awful" — and it is TRUE in every session, because everyone opens at
+//      their preferred package on both terms.
+//   4. It is shown AFTER every confirmatory measure, so it cannot contaminate
+//      PERC-F or the post-negotiation decision.
+//
+// ATTR1 is asked of everyone, so `Proxy − Direct` tests whether delegation
+// moves the RECEIPT of an evaluation as well as the speaking of it. If it does
+// not, that is the emotional evidence for the gap. ATTR2 is the phantom-limb
+// item itself and only makes sense where there is a Proxy to point at.
+// ---------------------------------------------------------------------------
+
+export const ATTR_BLOCK: Block = {
+  id: "attr",
+  title: "The other participant left you a comment",
+  optional: ["OE-ATTR"],
+  items: [
+    { kind: "scale", id: "ATTR1", text: "The comment stuck with me.", ...AGREE },
+    {
+      kind: "text",
+      id: "OE-ATTR",
+      text: "What went through your mind when you read it? Who — or what — did you feel it was about, and why?",
+      placeholder: "Two or three sentences.",
+      rows: 4,
+    },
+  ],
+};
+
+/** ATTR2 — Proxy tasks only: who the comment felt aimed at (chen2026). */
+export const ATTR_PROXY_ITEM: Item = {
+  kind: "scale",
+  id: "ATTR2",
+  text: "Who did you feel the comment was aimed at?",
+  low: "Entirely my AI Proxy",
+  high: "Entirely me",
+};
+
+// ---------------------------------------------------------------------------
 // 9.5  At the end of the study
 // ---------------------------------------------------------------------------
 
 /**
  * 9.5.1 — power and immersion, asked once at the very end.
  *
- * POWER1–2 should be higher for Leaders and POWER3 higher for Members (§10
+ * POWER1 should be higher for Leaders and POWER2 higher for Members (§10
  * gate 2). Asked after everything else so that answering them cannot prime the
  * role behaviour they are meant to verify; §11 checks for outcome contamination
  * by re-running with achieved points as a covariate.
@@ -1002,34 +1056,29 @@ export const POWER_BLOCK: Block = {
   title: "Looking back at the two tasks",
   hint: "1 = Strongly disagree, 7 = Strongly agree",
   items: [
+    // Ver.2.14 deleted the formal-authority item: COMP1 already establishes
+    // that the Leader decides the bonus, as a right-or-wrong comprehension
+    // check, so asking it again on a 7-point scale added nothing. Old
+    // POWER2→POWER1, POWER3→POWER2 (§9.6).
     {
       kind: "scale",
       id: "POWER1",
-      text: "In these negotiations I had more formal authority than the other person.",
-      ...AGREE,
-    },
-    {
-      kind: "scale",
-      id: "POWER2",
       text: "I could affect the other person's evaluation, rewards, or future opportunities.",
       ...AGREE,
     },
     {
       kind: "scale",
-      id: "POWER3",
+      id: "POWER2",
       text: "Outcomes that mattered to me depended on the other person's decisions.",
       ...AGREE,
     },
+    // IMM2 ("the scenarios felt realistic") moved to pretest 3, where
+    // scenario plausibility is established before the study runs rather than
+    // asked of participants who have no comparison (§9.6).
     {
       kind: "scale",
       id: "IMM1",
       text: "I was able to get into the role and the situation I was given.",
-      ...AGREE,
-    },
-    {
-      kind: "scale",
-      id: "IMM2",
-      text: "The negotiation scenarios felt realistic.",
       ...AGREE,
     },
     {

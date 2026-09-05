@@ -6,7 +6,7 @@
  * THE ONLY SCREEN THAT DIFFERS BY ROLE, and the asymmetry is the manipulation:
  * a Leader decides the Member's bonus for this task, and a Member receives one.
  * That is what makes the Leader's reward power real rather than asserted, and
- * POWER2 at the end of the study is the check that it landed.
+ * POWER1 at the end of the study is the check that it landed.
  *
  * FOR THE LEADER this is a behavioural outcome (`BONUS`), not a survey item.
  * The instruction is fixed wording from §8 and names both the negotiation
@@ -32,7 +32,7 @@
  *    Task 2 measures would pick up; the whole reason the number had to be
  *    constant was to stop it varying, and not showing one stops it entirely.
  *
- * WHAT THE WAIT IS STILL DOING. POWER3 asks whether outcomes that mattered
+ * WHAT THE WAIT IS STILL DOING. POWER2 asks whether outcomes that mattered
  * depended on the other person's decisions, and it is the Member-side half of
  * gate 2's manipulation check. Waiting while someone else decides your bonus
  * IS that experience — the number was never what made the power real, the
@@ -60,6 +60,7 @@ import {
   dummyAnswer,
   requiredIds,
 } from "@/lib/measures";
+import { RemarkPhase } from "../remark";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { getTask } from "@/lib/tasks";
@@ -82,6 +83,35 @@ export default function TaskRewardPage({
   const [evalAnswers, setEvalAnswers] = useState<Answers>({});
   const [evalSubmitted, setEvalSubmitted] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  /**
+   * REMARK comes LAST on this screen (§6.8 rule 4): every confirmatory measure
+   * — PERC, PCR, PNPQ, PNOQ, OWN/OTHER-AI, and the decision above — is already
+   * recorded, so a mildly negative comment cannot contaminate any of them.
+   */
+  const [showRemark, setShowRemark] = useState(false);
+  /**
+   * Did this task reach a package? REMARK's opener differs — "glad we got
+   * that sorted" would be false after an impasse — and nothing else about the
+   * comment varies (§6.8 rule 1).
+   *
+   * Read from the outcome row the review screen already wrote, rather than
+   * threaded through the flow: this page is a separate route, so the
+   * negotiation state is long gone by the time it renders.
+   */
+  const [agreed, setAgreed] = useState(true);
+
+  useEffect(() => {
+    if (!participantKey) return;
+    let live = true;
+    void getStore()
+      .loadResponses(participantKey, `task_outcome_t${taskIndex}`)
+      .then((row) => {
+        if (live && row) setAgreed(row.outcome === "agreement");
+      });
+    return () => {
+      live = false;
+    };
+  }, [participantKey, taskIndex]);
 
   const isLeader = assignment?.role === "leader";
   const plan = assignment ? sessionPlan(assignment, taskIndex) : null;
@@ -128,8 +158,15 @@ export default function TaskRewardPage({
     window.scrollTo({ top: 0 });
   }
 
+  /** The decision is recorded first, then REMARK is shown (§6.8 rule 4). */
   async function save() {
     if (!canContinue) return;
+    await persistDecision();
+    setShowRemark(true);
+    window.scrollTo({ top: 0 });
+  }
+
+  async function persistDecision() {
     if (participantKey) {
       await getStore().saveResponses(participantKey, `reward_t${taskIndex}`, {
         role: assignment?.role ?? null,
@@ -144,6 +181,16 @@ export default function TaskRewardPage({
       { amount: isLeader ? amount : null, decided: isLeader },
       { sessionIndex: taskIndex },
     );
+  }
+
+  async function finishRemark(answers: Answers) {
+    if (participantKey) {
+      await getStore().saveResponses(
+        participantKey,
+        `attr_t${taskIndex}`,
+        answers,
+      );
+    }
     router.push(nextHref(flowKey));
   }
 
@@ -152,6 +199,17 @@ export default function TaskRewardPage({
       <Page>
         <p className="text-sm text-[var(--ink-2)]">Loading…</p>
       </Page>
+    );
+  }
+
+  if (showRemark) {
+    return (
+      <RemarkPhase
+        taskIndex={taskIndex}
+        isProxy={plan?.condition !== "direct"}
+        agreed={agreed}
+        onDone={finishRemark}
+      />
     );
   }
 
@@ -173,7 +231,7 @@ export default function TaskRewardPage({
           <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/40 via-white to-blue-50/20">
             <div className="flex items-center justify-between gap-2 mb-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-extrabold text-blue-900 shadow-2xs">
-                👑 Manager Decision · Task {taskIndex}
+                👑 Team Lead Decision · Task {taskIndex}
               </span>
               <span className="text-xs font-bold text-slate-500">
                 Bonus Allocation
@@ -184,9 +242,9 @@ export default function TaskRewardPage({
             </h1>
             <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
               As the team lead, you decide the recommended performance bonus
-              for the Member for this task. Please consider the negotiation
-              result <strong>together with what you learned during the
-              negotiation about their work reliability and availability</strong>.
+              for this task. Please consider not only the negotiation result
+              but <strong>the negotiation as a whole, and whether you would
+              want to work with this person again</strong>.
             </p>
           </Card>
 
@@ -246,13 +304,13 @@ export default function TaskRewardPage({
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--ink)]">
-              Evaluate the Manager
+              Evaluate the Team Lead
             </h1>
             <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-              Please write your evaluation of the manager, considering{" "}
-              <strong>the judgement and operational competence you saw during
-              the negotiation</strong>. It will be passed to the district
-              manager.
+              Please write your evaluation of the team lead, considering not
+              only the negotiation result but <strong>the negotiation as a
+              whole, and whether you would want to work with them
+              again</strong>. It will be passed to the director.
             </p>
           </Card>
 
@@ -295,7 +353,7 @@ export default function TaskRewardPage({
               ))}
             </span>
             <p className="text-lg sm:text-xl font-bold text-slate-900">
-              The manager is deciding your performance bonus…
+              The team lead is deciding your performance bonus…
             </p>
             <p className="mt-2 max-w-prose text-xs sm:text-sm text-slate-600">
               They were asked to consider the negotiation result together with
@@ -313,7 +371,7 @@ export default function TaskRewardPage({
               Decision Submitted
             </CardTitle>
             <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-              The manager has submitted their bonus decision for Task {taskIndex}.
+              The team lead has submitted their bonus decision for Task {taskIndex}.
               Any awarded bonus is added to your Prolific payment once the whole
               study concludes.
             </p>

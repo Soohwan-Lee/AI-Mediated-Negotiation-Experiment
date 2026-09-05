@@ -27,7 +27,7 @@ import { FLOW } from "@/lib/study-config";
 import type { ProxyPolicy, Role, SequenceId } from "@/lib/types";
 
 const ROLES: Role[] = ["leader", "member"];
-const POLICIES: ProxyPolicy[] = ["delegate", "explorer"];
+const POLICIES: ProxyPolicy[] = ["user_specified", "ai_supplemented"];
 const SEQUENCES: SequenceId[] = ["seq1", "seq2", "seq3", "seq4"];
 
 /** Session-index-parameterized routes need a concrete index to link to. */

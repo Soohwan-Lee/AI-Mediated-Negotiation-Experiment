@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Phases shared by the Baseline and Proxy tasks (Experimental Design Ver.2.4
+ * Phases shared by the Direct and Proxy tasks (Experimental Design Ver.2.4
  * §8).
  *
  * The order of the first three matters and is not arbitrary:
@@ -49,13 +49,12 @@ import {
   counterpartStageAfter,
   counterpartStep,
   foldTier,
+  LABEL_TIER,
   mentionsScoreNumbers,
-  tierOf,
   type ReasonTier,
 } from "@/lib/negotiation/machine";
 import {
   BriefingPanel,
-  IssueReasonGroups,
   TaskCover,
   type CoverScene,
   TaskHeader,
@@ -203,16 +202,16 @@ export function TaskBrief({
         />
 
         {/* Shared Public Scenario */}
-        <Card className="mb-6 border-slate-200 bg-white">
-          <CardTitle hint="Public context known to both participants:">
-            📋 Project Scenario: {task.title}
+        <Card className="mb-6 border-blue-100/80 bg-gradient-to-br from-white to-blue-50/20">
+          <CardTitle hint="What you and your colleague both know about this project:">
+            📋 The Project Setting: {task.title}
           </CardTitle>
           <p className="text-sm sm:text-base leading-relaxed text-slate-700 mt-2">
             {task.publicBrief}
           </p>
-          <div className="mt-3.5 flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-600 border border-slate-200">
-            <span>🌐</span>
-            <span>Both parties share the project background above. Your personal goals and situation below are private.</span>
+          <div className="mt-3.5 flex items-center gap-2.5 rounded-xl bg-blue-50/80 p-3 text-xs font-semibold text-blue-900 border border-blue-200/60">
+            <span className="text-base">🌐</span>
+            <span>Shared Workplace Setting: Both you and your colleague share the project background above. Your personal goals and private story below are confidential to you.</span>
           </div>
         </Card>
 
@@ -344,13 +343,13 @@ export function PreferenceForm({
           />
 
           <div className="mb-6">
-            <Callout tone="private" title="🔒 Strictly Confidential · What You Want">
+            <Callout tone="private" title="🔒 Private to You · Set Your Goals">
               <p className="text-xs sm:text-sm leading-relaxed">
-                Choose what you would like on each of the two terms. The other
-                person never sees this.{" "}
+                Select the option you would like to aim for on each of the two terms. The other
+                person never sees your selections.{" "}
                 {isProxy
-                  ? "Your AI Proxy opens by asking for it."
-                  : "Afterwards you will see it beside what was actually agreed."}
+                  ? "Your AI Proxy opens by asking for these choices."
+                  : "Afterwards, you will see your original goals beside the final agreed package."}
               </p>
 
               <PointsKey
@@ -608,7 +607,7 @@ export function Matchmaking({ onReady }: { onReady: () => void }) {
           </p>
           <ul className="space-y-1.5 text-xs">
             {/* ARM-NEUTRAL WORDING. This screen is shared, and "mandate"
-                only exists in one arm — a Baseline participant was being told
+                only exists in one arm — a Direct participant was being told
                 their mandate was locked when they never wrote one. Words that
                 belong to one condition do not go on a shared screen
                 (deception item 2). */}
@@ -632,119 +631,6 @@ export function Matchmaking({ onReady }: { onReady: () => void }) {
         </div>
       </div>
     </Page>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Reason attachment (Baseline)
-// ---------------------------------------------------------------------------
-
-export function ReasonPicker({
-  task,
-  role,
-  value,
-  onChange,
-  alreadyVoiced,
-}: {
-  task: NegotiationTask;
-  role: Role;
-  value: string | null;
-  onChange: (id: string | null) => void;
-  alreadyVoiced: string[];
-}) {
-  const [open, setOpen] = useState(false);
-  const cards = task.roleBriefs[role].reasonCards;
-  if (!cards.length) return null;
-
-  const selected = cards.find((c) => c.id === value);
-
-  return (
-    <div className="border-t border-slate-200 bg-amber-50/50 px-4 py-3 sm:px-5">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-3 text-left transition-colors"
-      >
-        <span className="text-xs sm:text-sm text-[var(--private-ink)] font-medium">
-          {selected ? (
-            <>
-              <span aria-hidden className="mr-1">📎</span> Saying this reason:{" "}
-              <span className="font-bold text-slate-900">
-                &ldquo;{selected.text.slice(0, 50)}
-                {selected.text.length > 50 ? "…" : ""}&rdquo;
-              </span>
-            </>
-          ) : (
-            <>
-              <span aria-hidden className="mr-1">📎</span> Attach a rationale card to this message (optional)
-            </>
-          )}
-        </span>
-        <span className="shrink-0 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-bold text-amber-900 shadow-2xs hover:bg-amber-50">
-          {open ? "▲ Close" : "▼ Choose"}
-        </span>
-      </button>
-
-      {open ? (
-        <div className="mt-3.5 space-y-3">
-          <IssueReasonGroups
-            task={task}
-            role={role}
-            renderCard={(card) => (
-              <ReasonChoice
-                card={card}
-                checked={value === card.id}
-                voiced={alreadyVoiced.includes(card.id)}
-                onToggle={() =>
-                  onChange(value === card.id ? null : card.id)
-                }
-              />
-            )}
-          />
-          <p className="text-xs text-amber-900/80 font-medium">
-            💡 You write your own message text — selecting a card records which background rationale you voiced.
-          </p>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function ReasonChoice({
-  card,
-  checked,
-  voiced,
-  onToggle,
-}: {
-  card: { id: string; text: string };
-  checked: boolean;
-  voiced: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <label
-      className={cx(
-        "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all shadow-2xs",
-        checked
-          ? "border-blue-500 bg-blue-50/80 text-blue-950 ring-2 ring-blue-500/20"
-          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50",
-      )}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onToggle}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 accent-blue-600"
-      />
-      <span className="text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
-        {card.text}
-        {voiced ? (
-          <span className="ml-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-2xs font-bold text-slate-600">
-            already mentioned
-          </span>
-        ) : null}
-      </span>
-    </label>
   );
 }
 
@@ -953,8 +839,13 @@ export function DirectNegotiation({
     openingPackage,
   );
   const [secondsRemaining, setSecondsRemaining] = useState(CLOSING_SECONDS);
-  const [attachedReasonId, setAttachedReasonId] = useState<string | null>(null);
-  const [voicedReasonIds, setVoicedReasonIds] = useState<string[]>([]);
+  /**
+   * The rung the participant's own words have reached in this closing (§6.2a).
+   * No card buttons here either — Ver.2.20 removed them from both places the
+   * participant speaks for themselves, so the two are the same act.
+   */
+  const [personalTier, setPersonalTier] = useState<ReasonTier>("none");
+  const [selfDisclosed, setSelfDisclosed] = useState(false);
   /** SCRIPT-ASKWHY / SCRIPT-NONUM / SCRIPT-CLOSE are each one-shot. */
   const [askedWhy, setAskedWhy] = useState(false);
   const [numbersReminded, setNumbersReminded] = useState(false);
@@ -974,19 +865,14 @@ export function DirectNegotiation({
   const yourTurn = !pending && canSend && !settled;
 
   /**
-   * The credibility ladder carries over from the AI-AI exchange and only
-   * ever rises: the proxy's voiced tier, raised by any card the participant
-   * tags in person on their own core issue.
+   * The ladder carries over from the AI-AI exchange and only ever RISES: what
+   * the proxy earned, raised by whatever the participant says here in person.
+   *
+   * This is the one place `SB-TIMING = wrap_up` can happen — a participant who
+   * authorized nothing, watched the proxies settle at the priority rung, and
+   * then said the thing themselves.
    */
-  const personallyVoiced = voicedReasonIds
-    .map((id) => task.roleBriefs[role].reasonCards.find((c) => c.id === id))
-    .filter(
-      (c): c is NonNullable<typeof c> =>
-        Boolean(c) && c!.issueId === requirement.id,
-    );
-  const tier: ReasonTier = foldTier(proxyVoicedTier, tierOf(personallyVoiced));
-
-  const selfDisclosed = personallyVoiced.some((c) => c.layer === "sensitive");
+  const tier: ReasonTier = foldTier(proxyVoicedTier, personalTier);
 
   useDevAutofill(() => {
     if (settled) return;
@@ -1048,21 +934,28 @@ export function DirectNegotiation({
     setDraft("");
     setConfirmDecline(false);
 
-    const voiced = attachedReasonId
-      ? [...new Set([...voicedReasonIds, attachedReasonId])]
-      : voicedReasonIds;
-    setVoicedReasonIds(voiced);
-    setAttachedReasonId(null);
+    // The classifier reads this message (§6.2a); the rung it earns counts
+    // from THIS turn, because a confession should land the moment it is made.
+    type ReasonLabel = "none" | "WR" | "PRI" | "SB";
+    let label: ReasonLabel = "none";
+    if (!mockAi) {
+      try {
+        const res = await fetch("/api/classify-reason", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId: task.id, role, message: text }),
+        });
+        const data = (await res.json()) as { label?: ReasonLabel };
+        if (data.label) label = data.label;
+      } catch (error) {
+        console.warn("[classify-reason] failed", error);
+      }
+    }
 
-    // The tier the counterpart reads THIS turn, including a card attached to
-    // this very message — a confession should count the moment it is made.
-    const voicedNow = voiced
-      .map((id) => task.roleBriefs[role].reasonCards.find((c) => c.id === id))
-      .filter(
-        (c): c is NonNullable<typeof c> =>
-          Boolean(c) && c!.issueId === requirement.id,
-      );
-    const tierNow: ReasonTier = foldTier(proxyVoicedTier, tierOf(voicedNow));
+    const personalNow = foldTier(personalTier, LABEL_TIER[label]);
+    setPersonalTier(personalNow);
+    if (label === "SB") setSelfDisclosed(true);
+    const tierNow: ReasonTier = foldTier(proxyVoicedTier, personalNow);
 
     logEvent(
       "message_sent",
@@ -1071,7 +964,7 @@ export function DirectNegotiation({
         length: text.length,
         secondsRemaining,
         requirementOption: sentOffer[requirement.id] ?? null,
-        reasonCardId: attachedReasonId,
+        reasonLabel: label,
         tier: tierNow,
       },
       { sessionIndex: taskIndex },
@@ -1086,7 +979,6 @@ export function DirectNegotiation({
         createdAt: new Date().toISOString(),
         stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET),
         proposal: Object.keys(sentOffer).length > 0 ? sentOffer : undefined,
-        reasonCardId: attachedReasonId ?? undefined,
       });
     }
 
@@ -1193,7 +1085,7 @@ export function DirectNegotiation({
       // recorded impasse with an agreement — two `negotiation_ended` events
       // for one exchange, and which one survived decided by network timing.
       // The reply delay is 8-25s on a 180s closing clock, so a message sent
-      // near the end is genuinely likely to land after zero. Baseline has the
+      // near the end is genuinely likely to land after zero. Direct has the
       // same shape on a 600s clock, which made this an asymmetry on the
       // primary contrast as well as a bug.
       if (!settledRef.current && (decision.accepts || decision.impasse)) {
@@ -1211,7 +1103,7 @@ export function DirectNegotiation({
   /**
    * The explicit accept: take the counterpart's standing proposal as-is.
    * Deterministic — no model reads the participant's words to decide whether
-   * they agreed — and the same control the Baseline arm has, so closing works
+   * they agreed — and the same control the Direct arm has, so closing works
    * identically across conditions.
    */
   function acceptStanding() {
@@ -1292,13 +1184,6 @@ export function DirectNegotiation({
                   ? "The proxies are done. Say hello and settle it — or accept the package below."
                   : "Set the levels you want below, then put them to the other participant."
               }
-            />
-            <ReasonPicker
-              task={task}
-              role={role}
-              value={attachedReasonId}
-              onChange={setAttachedReasonId}
-              alreadyVoiced={voicedReasonIds}
             />
             <MessageComposer
               value={draft}
@@ -1484,7 +1369,7 @@ export function RehearsalChat({
   taskIndex: 1 | 2;
   task: NegotiationTask;
   role: Role;
-  policy: "delegate" | "explorer";
+  policy: "user_specified" | "ai_supplemented";
   mandate: Mandate;
   steps: string[];
   stepIndex: number;

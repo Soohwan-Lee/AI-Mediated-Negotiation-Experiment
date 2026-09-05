@@ -105,9 +105,9 @@ export default function ConsentPage() {
     <>
       <Page>
         <PageHeader
-          eyebrow="Research Study · CHI 2027"
+          eyebrow="Interactive Simulation · Workplace Study"
           title={STUDY.title}
-          subtitle="A study exploring workplace negotiation and communication patterns when software tools are involved."
+          subtitle="An interactive study exploring how colleagues communicate priorities and reach agreement on workplace arrangements."
         />
 
         {/* 3 Core Stats Cards */}
@@ -133,6 +133,17 @@ export default function ConsentPage() {
             hint="At Prolific's fair-pay rate"
             tone="indigo"
           />
+        </div>
+
+        {/* Device Recommendation Notice */}
+        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 sm:p-4 text-xs sm:text-sm font-medium text-amber-950 shadow-2xs">
+          <span className="text-xl shrink-0">💻</span>
+          <div className="min-w-0 flex-1 leading-relaxed">
+            <strong className="font-extrabold text-amber-900">Desktop or Laptop Highly Recommended: </strong>
+            <span>
+              This study requires split-screen negotiation workspaces and a live chat interface designed for larger screens. Mobile devices and small tablets are not recommended.
+            </span>
+          </div>
         </div>
 
         {/* Quick Summary Card */}
@@ -213,7 +224,7 @@ export default function ConsentPage() {
         {/* Data & Privacy Section */}
         <div className="mb-6 grid gap-4 sm:grid-cols-2">
           <Card>
-            <CardTitle hint="Standard anonymized research telemetry">
+            <CardTitle hint="Recorded strictly for research analysis">
               📝 What is Recorded
             </CardTitle>
             <ul className="space-y-2 mt-2">
@@ -230,11 +241,11 @@ export default function ConsentPage() {
           </Card>
 
           <Card>
-            <CardTitle hint="Strict research confidentiality">
+            <CardTitle hint="Confidential & completely anonymous">
               🛡️ How Data is Kept
             </CardTitle>
             <p className="text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]">
-              All responses are strictly anonymized under a research code. Your Prolific ID is used solely for compensation.
+              All responses are stored under an anonymous research ID. Your Prolific ID is used solely for compensation payout.
             </p>
             <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-2xs sm:text-xs leading-relaxed text-amber-900 font-medium">
               ⚠️ Please do not enter real names or personal contact info in text boxes.

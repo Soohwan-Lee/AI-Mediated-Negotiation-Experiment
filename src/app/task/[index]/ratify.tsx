@@ -12,7 +12,7 @@
  * reasoning was right about the shape it had: when BOTH arms ended with the
  * participant agreeing a package in conversation, a following "do you accept
  * this?" made them re-decide what they had just decided, and handed the Proxy
- * arm a way to undo an agreement Baseline could not undo. Ver.2.13 changes
+ * arm a way to undo an agreement Direct could not undo. Ver.2.13 changes
  * that shape. The closing conversation is no longer how a Proxy task ends by
  * default — it is where modify-or-reject LEADS. The construct this study is
  * built on is delegation of VOICE with RETENTION OF THE DECISION (§2.6), and

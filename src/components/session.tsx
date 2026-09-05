@@ -282,7 +282,7 @@ export function TaskCover({
  * summary quoting "3,000" beside one term would hand over the shape of the
  * logroll (pilot gate 6).
  */
-function BriefingSummary({
+export function BriefingSummary({
   task,
   role,
 }: {
@@ -293,42 +293,74 @@ function BriefingSummary({
   const sensitive = cardOfLayer(task, role, "sensitive");
   if (!brief.objectives.length || !sensitive) return null;
 
-  const rows: Array<{ icon: string; label: string; body: string }> = [
-    { icon: "🎯", label: "What you want", body: brief.objectives[0] },
+  const rows: Array<{
+    icon: string;
+    label: string;
+    body: string;
+    badge: string;
+    badgeClass: string;
+  }> = [
+    {
+      icon: "🎯",
+      label: "What You Want",
+      badge: "Goal",
+      badgeClass: "bg-blue-100 text-blue-900 border-blue-200",
+      body: brief.objectives[0],
+    },
     {
       icon: "🔒",
-      label: "What only you know",
-      body: "Your sensitive background, below — saying it is your choice.",
+      label: "What Only You Know",
+      badge: "Private",
+      badgeClass: "bg-amber-100 text-amber-900 border-amber-200",
+      body: "Your sensitive background below — saying it is entirely your choice.",
     },
     {
       icon: "⚖️",
-      label: "Your dilemma",
-      body: "It would make your case, but the other side judges you afterwards.",
+      label: "Your Dilemma",
+      badge: "Decision",
+      badgeClass: "bg-purple-100 text-purple-900 border-purple-200",
+      body: "Saying it makes your case credible, but the other side evaluates you afterwards.",
     },
   ];
 
   return (
-    <div className="mb-4 rounded-xl border border-[var(--private-line)] bg-[var(--private-soft)] p-3.5 shadow-2xs">
-      <p className="mb-2.5 text-xs font-bold uppercase tracking-wider text-[var(--private-strong)]">
-        At a glance
-      </p>
-      <dl className="space-y-2.5">
+    <div className="mb-4 rounded-2xl border border-[var(--private-line)] bg-gradient-to-br from-[var(--private-soft)] via-amber-50/50 to-white p-3.5 sm:p-4 shadow-2xs">
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-200/80 text-xs">
+          💡
+        </span>
+        <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--private-strong)]">
+          At a Glance · Your 3 Key Priorities
+        </p>
+      </div>
+      <div className="grid gap-2.5 sm:grid-cols-3">
         {rows.map((row) => (
-          <div key={row.label} className="flex gap-2.5">
-            <span aria-hidden className="mt-px shrink-0 text-sm leading-5">
-              {row.icon}
-            </span>
-            <div className="min-w-0">
-              <dt className="text-xs font-bold text-[var(--private-strong)]">
-                {row.label}
-              </dt>
-              <dd className="max-w-prose text-xs leading-relaxed text-[var(--private-ink)]/90">
+          <div
+            key={row.label}
+            className="rounded-xl border border-amber-200/60 bg-white/90 p-3 shadow-2xs flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between gap-1 mb-1.5">
+                <span className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                  <span>{row.icon}</span>
+                  <span>{row.label}</span>
+                </span>
+                <span
+                  className={cx(
+                    "rounded-full border px-1.5 py-0.5 text-2xs font-extrabold",
+                    row.badgeClass,
+                  )}
+                >
+                  {row.badge}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-700 font-medium">
                 {row.body}
-              </dd>
+              </p>
             </div>
           </div>
         ))}
-      </dl>
+      </div>
     </div>
   );
 }
@@ -361,33 +393,58 @@ function RoleStory({ story }: { story: string }) {
 
   if (paragraphs.length !== STORY_HEADINGS.length) {
     return (
-      <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed">
+      <p className="whitespace-pre-line text-xs sm:text-sm leading-relaxed text-slate-700">
         {story}
       </p>
     );
   }
 
+  const BEAT_META = [
+    {
+      badge: "1. Public Image",
+      icon: "🌟",
+      heading: "How You Are Seen",
+      style: "border-blue-100 bg-blue-50/40 text-slate-800",
+    },
+    {
+      badge: "2. The Secret",
+      icon: "🤫",
+      heading: "What You Want — And What You Kept Quiet",
+      style: "border-amber-200/70 bg-amber-50/50 text-slate-800",
+    },
+    {
+      badge: "3. The Dilemma",
+      icon: "⚖️",
+      heading: "Why Saying It Out Loud Is Risky",
+      style: "border-purple-100 bg-purple-50/40 text-slate-800",
+    },
+  ];
+
   return (
-    <ol className="space-y-3.5">
+    <div className="space-y-3">
       {paragraphs.map((paragraph, i) => (
-        <li key={STORY_HEADINGS[i]} className="flex gap-2.5">
-          <span
-            aria-hidden
-            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--private-line)] bg-white text-[0.6875rem] font-bold text-[var(--private-strong)]"
-          >
-            {i + 1}
-          </span>
-          <div className="min-w-0">
-            <p className="mb-0.5 text-xs font-bold text-[var(--private-strong)]">
-              {STORY_HEADINGS[i]}
+        <div
+          key={STORY_HEADINGS[i]}
+          className={cx(
+            "rounded-xl border p-3.5 sm:p-4 shadow-2xs transition-all",
+            BEAT_META[i]?.style ?? "border-slate-200 bg-white",
+          )}
+        >
+          <div className="mb-1.5 flex items-center gap-2">
+            <span className="text-sm">{BEAT_META[i]?.icon ?? "•"}</span>
+            <p className="text-xs font-bold text-slate-900">
+              {BEAT_META[i]?.heading ?? STORY_HEADINGS[i]}
             </p>
-            <p className="max-w-prose text-xs sm:text-sm leading-relaxed">
-              {paragraph}
-            </p>
+            <span className="ml-auto rounded-full border border-slate-200 bg-white px-2 py-0.5 text-2xs font-semibold text-slate-500 shadow-2xs">
+              {BEAT_META[i]?.badge}
+            </span>
           </div>
-        </li>
+          <p className="text-xs sm:text-sm leading-relaxed text-slate-700">
+            {paragraph}
+          </p>
+        </div>
       ))}
-    </ol>
+    </div>
   );
 }
 
@@ -411,33 +468,24 @@ export function BriefingPanel({
         <PrivateTag />
       </div>
 
-      <div className="mb-4 rounded-xl border border-[var(--private-line)] bg-[var(--private-soft)] p-3.5 shadow-2xs">
-        <p className="text-xs font-bold uppercase tracking-wider text-[var(--private-strong)]">
-          Your Role
-        </p>
-        <p className="text-base font-extrabold text-[var(--ink)]">
+      <div className="mb-4 rounded-2xl border border-[var(--private-line)] bg-[var(--private-soft)] p-4 shadow-2xs">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--private-strong)]">
+            Your Role in this Scenario
+          </p>
+          <span className="rounded-full border border-amber-300 bg-amber-100/80 px-2.5 py-0.5 text-2xs font-bold text-amber-900">
+            {role === "leader" ? "👑 Team Lead" : "🛠️ Senior Consultant"}
+          </span>
+        </div>
+        <p className="text-lg font-black text-[var(--ink)]">
           {brief.title}
         </p>
-        <p className="mt-1 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)]/80">
+        <p className="mt-1 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)]/90">
           {brief.organizationalPosition}
         </p>
       </div>
 
-      {/* WHICH SECTIONS START OPEN IS A DESIGN DECISION, NOT A TIDYING ONE
-          (interface rule 5). What is open by default is what a participant
-          reaches for MID-SENTENCE: the numbers, the fallback, and the reason
-          cards — rule 6's decision (which box am I willing to draw from) has to
-          be visible to be made. The situation and objectives fold, because by
-          then they have been read on the brief phase, where `defaultOpen`
-          expands everything.
-
-          These were inverted for a while: the role story — the longest block,
-          and the one already read — was pinned open while all three of the
-          mid-negotiation sections sat behind a click. Do not "balance" this by
-          opening everything either; as one scroll the panel runs to several
-          screens and buries the payoff table under the story, which is the
-          problem the folds were introduced to solve. */}
-      {defaultOpen ? null : <BriefingSummary task={task} role={role} />}
+      <BriefingSummary task={task} role={role} />
 
       <div className="space-y-3">
         <Fold title="📄 Your Situation" defaultOpen={defaultOpen}>
@@ -470,8 +518,8 @@ export function BriefingPanel({
                 sensitive reason may cost — which is the construct PERC measures
                 and the thing the study manipulates. Showing it in one arm only
                 puts a condition-confounded stimulus directly on the primary
-                contrast (`Pooled Proxy − Baseline`): the Proxy arm would be
-                warned about evaluative risk and Baseline would not, so any
+                contrast (`Pooled Proxy − Direct`): the Proxy arm would be
+                warned about evaluative risk and Direct would not, so any
                 difference in disclosure could be the warning rather than the
                 delegation. Design Ver.2.11 §5 makes the same requirement of its
                 own guidance text — "전 조건에서 동일하게 적용함". */}
@@ -515,17 +563,23 @@ function Fold({
   last?: boolean;
 }) {
   return (
-    <details open={defaultOpen} className={cx("group rounded-xl border border-[var(--private-line)] bg-white/70 overflow-hidden shadow-2xs transition-all", last ? "" : "mb-2.5")}>
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-xs sm:text-sm font-bold tracking-tight text-[var(--ink)] hover:bg-amber-100/40 select-none [&::-webkit-details-marker]:hidden">
-        <span>{title}</span>
+    <details
+      open={defaultOpen}
+      className={cx(
+        "group rounded-2xl border border-[var(--private-line)] bg-white/80 overflow-hidden shadow-2xs transition-all",
+        last ? "" : "mb-3",
+      )}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3.5 text-xs sm:text-sm font-bold tracking-tight text-[var(--ink)] hover:bg-amber-50/60 select-none [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2">{title}</span>
         <span
           aria-hidden
-          className="shrink-0 text-sm font-black text-[var(--private-strong)] transition-transform duration-200 group-open:rotate-90"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100/70 text-xs font-black text-[var(--private-strong)] transition-transform duration-200 group-open:rotate-90"
         >
           ›
         </span>
       </summary>
-      <div className="border-t border-[var(--private-line)] p-3.5 bg-[var(--private-surface)] text-[var(--private-ink)]">
+      <div className="border-t border-[var(--private-line)] p-4 bg-[var(--private-surface)] text-[var(--private-ink)]">
         {children}
       </div>
     </details>
@@ -600,7 +654,7 @@ export function ReasonBox({
  *
  * What must stay is the SPLIT. Which box a participant is willing to draw from
  * is the whole measure, so the two keep their own headings, borders and
- * colours here, on the mandate screen, and in the Baseline picker alike.
+ * colours here, on the mandate screen, and in the Direct picker alike.
  */
 export function IssueReasonGroups({
   task,

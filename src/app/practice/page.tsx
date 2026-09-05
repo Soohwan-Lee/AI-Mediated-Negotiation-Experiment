@@ -52,7 +52,7 @@ export default function PracticePage() {
   const [phase, setPhase] = useState<"intro" | "practice">("intro");
   const { assignment, logEvent, saveResponses } = useParticipant();
 
-  // Baseline practice states
+  // Direct practice states
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [offer, setOffer] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
@@ -454,7 +454,7 @@ export default function PracticePage() {
             /* BRANCH B: BASELINE DIRECT NEGOTIATION PRACTICE                            */
             /* ========================================================================= */
             <>
-              {/* Step 1 for Baseline: Offer Builder */}
+              {/* Step 1 for Direct: Offer Builder */}
               <Card
                 className={cx(
                   "mb-6 transition-all",
@@ -496,7 +496,7 @@ export default function PracticePage() {
                 </div>
               </Card>
 
-              {/* Step 2 for Baseline: Live Chatbox */}
+              {/* Step 2 for Direct: Live Chatbox */}
               <Card
                 className={cx(
                   "mb-6 flex flex-col overflow-hidden border-slate-200 transition-all",

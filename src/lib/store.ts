@@ -91,7 +91,7 @@ export interface Store {
    * The table was in the schema with no way to write to it, so pilot gate 9's
    * rationale audit had no source. Guardrail behaviour is also the thing most
    * likely to differ silently between the two policies, which makes its rate
-   * part of the Explorer − Delegate contrast rather than an implementation
+   * part of the AI-Supplemented − User-Specified contrast rather than an implementation
    * detail.
    */
   logGuardrailEvent(

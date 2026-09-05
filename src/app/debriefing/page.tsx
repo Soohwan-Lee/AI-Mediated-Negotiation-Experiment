@@ -151,7 +151,7 @@ export default function DebriefingPage() {
               </h2>
             </div>
             <p className="text-xs sm:text-sm leading-relaxed text-slate-700">
-              We study how delegating to an AI Proxy (under <em>Delegate</em> vs. <em>Explorer</em> policies) helps people overcome social hesitation when advocating for sensitive workplace priorities.
+              We study how delegating to an AI Proxy (under <em>User-Specified</em> vs. <em>AI-Supplemented</em> policies) helps people overcome social hesitation when advocating for sensitive workplace priorities.
             </p>
           </Card>
 

@@ -219,7 +219,7 @@ async function conversationRun(name, {
   console.log(`\n▶ ${name}`);
   const task = getTask(taskId);
   const counterpartRole = other(role);
-  const run = { name, kind: afterProxy ? "direct" : "baseline", taskId, role, checks: [], messages: [] };
+  const run = { name, kind: afterProxy ? "direct" : "direct", taskId, role, checks: [], messages: [] };
   report.runs.push(run);
 
   const messages = [...seedMessages];
@@ -347,7 +347,7 @@ const T_B = getTask("task_b");
 // 1. Delegate, SB checked --------------------------------------------------
 {
   const { run, task, mandate, messages, tentative, voicedTier } =
-    await proxyRun("proxy-delegate-sb", "task_a", "member", "delegate", { sb: true });
+    await proxyRun("proxy-delegate-sb", "task_a", "member", "user_specified", { sb: true });
   const best = maxPackage(task, "member");
   check(run, "settles at best↔best (3,000/3,000)", tentative && task.issues.every((i) => tentative[i.id] === best[i.id]), fmtPackage(task, tentative));
   check(run, "SB tier voiced by own proxy", voicedTier === "sensitive", voicedTier);
@@ -371,7 +371,7 @@ const T_B = getTask("task_b");
 // 2. Delegate, WR only -----------------------------------------------------
 let wrOnlyResult;
 {
-  const r = await proxyRun("proxy-delegate-wr", "task_a", "member", "delegate", { sb: false });
+  const r = await proxyRun("proxy-delegate-wr", "task_a", "member", "user_specified", { sb: false });
   wrOnlyResult = r;
   const { run, task, messages, tentative, voicedTier } = r;
   const partial = tierPackage(task, "member", "work");
@@ -389,7 +389,7 @@ let wrOnlyResult;
 // 3. Explorer, SB checked --------------------------------------------------
 {
   const { run, task, messages, tentative } =
-    await proxyRun("proxy-explorer-sb", "task_a", "leader", "explorer", { sb: true });
+    await proxyRun("proxy-explorer-sb", "task_a", "leader", "ai_supplemented", { sb: true });
   const best = maxPackage(task, "leader");
   check(run, "settles at best↔best", tentative && task.issues.every((i) => tentative[i.id] === best[i.id]), fmtPackage(task, tentative));
   const t3 = messages.find((m) => m.turn === 3);
@@ -416,7 +416,7 @@ let wrOnlyResult;
 // now that they DO settle, at the rung the WR earned (2,300 each).
 {
   const { run, task, tentative } =
-    await proxyRun("proxy-explorer-wr", "task_b", "member", "explorer", { sb: false });
+    await proxyRun("proxy-explorer-wr", "task_b", "member", "ai_supplemented", { sb: false });
   const wrPackage = tierPackage(task, "member", "work");
   check(run, "the proxies settle at the work rung, with no floor to block them",
     Boolean(tentative) && task.issues.every((i) => tentative[i.id] === wrPackage[i.id]),
@@ -584,7 +584,7 @@ let wrOnlyResult;
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      taskId: "task_a", role, policy: "delegate", mandate,
+      taskId: "task_a", role, policy: "user_specified", mandate,
       history: [
         {
           role: "user",

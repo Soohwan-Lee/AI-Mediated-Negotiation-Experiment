@@ -91,7 +91,7 @@ export function ReviewPhase({
   tentative: Package | null;
   /**
    * What the participant said they wanted before negotiating — the entry
-   * preferences under Baseline, the mandate's preferred levels under Proxy.
+   * preferences under Direct, the mandate's preferred levels under Proxy.
    * Ver.2.12 §7 asks the result screen to put hoped-for and agreed side by
    * side, per issue, with the participant's own point difference — neutrally,
    * never as praise or blame: on the WR-only path the gap IS the finding, and
@@ -112,7 +112,7 @@ export function ReviewPhase({
    */
   behaviour?: {
     /**
-     * RATIFY — Proxy only; null in Baseline, which has nothing to ratify.
+     * RATIFY — Proxy only; null in Direct, which has nothing to ratify.
      * Confirmatory for RQ3 (Ver.2.13 §9.3).
      */
     ratify?: "approved_as_is" | "modified" | "rejected" | null;
@@ -121,7 +121,7 @@ export function ReviewPhase({
      * sensitive background out BEFORE the counterpart's own disclosure?
      * Proxy: the mandate checkbox, since a checked card is voiced at the
      * proxy's first reason turn, which is stage 2 and so always before the
-     * counterpart's stage-4 disclosure. Baseline: tagged at the participant's
+     * counterpart's stage-4 disclosure. Direct: tagged at the participant's
      * first reason turn.
      */
     sb?: boolean;
@@ -134,7 +134,7 @@ export function ReviewPhase({
      * "Voiced at all" is categories 2+3+4; the old SB-VOICED is derivable and
      * so is not stored.
      *
-     * Categories 3 and 4 are structurally exclusive by arm — Baseline has no
+     * Categories 3 and 4 are structurally exclusive by arm — Direct has no
      * closing stage, and a Proxy participant's only free speech after the
      * counterpart's disclosure IS the closing — which §9.8-5 flags for the
      * χ² test's unit, not for the coding.
@@ -280,7 +280,7 @@ export function ReviewPhase({
     // Proxies finish, once when the direct conversation closes. The marker is
     // what keeps them apart; without it they are distinguishable only by
     // arrival order, and anything that counts or joins on the event
-    // double-counts the Proxy arm against a Baseline arm that fires it fewer
+    // double-counts the Proxy arm against a Direct arm that fires it fewer
     // times. This one closes the task itself.
     logEvent("negotiation_ended", { phase: "task_closed" }, {
       sessionIndex: taskIndex,

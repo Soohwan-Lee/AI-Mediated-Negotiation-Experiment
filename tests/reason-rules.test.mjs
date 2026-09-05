@@ -41,6 +41,7 @@ const {
   rankedOptions,
   scorePackage,
   cardOfLayer,
+  abstractedReason,
 } = await import("../src/lib/tasks.ts");
 const {
   counterpartStep,
@@ -50,6 +51,7 @@ const {
   tierOf,
   tierPackage,
   maxPackage,
+  misreadPackage,
   acceptablePackage,
   mentionsScoreNumbers,
   codeOutcome,
@@ -97,9 +99,17 @@ function standardMandate(task, role, authorizedReasonIds) {
  * the tier. That is what lets §9.6 drop UNLOCK, CONCEAL-PREMIUM and MAX-JOINT:
  * JOINT alone identifies the rung.
  */
+/**
+ * The ladder's DISTINCT rungs (Ver.2.16 §3.3).
+ *
+ * `work` is deliberately absent: under the decoy design the safe reason buys
+ * nothing, so it shares the `none` rank. That is asserted separately below —
+ * it is the single most important consequence of Ver.2.16 and the easiest
+ * thing to undo by accident.
+ */
 const LADDER = [
   { tier: "none", mine: 1600, theirs: 1600, joint: 3200 },
-  { tier: "work", mine: 2300, theirs: 2300, joint: 4600 },
+  { tier: "priority", mine: 2300, theirs: 2300, joint: 4600 },
   { tier: "sensitive", mine: 3000, theirs: 3000, joint: 6000 },
 ];
 
@@ -170,6 +180,70 @@ for (const taskId of TASKS) {
     const counterpart = other(role);
     const best = maxPackage(task, role);
 
+    test(`${taskId}/${role}: the work reason buys nothing (Ver.2.16 decoy)`, () => {
+      // THE POINT OF THE WHOLE DECOY DESIGN. A WR is true and safe, but the
+      // participant's core term is not that interest's obvious remedy, so it
+      // earns exactly what silence earns. If this ever passes at 2,300 again,
+      // the SB has stopped being the bottleneck and RQ1's primary outcome is
+      // measuring something else.
+      const none = tierPackage(task, role, "none");
+      const work = tierPackage(task, role, "work");
+      assert.deepEqual(work, none);
+      assert.equal(scorePackage(task, work, role), 1600);
+    });
+
+    test(`${taskId}/${role}: the misread pays less than saying nothing`, () => {
+      // SCRIPT-MISREAD offers the obvious remedy for the stated interest —
+      // the participant's NON-core term — and asks their core at the
+      // counterpart's best. Accepting it is worse than the unargued rung and
+      // no better than impasse (§3.4: joint 2,500). §13-19 flags it for
+      // softening if the pilot's acceptance rate clears gate 7.
+      const mis = misreadPackage(task, role);
+      assert.equal(scorePackage(task, mis, role), 600);
+      assert.equal(scorePackage(task, mis, counterpart), 1900);
+      assert.equal(
+        scorePackage(task, mis, role) + scorePackage(task, mis, counterpart),
+        2500,
+      );
+    });
+
+    test(`${taskId}/${role}: the misread is offered once, then never again`, () => {
+      // §6.2 `misread_pending`: only when a WR is all that has been voiced,
+      // and only once per task.
+      const first = counterpartStep(task, counterpart, 5, null, state("work"));
+      assert.equal(first.action, "misread");
+      assert.deepEqual(first.proposal, misreadPackage(task, role));
+
+      const after = counterpartStep(
+        task,
+        counterpart,
+        5,
+        null,
+        state("work", { misreadOffered: true }),
+      );
+      assert.notEqual(after.action, "misread");
+
+      // It is never offered at a rung above the work reason.
+      for (const tier of ["priority", "sensitive"]) {
+        const d = counterpartStep(task, counterpart, 5, null, state(tier));
+        assert.notEqual(d.action, "misread");
+      }
+    });
+
+    test(`${taskId}/${role}: the counterpart honours its own misread offer`, () => {
+      // It offered the thing sincerely, so it cannot refuse when taken up.
+      const mis = misreadPackage(task, role);
+      assert.equal(
+        acceptablePackage(task, role, mis, "work", true),
+        true,
+      );
+      // But not before it has been put on the table.
+      assert.equal(
+        acceptablePackage(task, role, mis, "work", false),
+        false,
+      );
+    });
+
     test(`${taskId}/${role}: over-ask without SB is countered at the tier, never accepted`, () => {
       // The participant asks for everything: their best on their core AND
       // the counterpart's core conceded — better than best↔best for them.
@@ -181,11 +255,15 @@ for (const taskId of TASKS) {
           role,
         )[0].id,
       };
-      for (const tier of ["none", "work"]) {
+      for (const tier of ["none", "priority"]) {
         const d = counterpartStep(task, counterpart, 5, greedy, state(tier));
         assert.equal(d.accepts, false);
         assert.deepEqual(d.proposal, tierPackage(task, role, tier));
       }
+      // The work rung answers an over-ask with the misread first (once), and
+      // still never accepts it.
+      const w = counterpartStep(task, counterpart, 5, greedy, state("work"));
+      assert.equal(w.accepts, false);
     });
 
     test(`${taskId}/${role}: with the SB voiced, best↔best is accepted`, () => {
@@ -243,12 +321,12 @@ for (const taskId of TASKS) {
       // core is an over-ask; conceding past the rung is an under-ask.
       const theirs = counterRequirementIssue(task, role);
       const shorted = {
-        ...tierPackage(task, role, "work"),
+        ...tierPackage(task, role, "priority"),
         [theirs.id]: rankedOptions(task, theirs.id, counterpart)[0].id,
       };
-      assert.equal(acceptablePackage(task, role, shorted, "work"), false);
+      assert.equal(acceptablePackage(task, role, shorted, "priority"), false);
       assert.equal(
-        acceptablePackage(task, role, tierPackage(task, role, "none"), "work"),
+        acceptablePackage(task, role, tierPackage(task, role, "none"), "priority"),
         false,
       );
       assert.equal(
@@ -440,14 +518,27 @@ for (const taskId of TASKS) {
       assert.deepEqual(plan.tentative, maxPackage(task, role));
     });
 
-    test(`${taskId}/${role}: plan — WR only settles at the partial agreement`, () => {
+    test(`${taskId}/${role}: plan — WR only settles at the priority rung`, () => {
+      // TIER 2 IS THE PROXY'S FLOOR (§6.5, §6.9 #1). The proxy holds the
+      // preferred package, so it always states which term matters more —
+      // it declines the misread and claims the priority. A Direct
+      // participant need not, which is the §13-13② asymmetry.
       const plan = buildProxyPlan(
         task,
         role,
         standardMandate(task, role, [wr.id]),
       );
-      assert.equal(plan.tier, "work");
-      assert.deepEqual(plan.tentative, tierPackage(task, role, "work"));
+      assert.equal(plan.tier, "priority");
+      assert.deepEqual(plan.tentative, tierPackage(task, role, "priority"));
+      assert.equal(scorePackage(task, plan.tentative, role), 2300);
+    });
+
+    test(`${taskId}/${role}: plan — checking nothing still reaches tier 2`, () => {
+      // §6.9 #12: WR unchecked and SB unchecked. The proxy still knows the
+      // preferred package, so it still states the priority — the bottom rung
+      // is unreachable through a proxy.
+      const plan = buildProxyPlan(task, role, standardMandate(task, role, []));
+      assert.equal(plan.tier, "priority");
       assert.equal(scorePackage(task, plan.tentative, role), 2300);
     });
 
@@ -477,7 +568,7 @@ test("tierOf reads layers and ignores everything else", () => {
 
 for (const taskId of TASKS) {
   for (const role of ROLES) {
-    for (const condition of ["baseline", "delegate", "explorer"]) {
+    for (const condition of ["direct", "user_specified", "ai_supplemented"]) {
       test(`${taskId}/${role}/${condition}: the scripted ideal settles at 3,000 / 3,000 and the machine accepts it`, () => {
         const task = getTask(taskId);
         const counterpart = other(role);
@@ -536,12 +627,12 @@ test("the counterpart's opening carries NO package (Ver.2.13 §6.1)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. The Explorer pool budget (unchanged shape, on its own action field)
+// 5. No additive reasons — the Ver.2.20 abstraction policy
 // ---------------------------------------------------------------------------
 
 const task = getTask("task_a");
 
-function poolAction(overrides = {}) {
+function addingAction(overrides = {}) {
   return {
     actionType: "propose",
     issueTargets: [],
@@ -549,98 +640,58 @@ function poolAction(overrides = {}) {
     stage: 2,
     reasonSourceId: "a_wr_l",
     addedReasonSourceId: "pool:0",
-    rationale: "The deadline matters, and client trust starts with keeping the dates you gave.",
+    rationale: "The office days matter, and being in the same room early keeps mistakes down.",
     unresolved: true,
-    internalProvenance: "pool_reason",
+    internalProvenance: "principal_reason",
     ...overrides,
   };
 }
 
-test("the pool is additive: it rides beside a principal card in one message", () => {
-  const result = validateAction(poolAction(), {
-    issues: task.issues,
-    policy: "explorer",
-    actorRole: "leader",
-    stage: 2,
-    reasonsUsed: [],
-    reasonKey: "rA",
-    reasonIssueId: "report_deadline",
-    addedReasonKey: "rPool0",
-    addedReasonIssueId: "report_deadline",
-  });
-  assert.equal(result.valid, true);
-});
-
-test("a second pool reason on the same issue is over budget", () => {
-  const result = validateAction(poolAction(), {
-    issues: task.issues,
-    policy: "explorer",
-    actorRole: "leader",
-    stage: 2,
-    reasonsUsed: [
-      { key: "rOld", issueId: "report_deadline", source: "pool" },
-    ],
-    reasonKey: "rA",
-    reasonIssueId: "report_deadline",
-    addedReasonKey: "rPool0",
-    addedReasonIssueId: "report_deadline",
-  });
-  assert.equal(result.valid, false);
-  assert.equal(result.violations[0].code, "rationale_budget_exceeded");
-});
-
-test("a third pool reason in the task is over budget", () => {
-  const result = validateAction(poolAction(), {
-    issues: task.issues,
-    policy: "explorer",
-    actorRole: "leader",
-    stage: 2,
-    reasonsUsed: [
-      { key: "rOld1", issueId: "report_deadline", source: "pool" },
-      { key: "rOld2", issueId: null, source: "pool" },
-    ],
-    reasonKey: "rA",
-    reasonIssueId: "report_deadline",
-    addedReasonKey: "rPool2",
-    addedReasonIssueId: null,
-  });
-  assert.equal(result.valid, false);
-  assert.equal(result.violations[0].code, "rationale_budget_exceeded");
-});
-
-test("a Delegate may not touch the pool at all", () => {
-  const result = validateAction(poolAction(), {
-    issues: task.issues,
-    policy: "delegate",
-    actorRole: "leader",
-    stage: 2,
-  });
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.violations.some((v) => v.code === "provenance_policy_violation"),
-  );
-});
-
-test("the added slot carries the pool only, never a principal card", () => {
-  const result = validateAction(
-    poolAction({ addedReasonSourceId: "a_sb_l" }),
-    {
+test("no policy may add a reason beside the principal's card", () => {
+  // Ver.2.20 ABOLISHED THE POOL. AI-Supplemented no longer adds to the card —
+  // it REPLACES the card with the §6.6 abstraction and says it among two
+  // covers, all three supplied by the route. So there is nothing legitimate
+  // for a model to put in `addedReasonSourceId` under EITHER policy, and a
+  // value there means it invented a reason of its own.
+  for (const policy of ["user_specified", "ai_supplemented"]) {
+    const result = validateAction(addingAction(), {
       issues: task.issues,
-      policy: "explorer",
+      policy,
       actorRole: "leader",
       stage: 2,
-    },
-  );
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.violations.some((v) => v.code === "provenance_policy_violation"),
-  );
+    });
+    assert.equal(result.valid, false, `${policy} should refuse an addition`);
+    assert.ok(
+      result.violations.some((v) => v.code === "provenance_policy_violation"),
+    );
+  }
+});
+
+test("every sensitive card carries its §6.6 abstraction and two covers", () => {
+  // The twelve sentences are FIXED (§6.6) — the model joins them, it never
+  // writes them, because what survives the abstraction IS the manipulation.
+  // A card missing them would silently fall back to relaying the card whole,
+  // making AI-Supplemented identical to User-Specified.
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const sb = cardOfLayer(getTask(taskId), role, "sensitive");
+      const rendered = abstractedReason(sb);
+      assert.ok(rendered, `${taskId}/${role} has no abstraction`);
+      assert.equal(rendered.cover.length, 2);
+      // The abstraction must not reproduce the card: it keeps the KIND of
+      // fact and drops the event, the third party's words, and the
+      // concealment. If it contained the card's own text the policies would
+      // differ in nothing.
+      assert.notEqual(rendered.abstract, sb.text);
+      assert.ok(rendered.abstract.length < sb.text.length);
+    }
+  }
 });
 
 test("an unchecked card may not be voiced under either policy", () => {
-  for (const policy of ["delegate", "explorer"]) {
+  for (const policy of ["user_specified", "ai_supplemented"]) {
     const result = validateAction(
-      poolAction({ addedReasonSourceId: null, reasonSourceId: "a_sb_l" }),
+      addingAction({ addedReasonSourceId: null, reasonSourceId: "a_sb_l" }),
       {
         issues: task.issues,
         policy,

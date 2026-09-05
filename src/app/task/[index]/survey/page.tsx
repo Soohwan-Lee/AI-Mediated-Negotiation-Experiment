@@ -118,10 +118,10 @@ export default function TaskSurveyPage({
       ? [
           ...postTaskBlocks(isProxy),
           // The open-ended set depends on the CONDITION, not just proxy-ness:
-          // the Explorer's two extra questions (OE-P6/P7) are the only data
+          // the AI-Supplemented's two extra questions (OE-P6/P7) are the only data
           // source that separates its policy's two elements (Design §9.4.7).
           openEndedBlock(task, assignment.role, plan.condition),
-          // Baseline answers M1 retrospectively here (§9.3); a Proxy
+          // Direct answers M1 retrospectively here (§9.3); a Proxy
           // participant answered it at the mandate, where the decision was
           // made.
           ...(isProxy
@@ -130,7 +130,7 @@ export default function TaskSurveyPage({
                 {
                   id: "m1",
                   title: "One more question",
-                  items: [m1Item("baseline")],
+                  items: [m1Item("direct")],
                 } satisfies Block,
               ]),
         ].map((b) => blockForTask(b, taskIndex))

@@ -44,37 +44,84 @@ import type {
 // The credibility ladder
 // ---------------------------------------------------------------------------
 
-/** The three rungs, named after what was voiced (Ver.2.12 §3.3). */
-export type ReasonTier = "none" | "work" | "sensitive";
+/**
+ * What the participant side has said, as the counterpart reads it (Ver.2.16
+ * §3.3). Four values, not three — `priority` is the rung Ver.2.16 inserted.
+ *
+ * THE WORK REASON NO LONGER BUYS ANYTHING, and that is the whole point of the
+ * decoy design. A WR is a true, safe statement of the participant's real
+ * interest ("the workload is heavy this quarter"), but the term they actually
+ * need is NOT that interest's obvious remedy — heavy workload is answered by
+ * fewer office days, not by dropping the client presentations. So a
+ * counterpart who hears only the WR sincerely offers the WRONG THING
+ * (SCRIPT-MISREAD), and "why that term specifically?" is left standing. Only
+ * the SB answers it.
+ *
+ * `priority` ("presentations matter more to me than office days") is a bare
+ * claim: believable enough to move the counterpart one step, not enough to
+ * explain the mismatch, so it stops at the second option.
+ */
+export type ReasonTier = "none" | "work" | "priority" | "sensitive";
 
 /**
- * How deep into the participant's core issue the counterpart will concede,
- * as an index into that issue's options ranked best-first FOR THE PARTICIPANT.
- * 0 = the participant's best option; a package asking a rank BELOW the limit
- * is asking for more credibility than has been earned.
+ * How deep into BOTH cores the counterpart will concede, as an index into the
+ * options ranked best-first for whichever side owns that core. 0 = best.
+ *
+ * `none` and `work` share a rank on purpose (§3.3): the WR is a decoy, so
+ * hearing it changes what the counterpart OFFERS (a misread package, once)
+ * but not how far it will move.
  */
 export const TIER_LIMIT_INDEX: Record<ReasonTier, number> = {
   none: 2,
-  work: 1,
+  work: 2,
+  priority: 1,
   sensitive: 0,
+};
+
+/** Rank order for folding. Higher wins; the tier never falls (§6.2). */
+const TIER_RANK: Record<ReasonTier, number> = {
+  none: 0,
+  work: 1,
+  priority: 2,
+  sensitive: 3,
+};
+
+/**
+ * The P5 classifier's four labels, mapped onto the ladder (§6.2a).
+ *
+ * The classifier names what was SAID; this names what it BUYS. They are
+ * separate on purpose — `WR` is a real thing to have said, and the log keeps
+ * it for the audit, but under the decoy design it earns no more than silence.
+ */
+export const LABEL_TIER: Record<"none" | "WR" | "PRI" | "SB", ReasonTier> = {
+  none: "none",
+  WR: "work",
+  PRI: "priority",
+  SB: "sensitive",
 };
 
 /**
  * The higher of two tiers.
  *
  * The Proxy closing needs it: the ladder carries over from what the proxy
- * voiced and can only RISE when the participant tags a card in person. It is
+ * voiced and can only RISE when the participant says more in person. It is
  * one function because the same fold is read twice per turn — once for what
  * the counterpart sees, once for what `settle()` logs as an analysis variable
  * — and two hand-written ternaries would eventually disagree.
  */
 export function foldTier(a: ReasonTier, b: ReasonTier): ReasonTier {
-  if (a === "sensitive" || b === "sensitive") return "sensitive";
-  if (a === "work" || b === "work") return "work";
-  return "none";
+  return TIER_RANK[a] >= TIER_RANK[b] ? a : b;
 }
 
-/** The tier the voiced cards have earned. Reads layers, never text. */
+/**
+ * The tier a set of voiced cards has earned. Reads layers, never text.
+ *
+ * This is the PROXY path only — there the participant's checkboxes decide
+ * which card is voiced, so the kind is known without reading anything. The
+ * Direct path and the Proxy closing go through the P5 classifier instead
+ * (§6.2a), because Ver.2.20 removed the card buttons and the participant now
+ * simply talks.
+ */
 export function tierOf(
   voiced: ReadonlyArray<Pick<ReasonCard, "layer">>,
 ): ReasonTier {
@@ -131,6 +178,41 @@ export function maxPackage(
 }
 
 /**
+ * The MISREAD package (Ver.2.17 §6.2) — the counterpart's sincere, wrong
+ * answer to a work reason.
+ *
+ * It gives the participant the OBVIOUS REMEDY for the interest they stated —
+ * their NON-core issue, one step in — and asks for their core at the
+ * counterpart's best. Participant 600, counterpart 1,900, joint 2,500.
+ *
+ * IT IS NOT A LOWBALL AND MUST NOT READ AS ONE. The counterpart believes it is
+ * helping: told the workload is heavy, it offers fewer office days. That is
+ * exactly what makes the decoy legible to the participant — the safe reason
+ * was heard, believed, and answered, and still got them the wrong thing. It is
+ * offered once and never repeated; a correction ends it (§6.4).
+ *
+ * Accepting it pays 600, the same as impasse and below the 1,600 a participant
+ * who said nothing gets. That is a real trap, and §13-19 flags it: if the
+ * pilot's acceptance rate clears gate 7, the script softens from an offer to a
+ * question. It is left as an offer here because the design says so.
+ */
+export function misreadPackage(
+  task: NegotiationTask,
+  participantRole: Role,
+): Package {
+  const counterpartRole: Role =
+    participantRole === "leader" ? "member" : "leader";
+  const req = requirementIssue(task, participantRole);
+  const theirs = counterRequirementIssue(task, participantRole);
+  return {
+    // Their core, at the counterpart's own best — the thing being asked for.
+    [req.id]: rankedOptions(task, req.id, counterpartRole)[0].id,
+    // Their non-core, one step in — the "help" being offered.
+    [theirs.id]: rankedOptions(task, theirs.id, participantRole)[1].id,
+  };
+}
+
+/**
  * The acceptance judgement (Ver.2.13 §6.2): the counterpart accepts EXACTLY
  * the symmetric package of the current tier, and nothing else.
  *
@@ -148,17 +230,24 @@ export function acceptablePackage(
   participantRole: Role,
   pkg: Package | null | undefined,
   tier: ReasonTier,
+  misreadOffered = false,
 ): boolean {
   if (!pkg) return false;
-  const target = tierPackage(task, participantRole, tier);
-  return task.issues.every((issue) => pkg[issue.id] === target[issue.id]);
+  const matches = (target: Package) =>
+    task.issues.every((issue) => pkg[issue.id] === target[issue.id]);
+  if (matches(tierPackage(task, participantRole, tier))) return true;
+  // The misread package stays acceptable once the counterpart has put it up:
+  // it offered the thing sincerely, so it cannot refuse its own offer when the
+  // participant takes it (§6.2 `accept(p) iff p == package(tier) ||
+  // (p == misread_package && misread_done)`).
+  return misreadOffered && matches(misreadPackage(task, participantRole));
 }
 
 // ---------------------------------------------------------------------------
 // Clocks
 // ---------------------------------------------------------------------------
 
-/** The Baseline negotiation clock (Design §2.3: 직접 협상 10분). */
+/** The Direct negotiation clock (Design §2.3: 직접 협상 10분). */
 export const NEGOTIATION_SECONDS = 10 * 60;
 
 /** The Proxy arm's direct closing clock (Design §7: 직접 마무리 3분). */
@@ -212,6 +301,7 @@ export type DecidedAction =
   | "state_priority"
   | "disclose_sb"
   | "ask_why"
+  | "misread"
   | "propose_tier"
   | "balance"
   | "accept"
@@ -242,6 +332,13 @@ export interface ExchangeState {
   tier: ReasonTier;
   /** SCRIPT-ASKWHY has been spent (it is asked once, §6.2). */
   askedWhy: boolean;
+  /**
+   * SCRIPT-MISREAD has been offered (once per task, §6.2 `misread_done`).
+   *
+   * It also keeps the misread package acceptable afterwards — the counterpart
+   * offered it in good faith and cannot then refuse it.
+   */
+  misreadOffered?: boolean;
   /** SCRIPT-NONUM has been spent (once, then mentions are ignored). */
   numbersReminded: boolean;
   /** Did the participant's LAST message mention score numbers? */
@@ -337,6 +434,7 @@ export function counterpartStep(
         participantRole,
         incoming,
         state.tier,
+        state.misreadOffered,
       );
 
       // THE TIER PACKAGE, AND ONLY IT, IS ACCEPTED (Ver.2.13 §6.2). Both
@@ -375,9 +473,35 @@ export function counterpartStep(
         };
       }
 
-      // A reason-free over-ask gets one "why does that matter?" before the
-      // tier is enforced (§6.2: 이유 요청 1회). Judgement deferred one turn.
-      if (state.tier === "none" && !state.askedWhy) {
+      // THE MISREAD, ONCE (Ver.2.17 §6.2). The participant side has given the
+      // safe work reason and nothing more, so the counterpart answers it
+      // sincerely — and answers the WRONG ISSUE, because the term they need is
+      // not that interest's obvious remedy. This is the move that makes the
+      // decoy legible from inside the conversation rather than as a rule the
+      // participant is told about.
+      //
+      // It outranks ask_why: the counterpart has been given a reason, so
+      // asking "why does that matter?" would ignore what it just heard. The
+      // mismatch question comes later, when they hold out for the core term
+      // anyway.
+      if (state.tier === "work" && !state.misreadOffered) {
+        return {
+          ...base,
+          action: "misread",
+          proposal: misreadPackage(task, participantRole),
+          accepts: false,
+        };
+      }
+
+      // ONE "why that term specifically?" (§6.2, SCRIPT-ASKWHY). Two routes
+      // reach it and they are the same speech act: a participant who has given
+      // no reason at all, and a participant who has claimed a priority but
+      // still cannot square it with the safe reason they gave. Judgement is
+      // deferred one turn either way.
+      if (
+        (state.tier === "none" || state.tier === "priority") &&
+        !state.askedWhy
+      ) {
         return { ...base, action: "ask_why", proposal: null, accepts: false };
       }
 
@@ -445,9 +569,9 @@ export interface ProxyPlan {
 /**
  * Turns a mandate into the proxy's plan.
  *
- * BOTH POLICIES COMPUTE THIS IDENTICALLY. Design §2.3 defines Delegate and
- * Explorer as differing in REASON USE POLICY, not in what they will trade; a
- * policy that reached further would confound `Explorer − Delegate` with
+ * BOTH POLICIES COMPUTE THIS IDENTICALLY. Design §2.3 defines User-Specified and
+ * AI-Supplemented as differing in REASON USE POLICY, not in what they will trade; a
+ * policy that reached further would confound `AI-Supplemented − User-Specified` with
  * concession reach.
  *
  * The plan is short because the ladder did the work the old spend-down loop
@@ -476,7 +600,24 @@ export function buildProxyPlan(
   const authorized = task.roleBriefs[participantRole].reasonCards.filter((c) =>
     mandate.authorizedReasonIds.includes(c.id),
   );
-  const tier = tierOf(authorized);
+
+  /**
+   * TIER 2 IS THE PROXY'S FLOOR, and that is a structural difference from the
+   * Direct arm (§6.5, §6.9 #1 and #12, §13-13②).
+   *
+   * A proxy is given its principal's preferred package, so it always knows
+   * which term matters more and says so — it declines the counterpart's
+   * misread and states the priority (`PRI`). It therefore cannot land on the
+   * bottom rung, and cannot accept the misread either. A Direct participant
+   * can do both, because nothing makes them state a priority at all.
+   *
+   * This is a known, documented asymmetry rather than an oversight: it puts a
+   * mechanical component into any Mode difference in Points/JOINT, which is
+   * exactly why §9.3 keeps JOINT as a SECONDARY outcome and `SB` — a
+   * disclosure decision available identically in both arms — as the
+   * confirmatory one.
+   */
+  const tier = foldTier(tierOf(authorized), "priority");
 
   const ranked = rankedOptions(task, req.id, participantRole);
   const forIssue = (issueId: string) =>

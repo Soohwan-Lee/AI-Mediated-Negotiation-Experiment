@@ -11,9 +11,11 @@
 import { AI_CONFIG, getApiKey } from "./config";
 import { NEGOTIATION_ACTION_SCHEMA, type NegotiationAction } from "./schema";
 import {
+  buildClassifierPrompt,
   buildSystemPrompt,
   STRUCTURED_OUTPUT_INSTRUCTION,
   type AgentKind,
+  type ClassifierContext,
   type PromptContext,
 } from "./prompts";
 
@@ -187,4 +189,94 @@ function extractOutputText(payload: ResponsesPayload): string {
     (c) => c.type === "output_text" || typeof c.text === "string",
   );
   return chunk?.text ?? "";
+}
+
+// ---------------------------------------------------------------------------
+// P5 — the reason classifier (Design Ver.2.20 §6.2a)
+// ---------------------------------------------------------------------------
+
+/** The four labels P5 may return, and the confidence it reports with them. */
+export interface ReasonClassification {
+  label: "none" | "WR" | "PRI" | "SB";
+  confidence: number;
+  /** True when no model was configured and the fallback was used. */
+  stubbed: boolean;
+}
+
+const CLASSIFIER_SCHEMA = {
+  type: "object",
+  properties: {
+    label: { type: "string", enum: ["none", "WR", "PRI", "SB"] },
+    confidence: { type: "number" },
+  },
+  required: ["label", "confidence"],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Classify one participant message into the justification ladder (P5).
+ *
+ * SEPARATE FROM EVERY OTHER CALL IN THIS FILE, on purpose. It shares no
+ * history, speaks for no party, and produces no text anyone reads. The
+ * negotiating models (P1–P4) are never asked to grade an argument, because a
+ * counterpart whose judgement is a model's is a different counterpart for
+ * every participant — which is exactly what the fixed scripts exist to
+ * prevent (§6.7).
+ *
+ * WHEN NO KEY IS CONFIGURED it returns `none`, not a guess. A stub that
+ * invented a tier would make the mockup show concessions the live system
+ * would not grant, and the walkthrough's whole job is to show what a
+ * participant would actually see. Mockup mode drives its transcripts from
+ * `lib/negotiation/script.ts` instead, which is scripted end to end.
+ */
+export async function classifyReason(args: {
+  ctx: ClassifierContext;
+}): Promise<ReasonClassification> {
+  const apiKey = getApiKey();
+  if (!apiKey) return { label: "none", confidence: 0, stubbed: true };
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: AI_CONFIG.model,
+      // No `temperature` — see ai/config.ts.
+      reasoning: { effort: AI_CONFIG.reasoningEffort },
+      max_output_tokens: AI_CONFIG.maxOutputTokens,
+      input: [
+        { role: "system", content: buildClassifierPrompt(args.ctx) },
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "reason_classification",
+          strict: true,
+          schema: CLASSIFIER_SCHEMA,
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Classifier request failed: ${response.status} ${await response.text()}`,
+    );
+  }
+
+  const payload = (await response.json()) as ResponsesPayload;
+  const text = extractOutputText(payload);
+  if (!text) {
+    throw new Error(
+      `Classifier returned no content (status: ${payload.status ?? "unknown"})`,
+    );
+  }
+
+  const parsed = JSON.parse(text) as {
+    label: ReasonClassification["label"];
+    confidence: number;
+  };
+  return { ...parsed, stubbed: false };
 }

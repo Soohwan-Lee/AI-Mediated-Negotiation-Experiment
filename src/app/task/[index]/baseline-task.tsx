@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Baseline task (Experimental Design Ver.2.4 §8 "Baseline task 흐름").
+ * Direct task (Experimental Design Ver.2.4 §8 "Direct task 흐름").
  *
  * The participant chooses each package and writes each message. Every proposal
  * they send is understood by the other side as their own position — that is
@@ -42,7 +42,8 @@ import {
   counterpartStageAfter,
   counterpartStep,
   mentionsScoreNumbers,
-  tierOf,
+  foldTier,
+  LABEL_TIER,
   type ReasonTier,
 } from "@/lib/negotiation/machine";
 import { scriptedTask } from "@/lib/negotiation/script";
@@ -55,7 +56,6 @@ import { ReviewPhase } from "./review";
 import {
   Matchmaking,
   PreferenceForm,
-  ReasonPicker,
   RiskForm,
   TaskBrief,
   TaskIntro,
@@ -179,7 +179,7 @@ const PHASE_LABELS: Record<Phase, string> = {
 
 /** Entry preferences as a package (nulls dropped). */
 /**
- * SB-TIMING (Ver.2.13 §9.3) for the Baseline arm, from the reply index the
+ * SB-TIMING (Ver.2.13 §9.3) for the Direct arm, from the reply index the
  * participant's SB was tagged at.
  *
  * THE BOUNDARY IS A FIXED SCRIPT POSITION, not something the participant can
@@ -187,7 +187,7 @@ const PHASE_LABELS: Record<Phase, string> = {
  * tag at reply 0 or 1 is out before it and anything later is after. That also
  * makes `SB` — the primary outcome — the "before" category alone.
  *
- * Baseline has no closing stage, so category "wrap_up" is unreachable here;
+ * Direct has no closing stage, so category "wrap_up" is unreachable here;
  * §9.8-5 flags that as a structural zero cell for the χ², not a coding gap.
  */
 function sbTimingCode(
@@ -271,18 +271,19 @@ export function BaselineTask({
   const outOfTime = secondsRemaining <= 0;
 
   /**
-   * Which reason card, if any, the participant attached to this message.
+   * The rung the participant's own words have reached so far (§6.2a).
    *
-   * Not decoration. Design §4's reason-linked acceptance rule needs a
-   * deterministic answer to "has a reason been given for this requirement",
-   * and asking a model to judge whether free text contained a good argument
-   * would put the judgement back with the model. A structured attachment keeps
-   * it with the system — and it is also the Baseline analogue of the Proxy
-   * mandate's checked cards, so the voiced-reason log has the same shape in
-   * both conditions.
+   * THERE IS NO CARD BUTTON ANY MORE. Ver.2.20 removed it: pressing
+   * "[sensitive background]" is a more deliberate act than saying the thing,
+   * which risked a floor on the primary outcome, and it made the Direct arm
+   * something other than "just talking" — so `Pooled Proxy − Direct` would
+   * have compared two interfaces rather than two ways of being represented.
+   *
+   * The tier now comes from the P5 classifier, one call per message, and it
+   * ONLY EVER RISES (§6.2). `foldTier` is what enforces that: a participant
+   * who discloses and then changes the subject keeps the rung they paid for.
    */
-  const [attachedReasonId, setAttachedReasonId] = useState<string | null>(null);
-  const [voicedReasonIds, setVoicedReasonIds] = useState<string[]>([]);
+  const [tier, setTier] = useState<ReasonTier>("none");
   /** SCRIPT-ASKWHY / SCRIPT-NONUM / SCRIPT-CLOSE are each one-shot (§6.2). */
   const [askedWhy, setAskedWhy] = useState(false);
   const [numbersReminded, setNumbersReminded] = useState(false);
@@ -336,7 +337,7 @@ export function BaselineTask({
    * an empty composer on stage 4 tells you nothing about whether the review
    * screen that follows makes sense.
    */
-  const script = scriptedTask(task, role, "baseline");
+  const script = scriptedTask(task, role, "direct");
 
   useDevActions(
     `task-${taskIndex}`,
@@ -381,7 +382,6 @@ export function BaselineTask({
     if (own) {
       setDraft(own.text);
       if (own.proposal) setOffer(own.proposal);
-      if (own.reasonCardId) setAttachedReasonId(own.reasonCardId);
     }
   }, `baseline-t${taskIndex}-${phase}-${replies}`);
 
@@ -395,34 +395,46 @@ export function BaselineTask({
     setMessages(next);
     setDraft("");
 
-    const voiced = attachedReasonId
-      ? [...new Set([...voicedReasonIds, attachedReasonId])]
-      : voicedReasonIds;
-    setVoicedReasonIds(voiced);
-    const attachedCard = attachedReasonId
-      ? task.roleBriefs[role].reasonCards.find((c) => c.id === attachedReasonId)
-      : undefined;
-    if (
-      attachedCard?.layer === "sensitive" &&
-      attachedCard.issueId === requirement.id &&
-      sbVoicedAtReply === null
-    ) {
+    /**
+     * THE CLASSIFIER DECIDES THE RUNG, AND THE COUNTERPART'S OWN MODEL NEVER
+     * DOES (§6.2a, §6.7). This is a separate single-purpose call that writes
+     * nothing anyone sees; its one label becomes the tier, and `machine.ts`
+     * decides the package from it exactly as it did from a checkbox.
+     *
+     * A FAILURE FLOORS RATHER THAN GUESSES. The route answers `none` when the
+     * model errors, and the fold below means a floor costs the participant
+     * only this turn — they can say it again. A guess in the other direction
+     * would hand out the maximum package on a network error.
+     */
+    let label: "none" | "WR" | "PRI" | "SB" = "none";
+    if (!mockAi) {
+      try {
+        const res = await fetch("/api/classify-reason", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId, role, message: text }),
+        });
+        const data = (await res.json()) as { label?: typeof label };
+        if (data.label) label = data.label;
+      } catch (error) {
+        console.warn("[classify-reason] failed", error);
+      }
+    } else if (script.messages.some((m) => m.speaker === "participant")) {
+      // Mockup mode walks the IDEAL trajectory, so the scripted participant
+      // messages are the ones that carry the SB. Classifying them live would
+      // spend a model call to re-derive what the script already fixes.
+      label = "SB";
+    }
+
+    const tierNow: ReasonTier = foldTier(tier, LABEL_TIER[label]);
+    setTier(tierNow);
+
+    // SB (§9.3) is "was the participant's SB out before the counterpart's
+    // stage-4 disclosure" — so it is the first message the classifier reads
+    // as SB that fixes it, whatever they say afterwards.
+    if (label === "SB" && sbVoicedAtReply === null) {
       setSbVoicedAtReply(replies);
     }
-    setAttachedReasonId(null);
-
-    /**
-     * The credibility tier (Ver.2.12 §6.2), decided by the SYSTEM from the
-     * card log — which cards the participant has tagged onto messages, scoped
-     * to their own core issue. Never by a model reading the text.
-     */
-    const voicedCore = voiced
-      .map((id) => task.roleBriefs[role].reasonCards.find((c) => c.id === id))
-      .filter(
-        (c): c is NonNullable<typeof c> =>
-          Boolean(c) && c!.issueId === requirement.id,
-      );
-    const tierNow: ReasonTier = tierOf(voicedCore);
 
     logEvent(
       "message_sent",
@@ -431,7 +443,10 @@ export function BaselineTask({
         stage: counterpartStageAfter(replies),
         secondsRemaining,
         requirementOption: sentOffer[requirement.id] ?? null,
-        reasonCardId: attachedCard?.id ?? null,
+        // The classifier's verdict on THIS message, stored per message for
+        // the post-hoc human re-coding and the κ that gate 19 turns on
+        // (§6.2). Not shown to anyone.
+        reasonLabel: label,
         tier: tierNow,
       },
       { sessionIndex: taskIndex },
@@ -446,7 +461,6 @@ export function BaselineTask({
         createdAt: new Date().toISOString(),
         stage: counterpartStageAfter(replies),
         proposal: Object.keys(sentOffer).length > 0 ? sentOffer : undefined,
-        reasonCardId: attachedCard?.id ?? undefined,
       });
     }
 
@@ -528,7 +542,7 @@ export function BaselineTask({
         // the response meant the two arms resolved any divergence
         // DIFFERENTLY (the Proxy closing has always kept its local one),
         // which would put a mechanical asymmetry on `Pooled Proxy −
-        // Baseline` for a case that is supposed to be impossible.
+        // Direct` for a case that is supposed to be impossible.
         counterProposal = decision.proposal;
 
         // The reply is delayed in proportion to its own length and jittered,
@@ -581,7 +595,7 @@ export function BaselineTask({
         logEvent(
           "negotiation_ended",
           {
-            phase: "baseline",
+            phase: "direct",
             reason: decision.accepts ? "agreed" : "impasse",
             replies: replies + 1,
             secondsRemaining,
@@ -687,7 +701,7 @@ export function BaselineTask({
           // 1: its own best package on both terms). Every participant
           // therefore answers the same anchor, which is what makes their
           // replies comparable — and it is the same order the Proxy tasks run,
-          // so Baseline and Proxy transcripts line up stage for stage.
+          // so Direct and Proxy transcripts line up stage for stage.
           //
           // Seeding the message here rather than waiting for the first send is
           // the point: otherwise the participant opens into nothing and the
@@ -773,7 +787,7 @@ export function BaselineTask({
                     setSettled("impasse");
                     logEvent(
                       "negotiation_ended",
-                      { phase: "baseline", reason: "timeout" },
+                      { phase: "direct", reason: "timeout" },
                       { sessionIndex: taskIndex },
                     );
                   }}
@@ -808,14 +822,6 @@ export function BaselineTask({
               messages={messages}
               pending={pending}
               emptyHint="The other side opens first. Your reply will start the live exchange."
-            />
-
-            <ReasonPicker
-              task={task}
-              role={role}
-              value={attachedReasonId}
-              onChange={setAttachedReasonId}
-              alreadyVoiced={voicedReasonIds}
             />
 
             <MessageComposer

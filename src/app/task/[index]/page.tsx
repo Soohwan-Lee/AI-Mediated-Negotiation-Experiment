@@ -39,7 +39,7 @@ export default function TaskPage({
       taskIndex={taskIndex}
       taskId={plan.taskId}
       role={assignment.role}
-      policy={plan.condition === "explorer" ? "explorer" : "delegate"}
+      policy={plan.condition === "ai_supplemented" ? "ai_supplemented" : "user_specified"}
     />
   ) : (
     <BaselineTask

@@ -12,7 +12,7 @@
  * be checked wherever it is running without reconfiguring anything.
  *
  * BEFORE RECRUITING, SET `NEXT_PUBLIC_DEV_TOOLS=off` AND REDEPLOY.
- * The panel names conditions ("Delegate", "Explorer"), shows the assignment,
+ * The panel names conditions ("User-Specified", "AI-Supplemented"), shows the assignment,
  * and jumps between pages — all of which invalidate the study if a participant
  * finds them (CLAUDE.md §"Things the participant must never learn mid-study").
  * With the variable set to `off` the constant below is false at build time, so
@@ -109,7 +109,7 @@ const DEFAULTS: DevSettings = {
   mockAi: true,
   autoFill: true,
   slotOverride: false,
-  slot: { proxyPolicy: "delegate", role: "leader", sequenceId: "seq1" },
+  slot: { proxyPolicy: "user_specified", role: "leader", sequenceId: "seq1" },
 };
 
 const STORAGE_KEY = "amne:dev";

@@ -32,13 +32,13 @@ export interface NegotiationAction {
    * Which of the principal's own reason cards the visible rationale draws on,
    * if any — a card id, designated by the state machine (Design §7 ver.2.6).
    *
-   * A `pool:<n>` id may still appear here for the Explorer's exchange
+   * A `pool:<n>` id may still appear here for the AI-Supplemented's exchange
    * argument, which links terms rather than arguing for one and so has no
    * principal card to sit beside.
    */
   reasonSourceId: string | null;
   /**
-   * Explorer only: a pre-approved role-plausible argument added ALONGSIDE the
+   * AI-Supplemented only: a pre-approved role-plausible argument added ALONGSIDE the
    * card in `reasonSourceId`, inside the same message.
    *
    * WHY THIS IS A SECOND FIELD. Ver.2.5 deliberately used one field, on the
@@ -50,8 +50,8 @@ export interface NegotiationAction {
    * and both outcomes corrupt the primary contrast. Put the pool id in it and
    * the principal's card goes unrecorded, and the message's issue becomes the
    * pool item's — which for each role's exchange argument is null, so the
-   * requirement's reason is never registered and the Explorer arm arrives at
-   * the direct conversation flagged reasonless where the Delegate arm does
+   * requirement's reason is never registered and the AI-Supplemented arm arrives at
+   * the direct conversation flagged reasonless where the User-Specified arm does
    * not. Put the card id in it and the pool reason is invisible to the budget,
    * so the one-per-issue and two-per-task caps gate 10 rests on stop binding.
    */
@@ -61,7 +61,7 @@ export interface NegotiationAction {
   unresolved: boolean;
   /**
    * Audit-only. Stored in the backend, never rendered to participants in the
-   * Explorer condition (Design §7 "이유 출처 표시").
+   * AI-Supplemented condition (Design §7 "이유 출처 표시").
    */
   internalProvenance: "principal_reason" | "pool_reason";
 }

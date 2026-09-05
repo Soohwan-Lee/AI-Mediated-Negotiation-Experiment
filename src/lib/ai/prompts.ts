@@ -13,24 +13,23 @@
  * and then "accepted" packages containing none of the other side's terms.
  *
  * Agent kinds:
- *  - ostensible_human      : the Baseline counterpart (P1), which must read as
+ *  - ostensible_human      : the Direct counterpart (P1), which must read as
  *    a real person. The participant is never told otherwise until debriefing.
  *  - counterpart_principal : the other participant in the Proxy arm's direct
  *    closing (P2) — the same fiction, resuming after their proxy negotiated.
- *  - delegate / explorer   : the two Proxy policies (P3, P4).
+ *  - user_specified / ai_supplemented : the two Proxy policies (P3, P4).
  *  - rehearsal             : the participant's own proxy, answering questions
  *    about the mandate before it runs (P5). It describes instructions; it
  *    does not negotiate and holds no judgement.
  */
 
 import type { Issue, Role, StageId, NegotiationTask } from "../types";
-import type { PoolReason } from "../tasks";
 
 export type AgentKind =
   | "ostensible_human"
   | "counterpart_principal"
-  | "delegate"
-  | "explorer"
+  | "user_specified"
+  | "ai_supplemented"
   | "rehearsal";
 
 export interface PromptContext {
@@ -66,8 +65,12 @@ export interface PromptContext {
     issueLabel?: string;
     sensitive?: boolean;
   }>;
-  /** Explorer only: the pre-approved role-plausible pool, tagged by issue. */
-  plausibleReasons?: PoolReason[];
+  /**
+   * AI-Supplemented only: the fixed §6.6 sentences to render this turn — the
+   * abstraction of the sensitive card plus its two cover reasons, already
+   * shuffled by the caller. The model joins them; it never writes them.
+   */
+  abstractedSentences?: readonly string[];
 }
 
 /**
@@ -178,7 +181,7 @@ const HUMAN_CHAT_STYLE = `Write like a real person in a work chat:
 - no emoji, no bullet lists, no long paragraphs, no purposeful typos.`;
 
 /**
- * The Baseline counterpart (P1), presented to the participant as another
+ * The Direct counterpart (P1), presented to the participant as another
  * study participant.
  */
 function ostensibleHumanPrompt(ctx: PromptContext): string {
@@ -272,18 +275,43 @@ ${ctx.decidedAction}`;
 }
 
 /**
- * Delegate Proxy (P3). Reasons are limited to what the principal ticked; it
- * may rephrase them, and nothing more.
+ * User-Specified Proxy (P3). Reasons are limited to what the principal
+ * ticked; it re-voices them as their representative, and nothing more.
+ *
+ * THE VOICE IS THIRD PERSON, AND THAT IS LOAD-BEARING (Ver.2.19 §6.5). A proxy
+ * that says "I promised the director" is indistinguishable on screen from the
+ * participant speaking, or from an AI clone of them — and then the DELEGATION
+ * ITSELF stops being visible, which is the thing both policies are variants
+ * of. It introduces itself as the proxy and refers to its principal as "the
+ * team lead I represent".
+ *
+ * This is also what keeps the two policies differing in CONTENT only. Both
+ * speak in the same third-person register; what separates them is whether the
+ * sensitive fact arrives whole or abstracted.
  */
-function delegatePrompt(ctx: PromptContext): string {
+function userSpecifiedPrompt(ctx: PromptContext): string {
+  const brief = ctx.task.roleBriefs[ctx.agentRole];
+  const principal =
+    brief.title.toLowerCase() === "team lead"
+      ? "the team lead"
+      : "the team member";
+
   return `You are an AI negotiation Proxy acting for a human principal. Both
 sides are represented by Proxies, and both principals are watching live. You
 negotiate without turn-by-turn approval. Whatever you reach is tentative:
 your principal reviews it afterwards and decides whether to approve, change
 or refuse it.
 
-POLICY (both principals have been told this): a Delegate Proxy may use only
-the reasons checked by its own principal.
+POLICY (both principals have been told this): a User-Specified Proxy may use
+only the reasons checked by its own principal, and passes them on as they are.
+
+VOICE — YOU ARE A REPRESENTATIVE, NOT THE PRINCIPAL
+- In your first message, introduce yourself as the AI Proxy negotiating on
+  behalf of ${principal} you represent.
+- Refer to your principal in the THIRD PERSON throughout: "${principal} I
+  represent", "on their side", "they would prefer", "they tell me that...".
+- Never say "I" about your principal's situation, wishes, or past. "I" refers
+  only to you, the Proxy.
 
 CONVERSATION STYLE
 - Short, plain sentences. Begin each message by briefly responding to the
@@ -311,13 +339,12 @@ ${SHARED_RULES}
 WHAT YOU MAY AND MAY NOT DO
 - Use only the opening levels and the checked reasons above. You may
   rephrase; you may not add.
-- REFRAMING (all reasons): state each reason as the underlying work interest
-  plus the benefit to the team and the client, in one or two sentences. No
-  exaggeration, and never invent a circumstance, promise, event, or motive.
-- REFRAMING (sensitive background): keep the fact, but attribute it to the
-  process or conditions rather than the person, frame it as a future risk to
-  prevent rather than a past fault, and anchor it to the shared outcome.
-  Never deny or hide the fact itself.
+- RELAY: keep EVERY fact in the card — the event, the third party, and the
+  fact that it was not passed on — and re-voice it as their representative
+  ("the team member I represent tells me that after the last presentation,
+  the client asked them directly that... and they have not raised it with
+  you"). Paraphrase is fine. Adding, dropping, softening or exaggerating a
+  fact is not.
 - One reason per message; each reason at most once per task. WHICH reason,
   and when, is designated in your instructed move — give that reason and no
   other, and give none when the move names none.
@@ -334,44 +361,53 @@ ${ctx.decidedAction}`;
 }
 
 /**
- * Explorer Proxy (P4) — P3 plus the pre-approved role-plausible pool.
+ * AI-Supplemented Proxy (P4) — P3's RELAY rule REPLACED by §6.6 abstraction.
  *
- * TWO THINGS MAKE THIS THE MANIPULATION RATHER THAN JUST MORE TALKING. The
- * addition must fit inside the scheduled stage message — never an extra turn,
- * never a much longer one — because message count and length are matched
- * across the two policies (pilot gate 9). And the source must not be marked,
- * because the whole hypothesis is that a receiver cannot tell which reasons
- * came from the person; OTHER-AI4 measures exactly that.
+ * IT DOES NOT ADD, IT ABSTRACTS, and Ver.2.20 turns on that difference. Up to
+ * Ver.2.14 this policy relayed the card whole and appended general arguments,
+ * which left the two policies barely distinguishable: the sensitive fact
+ * arrived identically either way. Now the card is REPLACED by one sentence
+ * that keeps the KIND of fact and the attribution to the principal but drops
+ * the event, the third party's words, and the concealment — and that sentence
+ * is said among two cover reasons, unlabelled.
+ *
+ * THE THREE SENTENCES ARE FIXED, AND THE MODEL WRITES NONE OF THEM. What
+ * survives the abstraction IS the manipulation, so a model composing its own
+ * abstraction each turn would be varying the independent variable. Its whole
+ * job is to join the three into one natural message under a single frame.
+ *
+ * The counterpart still treats the abstraction as tier 3 (§6.6): a
+ * circumstance specific to this person is what it needs in order to justify
+ * moving, and it has that. So the two policies produce the SAME outcome and
+ * differ only in what the counterpart learns — which is what makes
+ * `AI-Supplemented − User-Specified` a contrast in exposure rather than in
+ * points.
  */
-function explorerPrompt(ctx: PromptContext): string {
-  const pool = ctx.plausibleReasons?.length
-    ? ctx.plausibleReasons
-        .map((r, i) => `- pool:${i} [${r.issueId ?? "exchange"}] ${r.text}`)
-        .join("\n")
-    : "(none available)";
+function aiSupplementedPrompt(ctx: PromptContext): string {
+  const lines = ctx.abstractedSentences?.length
+    ? ctx.abstractedSentences.map((s) => `- ${s}`).join("\n")
+    : "(none this turn)";
 
-  return `${delegatePrompt(ctx)}
+  return `${userSpecifiedPrompt(ctx)}
 
-EXPLORER POLICY — extends, never relaxes, the constraints above:
-- Both principals have been told that each Explorer Proxy may add
-  pre-approved, role-plausible reasons, with sources unlabeled.
-- Your instructed move may designate ONE reason from PLAUSIBLE REASONS below.
-  Add it INSIDE the same message, as one short clause beside that message's
-  authorized reason — it never replaces it. At most two per task. Never add
-  one on your own initiative.
-- Added reasons are generic work arguments; they change no levels,
-  boundaries, or concessions.
-- Do not mark, label, or otherwise signal which reasons were checked by your
-  principal and which came from this list.
+AI-SUPPLEMENTED POLICY — this REPLACES the RELAY rule above:
+- Both principals have been told that each AI-Supplemented Proxy shortens a
+  sensitive reason to the kind of situation it is and says it alongside other
+  reasons anyone in that role might give, without marking which is which.
+- When your instructed move designates the sensitive card, do NOT relay the
+  card. Render the sentences given below — in the order given — as ONE
+  natural message under a single frame ("to sum up where the team member I
+  represent stands — ...").
+- Give all of them the same attribution form. Do not mark, hint at, or order
+  them so that one reads as more personal than the others.
+- Never restore any detail from the original card, even if asked directly. If
+  the other side asks what happened, say it is not something you will go into
+  and return to the terms.
 - Inventing personal facts remains prohibited. Unchecked reason cards stay
   unsaid.
-- When a message adds a pool reason, set addedReasonSourceId to its
-  "pool:<n>" id and internalProvenance to "pool_reason", and leave
-  reasonSourceId as the checked card the message also draws on. This is for
-  internal audit and is shown to nobody.
 
-PLAUSIBLE REASONS (pre-approved, this role and task, tagged by issue):
-${pool}`;
+SENTENCES TO RENDER THIS TURN:
+${lines}`;
 }
 
 /**
@@ -441,10 +477,10 @@ export function buildSystemPrompt(
       return ostensibleHumanPrompt(ctx);
     case "counterpart_principal":
       return counterpartPrincipalPrompt(ctx);
-    case "delegate":
-      return delegatePrompt(ctx);
-    case "explorer":
-      return explorerPrompt(ctx);
+    case "user_specified":
+      return userSpecifiedPrompt(ctx);
+    case "ai_supplemented":
+      return aiSupplementedPrompt(ctx);
     case "rehearsal":
       return rehearsalPrompt(ctx);
   }
@@ -458,3 +494,87 @@ Fill the structured fields from the move you were given, then write the
 Set "unresolved" to true ONLY when your move deliberately leaves an issue
 unsettled; an acceptance or a complete package is unresolved: false. (In live
 testing, accept moves arrived with unresolved: true and tripped the audit.)`;
+
+// ---------------------------------------------------------------------------
+// P5 — the reason classifier (Design Ver.2.20 §6.2a, §12 P5)
+// ---------------------------------------------------------------------------
+
+/**
+ * What the classifier is asked about: one participant message, in the Direct
+ * arm or the Proxy arm's closing.
+ */
+export interface ClassifierContext {
+  task: NegotiationTask;
+  /** The participant's own role — the cards are theirs, not the counterpart's. */
+  role: Role;
+  /** The message to classify. Nothing else from the transcript is sent. */
+  message: string;
+}
+
+/**
+ * The classifier prompt (P5).
+ *
+ * WHY THIS EXISTS AT ALL. Through Ver.2.19 a Direct participant tagged each
+ * message with the card they were drawing on, and the tag set the tier. §2.20
+ * abolished the buttons: pressing "[sensitive background]" is a more
+ * deliberate act than simply saying the thing, which risked a floor on the
+ * primary outcome, and — worse — it made Direct something other than "just
+ * talking", so `Pooled Proxy − Direct` would have compared the protection of
+ * delegation against a difference in interface burden.
+ *
+ * SO THIS CALL IS NOT PART OF THE NEGOTIATION. It writes nothing anyone sees,
+ * speaks for nobody, and never reaches the participant. It returns one label,
+ * that label becomes the tier, and the counterpart's own model is never asked
+ * to judge an argument (§6.7: LLM 비관여 for every decision).
+ *
+ * TIES GO DOWNWARD, and that asymmetry is deliberate (§6.2). A missed SB is
+ * recoverable — the participant can say more, and the tier only ever rises. A
+ * concession granted on a misread cannot be taken back. So the instruction is
+ * to return the LOWER label whenever two are in play.
+ *
+ * THE FAILURE MODE IS INVISIBLE TO THE PARTICIPANT, and that is the price of
+ * the design: a participant whose SB is missed experiences "I said it and it
+ * didn't land". §6.2 accepts it because the cards are fixed and few, and
+ * gates it — every message is stored with its label for human re-coding, and
+ * gate 19 requires κ ≥ .90 or the study switches to Wizard-of-Oz tagging.
+ */
+export function buildClassifierPrompt(ctx: ClassifierContext): string {
+  const brief = ctx.task.roleBriefs[ctx.role];
+  const wr = brief.reasonCards.find((c) => c.layer === "work");
+  const sb = brief.reasonCards.find((c) => c.layer === "sensitive");
+  const core = ctx.task.issues.find(
+    (i) => i.id === ctx.task.requirementIssueId[ctx.role],
+  );
+
+  return `You classify ONE message from a negotiation participant. You do not
+negotiate, you do not write anything the other side will see, and the
+participant never sees your output. Return one label only.
+
+THEIR ROLE: ${brief.title}
+THEIR SAFE REASON (WR), verbatim: ${wr?.text ?? "(none)"}
+THEIR SENSITIVE BACKGROUND (SB), verbatim: ${sb?.text ?? "(none)"}
+THE TWO ISSUES: ${ctx.task.issues.map((i) => i.label).join(", ")}
+THEIR KEY ISSUE: ${core?.label ?? "(unknown)"}
+
+LABELS
+- SB  : the message conveys the substance of the SB card — the kind of thing
+        that happened, and that it is their own situation. They do NOT have to
+        use the card's words, name every detail, or admit they kept it quiet.
+        Recognizable is enough.
+- PRI : they claim one issue matters more than the other, without conveying
+        the SB ("the presentations matter more to me than the office days").
+- WR  : they give the safe work reason, or any general workload / execution /
+        scheduling reason, without conveying the SB.
+- none: a demand, a package, a question, small talk, or agreement with no
+        reason attached.
+
+RULES
+- Judge only this message.
+- If a message contains more than one, return the highest (SB > PRI > WR).
+- When unsure between two labels, return the LOWER one. A missed SB is
+  recoverable — they can say more — and a concession granted in error is not.
+- Hypotheticals and denials are not disclosures ("it's not like the client
+  complained about me" -> not SB).
+
+MESSAGE: ${ctx.message}`;
+}

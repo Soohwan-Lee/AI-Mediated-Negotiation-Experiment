@@ -8,8 +8,8 @@
  *   POWER + IMM  →  final open-ended  →  suspicion probe
  *
  * POWER and IMM are asked ONCE, here, rather than after each task. They verify
- * that the role manipulation landed (§10 gate 2: Leaders higher on POWER1-2,
- * Members on POWER3) and that participants got into the scenario, and both are
+ * that the role manipulation landed (§10 gate 2: Leaders higher on POWER1,
+ * Members on POWER2) and that participants got into the scenario, and both are
  * judgements about the study as a whole. Asking them earlier would prime the
  * role behaviour they exist to check.
  *

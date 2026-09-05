@@ -83,15 +83,30 @@ const CHECKS: CheckItem[] = COMPREHENSION_BLOCK.items.flatMap((item) =>
  * without re-reading the card. It is `aria-hidden` because the heading beside
  * it already says the same thing in words.
  */
-function Gist({ term, children }: { term: string; children: ReactNode }) {
+function Gist({
+  icon,
+  term,
+  children,
+}: {
+  icon?: string;
+  term: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-3 sm:flex-nowrap rounded-xl bg-white/80 p-2.5 border border-slate-100 shadow-2xs">
-      <dt className="w-24 shrink-0 text-xs font-extrabold uppercase tracking-wider text-[var(--accent)]">
-        {term}
-      </dt>
-      <dd className="min-w-0 flex-1 text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
-        {children}
-      </dd>
+    <div className="flex items-start gap-3 rounded-2xl bg-white/90 p-3 sm:p-3.5 border border-slate-100 shadow-2xs hover:border-indigo-100 transition-all">
+      {icon ? (
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-base border border-indigo-100/80">
+          {icon}
+        </span>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <dt className="text-2xs font-extrabold uppercase tracking-wider text-[var(--accent)] mb-0.5">
+          {term}
+        </dt>
+        <dd className="text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
+          {children}
+        </dd>
+      </div>
     </div>
   );
 }
@@ -108,29 +123,45 @@ function PowerBox({
   return (
     <div
       className={cx(
-        "rounded-2xl border p-4 sm:p-5 transition-all shadow-2xs",
+        "rounded-2xl border p-4 sm:p-5 transition-all shadow-2xs flex flex-col justify-between",
         tone === "own"
-          ? "border-blue-200 bg-blue-50/50 text-blue-950"
+          ? "border-blue-200 bg-gradient-to-br from-blue-50/60 via-white to-blue-50/30 text-blue-950"
           : "border-slate-200 bg-slate-50/70 text-slate-800",
       )}
     >
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-sm">{tone === "own" ? "🧑‍💼" : "👤"}</span>
-        <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--ink)]">
-          {title}
-        </p>
-      </div>
-      <ul className="space-y-2">
-        {items.map((item) => (
-          <li
-            key={item}
-            className="flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]"
+      <div>
+        <div className="mb-3 flex items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-white text-sm shadow-2xs border border-slate-200/60">
+              {tone === "own" ? "🧑‍💼" : "👤"}
+            </span>
+            <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--ink)]">
+              {title}
+            </p>
+          </div>
+          <span
+            className={cx(
+              "rounded-full px-2.5 py-0.5 text-2xs font-bold shadow-2xs",
+              tone === "own"
+                ? "bg-blue-100 text-blue-900 border border-blue-200"
+                : "bg-slate-200/80 text-slate-700",
+            )}
           >
-            <span aria-hidden className="text-blue-600 font-bold">•</span>
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
+            {tone === "own" ? "Your Role" : "Their Role"}
+          </span>
+        </div>
+        <ul className="space-y-2">
+          {items.map((item) => (
+            <li
+              key={item}
+              className="flex items-start gap-2.5 text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]"
+            >
+              <span aria-hidden className="text-blue-600 font-bold">•</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
@@ -201,27 +232,27 @@ export default function InstructionPage() {
       <>
         <Page>
           <PageHeader
-            eyebrow="Tutorial · Instructions (Part 1/2)"
-            title="Your Role and Study Instructions"
-            subtitle="Please read these instructions carefully. A 3-question comprehension check follows on the next screen."
+            eyebrow="Tutorial · Instructions (Part 1 of 2)"
+            title="Your Role & Study Guide"
+            subtitle="Please read this short briefing to get familiar with the scenario. A quick 3-question check follows on the next screen."
           />
 
           {/* Quick Gist card */}
           <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/40 to-blue-50/20">
             <CardTitle hint="At a glance:">
-              🎯 The study in five lines
+              💡 The Scenario at a Glance
             </CardTitle>
-            <dl className="space-y-2.5 mt-3">
-              <Gist term="Where you are">
+            <div className="space-y-2.5 mt-3">
+              <Gist icon="🏢" term="Where you are">
                 A consulting and marketing agency, on a client project team. You
                 are the{" "}
                 <strong>{isLeader ? "team lead 👑" : "senior consultant 🛠️"}</strong>.
               </Gist>
-              <Gist term="Who you talk to">
+              <Gist icon="👤" term="Who you talk to">
                 One other participant, playing the other role. They want
                 different working conditions than you do.
               </Gist>
-              <Gist term="What you settle">
+              <Gist icon="🤝" term="What you settle">
                 <strong>Two working conditions</strong> — and you have to agree
                 on both. Neither of you can set them alone.
               </Gist>
@@ -231,17 +262,17 @@ export default function InstructionPage() {
                   outcome is — a higher score, no agreement pays the low
                   fallback — WITHOUT naming the trade that gets you there:
                   finding it is the behaviour being observed. */}
-              <Gist term="What counts as doing well">
+              <Gist icon="🎯" term="What counts as doing well">
                 Each option is worth points to you, privately. A better deal is
                 one worth more points to you — and no agreement at all pays the
                 low fallback score to both of you.
               </Gist>
-              <Gist term="Why it is not obvious">
+              <Gist icon="🔒" term="Why it is not obvious">
                 You each have a private point sheet, and{" "}
                 <strong>you cannot see theirs</strong>. The only way to find out what
                 they can give you is to talk about it.
               </Gist>
-            </dl>
+            </div>
           </Card>
 
           {/* Role & Power Asymmetry Card */}
@@ -364,32 +395,54 @@ export default function InstructionPage() {
             </div>
           </Card>
 
-          {/* Bonus callout */}
-          <Callout title="💰 Task Bonus Opportunity" tone="warning">
-            {isLeader ? (
-              <p className="text-xs sm:text-sm">
-                After each task you decide the Member&apos;s recommended bonus
-                (up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task,{" "}
-                {STUDY.currencySymbol}{STUDY.bonusAmount} total), weighing the
-                result and what you learned during the negotiation — and the
-                Member writes an evaluation of you that goes to the district
-                manager.
-              </p>
-            ) : (
-              <p className="text-xs sm:text-sm">
-                After each task the manager decides your recommended bonus (up
-                to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task),
-                weighing the result and what they learned during the
-                negotiation — and you write an evaluation of the manager that
-                goes to the director. Any bonus is paid when the study
-                ends.
-              </p>
-            )}
-          </Callout>
+          {/* Bonus & Evaluation Card */}
+          <div className="mb-6 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-white to-amber-50/40 p-4 sm:p-5 shadow-2xs">
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-lg border border-amber-200">
+                💰
+              </span>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-amber-950">
+                  Performance Bonus & Mutual Feedback
+                </h3>
+                <p className="text-xs text-amber-900/80">
+                  How you and your colleague evaluate each other after each task
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 mb-3.5">
+              <div className="rounded-xl border border-amber-200/60 bg-white/90 p-3.5 shadow-2xs">
+                <p className="text-xs font-bold text-amber-950 mb-1">
+                  {isLeader ? "👑 Your Bonus Decision" : "🛠️ Your Upward Evaluation"}
+                </p>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  {isLeader
+                    ? `You decide the senior consultant's recommended performance bonus (up to ${STUDY.currencySymbol}${STUDY.bonusPerTask} per task, ${STUDY.currencySymbol}${STUDY.bonusAmount} total), weighing their communication, proposals, and collaboration.`
+                    : "You write an upward evaluation of the team lead's communication and leadership, which goes directly to the project director."}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-amber-200/60 bg-white/90 p-3.5 shadow-2xs">
+                <p className="text-xs font-bold text-amber-950 mb-1">
+                  {isLeader ? "👤 Their Evaluation of You" : "👑 The Lead's Bonus Decision"}
+                </p>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  {isLeader
+                    ? "The senior consultant writes an upward evaluation of your leadership for the project director."
+                    : `The team lead decides your recommended performance bonus (up to ${STUDY.currencySymbol}${STUDY.bonusPerTask} per task), weighing your communication and collaboration.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-200/80 bg-amber-100/50 p-3 text-xs leading-relaxed text-amber-950 font-medium">
+              💡 <strong>Points vs. Bonus:</strong> Points reflect your private scenario goals. The other person cannot see your point sheet, so earning higher points does not automatically determine the bonus. The bonus reflects your overall communication and teamwork. Your base compensation ({STUDY.currencySymbol}{STUDY.compensation}) is <strong>always 100% guaranteed</strong>!
+            </div>
+          </div>
         </Page>
 
         <ActionBar
-          label="Proceed to Comprehension Check"
+          label="Proceed to Quick Check"
           onClick={() => {
             setPart("check");
             window.scrollTo({ top: 0, behavior: "smooth" });
@@ -408,9 +461,9 @@ export default function InstructionPage() {
     <>
       <Page>
         <PageHeader
-          eyebrow="Comprehension Check · (Part 2/2)"
-          title="Quick Comprehension Check"
-          subtitle="Please answer these 3 questions to ensure the rules and payoff format are clear. If you miss any, you will have a chance to retry."
+          eyebrow="Quick Check-in · (Part 2 of 2)"
+          title="Just 3 Quick Questions"
+          subtitle="A friendly check to ensure the rules and scenario feel clear before you begin. Helpful hints will appear if anything needs a second look!"
         />
 
         <div className="space-y-6">

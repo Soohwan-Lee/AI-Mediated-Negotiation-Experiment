@@ -14,7 +14,7 @@
  *    would have them answer having already decided which sensitive cards to
  *    hand over and read the policy disclosure — a pre-task measure turned
  *    partly post-treatment, in one arm only. It is now asked straight after
- *    the briefing, which is where Baseline asks it too.
+ *    the briefing, which is where Direct asks it too.
  *  - The mandate is ONE screen. Levels on both terms and the reason cards
  *    used to be two screens in sequence; deciding a position and deciding what
  *    may be said for it is one act, and that the second half was never asked
@@ -25,7 +25,7 @@
  *  - The review does not ratify. Both arms now end with the participant
  *    agreeing a package in conversation, so there is nothing left to approve.
  *
- * DECEPTION INTEGRITY: Delegate and Explorer render the SAME interface. The
+ * DECEPTION INTEGRITY: User-Specified and AI-Supplemented render the SAME interface. The
  * only difference is what the backend permits the proxies to do. The
  * transcript never marks which reasons came from the participant's cards and
  * which from the plausible-reason pool — provenance is stripped server-side.
@@ -114,7 +114,7 @@ import {
  * mandate. Both arms now ask it in the same place, cold, straight after the
  * briefing:
  *
- *   Baseline: brief → RISK → levels → negotiate
+ *   Direct: brief → RISK → levels → negotiate
  *   Proxy:    brief → RISK → levels + reasons → confirm → watch → negotiate
  */
 type Phase =
@@ -272,17 +272,17 @@ const TOTAL_TURNS = 8;
  * The two strings are deliberately matched in length and shape. If one arm read
  * as a longer or more careful explanation than the other, the disclosure itself
  * would become a cue about which arm a participant is in, on the contrast
- * (`Explorer − Delegate`) it exists to support.
+ * (`AI-Supplemented − User-Specified`) it exists to support.
  *
- * The Explorer sentence used to end "Which is which will not be marked" — a
+ * The AI-Supplemented sentence used to end "Which is which will not be marked" — a
  * fragment whose referent a first-time reader has to reconstruct. It now says
  * what is not marked, in the same breath as what may be added.
  */
-const POLICY_DISCLOSURE: Record<"delegate" | "explorer", string> = {
-  delegate:
-    "Both AI Proxies in this task say only the reasons their own person ticked. Nothing else is added, on either side.",
-  explorer:
-    "Both AI Proxies in this task may add general work points anyone in that role could make, on top of the reasons their own person ticked. Neither proxy marks which is which.",
+const POLICY_DISCLOSURE: Record<"user_specified" | "ai_supplemented", string> = {
+  user_specified:
+    "Both AI Proxies in this task pass on the reasons their own person ticked as they are, changing only the wording. Nothing is added or left out, on either side.",
+  ai_supplemented:
+    "Both AI Proxies in this task shorten a sensitive reason to the kind of situation it is, leaving the specifics out, and say it alongside other reasons anyone in that role might give. Neither proxy marks which reason came from their own person.",
 };
 
 function emptyMandate(
@@ -334,7 +334,7 @@ export function ProxyTask({
   taskIndex: 1 | 2;
   taskId: TaskId;
   role: Role;
-  policy: "delegate" | "explorer";
+  policy: "user_specified" | "ai_supplemented";
 }) {
   usePageEnter(`task-${taskIndex}`);
   const router = useRouter();
@@ -345,7 +345,7 @@ export function ProxyTask({
 
   // "intro", not "brief". This started on the brief and so the Proxy arm's
   // cover was unreachable — `phase === "intro"` was rendered but never true,
-  // while the Baseline arm opened on its cover as intended. That put a whole
+  // while the Direct arm opened on its cover as intended. That put a whole
   // orientation screen (the step list, the time estimate, "neither of you can
   // settle anything alone") in one condition and not the other, which is a
   // between-condition difference in what participants were told before the
@@ -597,13 +597,13 @@ export function ProxyTask({
     // matters: without this the participant's own proxy's stage-5 proposal was
     // the last one carrying a package, so a refusal was silently recorded as a
     // tentative agreement — and a Proxy impasse would have been recoded as an
-    // agreement while Baseline recorded it correctly, leaving the two arms
+    // agreement while Direct recorded it correctly, leaving the two arms
     // disagreeing about what an impasse is.
     let proxyImpasse = false;
     /**
      * Where the requirement stood at each of the proxy's turns.
      *
-     * The Baseline task gets this for free — the participant sends the
+     * The Direct task gets this for free — the participant sends the
      * messages, so each one is logged with the level it carried. A Proxy task
      * has no participant messages at all, so without recording it here the
      * trajectory would jump from what was entrusted straight to the final
@@ -618,7 +618,7 @@ export function ProxyTask({
     // Opaque tokens for the reasons this side has voiced. The budgets are
     // whole-task limits and the route is stateless, so the history lives
     // here — but the client is deliberately not told WHICH reasons they
-    // were, since that would name the Explorer's additions. The server
+    // were, since that would name the AI-Supplemented's additions. The server
     // recovers each token's issue and kind for itself by re-hashing the
     // known ids.
     const reasonsUsed: string[] = [];
@@ -710,8 +710,8 @@ export function ProxyTask({
           // Persist the message text, not only the trajectory.
           //
           // Two pilot gates need the actual words: the fabricated-personal-
-          // fact audit (target zero, gate 9), and the check that Delegate and
-          // Explorer are matched on message count and length (gate 10). Both
+          // fact audit (target zero, gate 9), and the check that User-Specified and
+          // AI-Supplemented are matched on message count and length (gate 10). Both
           // are about what was said, and both were unrunnable while the proxy
           // transcript lived only in React state and vanished on submit.
           if (participantKey) {
@@ -786,7 +786,7 @@ export function ProxyTask({
         taskIndex={taskIndex}
         steps={COVER_STEPS}
         scene="proxy"
-        /* The longer arm: two conversations where Baseline has one. */
+        /* The longer arm: two conversations where Direct has one. */
         minutes={15}
         onStart={() => setPhase("brief")}
       />
@@ -1342,7 +1342,7 @@ function ReasonMandateSection({
 }: {
   task: ReturnType<typeof getTask>;
   role: Role;
-  policy: "delegate" | "explorer";
+  policy: "user_specified" | "ai_supplemented";
   mandate: Mandate;
   onToggle: (cardId: string) => void;
 }) {

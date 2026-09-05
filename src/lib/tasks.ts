@@ -1,5 +1,5 @@
 /**
- * The two negotiation scenarios, from Experimental Design Ver.2.12 §3, §8.
+ * The two negotiation scenarios, from Experimental Design Ver.2.20 §3, §8.
  *
  * Both tasks share one latent payoff structure and differ only on the surface,
  * so Task A and Task B are interchangeable within a participant. Two issues,
@@ -8,28 +8,30 @@
  *   Leader-priority   3000 / 2000 / 1000 / 0   (Member: 0 / 300 / 600 / 900)
  *   Member-priority   the exact mirror image
  *
- * THE CREDIBILITY LADDER IS THE POINT OF THESE NUMBERS (Ver.2.12 §3.3). A
- * priority claim alone is cheap talk; a work reason (WR) makes it plausible; a
- * sensitive background (SB) — a self-damaging confession — makes it credible,
- * because the speaker pays a face cost to say it. The counterpart's concession
- * on the participant's core issue follows that ladder exactly:
+ * THE JUSTIFICATION LADDER IS THE POINT OF THESE NUMBERS (Ver.2.16 §3.3), and
+ * it is SYMMETRIC — both cores land on the same rank, so what the participant
+ * earns the counterpart matches:
  *
- *   nothing voiced → 3rd option   participant 1,000 · counterpart 3,600 · 4,600
- *   WR voiced      → 2nd option   participant 2,000 · counterpart 3,300 · 5,300
- *   SB voiced      → best option  participant 3,000 · counterpart 3,000 · 6,000
- *   impasse        →              600 each · 1,200
+ *   nothing / WR only → 3rd option   1,600 each · joint 3,200
+ *   priority claim    → 2nd option   2,300 each · joint 4,600
+ *   SB (or SB-summary)→ best option  3,000 each · joint 6,000
+ *   impasse           →                600 each · joint 1,200
+ *   misread accepted  →      participant 600 · counterpart 1,900 · joint 2,500
  *
- * Every agreement path holds the counterpart's own priority at its best
- * option, so the individual maximum on any reachable agreement is 3,000 and
- * the full ladder is symmetric across roles. Fallback 600 keeps every rung —
- * including the unargued one — better than no deal.
+ * THE WORK REASON BUYS NOTHING, and that is deliberate (Ver.2.16). A WR is a
+ * true, safe statement of the participant's real interest, but their core term
+ * is NOT that interest's obvious remedy — heavy workload is answered by fewer
+ * office days, not by dropping the presentations. So a counterpart who hears
+ * only the WR offers the obvious remedy in good faith (the misread), and "why
+ * that term specifically?" is left standing. Only the SB answers it, which is
+ * what makes disclosure the sole bottleneck to the maximum without the
+ * participant ever being told a rule.
  *
- * EACH SB IS A FACE CONFESSION (Ver.2.12 §4): it contradicts the professional
- * image the role brief sets up, contains one concrete incident, lands on the
- * announced evaluation axis (bonus / upward evaluation), and is the CAUSE of
- * the role's priority. The two tasks carry DIFFERENT incidents — the same
- * person repeating the same mistake would be a tell, and each task's
- * counterpart is introduced as a different participant.
+ * EACH SB IS A THING ALREADY DONE (Ver.2.18 §4). Leader = a judgement already
+ * committed upward; Member = an adverse client judgement kept quiet. Neither
+ * can be dissolved by the counterpart offering to help, which is why the
+ * earlier fear-and-skill-gap cards were replaced: "let's practise" makes the
+ * face cost small and stops the fact being the cause of the priority.
  *
  * The numbers are working values pending pilot (Design §13.2); the shapes are
  * stable, so changing a number needs no UI change.
@@ -40,7 +42,6 @@ import type {
   ReasonCard,
   ReasonScope,
   Role,
-  ScenarioId,
   TaskId,
 } from "./types";
 
@@ -115,40 +116,72 @@ export const RESERVATION_POINTS = 600;
  */
 const REQUIREMENT_THRESHOLD_INDEX = 1;
 
+/**
+ * A working-reason card — and since Ver.2.16 it is a DECOY (§4, §3.3).
+ *
+ * It states the participant's real interest at a level anyone could say
+ * aloud, and it is TRUE and SAFE. What it does not do is justify the term they
+ * actually want, because their core term is not that interest's obvious
+ * remedy: heavy workload is answered by fewer office days, not by dropping the
+ * client presentations. So `issueId` points at the participant's core issue —
+ * that is what the card is being used to argue for — while the interest it
+ * names would naturally be served by the OTHER one. That gap is the design.
+ *
+ * A counterpart who hears only this offers the obvious remedy in good faith
+ * (SCRIPT-MISREAD) and is left asking "why that term specifically?". Only the
+ * SB answers it, which is what makes the SB the sole bottleneck to the
+ * maximum without any rule the participant has to be told.
+ */
 function work(id: string, issueId: string, text: string): ReasonCard {
   return { id, issueId, layer: "work", text };
 }
 
 /**
- * A sensitive background card (Ver.2.12 §4).
- *
- * FOUR WRITING RULES, all validity-bearing:
+ * A sensitive background card (Ver.2.18 §4, six writing rules).
  *
  *  - FACE CONTRADICTION. The confession must contradict the professional image
- *    the role brief sets up first ("head office rates you as a manager whose
- *    plans are precise" → "I got the forecast wrong twice"). Face is a claimed
- *    image, so the threat comes from the contradiction (Goffman; White et al.
- *    2004).
- *  - ONE CONCRETE INCIDENT. A short episode of an actual mistake or ask for
- *    help is what makes the confession verifiable and the face cost real.
- *  - THE ANNOUNCED AXIS. The content must land on exactly the axis the other
- *    side is told to weigh in their post-negotiation decision (competence,
- *    reliability, judgement) — otherwise disclosing it costs nothing that the
- *    design measures.
- *  - CAUSE OF THE PRIORITY. The fact must be WHY this issue is absolute. A
- *    weakness unrelated to the ask makes disclosure noise, not signal.
+ *    the role brief sets up first ("the director and your team know you as a
+ *    team lead whose judgement is sound" → "I answered before asking anyone").
+ *    Face is a claimed image, so the threat is in the contradiction.
+ *  - ONE CONCRETE INCIDENT, which is what makes it verifiable and the cost
+ *    real.
+ *  - THE ANNOUNCED AXIS. It must land on the axis the other side was told to
+ *    weigh — the negotiation as a whole, and whether they would want to work
+ *    with this person again. All four land there via "without asking me?" /
+ *    "why am I only hearing this now?".
+ *  - CAUSE OF THE PRIORITY. The fact must be WHY this issue is absolute.
+ *  - NOT DISSOLVED BY ONE REQUEST (rule 5). A skill or information gap invites
+ *    "just say so and we'll show you", which makes the face cost small and
+ *    stops the fact being the cause. Ver.2.18 extended this to FEAR and LACK
+ *    OF CONFIDENCE for the same reason: the natural reply is "let's practise,
+ *    I'll sit in" — dissolved by one request — and it reads as someone who
+ *    keeps avoiding what they cannot do, which is a competence verdict rather
+ *    than a face cost. What survives is a thing ALREADY DONE.
+ *  - SELF-RELEVANCE (rule 6). The term negotiated sits on the same axis as the
+ *    confession: the person a client would rather not see present negotiates
+ *    the presentation count.
  *
- * The text is SPEAKABLE: it is what the speaker (or their proxy, reframed)
- * says aloud to the other side, in the first person, so it must work as
- * speech.
+ * A DECEIT MUST NOT BE READ INTO IT. "The director thinks I checked with the
+ * team" was cut in Ver.2.18: a competence violation is recoverable, an
+ * integrity violation is not, so a card that reads as lying carries a cost so
+ * large it would floor disclosure in every cell.
+ *
+ * The text is SPEAKABLE — first person, said aloud to the other side.
+ *
+ * `abstract` and `cover` are the AI-Supplemented rendering (§6.6) and are
+ * fixed here rather than generated, because the manipulation is the WORDING:
+ * a model writing its own abstraction each turn would vary how much survives,
+ * and how much survives is the independent variable.
  */
 function sensitive(
   id: string,
   issueId: string,
   facet: NonNullable<ReasonCard["facet"]>,
   text: string,
+  abstract: string,
+  cover: readonly [string, string],
 ): ReasonCard {
-  return { id, issueId, layer: "sensitive", facet, text };
+  return { id, issueId, layer: "sensitive", facet, text, abstract, cover };
 }
 
 // ---------------------------------------------------------------------------
@@ -173,49 +206,49 @@ function sensitive(
 
 const TASK_A: NegotiationTask = {
   id: "task_a",
-  title: "The Quarterly Client Project",
+  title: "Next Quarter's Working Arrangements",
   reservationPoints: RESERVATION_POINTS,
   requirementIssueId: {
-    leader: "report_deadline",
-    member: "review_sessions",
+    leader: "office_days",
+    member: "client_presentations",
   },
   publicBrief:
-    "You both work at the same consulting and marketing agency, on the same client project team. The Leader is the team lead and the Member is the senior consultant. The two of you are settling two working conditions for next quarter's client project, twelve weeks. Two things have to be agreed: when the final report is due, and how many of the client review sessions the Member presents. Neither of you can set them alone. The two do not physically collide — presenting fewer sessions does not change the report work itself.",
+    "You both work on the same project team at the same company. The Leader is the team lead and the Member is a senior member of the team. The two of you are settling two working conditions for next quarter, twelve weeks. Two things have to be agreed: how many days a week the team comes into the office, and how many of the client meetings the Member presents at. Neither of you can set them alone. The two do not collide — coming in more days does not change who presents.",
 
   issues: [
     {
-      id: "report_deadline",
-      label: "Final report deadline",
-      description: "How soon the final report is due after the project ends.",
+      id: "office_days",
+      label: "Days a week in the office",
+      description: "How many days a week the team comes into the office.",
       type: "leader_priority",
       requirementThresholdIndex: REQUIREMENT_THRESHOLD_INDEX,
       options: options(
-        "rd",
-        ["2 weeks", "3 weeks", "4 weeks", "5 weeks"],
+        "od",
+        ["4 days", "3 days", "2 days", "1 day"],
         LEADER_POINTS,
       ),
       rationale: {
         leader:
-          "The date you gave the client is the date you are measured against.",
+          "The number you already gave upward is the number you are held to.",
         member:
-          "Every week taken off the deadline is a week of work compressed into the project itself.",
+          "Every extra day in the office is a day of commuting and interruption.",
       },
     },
     {
-      id: "review_sessions",
-      label: "Review sessions you present",
+      id: "client_presentations",
+      label: "Client meetings you present at",
       description:
-        "How many of the quarter's four client review sessions the Member presents.",
+        "How many of the quarter's four client meetings the Member presents at.",
       type: "member_priority",
       requirementThresholdIndex: REQUIREMENT_THRESHOLD_INDEX,
       options: options(
-        "rs",
+        "cp",
         ["1 of 4", "2 of 4", "3 of 4", "4 of 4"],
         MEMBER_POINTS,
       ),
       rationale: {
         leader:
-          "Every session the Member does not present is one you present yourself, on top of everything else.",
+          "Every meeting the Member does not present at is one you present yourself, on top of everything else.",
         member:
           "Standing in front of the client is the part of this job that costs you most.",
       },
@@ -228,26 +261,31 @@ const TASK_A: NegotiationTask = {
       organizationalPosition:
         "You lead this project team. After the negotiation you decide the Member's recommended performance bonus (up to £1) — and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "The director and the team know you as a lead who keeps to the dates you commit to — someone whose planning is accurate. Now next quarter's client project, twelve weeks of it, has to be settled with your senior consultant.\n\nWhat matters most to you is bringing the final report deadline as far forward as you can. There is something only you know. That deadline is a date you promised the client yourself, without checking it with the team first, and the director believes you confirmed the team's schedule before answering. That is why the deadline cannot slip — and why, if the deadline holds, you can afford to take more of the review sessions yourself.\n\nSaying this out loud would make it believable why the deadline is urgent. But after the negotiation the Member writes an upward evaluation of you, guided to weigh the judgement and planning they saw — and a date promised without checking can read as a lead who commits before he knows.",
+        "The director and the team know you as a lead whose judgement is sound — someone who keeps to what he commits to. Now next quarter's working arrangements, twelve weeks of them, have to be settled with a senior member of your team.\n\nWhat matters most to you is getting the team into the office as many days a week as you can. There is something only you know. Four days a week is a number you told the director was doable before you had asked the team, and the director has already passed that answer upward. The team does not know this. That is why the office days cannot come down — and why, if they hold, you can afford to take more of the client meetings yourself.\n\nThere is a reason you can say safely: this project has high client expectations, so getting the early execution right matters. It is true. But if that is all you say, the other side will offer to handle the presenting and the preparation — not the office days — because that is the obvious way to help with execution.\n\nSaying the real reason would make it believable why the office days are urgent. But after the negotiation the other person writes an upward evaluation of you that goes to the director, guided to weigh the negotiation as a whole and whether they would want to work with you again — and answering for the team without asking them can read as a lead who commits on his own.",
       objectives: [
-        "Get the final report deadline as early as you can.",
-        "If the deadline holds, the review sessions are something you can give ground on.",
+        "Get as many days a week in the office as you can.",
+        "If the office days hold, the client meetings are something you can give ground on.",
       ],
       requirementNote:
-        "An early deadline is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
+        "The office days are what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a lead who commits to dates without checking — and the Member's upward evaluation of you is guided to weigh exactly that.",
+        "Explaining the real reason could make you look like a lead who answers for his team without asking them — and the other person's upward evaluation of you is guided to weigh exactly that.",
       reasonCards: [
         work(
           "a_wr_l",
-          "report_deadline",
-          "The client's own timeline is tight, so the report has to land early. This quarter, the deadline is the one condition I most urgently need.",
+          "office_days",
+          "This project has high expectations from the client, so getting the early execution right matters. We need to be on it properly from the start.",
         ),
         sensitive(
           "a_sb_l",
-          "report_deadline",
+          "office_days",
           "promised_alone",
-          "The truth is, this deadline is a date I promised the client myself, without checking it with the team first. The director thinks I confirmed our schedule before I answered. If it slips, what comes out is that I committed without checking.",
+          "The truth is, four days a week is something I told the director was doable before I'd checked with the team. The director has already passed that answer upward. The team doesn't know about it.",
+          "The office days are something the team lead I represent has already spoken about upward, so there is very little room to adjust them.",
+          [
+            "They think that early on in a project, being in the same room is what keeps mistakes down.",
+            "There is also the fact that reviews and onboarding go a lot faster face to face.",
+          ],
         ),
       ],
       batnaSummary:
@@ -255,30 +293,35 @@ const TASK_A: NegotiationTask = {
     },
 
     member: {
-      title: "Senior Consultant",
+      title: "Senior Team Member",
       organizationalPosition:
-        "You are the senior consultant on this team — the one the lead puts in front of the client alone. After the negotiation the lead decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You are a senior member of this team — the one the lead puts in front of the client alone. After the negotiation the lead decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "The lead knows you as the senior who can be put in front of a client on your own. Now next quarter's client project, twelve weeks of it, has to be settled with the lead.\n\nWhat matters most to you is presenting as few of the review sessions as you can. There is something the lead does not know. At last quarter's kickoff a client asked you a question and your mind went blank — you could not answer, and the session moved on without you. The lead was away on another project that day and never heard about it. Since then, standing in front of a client is something you dread. That is why more sessions are a risk you cannot take — and why, if the sessions come down, you can absorb a tighter report deadline.\n\nSaying this out loud would make it believable why the sessions must come down. But after the negotiation the lead decides your bonus, guided to weigh the competence and reliability they saw — and freezing in front of a client can read as a senior who is not ready to be there alone.",
+        "The lead knows you as the senior who can be put in front of a client on your own. Now next quarter's working arrangements, twelve weeks of them, have to be settled with the lead.\n\nWhat matters most to you is presenting at as few of the client meetings as you can. There is something the lead does not know. After the last presentation, the client contact took you aside and said that from now on they would rather the team lead presented. You did not pass that on. That is why the meetings have to come down — and why, if they do, you can absorb more days in the office.\n\nThere is a reason you can say safely: your analysis scope is wide this quarter, so the workload is heavy and you need time to concentrate. It is true. But if that is all you say, the other side will offer to cut your office days — not the presenting — because that is the obvious way to help with workload.\n\nSaying the real reason would make it believable why the meetings must come down. But after the negotiation the lead decides your bonus, guided to weigh the negotiation as a whole and whether they would want to work with you again — and a client asking for someone else, kept quiet since, can read as someone they cannot put in front of a client.",
       objectives: [
-        "Get the number of review sessions you present down as far as you can.",
-        "If the sessions come down, the report deadline is something you can give ground on.",
+        "Get the number of client meetings you present at down as far as you can.",
+        "If the meetings come down, the office days are something you can give ground on.",
       ],
       requirementNote:
-        "Fewer review sessions is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
+        "Fewer client meetings is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a senior who cannot be put in front of a client — and the lead's bonus decision is guided to weigh exactly that.",
+        "Explaining the real reason could make you look like someone the client would rather not see present — and the lead's bonus decision is guided to weigh exactly that.",
       reasonCards: [
         work(
           "a_wr_m",
-          "review_sessions",
-          "I want to concentrate on the analysis work this quarter, so I'd like to carry less of the presenting. The session count is the condition that matters most to me.",
+          "client_presentations",
+          "My analysis scope is wide this quarter, so the workload is heavy. I need time to concentrate on it.",
         ),
         sensitive(
           "a_sb_m",
-          "review_sessions",
-          "froze_in_front_of_client",
-          "The truth is, at last quarter's kickoff a client asked me something and my mind went blank. I couldn't answer and we moved on. You were away that day, so you never heard about it. Since then I've been afraid of it happening again every time I'm in front of them.",
+          "client_presentations",
+          "client_asked_for_someone_else",
+          "The truth is, after the quarterly walkthrough the client contact pulled me aside in the corridor and said that from now on they'd rather you delivered these yourself. I never repeated that to you.",
+          "On the presenting, there is something the client passed directly to the team member I represent, so they would like to do fewer of them this quarter.",
+          [
+            "They think their time is better spent for the team on pulling the analysis together.",
+            "There is also the point that sharing the presenting around builds the experience across the team.",
+          ],
         ),
       ],
       batnaSummary:
@@ -310,13 +353,13 @@ const TASK_B: NegotiationTask = {
     member: "escalation_duty",
   },
   publicBrief:
-    "The same team is settling the terms for the first four weeks of a new client account. The Leader is the team lead and the Member is the senior consultant. Two things have to be agreed: how many days a week the Member is staffed on the new account, and how many times a month the Member takes the client escalation duty. Neither of you can set them alone. The two are scheduled separately — the duty rota runs whatever account you are staffed on.",
+    "The same team is settling the terms for the first four weeks of a new project. The Leader is the team lead and the Member is a senior member of the team. Two things have to be agreed: how many days a week the Member works on the new project, and how many times a month the Member is on urgent-call duty for the client. Neither of you can set them alone. The two are scheduled separately — the duty rota runs whatever project you are on.",
 
   issues: [
     {
       id: "account_days",
-      label: "Days on the new account",
-      description: "How many days a week the Member is staffed on the new account.",
+      label: "Days a week on the new project",
+      description: "How many days a week the Member works on the new project.",
       type: "leader_priority",
       requirementThresholdIndex: REQUIREMENT_THRESHOLD_INDEX,
       options: options(
@@ -326,16 +369,16 @@ const TASK_B: NegotiationTask = {
       ),
       rationale: {
         leader:
-          "The first four weeks are what the client judges the account on.",
+          "The plan you submitted was approved on the assumption of those days.",
         member:
-          "Every day on the new account is a day off everything else you carry.",
+          "Every day on the new project is a day off everything else you carry.",
       },
     },
     {
       id: "escalation_duty",
-      label: "Escalation duty",
+      label: "Urgent-call duty",
       description:
-        "How many times a month the Member is first to take client escalation calls.",
+        "How many times a month the Member is first to take the client's urgent calls.",
       type: "member_priority",
       requirementThresholdIndex: REQUIREMENT_THRESHOLD_INDEX,
       options: options(
@@ -347,7 +390,7 @@ const TASK_B: NegotiationTask = {
         leader:
           "Every duty the Member does not take is one that falls to someone with less client experience.",
         member:
-          "Taking the escalation call is the part of this job that costs you most.",
+          "Taking the urgent call is the part of this job that costs you most.",
       },
     },
   ],
@@ -358,61 +401,71 @@ const TASK_B: NegotiationTask = {
       organizationalPosition:
         "You lead this project team. After the negotiation you decide the Member's recommended performance bonus (up to £1) — and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "The director and the team know you as a lead whose staffing calls are sound. Now the first four weeks of a new client account have to be settled with your senior consultant.\n\nWhat matters most to you is having the senior staffed on the new account as many days a week as possible. There is something only you know. On the last account, when the client cut the scope back, the director questioned your staffing judgement and spoke about this account as though it were effectively your last chance. That is why the proposal says four days of senior time a week — and it is why the staffing cannot come down; if it holds, you can give ground on the duty rota.\n\nSaying this out loud would make it believable why the staffing is urgent. But the fact that the director has already questioned your judgement can read as a lead whose position is not secure — and the Member's upward evaluation of you is guided to weigh exactly that.",
+        "The director and the team know you as a lead whose planning is accurate. Now the first four weeks of a new project have to be settled with a senior member of your team.\n\nWhat matters most to you is having them on the new project as many days a week as possible. There is something only you know. When you submitted the plan for this project, you put down fewer people than it actually needs. It only works as planned if this person is in four days a week, and asking for more people now would show the director that the estimate was wrong. The team does not know this.\n\nThere is a reason you can say safely: the first four weeks of a new project are what matter, and nothing can go wrong early on. It is true. But if that is all you say, the other side will offer to take the urgent calls well — not the project days — because that is the obvious way to help with a clean start.\n\nSaying the real reason would make it believable why the days are urgent. But after the negotiation the other person writes an upward evaluation of you that goes to the director, guided to weigh the negotiation as a whole and whether they would want to work with you again — and understating what a project needs, then covering it, can read as a lead whose planning cannot be relied on.",
       objectives: [
-        "Get as many days a week of senior time on the new account as you can.",
-        "If the staffing holds, the escalation duty is something you can give ground on.",
+        "Get as many days a week on the new project as you can.",
+        "If the days hold, the urgent-call duty is something you can give ground on.",
       ],
       requirementNote:
-        "Senior time on the new account is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
+        "The days on the new project are what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a lead whose judgement has already been questioned — and the Member's upward evaluation of you is guided to weigh exactly that.",
+        "Explaining the real reason could make you look like a lead who understated what the project needed and then covered it — and the other person's upward evaluation of you is guided to weigh exactly that.",
       reasonCards: [
         work(
           "b_wr_l",
           "account_days",
-          "A new account is won or lost in the first four weeks. This month, the days on the account are the one condition I most urgently need.",
+          "The first four weeks of a new project are what matter. Nothing can go wrong early on.",
         ),
         sensitive(
           "b_sb_l",
           "account_days",
-          "director_warning",
-          "The truth is, when the client cut the scope on the last account the director questioned my staffing judgement, and talked about this one as if it were my last chance. That's why the proposal says four senior days a week. Nobody on the team knows about it.",
+          "understated_headcount",
+          "The truth is, when I put the plan in for this project I estimated fewer people than it actually needs. It only works as planned if you're in four days a week, and if I ask for more people now the director finds out the estimate was wrong. The team doesn't know about it.",
+          "On the days, the plan the team lead I represent submitted was approved on the basis of that number, so it is hard for them to give much ground on it.",
+          [
+            "They think the impression made in the first four weeks sets the whole first year of a project.",
+            "There is also the point that getting the rhythm right early makes later adjustments easier.",
+          ],
         ),
       ],
       batnaSummary:
-        "If the two of you do not agree on both terms, the account launches on the default terms and you receive your fallback score of 600 points.",
+        "If the two of you do not agree on both terms, the project starts on the default terms and you receive your fallback score of 600 points.",
     },
 
     member: {
-      title: "Senior Consultant",
+      title: "Senior Team Member",
       organizationalPosition:
-        "You are the senior consultant on this team — the one the lead counts on to take the difficult client calls. After the negotiation the lead decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You are a senior member of this team — the one the lead counts on to take the difficult client calls. After the negotiation the lead decides your recommended performance bonus (up to £1) — and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "The lead knows you as the senior who handles the client when it gets difficult. Now the first four weeks of a new client account have to be settled with the lead.\n\nWhat matters most to you is bringing the escalation duty down. There is something the lead does not know. On last month's escalation call the client's contact named you and said they would rather someone else took it next time. A colleague picked up the rest of it afterwards and never reported it upward. Since then, taking an escalation call is something you dread. That is why more duty is a risk you cannot take — and why, if the duty comes down, you can take on more days on the new account.\n\nSaying this out loud would make it believable why the duty must come down. But after the negotiation the lead decides your bonus, guided to weigh the competence and reliability they saw — and a client asking for someone else can read as a senior who cannot handle them.",
+        "The lead knows you as the senior who handles the client when it gets difficult. Now the first four weeks of a new project have to be settled with the lead.\n\nWhat matters most to you is bringing the urgent-call duty down. There is something the lead does not know. On last month's duty you missed an urgent call that came in at night and only dealt with it the next morning. The client complained to you directly and you apologised and closed it out yourself. You never reported it. Since then the client has been uncomfortable with you being the one on urgent calls.\n\nThere is a reason you can say safely: two existing projects have deadlines falling in the same month, so you have almost no capacity. It is true. But if that is all you say, the other side will offer to cut your days on the new project — not the duty — because that is the obvious way to help with capacity.\n\nSaying the real reason would make it believable why the duty must come down. But after the negotiation the lead decides your bonus, guided to weigh the negotiation as a whole and whether they would want to work with you again — and a missed call and a complaint kept quiet can read as someone who cannot be relied on with it.",
       objectives: [
-        "Get the number of escalation duties down as far as you can.",
-        "If the duty comes down, days on the new account are something you can take on more of.",
+        "Get the number of urgent-call duties down as far as you can.",
+        "If the duty comes down, days on the new project are something you can take on more of.",
       ],
       requirementNote:
-        "Less escalation duty is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
+        "Less urgent-call duty is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a senior the client does not want on the call — and the lead's bonus decision is guided to weigh exactly that.",
+        "Explaining the real reason could make you look like someone who missed a call and kept the complaint quiet — and the lead's bonus decision is guided to weigh exactly that.",
       reasonCards: [
         work(
           "b_wr_m",
           "escalation_duty",
-          "When escalations come often, my own work keeps slipping behind. This month, the duty count is the condition that matters most to me.",
+          "Two projects I'm already on have deadlines falling in the same month. I've got almost no capacity.",
         ),
         sensitive(
           "b_sb_m",
           "escalation_duty",
-          "client_asked_for_someone_else",
-          "The truth is, on last month's escalation call the client's contact named me and said they'd rather someone else took it next time. A colleague cleaned up after it and never reported it to you. Since then I've been dreading picking up those calls.",
+          "missed_call_complaint",
+          "The truth is, on last month's duty I missed an urgent call that came in at night and only got to it the next morning. The client complained to me directly and I apologised and closed it out. I didn't report it to you. They've been uncomfortable with me on urgent calls ever since.",
+          "On the urgent calls, there is something that happened recently between the client and the team member I represent, so they are uneasy about taking it on this month.",
+          [
+            "They think an urgent call is answered faster by someone who knows that project's context.",
+            "There is also the point that piling the duty onto one person makes the responses worse.",
+          ],
         ),
       ],
       batnaSummary:
-        "If the two of you do not agree on both terms, the account launches on the default terms and you receive your fallback score of 600 points.",
+        "If the two of you do not agree on both terms, the project starts on the default terms and you receive your fallback score of 600 points.",
     },
   },
 };
@@ -474,7 +527,7 @@ export const PRACTICE_TASK: NegotiationTask = {
       batnaSummary: "If you cannot agree, both are left as they are.",
     },
     member: {
-      title: "Senior Consultant",
+      title: "Senior Team Member",
       organizationalPosition: "You are at your desk all day.",
       roleStory:
         "Where the printer goes matters to you far more than the move week does — which is worth noticing, because the other side feels the opposite way.",
@@ -641,91 +694,32 @@ export function reasonScope(
 }
 
 // ---------------------------------------------------------------------------
-// Explorer role-plausible reason pool (Design §6.6)
+// AI-Supplemented rendering (Design §6.6)
 // ---------------------------------------------------------------------------
 
 /**
- * One pre-approved argument the Explorer Proxy may add, tagged with the issue
- * it argues about — or `issueId: null` for the one exchange argument, which
- * links terms rather than arguing for one.
+ * The three sentences an AI-Supplemented proxy says INSTEAD of a sensitive
+ * card: the abstraction first in the tuple, then the two cover reasons.
+ *
+ * WHY THERE IS NO POOL ANY MORE. Through Ver.2.14 the AI-Supplemented policy
+ * (then "AI-Supplemented") relayed the card verbatim and ADDED general arguments from
+ * a pool. §6.6 abolished that: the difference from User-Specified was too
+ * small to detect, because the sensitive fact itself arrived identically under
+ * both policies and only the surrounding sentences changed. Ver.2.20's policy
+ * REPLACES the card instead — the operation is abstraction, not addition — and
+ * that is what `OTHER-AI2` ("could you tell which reasons the counterpart had
+ * selected") is written to detect.
+ *
+ * The four-stage table in §6.6 explains why the cover sentences are stage-3
+ * "interest conversion" text and why stage 3 is never used ALONE: on its own
+ * it is WR-grade, so the counterpart would have no grounds to treat it as tier
+ * 3, and the two policies would then differ in OUTCOME as well as in exposure.
+ * Mixing the abstraction in among them keeps the outcome identical and moves
+ * only what the counterpart learns.
  */
-export interface PoolReason {
-  issueId: string | null;
-  text: string;
-}
-
-/**
- * The pre-approved arguments an Explorer Proxy may add on top of the cards its
- * principal checked — things anyone in this role could reasonably say.
- *
- * Ver.2.12 §6.6 fixes this at TWO per role per task: one supporting the role's
- * own core issue, and one exchange argument (`issueId: null`). They are
- * WR-grade general arguments and NEVER open the SB tier — the credibility
- * ladder reads only the principal's own cards. They are spent on different
- * issues at different stages, which is why they are not interchangeable.
- *
- * WHY THIS IS A FIXED LIST AND NOT GENERATED. The Explorer policy is defined
- * by source ambiguity, not by inventiveness: a pool item must be plausible for
- * the role and true of nobody in particular. A model asked to improvise would
- * eventually assert a policy, a client demand, or a past mistake that does not
- * exist, and that is fabrication rather than exploration.
- *
- * Never rendered with a source label — see Design §6.6.
- */
-export const PLAUSIBLE_REASON_POOL: Record<
-  TaskId,
-  Record<Role, PoolReason[]>
-> = {
-  task_a: {
-    leader: [
-      {
-        issueId: "report_deadline",
-        text: "Client trust starts with hitting the dates you gave them.",
-      },
-      {
-        issueId: null,
-        text: "If the deadline holds, there is room to move on who presents.",
-      },
-    ],
-    member: [
-      {
-        issueId: "review_sessions",
-        text: "The report holds up when the senior has time to stay on the analysis.",
-      },
-      {
-        issueId: null,
-        text: "If the sessions are settled, there is room to move on the deadline.",
-      },
-    ],
-  },
-  task_b: {
-    leader: [
-      {
-        issueId: "account_days",
-        text: "How densely you staff the first four weeks sets the client's first impression.",
-      },
-      {
-        issueId: null,
-        text: "If the staffing holds, there is room to move on the duty rota.",
-      },
-    ],
-    member: [
-      {
-        issueId: "escalation_duty",
-        text: "Spreading escalations across the team is what keeps the main work on schedule.",
-      },
-      {
-        issueId: null,
-        text: "If the duty is settled, there is room to move on the days.",
-      },
-    ],
-  },
-};
-
-export function plausibleReasons(
-  taskId: ScenarioId,
-  role: Role,
-): PoolReason[] {
-  if (taskId === "practice") return [];
-  return PLAUSIBLE_REASON_POOL[taskId][role];
+export function abstractedReason(
+  card: ReasonCard,
+): { abstract: string; cover: readonly [string, string] } | null {
+  if (card.layer !== "sensitive" || !card.abstract || !card.cover) return null;
+  return { abstract: card.abstract, cover: card.cover };
 }

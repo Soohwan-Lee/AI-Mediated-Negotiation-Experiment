@@ -20,7 +20,7 @@ export const STUDY = {
    * study takes underpays every participant who is slower than the estimate,
    * and Prolific's fair-pay rate is computed against this number.
    */
-  estimatedMinutes: 58,
+  estimatedMinutes: 61,
   /* ^ Keep in step with `TOTAL_MINUTES` below, which is derived from
      STAGE_MINUTES; `assertTimingConsistent()` fails the build if they part. */
   /**
@@ -35,20 +35,23 @@ export const STUDY = {
   /**
    * Base participation payment, advertised on the consent page.
    *
-   * £8.00 base + £1.00 bonus = £9.00 for a 58-minute study, which is £9.31 an
+   * £8.25 base + £1.00 bonus = £9.25 for a 61-minute study, which is £9.10 an
    * hour — above Prolific's recommended fair-pay rate of £9.00 (their hard
    * floor is £6.00). The recommended rate rather than the floor because this
    * is an effortful hour: two briefings to read, two negotiations to conduct,
    * and roughly eighty rating items plus fourteen written answers.
    *
-   * THE PAY DID NOT FALL WHEN THE BUDGET DID. Ver.2.13 shortened the flow by
-   * two minutes (the mandate lost a control per issue; the Proxy closing is
-   * now conditional), and the payment stayed where it was rather than being
-   * shaved to match — the study asks the same work of a participant either
-   * way, and the estimate is a cap most people finish inside.
+   * THE PAY ROSE WHEN THE BUDGET DID. Ver.2.14 added the REMARK screen and
+   * ATTR after each post-negotiation decision (§6.8), which is two minutes
+   * across the study. Left at £8.00 the rate would have fallen to £8.85/hour
+   * — below the recommended rate the listing is judged against — so the base
+   * moved with it. The number to adjust is always the PAY, never the
+   * advertised minutes: the estimate is derived from the screens that exist,
+   * and quoting less than the study takes underpays whoever is slower than
+   * the estimate.
    */
-  compensation: "8.00",
-  hourlyEquivalent: "9.31",
+  compensation: "8.25",
+  hourlyEquivalent: "9.10",
   /**
    * The performance bonus (Design §2, §8). £1.00 per participant, across the
    * study — not per task.
@@ -60,7 +63,7 @@ export const STUDY = {
    *
    * The reason for holding a pound back rather than simply paying £8.25 flat
    * is that the Leader's reward power has to be REAL to the Member for gate
-   * 2's manipulation check to mean anything. POWER3 asks whether outcomes
+   * 2's manipulation check to mean anything. POWER2 asks whether outcomes
    * that mattered depended on the other person's decisions; a bonus the
    * Member believes is being decided about them by someone else is that
    * dependence, and a flat fee announced up front is not.
@@ -84,7 +87,7 @@ export const STUDY = {
    */
   bonusPerTask: "0.50",
   /** Advertised total: base + the full bonus, which everyone is paid. */
-  totalPaid: "9.00",
+  totalPaid: "9.25",
   irb: {
     protocolNumber: "TBD-IRB-0000",
     institution: "UNIST",
@@ -143,7 +146,17 @@ export const STAGE_MINUTES = {
    * the two tasks and therefore understated the pay owed for them.
    */
   taskSurvey: 7,
-  reward: 1,
+  /**
+   * The post-negotiation decision, then REMARK and ATTR.
+   *
+   * 2, up one from Ver.2.13. The decision itself is one control (a slider for
+   * the Leader, three ratings and an optional note for the Member), and
+   * Ver.2.14 added a screen after it: the counterpart's fixed parting comment
+   * plus ATTR1, ATTR2 (Proxy only) and one written answer (§6.8, §9.4.9).
+   * That screen has to come after every confirmatory measure, so it cannot be
+   * folded into the battery above.
+   */
+  reward: 2,
   wrapUp: 3,
 } as const;
 
@@ -188,7 +201,7 @@ export const NEGOTIATION = {
   /** "Waiting for the other participant…" before a task starts. */
   matchmakingMs: { minMs: 4000, maxMs: 5000 },
   /**
-   * How long the ostensible-human counterpart takes to reply in Baseline.
+   * How long the ostensible-human counterpart takes to reply in Direct.
    *
    * A flat delay is a machine tell — a real person does not answer a
    * three-word question and a full counterpackage in the same 2.5 seconds,
@@ -202,8 +215,8 @@ export const NEGOTIATION = {
    * Maximum characters in one negotiation message (Design §7 노출량 통제).
    *
    * Applies to BOTH conditions and to the participant's own composer. It is an
-   * exposure control, not a style preference: if Explorer messages could run
-   * longer than Delegate ones to fit an extra reason, the contrast would be
+   * exposure control, not a style preference: if AI-Supplemented messages could run
+   * longer than User-Specified ones to fit an extra reason, the contrast would be
    * confounded by sheer volume of argument.
    */
   maxMessageChars: 280,

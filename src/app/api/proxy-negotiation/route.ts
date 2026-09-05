@@ -20,8 +20,8 @@
  * The counterpart's evaluation at turn 6 is the credibility ladder: the tier
  * earned by the reasons ACTUALLY voiced (recovered from the carried tokens,
  * pool arguments never counting) sets how far it concedes on the
- * participant's core issue. Fixed turn order is what keeps Delegate and
- * Explorer matched on message count (pilot gate 9); the Explorer's two pool
+ * participant's core issue. Fixed turn order is what keeps User-Specified and
+ * AI-Supplemented matched on message count (pilot gate 9); the AI-Supplemented's two pool
  * clauses ride INSIDE turns 3 and 5, never as extra turns.
  *
  * ONE TURN PER REQUEST: the client drives the sequence, each request stays
@@ -43,7 +43,7 @@ import {
   cardOfLayer,
   counterRequirementIssue,
   getTask,
-  plausibleReasons,
+  abstractedReason,
   requirementIssue,
 } from "@/lib/tasks";
 import type {
@@ -63,7 +63,7 @@ export const maxDuration = 60;
 interface RequestBody {
   taskId: TaskId;
   participantRole: Role;
-  policy: "delegate" | "explorer";
+  policy: "user_specified" | "ai_supplemented";
   mandate: Mandate;
   sessionIndex: 1 | 2;
   /** 0-based index into the turn order above. */
@@ -168,7 +168,7 @@ function fallbackText(
  * difference between "the same reason as last turn" (which the budget needs)
  * and "this sentence came from the pool" (which the participant must not
  * learn). NO KIND MARKER, ever: the token is returned with every message, so
- * any marker would label the Explorer's additions per message for the whole
+ * any marker would label the AI-Supplemented's additions per message for the whole
  * transcript — the judgement OTHER-AI4 asks the participant to make unaided.
  */
 function reasonToken(id: string): string {
@@ -180,10 +180,10 @@ function reasonToken(id: string): string {
 }
 
 /**
- * Recovers each carried token's source — which card or pool item, which
- * issue, principal or pool — by re-hashing the known ids for this task and
- * role. The route is stateless; the mapping is rebuilt per request and
- * nothing kind- or issue-shaped ever travels to the client.
+ * Recovers each carried token's source — which card, which issue — by
+ * re-hashing the known ids for this task and role. The route is stateless;
+ * the mapping is rebuilt per request and nothing kind- or issue-shaped ever
+ * travels to the client.
  */
 function resolveReasonTokens(
   taskId: TaskId,
@@ -193,7 +193,6 @@ function resolveReasonTokens(
   key: string;
   sourceId: string;
   issueId: string | null;
-  source: "principal" | "pool";
   layer: ReasonCard["layer"] | null;
 }> {
   const byToken = new Map<
@@ -201,7 +200,6 @@ function resolveReasonTokens(
     {
       sourceId: string;
       issueId: string | null;
-      source: "principal" | "pool";
       layer: ReasonCard["layer"] | null;
     }
   >();
@@ -209,41 +207,13 @@ function resolveReasonTokens(
     byToken.set(reasonToken(card.id), {
       sourceId: card.id,
       issueId: card.issueId,
-      source: "principal",
       layer: card.layer,
     });
   }
-  plausibleReasons(taskId, role).forEach((item, i) => {
-    byToken.set(reasonToken(`pool:${i}`), {
-      sourceId: `pool:${i}`,
-      issueId: item.issueId,
-      source: "pool",
-      layer: null,
-    });
-  });
   return tokens.flatMap((key) => {
     const hit = byToken.get(key);
     return hit ? [{ key, ...hit }] : [];
   });
-}
-
-/**
- * The pool item the Explorer adds this turn (Design §6.6: 삽입 여부는 state
- * machine이 지정, task당 최대 2회). SCHEDULED, NOT VOLUNTEERED: the schedule
- * places the core-support item inside turn 3 and the exchange item inside
- * turn 5, so the per-issue cap is satisfied by construction.
- */
-function designatedPool(
-  taskId: TaskId,
-  role: Role,
-  issueId: string | null,
-  alreadyUsed: readonly string[],
-): { id: string; text: string } | null {
-  const pool = plausibleReasons(taskId, role);
-  const index = pool.findIndex(
-    (item, i) => item.issueId === issueId && !alreadyUsed.includes(`pool:${i}`),
-  );
-  return index === -1 ? null : { id: `pool:${index}`, text: pool[index].text };
 }
 
 /**
@@ -273,36 +243,9 @@ function mentionsCard(message: string, cardText: string): boolean {
   return hits / want.size >= 0.33;
 }
 
-/**
- * Did the model already say the pool clause, in its own words?
- *
- * A loose content-word overlap rather than a substring match: the proxies are
- * told to rephrase, so an exact match would almost never fire and the clause
- * would be appended twice in slightly different wording. Over half the
- * clause's distinctive words appearing in the message is taken as "already
- * said" — the failure mode that matters is duplication, and the cost of a
- * false negative (one appended clause the model half-covered) is far smaller
- * than the cost of the clause going missing entirely.
- */
-function containsPoolClause(message: string, clause: string): boolean {
-  const words = (t: string) =>
-    new Set(
-      t
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, " ")
-        .split(/\s+/)
-        .filter((w) => w.length > 4),
-    );
-  const want = words(clause);
-  if (want.size === 0) return false;
-  const have = words(message);
-  let hits = 0;
-  for (const w of want) if (have.has(w)) hits += 1;
-  return hits / want.size > 0.5;
-}
 
 /**
- * The Explorer's one added clause for this turn (§6.6) is NOT requested in
+ * The AI-Supplemented's one added clause for this turn (§6.6) is NOT requested in
  * the decidedAction — it is appended to the finished message instead.
  *
  * It rode in the instruction first, and lost. It competed with the card
@@ -313,9 +256,9 @@ function containsPoolClause(message: string, clause: string): boolean {
  * the added argument and not the principal's own reason.
  *
  * Both failures are validity defects rather than wording problems. The pool
- * clause IS the Explorer manipulation, and `voicedPoolId` spends the §6.6
+ * clause IS the AI-Supplemented manipulation, and `voicedPoolId` spends the §6.6
  * budget from the SCHEDULE — so a dropped clause was recorded as voiced and
- * `Explorer - Delegate` compared Delegate against a mostly-Delegate Explorer.
+ * `AI-Supplemented - User-Specified` compared User-Specified against a mostly-User-Specified AI-Supplemented.
  * The card, meanwhile, drives the credibility ladder, so a dropped card
  * credited a participant with a disclosure nobody heard.
  *
@@ -324,6 +267,23 @@ function containsPoolClause(message: string, clause: string): boolean {
  * bubble, which is also how §6.6 describes it. `designatedPool` still decides
  * WHETHER and WHICH, so the per-issue and per-task budgets are unchanged.
  */
+
+/**
+ * Order the §6.6 sentences so their POSITION carries nothing.
+ *
+ * If the abstraction always came first (or last), a receiver could sort the
+ * principal's own circumstance out of the three by layout alone, and
+ * `OTHER-AI2` — "could you tell which reasons the counterpart had selected" —
+ * would be measuring a formatting convention instead of the manipulation.
+ */
+function shuffle<T>(items: readonly T[]): T[] {
+  const out = items.slice();
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 /**
  * A package's levels, written out for a decidedAction. Every move that
@@ -389,14 +349,9 @@ export async function POST(request: Request) {
     body.reasonsUsed ?? [],
   );
   const voicedCards = resolvedHistory.filter(
-    (r) => r.source === "principal" && r.issueId === yourRequirement.id,
+    (r) => r.issueId === yourRequirement.id,
   );
-  const voicedCardIds = resolvedHistory
-    .filter((r) => r.source === "principal")
-    .map((r) => r.sourceId);
-  const usedPoolIds = resolvedHistory
-    .filter((r) => r.source === "pool")
-    .map((r) => r.sourceId);
+  const voicedCardIds = resolvedHistory.map((r) => r.sourceId);
   const tier: ReasonTier = tierOf(
     voicedCards.map((c) => ({ layer: c.layer ?? "work" })),
   );
@@ -425,9 +380,12 @@ export async function POST(request: Request) {
   let decidedAction: string;
   /** The card the schedule told this turn to voice (participant side). */
   let designatedCard: ReasonCard | null = null;
-  /** The Explorer's added clause for this turn, when the schedule places one.
-   * Boxed so the assignment inside `addPool` survives TS narrowing. */
-  const poolBox: { item: { id: string; text: string } | null } = { item: null };
+  /**
+   * The §6.6 sentences an AI-Supplemented proxy renders INSTEAD of the
+   * designated sensitive card — the abstraction plus its two covers, shuffled
+   * so the abstraction's position carries no signal.
+   */
+  let abstractedSentences: string[] | null = null;
   let accepted = false;
   /**
    * The AI-AI exchange no longer has a way to end without a package
@@ -447,17 +405,6 @@ export async function POST(request: Request) {
    */
   let effectiveStage: StageId = stage;
 
-  /** Designate this turn's pool item, if the schedule places one here. */
-  const addPool = (issueId: string | null) => {
-    if (!isParticipantSide || body.policy !== "explorer") return;
-    poolBox.item = designatedPool(
-      body.taskId,
-      body.participantRole,
-      issueId,
-      usedPoolIds,
-    );
-  };
-
   if (isParticipantSide) {
     switch (turn) {
       case 1:
@@ -475,17 +422,34 @@ export async function POST(request: Request) {
           body.mandate.authorizedReasonIds,
           voicedCardIds,
         );
-        const reasonClause = designatedCard
-          ? ` To make credible why, give exactly this authorized reason and no other: "${designatedCard.text}"`
-          : " Give no reason beyond naming the priority — none has been authorized.";
+        // AI-SUPPLEMENTED REPLACES THE CARD, IT DOES NOT DECORATE IT (§6.6).
+        // When the designated card is the sensitive one, the proxy renders the
+        // fixed abstraction plus two covers instead of the card's own text.
+        // The order is shuffled so that position never marks which sentence is
+        // the principal's — if the abstraction always came first or last, a
+        // receiver could sort them without reading, and OTHER-AI2 would be
+        // measuring a layout convention rather than the manipulation.
+        const abstracted =
+          body.policy === "ai_supplemented" && designatedCard
+            ? abstractedReason(designatedCard)
+            : null;
+        if (abstracted) {
+          abstractedSentences = shuffle([
+            abstracted.abstract,
+            ...abstracted.cover,
+          ]);
+        }
+        const reasonClause = abstractedSentences
+          ? ` Render the sentences you are given, all three, as one message under a single frame.`
+          : designatedCard
+            ? ` To make credible why, give exactly this authorized reason and no other: "${designatedCard.text}"`
+            : " Give no reason beyond naming the priority — none has been authorized.";
         decidedAction = `Answer their question: say that ${yourRequirement.label.toLowerCase()} is your principal's priority.${reasonClause}`;
-        addPool(yourRequirement.id);
         break;
       }
       case 5:
         proposal = plan.tradeProposal;
         decidedAction = `Propose this conditional exchange, naming these exact levels and no others: ${packageSentence(task, plan.tradeProposal)}. Say plainly that your principal offers ${theirRequirement.label.toLowerCase()} at that level in exchange for holding ${yourRequirement.label.toLowerCase()}.`;
-        addPool(null);
         break;
       default: {
         // Turn 7 — the close, answering the counterpart's turn-6 decision.
@@ -614,14 +578,13 @@ export async function POST(request: Request) {
         // finished message instead, so listing it here only offered the model
         // a second thing it might say INSTEAD of its principal's card — and
         // measured live it took that option: on the reason turn the card
-        // survived 4 of 4 Delegate generations against 1 of 4 Explorer ones.
+        // survived 4 of 4 User-Specified generations against 1 of 4 AI-Supplemented ones.
         // A failure that fires in one arm only, on the reason turn, biases
-        // `Explorer - Delegate` itself.
+        // `AI-Supplemented - User-Specified` itself.
         //
-        // The Delegate-side guardrail is unaffected: it reads the action's
-        // own `pool:` fields, which a Delegate never had the pool to fill.
-        plausibleReasons: undefined,
-      },
+        // The User-Specified-side guardrail is unaffected: it reads the action's
+        // own `pool:` fields, which a User-Specified never had the pool to fill.
+        },
       history,
     });
 
@@ -638,21 +601,32 @@ export async function POST(request: Request) {
      * for the package-only fallback, which on the reason turn is worse than
      * the problem: the fallback carries no reason at all and nulls the reason
      * token, handing the direct conversation a false "no reason was given".
-     * And it cannot be appended the way the pool clause is, because §6.6
-     * requires the proxy to REFRAME a card rather than read it out — pasting
-     * the card's own words would break the reframing rule the Delegate and
-     * Explorer prompts share. Asking again is the only move that keeps both.
+     * And it cannot simply be appended, because §6.5 requires the proxy to
+     * re-voice a card in its own representative voice rather than read it
+     * out — pasting the card's own first-person words would break the third
+     * person the whole delegation is visible through. Asking again is the
+     * only move that keeps both.
      *
      * One retry, not a loop: each turn is a live request in front of a
      * waiting participant, and a second failure is rare enough to accept.
      */
-    /** Both generations dropped the card the schedule designated. */
-    let cardMissing = false;
+    /**
+     * WHAT THIS TURN HAD TO SAY, which is policy-dependent.
+     *
+     * Under User-Specified it is the card, re-voiced. Under AI-Supplemented
+     * the card is never said at all — the §6.6 abstraction stands in for it —
+     * so checking for the card's own words there would fail every correct
+     * message and retry until it produced a wrong one.
+     */
+    const requiredText = abstractedSentences
+      ? (designatedCard?.abstract ?? null)
+      : (designatedCard?.text ?? null);
+
     let { action, stubbed } = await generate();
     if (
       isParticipantSide &&
-      designatedCard &&
-      !mentionsCard(action.rationale, designatedCard.text)
+      requiredText &&
+      !mentionsCard(action.rationale, requiredText)
     ) {
       // The retry says WHAT WENT WRONG rather than repeating the same ask. A
       // bare second roll failed too in live runs — the model does not know it
@@ -666,18 +640,15 @@ export async function POST(request: Request) {
       // is not worth having, so a throw leaves the first attempt standing.
       try {
         const second = await generate(
-          ` YOUR LAST ATTEMPT LEFT THE REASON OUT. The message is not acceptable without it. Reframe this reason in your own words and make it the body of the message: "${designatedCard.text}"`,
+          ` YOUR LAST ATTEMPT LEFT THE REASON OUT. The message is not acceptable without it. Carry this into the body of the message, in your own representative voice: "${requiredText}"`,
         );
-        if (mentionsCard(second.action.rationale, designatedCard.text)) {
+        if (mentionsCard(second.action.rationale, requiredText)) {
           action = second.action;
           stubbed = second.stubbed;
-        } else {
-          cardMissing = true;
         }
       } catch (retryError) {
         // Logged, not raised: the first attempt is still a valid message.
         console.warn("[proxy-negotiation] card retry failed", retryError);
-        cardMissing = true;
       }
     }
 
@@ -687,10 +658,6 @@ export async function POST(request: Request) {
     const voicedReasonId = isParticipantSide
       ? (designatedCard?.id ?? null)
       : null;
-    const voicedPoolId = isParticipantSide
-      ? (poolBox.item?.id ?? null)
-      : null;
-
     const validation = validateAction(action, {
       issues: task.issues,
       mandate: isParticipantSide ? body.mandate : undefined,
@@ -700,7 +667,7 @@ export async function POST(request: Request) {
       reasonsUsed: isParticipantSide ? resolvedHistory : undefined,
       reasonKey: voicedReasonId ? reasonToken(voicedReasonId) : null,
       reasonIssueId: designatedCard?.issueId ?? null,
-      addedReasonKey: voicedPoolId ? reasonToken(voicedPoolId) : null,
+      addedReasonKey: null,
       addedReasonIssueId: null,
     });
 
@@ -709,58 +676,42 @@ export async function POST(request: Request) {
     const blocked =
       !validation.valid && validation.disposition === "regenerate";
 
-    // THE EXPLORER'S ADDED CLAUSE IS APPENDED, NOT REQUESTED.
+    // WHAT MUST SURVIVE THE CAP, IN PRIORITY ORDER.
     //
-    // It rode in the decidedAction as an instruction, and the model dropped it
-    // roughly three times in four — it competed with the card instruction on
-    // the same turn, and a card instruction is the more forceful one. Rewording
-    // both helped and did not fix it: measured live it still landed about one
-    // turn in four.
+    // Under User-Specified that is the principal's card. Under
+    // AI-Supplemented the card is never said at all — the three §6.6
+    // sentences ARE the message — so the abstraction is protected first and
+    // the two covers after it.
     //
-    // That is a validity defect, not a wording preference. The clause IS the
-    // Explorer manipulation, and `voicedPoolId` above already spends the §6.6
-    // budget on it from the SCHEDULE — so a dropped clause was being recorded
-    // as voiced, and `Explorer − Delegate` was comparing Delegate against an
-    // Explorer that was mostly Delegate. The same reasoning CLAUDE.md applies
-    // to the rehearsal leak screen applies here: what the design requires is
-    // enforced, not hoped for.
+    // The ordering is load-bearing and was learned the hard way. Cutting from
+    // the end removed whichever clause the model wrote last; protecting the
+    // wrong one pushed the reason out while the schedule still recorded it as
+    // voiced, so a participant was credited with a disclosure nobody heard.
+    // The abstraction comes first for the same reason the card does: it is
+    // what the ladder is driven off, and losing a cover sentence costs only
+    // some of the cover.
     //
-    // It is appended as its own bubble, which is also how the design describes
-    // it (§6.6: "one short clause beside that message's authorized reason"),
-    // and the cap below then applies to the whole message — so the added
-    // clause cannot buy the Explorer arm extra LENGTH either.
-    // THE POOL CLAUSE IS WITHHELD WHEN THE CARD IS MISSING, and that guard is
-    // the whole reason this is not just a tidiness check.
-    //
-    // Appending it unconditionally made the omission POLICY-CORRELATED: an
-    // Explorer message that dropped the card still arrived carrying a fluent
-    // argument, so nothing downstream noticed, while the same failure under
-    // Delegate produced an obviously reasonless message. Measured live on the
-    // reason turn the card survived 4 of 4 Delegate generations and 1 of 4
-    // Explorer ones. A defect that fires in one arm only, on the reason turn,
-    // is a bias in `Explorer - Delegate` itself — the contrast the study
-    // exists to measure.
-    //
-    // Withholding it makes both policies fail identically and visibly.
-    const poolText = cardMissing ? null : (poolBox.item?.text ?? null);
-    const withPool =
-      !blocked && poolText && !containsPoolClause(action.rationale, poolText)
-        ? `${action.rationale} || ${poolText}`
-        : action.rationale;
+    // Matching is by CONTENT OVERLAP, never containment — a User-Specified
+    // proxy is required to re-voice its card rather than quote it, so a
+    // containment match would find the verbatim sentences every time and the
+    // re-voiced card never.
+    const protectedClauses = blocked
+      ? null
+      : abstractedSentences
+        ? abstractedSentences.slice().sort((a, b) => {
+            const abstractText = designatedCard?.abstract ?? "";
+            return (
+              (b === abstractText ? 1 : 0) - (a === abstractText ? 1 : 0)
+            );
+          })
+        : [designatedCard?.text ?? null];
 
     const text = capMessageLength(
-      blocked ? fallbackText(task, proposal, isParticipantSide) : withPool,
+      blocked
+        ? fallbackText(task, proposal, isParticipantSide)
+        : action.rationale,
       NEGOTIATION.maxMessageChars,
-      // BOTH clauses that carry meaning are protected, CARD FIRST.
-      //
-      // The Explorer's pool clause is the last bubble, so an unprotected cut
-      // from the end removed the manipulation and left the arm looking like
-      // Delegate. Protecting only the pool clause then pushed the CARD out
-      // instead — messages arrived carrying the added argument and not the
-      // principal's own reason, which is worse: the schedule records the card
-      // as voiced and drives the ladder off it, so the participant would have
-      // been credited with a disclosure nobody ever heard.
-      blocked ? null : [designatedCard?.text ?? null, poolText],
+      protectedClauses,
     );
 
     const message: TranscriptMessage = {
@@ -776,7 +727,7 @@ export async function POST(request: Request) {
 
     // Provenance is stripped before the response leaves the server: the
     // participant must not be able to tell a pool reason from one of their
-    // own — that indistinguishability IS the Explorer condition.
+    // own — that indistinguishability IS the AI-Supplemented condition.
     const { internalProvenance, ...visible } = message;
     void internalProvenance;
 
@@ -794,15 +745,18 @@ export async function POST(request: Request) {
       blocked,
       // FIXED WIDTH, ALWAYS TWO opaque hashes, decoys filling empty slots —
       // presence, absence, or count of real tokens would each name the
-      // Explorer's added turns in the network tab. `resolveReasonTokens`
+      // AI-Supplemented's added turns in the network tab. `resolveReasonTokens`
       // drops decoys server-side, so they spend no budget.
       reasonTokens: [
         isParticipantSide && !blocked && voicedReasonId
           ? reasonToken(voicedReasonId)
           : reasonToken(`nil:a:${turn}`),
-        isParticipantSide && !blocked && voicedPoolId
-          ? reasonToken(voicedPoolId)
-          : reasonToken(`nil:b:${turn}`),
+        // Always a decoy now. Ver.2.20 has no second reason id to carry — the
+        // AI-Supplemented policy replaces the card rather than adding beside
+        // it — but the RESPONSE SHAPE must not change, so the slot is padded.
+        // An array that were one element under one policy and two under the
+        // other is a per-message tell of exactly the kind §7 forbids.
+        reasonToken(`nil:b:${turn}`),
       ],
       // What the participant's own proxy voiced THIS TURN, as a tier rung.
       // The direct closing needs it to carry the credibility ladder over —
@@ -814,7 +768,7 @@ export async function POST(request: Request) {
       //
       // SCOPED TO THE REQUIREMENT ISSUE, like every sibling computation
       // (`resolveReasonTokens` here, `personallyVoiced` in the direct
-      // closing, the Baseline picker). Inert today because
+      // closing, the Direct picker). Inert today because
       // `designatedReason` already filters by issue and both cards sit on
       // the requirement term — but unscoped it is the one place a card added
       // on the OTHER term would hand the direct phase a tier the machine's

@@ -79,16 +79,16 @@ export function PointsKey({
   return (
     <div
       className={cx(
-        "rounded-xl border border-[var(--private-line)] bg-[var(--private-soft)] p-3.5 sm:p-4 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)] shadow-2xs",
+        "rounded-2xl border border-[var(--private-line)] bg-gradient-to-br from-[var(--private-soft)] to-amber-50/40 p-4 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)] shadow-2xs",
         className,
       )}
     >
       <div className="flex items-center gap-2 font-bold text-sm text-[var(--private-strong)] mb-1.5">
         <span>🔢</span>
-        <span>Your Point Guide</span>
+        <span>How Points Work (Private to You)</span>
       </div>
-      <p className="mb-2 text-xs sm:text-[0.8125rem]">
-        Points indicate how much a term is worth <strong>to you</strong> (higher is better).
+      <p className="mb-3 text-xs leading-relaxed text-[var(--private-ink)]/90">
+        Points show how well an option fits your personal priorities (more points = better outcome). Your sheet is 100% private — the other person never sees your scores.
       </p>
       {/* Label above value, not beside it. These pills live in the ~355px
           briefing rail as well as the wide task column, and as one inline row
@@ -98,19 +98,19 @@ export function PointsKey({
           gives the same shape at both widths, and `min-w-0` lets the pills
           shrink instead of pushing the rail wider. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-        <span className="min-w-0 rounded-lg border border-amber-300 bg-amber-100/70 px-2.5 py-1.5 font-semibold text-amber-900 shadow-2xs">
-          <span className="block text-[0.6875rem] leading-tight opacity-90">
-            🏆 Best possible ({termCount})
+        <span className="min-w-0 rounded-xl border border-amber-300 bg-amber-100/80 px-3 py-2 font-semibold text-amber-950 shadow-2xs">
+          <span className="block text-[0.6875rem] leading-tight opacity-90 font-medium">
+            🏆 Ideal Target ({termCount})
           </span>
-          <strong className="tabular block text-sm leading-tight">
+          <strong className="tabular block text-sm font-black leading-tight mt-0.5">
             {best.toLocaleString()} pts
           </strong>
         </span>
-        <span className="min-w-0 rounded-lg border border-slate-300 bg-white/80 px-2.5 py-1.5 font-semibold text-slate-800 shadow-2xs">
-          <span className="block text-[0.6875rem] leading-tight opacity-90">
-            🛡️ No-agreement fallback
+        <span className="min-w-0 rounded-xl border border-slate-300 bg-white/90 px-3 py-2 font-semibold text-slate-800 shadow-2xs">
+          <span className="block text-[0.6875rem] leading-tight opacity-90 font-medium">
+            🛡️ Fallback (No Deal)
           </span>
-          <strong className="tabular block text-sm leading-tight">
+          <strong className="tabular block text-sm font-black leading-tight mt-0.5">
             {reservationPoints.toLocaleString()} pts
           </strong>
         </span>
@@ -196,7 +196,7 @@ export function IssueValueTable({
         />
       ) : null}
       {issues.map((issue) => (
-        <div key={issue.id} className="rounded-xl border border-[var(--private-line)] bg-white/60 p-4 shadow-2xs">
+        <div key={issue.id} className="rounded-2xl border border-[var(--private-line)] bg-white/80 p-4 sm:p-5 shadow-2xs">
           {/* No badge marks which issue is this role's priority, and none may
               be added. Design §5 principle 1 is explicit that issue type and
               core-requirement marking are not displayed: a star on one issue
@@ -206,21 +206,21 @@ export function IssueValueTable({
               logroll is the behaviour being observed (pilot gate 6). The points
               and the one-line rationale below already convey what matters to
               this role, through the role's own story rather than a label. */}
-          <div className="mb-2">
+          <div className="mb-1.5">
             <p className="text-sm sm:text-base font-bold text-[var(--ink)]">{issue.label}</p>
           </div>
           <p className="mb-2 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)]/80">
             {issue.description}
           </p>
-          <div className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/70 p-2.5 text-xs sm:text-[0.8125rem] leading-relaxed text-[var(--private-ink)]">
-            <span className="font-semibold">💡 Your Situation: </span>
-            <span className="italic">{issue.rationale[role]}</span>
+          <div className="mb-3 rounded-xl border border-amber-200/80 bg-amber-50/70 p-2.5 text-xs sm:text-[0.8125rem] leading-relaxed text-[var(--private-ink)] font-medium">
+            <span className="font-bold text-amber-950">💡 Why it matters to you: </span>
+            <span>{issue.rationale[role]}</span>
           </div>
 
           <ul className="space-y-2">
             {issue.options.map((o) => (
-              <li key={o.id} className="flex items-center gap-3 text-xs sm:text-sm rounded-lg bg-white p-2 border border-slate-100 shadow-2xs">
-                <span className="min-w-0 flex-1 font-medium text-[var(--ink)]">{o.label}</span>
+              <li key={o.id} className="flex items-center gap-3 text-xs sm:text-sm rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                <span className="min-w-0 flex-1 font-semibold text-[var(--ink)]">{o.label}</span>
                 {showPoints ? (
                   <div className="flex items-center gap-2.5">
                     <span
@@ -232,7 +232,7 @@ export function IssueValueTable({
                         style={{ width: `${share(issue, o.points[role], role)}%` }}
                       />
                     </span>
-                    <span className="tabular font-bold text-xs sm:text-sm text-[var(--accent)] min-w-[3.5rem] text-right">
+                    <span className="tabular font-extrabold text-xs sm:text-sm text-[var(--accent)] min-w-[3.5rem] text-right">
                       {o.points[role].toLocaleString()} pts
                     </span>
                   </div>

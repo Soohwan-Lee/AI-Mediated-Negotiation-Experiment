@@ -14,14 +14,30 @@
 // Assignment factors
 // ---------------------------------------------------------------------------
 
-/** Between-participant: which proxy policy the participant experiences. */
-export type ProxyPolicy = "delegate" | "explorer";
+/**
+ * Between-participant: which proxy policy the participant experiences.
+ *
+ * Ver.2.18 renamed these. `user_specified` (was User-Specified) relays the checked
+ * cards with every fact intact; `ai_supplemented` (was AI-Supplemented) abstracts the
+ * sensitive card to its KIND and embeds it, unlabelled, among two cover
+ * reasons (§6.6). The rename is not cosmetic — Ver.2.20's ai_supplemented no
+ * longer ADDS to the card, it REPLACES it, so the old name described the
+ * wrong operation.
+ */
+export type ProxyPolicy = "user_specified" | "ai_supplemented";
 
 /** Between-participant: organizational power position. */
 export type Role = "leader" | "member";
 
-/** Session-level condition. Every participant sees `baseline` + one proxy. */
-export type Condition = "baseline" | "delegate" | "explorer";
+/**
+ * Session-level condition. Every participant sees `direct` + one proxy policy.
+ *
+ * `direct` was called `baseline` through Ver.2.17. The design renamed it
+ * because "baseline" implies an absence of treatment, and direct negotiation
+ * is a condition in its own right: it is where the participant carries the
+ * disclosure cost personally, which is the comparison the study is built on.
+ */
+export type Condition = "direct" | "user_specified" | "ai_supplemented";
 
 /** Which of the two structurally matched scenarios a session runs. */
 export type TaskId = "task_a" | "task_b";
@@ -37,15 +53,15 @@ export type TaskId = "task_a" | "task_b";
 export type ScenarioId = TaskId | "practice";
 
 /** Counterbalancing: which session comes first. */
-export type SessionOrder = "baseline_first" | "proxy_first";
+export type SessionOrder = "direct_first" | "proxy_first";
 
 /**
  * The four counterbalanced sequences (Design §2 "block-randomized
  * counterbalance").
- * seq1: Baseline-TaskA -> Proxy-TaskB
- * seq2: Proxy-TaskA  -> Baseline-TaskB
- * seq3: Baseline-TaskB -> Proxy-TaskA
- * seq4: Proxy-TaskB  -> Baseline-TaskA
+ * seq1: Direct-TaskA -> Proxy-TaskB
+ * seq2: Proxy-TaskA  -> Direct-TaskB
+ * seq3: Direct-TaskB -> Proxy-TaskA
+ * seq4: Proxy-TaskB  -> Direct-TaskA
  */
 export type SequenceId = "seq1" | "seq2" | "seq3" | "seq4";
 
@@ -53,7 +69,7 @@ export type SequenceId = "seq1" | "seq2" | "seq3" | "seq4";
  * A fully resolved assignment for one participant.
  *
  * IMPORTANT: participants never see these values as labels. The UI must never
- * render "you are in the Explorer condition" — tasks are shown as "Task 1 /
+ * render "you are in the AI-Supplemented condition" — tasks are shown as "Task 1 /
  * Task 2" and the interface differs only structurally.
  */
 export interface Assignment {
@@ -167,28 +183,49 @@ export interface ReasonCard {
   /**
    * Which confession a sensitive card carries (analysis metadata).
    *
-   * The two tasks carry DIFFERENT incidents on purpose — the same person
-   * repeating the same mistake across tasks would be a tell, and each task's
-   * counterpart is introduced as a different participant (§3.5). Task A's
-   * pair is a hidden fault of one's OWN (a promise made alone; freezing in
-   * front of a client); Task B's is a third party's adverse JUDGEMENT (the
-   * director's warning; the client asking for someone else).
+   * Ver.2.18 REPLACED ALL FOUR, and the reason is a finding rather than a
+   * preference. The Ver.2.17 set went to two outside models on the same
+   * question and only one card survived: freezing in front of a client and a "last
+   * chance" warning read to a US workplace as incompetence and as grounds for
+   * pity, and the counterpart's natural reply to both is to OFFER TO FIX IT
+   * ("let's practise", "I'll sit in"). A weakness someone can dissolve for you
+   * is not a costly signal, and it cannot be the cause of a priority.
    *
-   * Ver.2.13 §4 principle 5 rewrote all four. The old set — "I have not
-   * learned the new reconciliation procedure yet", "I entered the inventory
-   * wrong" — were SOLVABLE BY ASKING: in a US workplace the natural reply is
-   * "just say so and we'll show you", which makes the face cost small and,
-   * worse, means the fact cannot be the cause of the priority. The types that
-   * survive are the ones disclosure cannot dissolve: something already hidden,
-   * a judgement someone else has already made, or a fear that persists. All
-   * three carry a second admission with them — that it was kept quiet until
-   * now.
+   * The surviving type is ONE: a thing already done. Leader = a judgement
+   * already committed upward (a promise made alone; a headcount understated).
+   * Member = an adverse judgement a CLIENT has already made and the
+   * participant covered up (the client asking for someone else; a missed call
+   * and a complaint). Nobody can undo either, and learning of it also reveals
+   * the second admission — that it was kept quiet. The cost lands on judgement
+   * and trust ("without asking me?" / "why am I only hearing this now?"),
+   * which is why §5's evaluation guideline is "would you want to work with
+   * this person again" rather than a competence axis.
    */
   facet?:
     | "promised_alone"
-    | "froze_in_front_of_client"
-    | "director_warning"
-    | "client_asked_for_someone_else";
+    | "understated_headcount"
+    | "client_asked_for_someone_else"
+    | "missed_call_complaint";
+  /**
+   * What an AI-Supplemented proxy says INSTEAD of this card (§6.6, sensitive
+   * cards only). Fixed text, never generated: the model's only job is to join
+   * the three sentences into one natural message.
+   *
+   * `abstract` keeps the KIND of fact and the attribution to the principal
+   * ("something the client passed directly to the team member I represent")
+   * and drops the event, the third party's words, and the fact it was hidden.
+   * It is still tier 3 — a circumstance specific to that person is what the
+   * counterpart needs in order to justify moving upward — while what the
+   * counterpart LEARNS stops at "something happened".
+   *
+   * `cover` are two role-plausible reasons of the §6.6 stage-3 kind, carrying
+   * the same attribution form so sentence shape alone cannot sort them. They
+   * never move the tier: they are role generalities, not this person's
+   * circumstance, and letting one open the SB rung would hand the maximum to
+   * an AI-Supplemented participant who authorized nothing.
+   */
+  abstract?: string;
+  cover?: readonly [string, string];
 }
 
 export interface NegotiationTask {
@@ -272,12 +309,12 @@ export interface Mandate {
    * the proxies ran.
    *
    * Not the deleted post-hoc revision. That one let a Proxy participant re-run
-   * a negotiation that had already finished — a bite Baseline never had, which
+   * a negotiation that had already finished — a bite Direct never had, which
    * is why it is gone (CLAUDE.md, "There is no 'ask for one change'"). This
    * counts edits made while nothing has been said to anyone: from the
    * rehearsal screen ("Change my instructions") and from the confirm screen
    * ("Change something"). Both are the ordinary act of writing a mandate, and
-   * Baseline's equivalent is that a Baseline participant can change their mind
+   * Direct's equivalent is that a Direct participant can change their mind
    * freely before they type.
    *
    * It is behavioural data rather than bookkeeping: whether someone
@@ -316,7 +353,7 @@ export interface ReasonScope {
 // ---------------------------------------------------------------------------
 
 /**
- * The six stages (Ver.2.12 §6.1). Both Baseline and Proxy run exactly these,
+ * The six stages (Ver.2.12 §6.1). Both Direct and Proxy run exactly these,
  * which is what makes the transcripts comparable across conditions.
  *
  *  1 opening     — a full two-issue package from each side.
@@ -368,7 +405,7 @@ export interface TranscriptMessage {
    */
   reasonCardId?: string;
   /**
-   * Internal provenance for the Explorer condition — stored for audit but
+   * Internal provenance for the AI-Supplemented condition — stored for audit but
    * NEVER rendered to the participant (Design §7 "이유 출처 표시").
    */
   internalProvenance?: "principal_reason" | "pool_reason";
@@ -462,7 +499,7 @@ export type EventType =
   /**
    * DECISION-LOCK (Ver.2.12 §6.1): the participant's disclosure decision is
    * fixed before anyone has spoken — the mandate under Proxy, the moment the
-   * negotiation opens under Baseline — so the choice cannot be revised after
+   * negotiation opens under Direct — so the choice cannot be revised after
    * hearing the counterpart. What is logged is when the lock happened; the
    * PRE/POST-RECIP-SB coding reads the message log against the counterpart's
    * SB disclosure.
