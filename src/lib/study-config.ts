@@ -20,7 +20,7 @@ export const STUDY = {
    * study takes underpays every participant who is slower than the estimate,
    * and Prolific's fair-pay rate is computed against this number.
    */
-  estimatedMinutes: 61,
+  estimatedMinutes: 65,
   /* ^ Keep in step with `TOTAL_MINUTES` below, which is derived from
      STAGE_MINUTES; `assertTimingConsistent()` fails the build if they part. */
   /**
@@ -35,23 +35,31 @@ export const STUDY = {
   /**
    * Base participation payment, advertised on the consent page.
    *
-   * £8.25 base + £1.00 bonus = £9.25 for a 61-minute study, which is £9.10 an
+   * £9.00 base + £1.00 bonus = £10.00 for a 65-minute study, which is £9.23 an
    * hour — above Prolific's recommended fair-pay rate of £9.00 (their hard
    * floor is £6.00). The recommended rate rather than the floor because this
    * is an effortful hour: two briefings to read, two negotiations to conduct,
    * and roughly eighty rating items plus fourteen written answers.
    *
-   * THE PAY ROSE WHEN THE BUDGET DID. Ver.2.14 added the REMARK screen and
-   * ATTR after each post-negotiation decision (§6.8), which is two minutes
-   * across the study. Left at £8.00 the rate would have fallen to £8.85/hour
-   * — below the recommended rate the listing is judged against — so the base
-   * moved with it. The number to adjust is always the PAY, never the
-   * advertised minutes: the estimate is derived from the screens that exist,
-   * and quoting less than the study takes underpays whoever is slower than
-   * the estimate.
+   * THE PAY RISES WHENEVER THE BUDGET DOES, and it has now done so twice.
+   * Ver.2.14's REMARK screen added two minutes and took the base from £8.00 to
+   * £8.25. Making the Proxy arm's closing conversation UNCONDITIONAL added
+   * three more — every Proxy participant now holds it, where only a modifier
+   * or refuser used to — which took the study to 65 minutes; at £8.25 the rate
+   * would have fallen to £8.54/hour, below the rate the listing is judged
+   * against.
+   *
+   * £9.00 rather than the £8.75 that lands exactly on £9.00/hour, because
+   * exactly-on-the-line leaves no room: one more screen, or a pilot median
+   * that runs a minute long, would put the listing under the recommended rate
+   * with no warning. £9.23 absorbs that.
+   *
+   * The number to adjust is always the PAY, never the advertised minutes: the
+   * estimate is derived from the screens that exist, and quoting less than the
+   * study takes underpays whoever is slower than the estimate.
    */
-  compensation: "8.25",
-  hourlyEquivalent: "9.10",
+  compensation: "9.00",
+  hourlyEquivalent: "9.23",
   /**
    * The performance bonus (Design §2, §8). £1.00 per participant, across the
    * study — not per task.
@@ -87,8 +95,21 @@ export const STUDY = {
    */
   bonusPerTask: "0.50",
   /** Advertised total: base + the full bonus, which everyone is paid. */
-  totalPaid: "9.25",
+  totalPaid: "10.00",
   irb: {
+    /**
+     * APPROVED. The protocol NUMBER is still to be filled in from the approval
+     * letter, and it is left as a placeholder rather than invented, because a
+     * consent form is a record: a made-up number on it would misstate to a
+     * participant which approval covers them, and it is the one string here
+     * they might actually quote back to an IRB office.
+     *
+     * `approved` is what the copy keys off, so the screens can state that the
+     * study has been reviewed and approved — which is true — without printing
+     * a number that is not. Set `protocolNumber` before recruiting; the
+     * preflight route checks it.
+     */
+    approved: true,
     protocolNumber: "TBD-IRB-0000",
     institution: "UNIST",
     principalInvestigator: "[PI Name]",
@@ -122,12 +143,25 @@ export const STAGE_MINUTES = {
   /**
    * Briefing, preference or mandate, negotiation, decision, review.
    *
-   * 13, down one from Ver.2.12's 14. Two Ver.2.13 changes both shorten the
-   * task and neither is large: the mandate screen lost its second control per
-   * issue (the walkaway limit, §2.6), and in the Proxy arm the three-minute
-   * closing conversation is now reached only by a participant who asks for a
-   * change or refuses — an approver goes straight to review. It is a cap
-   * either way, and the pilot median decides whether it is right.
+   * 15, and the direction of the last two changes is the point.
+   *
+   * It went to 13 when the Proxy arm's three-minute closing became
+   * conditional — reached only by a participant who asked for a change or
+   * refused, with an approver going straight to review. THAT IS NO LONGER
+   * TRUE: every Proxy participant now holds the closing conversation whatever
+   * they chose at RATIFY, so the three minutes are back for everyone in that
+   * arm and the budget has to carry them.
+   *
+   * 13 + 3 would be 16; it is 15 because the mandate screen's lost second
+   * control per issue (the walkaway limit, §2.6) is a real saving that
+   * survives, and because the closing is a CAP that most participants finish
+   * well inside — the counterpart opens with a package already on the table.
+   * The pilot median decides whether 15 is right.
+   *
+   * IT IS THE PROXY ARM THAT GREW, not both. One figure covers both arms
+   * because a participant does one of each, so the total is what matters and
+   * the advertised number is computed from it. Budgeting the longer arm is
+   * the honest direction to round.
    *
    * NOT the §7 heading's "45-50 minutes". That is the design doc's rough
    * estimate; this figure is summed from the screens that actually exist, and
@@ -135,7 +169,7 @@ export const STAGE_MINUTES = {
    * would advertise less than the study takes, which underpays anyone slower
    * than the estimate.
    */
-  task: 13,
+  task: 15,
   /**
    * The rating blocks and open-ended after ONE task.
    *

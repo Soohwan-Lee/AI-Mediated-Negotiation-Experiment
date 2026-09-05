@@ -17,12 +17,16 @@
  * everything else: what is collected, that stopping is free, and that some
  * details are withheld until the end.
  *
- * The IRB text is PLACEHOLDER and must be replaced with the approved protocol
- * language before recruitment.
+ * THE STUDY IS IRB-APPROVED (`STUDY.irb.approved`), so the screens state that
+ * rather than showing a protocol number that is not yet filled in. The NUMBER
+ * itself is still a placeholder and must be set from the approval letter
+ * before recruiting — /api/preflight checks it. It is not invented in the
+ * meantime: a consent form is a record, and a made-up number would misstate to
+ * a participant which approval covers them.
  */
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
 import {
   Callout,
@@ -77,6 +81,37 @@ const RECORDED = [
   "The negotiation transcripts",
 ];
 
+/**
+ * Is the viewport too narrow to run the study in?
+ *
+ * 1024 is the breakpoint the layout itself uses: below `lg` the briefing panel
+ * stops being a pinned rail and goes behind a tap (`TaskLayout`), which is the
+ * point at which "read your private briefing while you negotiate" stops being
+ * possible side by side. So the threshold is not a guess — it is where the
+ * interface changes shape.
+ *
+ * A LIVE MEASUREMENT, NOT A USER-AGENT SNIFF. What matters is the viewport the
+ * study will actually run in: a half-width window on a laptop has exactly the
+ * same problem as a phone, and a tablet held in landscape may be fine. It
+ * re-checks on resize so the warning clears the moment someone widens the
+ * window, rather than stranding a reader who has already fixed it.
+ *
+ * Starts `false` so server and first client render agree; the effect corrects
+ * it immediately. Erring that way means a desktop reader never sees a flash of
+ * the red warning, while a phone reader sees it one frame late.
+ */
+function useIsNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return narrow;
+}
+
 export default function ConsentPage() {
   const router = useRouter();
   const { beginStudy, prolific } = useParticipant();
@@ -99,6 +134,7 @@ export default function ConsentPage() {
    * counterpart apologise forever mid-negotiation).
    */
   const [unavailable, setUnavailable] = useState(false);
+  const isNarrow = useIsNarrow();
 
   useDevAutofill(() => {
     setIsAdult(true);
@@ -182,14 +218,58 @@ export default function ConsentPage() {
           />
         </div>
 
-        {/* Device Recommendation Notice */}
-        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 sm:p-4 text-xs sm:text-sm font-medium text-amber-950 shadow-2xs">
-          <span className="text-xl shrink-0">💻</span>
+        {/*
+          DEVICE REQUIREMENT, NOT A RECOMMENDATION.
+          
+          It read "highly recommended" while the study is in practice not
+          completable on a phone: the briefing sits behind a drawer, the
+          negotiation composer and the package card compete for a 390px column,
+          and a participant who starts on mobile discovers this forty minutes
+          in, having already been paid for nothing. Saying so plainly on the
+          first screen is cheaper for them than any layout fix, and it is the
+          honest thing to put in front of a paid worker before they commit
+          an hour.
+
+          The screen-width test is a live check rather than a user-agent
+          sniff — what matters is the viewport the study will actually run in,
+          and a small window on a laptop has the same problem as a phone.
+        */}
+        <div
+          className={cx(
+            "mb-6 flex items-start gap-3 rounded-2xl border p-3.5 sm:p-4 text-xs sm:text-sm font-medium shadow-2xs",
+            isNarrow
+              ? "border-red-300 bg-red-50 text-red-950"
+              : "border-amber-200 bg-amber-50/80 text-amber-950",
+          )}
+        >
+          <span className="text-xl shrink-0">{isNarrow ? "⚠️" : "💻"}</span>
           <div className="min-w-0 flex-1 leading-relaxed">
-            <strong className="font-extrabold text-amber-900">Desktop or Laptop Highly Recommended: </strong>
-            <span>
-              This study requires split-screen negotiation workspaces and a live chat interface designed for larger screens. Mobile devices and small tablets are not recommended.
-            </span>
+            {isNarrow ? (
+              <>
+                <strong className="font-extrabold text-red-900">
+                  This screen is too small for the study.{" "}
+                </strong>
+                <span>
+                  Please open this link on a desktop or laptop — or widen this
+                  window if you are on one. The study has a live chat beside a
+                  private briefing you need to read while negotiating, and that
+                  does not fit here. If you continue on this device you are
+                  likely to be unable to finish, so we would rather you came
+                  back on a larger screen.
+                </span>
+              </>
+            ) : (
+              <>
+                <strong className="font-extrabold text-amber-900">
+                  Desktop or laptop required:{" "}
+                </strong>
+                <span>
+                  This study puts a live chat beside a private briefing you read
+                  while negotiating. It is not usable on a phone or a small
+                  tablet, so please take part on a computer.
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -342,7 +422,12 @@ export default function ConsentPage() {
               <dd className="font-semibold text-slate-800">
                 {STUDY.irb.institution} IRB
                 <br />
-                <span className="text-slate-600 font-medium">Protocol #{STUDY.irb.protocolNumber} · {STUDY.irb.contactEmail}</span>
+                <span className="text-slate-600 font-medium">
+                  {STUDY.irb.approved
+                    ? "Reviewed and approved"
+                    : `Protocol #${STUDY.irb.protocolNumber}`}{" "}
+                  · {STUDY.irb.contactEmail}
+                </span>
               </dd>
             </div>
           </dl>

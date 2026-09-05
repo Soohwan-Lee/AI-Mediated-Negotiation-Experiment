@@ -76,7 +76,7 @@ export default function CompletePage() {
       <Card tone="muted" className="border-slate-200">
         <CardTitle>Research Contact & Questions</CardTitle>
         <p className="text-xs sm:text-sm leading-relaxed text-slate-600 mt-2">
-          For any questions about the study or findings, please contact <span className="font-semibold text-slate-800">{STUDY.irb.researcherEmail}</span>. About your rights as a participant, contact {STUDY.irb.institution} IRB at <span className="font-semibold text-slate-800">{STUDY.irb.contactEmail}</span> (Protocol #{STUDY.irb.protocolNumber}).
+          For any questions about the study or findings, please contact <span className="font-semibold text-slate-800">{STUDY.irb.researcherEmail}</span>. About your rights as a participant, contact {STUDY.irb.institution} IRB at <span className="font-semibold text-slate-800">{STUDY.irb.contactEmail}</span>{STUDY.irb.approved ? "" : ` (Protocol #${STUDY.irb.protocolNumber})`}.
         </p>
         <p className="mt-3 text-xs font-semibold text-slate-500">
           ✓ Your data is safely submitted. You may now close this browser tab once you have registered completion on Prolific.

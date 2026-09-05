@@ -168,6 +168,13 @@ const STEP_LABELS = [
   "Check and start",
   "Watch",
   "Your decision",
+  // ITS OWN STEP SINCE THE CLOSING BECAME UNCONDITIONAL. It used to share a
+  // slot with "Your decision", which was right while it was a branch only some
+  // participants took — a bar segment for a step most people skipped would
+  // have mis-stated how much was left. Now everyone walks it, so hiding it
+  // understates the task by a whole phase on the one progress indicator the
+  // participant has.
+  "Talk it through",
   "Review",
 ];
 
@@ -190,6 +197,10 @@ const COVER_STEPS = [
   {
     label: "Your decision",
     hint: "Approve what they reached, ask for a change, or refuse it.",
+  },
+  {
+    label: "Talk it through",
+    hint: "You then settle it with the other participant yourself.",
   },
   { label: "Review", hint: "See where it landed." },
 ];
@@ -242,9 +253,9 @@ const STEP_OF: Record<Phase, number> = {
   matchmaking: 5,
   watching: 5,
   ratify: 6,
-  handover: 6,
-  negotiate: 6,
-  review: 7,
+  handover: 7,
+  negotiate: 7,
+  review: 8,
 };
 
 /**
@@ -1173,20 +1184,26 @@ export function ProxyTask({
         proxyTranscript={transcript}
         onDecide={(choice) => {
           setRatify(choice);
-          if (choice === "approved_as_is") {
-            // APPROVING ENDS THE TASK. There is no closing conversation to
-            // hold: the participant has decided, and the package the proxies
-            // reached is the outcome. Sending an approver into a three-minute
-            // chat anyway would make the decision cosmetic — RATIFY would code
-            // an intention that the flow then ignored.
-            setProxyTranscript(transcript);
-            setMessages([]);
-            setPhase("review");
-            return;
-          }
-          // Modify or refuse: three minutes with the other participant. A
-          // refusal starts from nothing — that is what refusing means, and it
-          // is why the choice carries a confirmation step.
+          // EVERY CHOICE LEADS TO THE CLOSING CONVERSATION, approval included.
+          //
+          // It used to end the task, on the reasoning that sending an approver
+          // into a chat would make their decision cosmetic. The cost of that
+          // was bigger than the tidiness it bought: how the task ENDED became a
+          // function of what the participant chose, so approvers and modifiers
+          // finished on different screens after different amounts of contact
+          // with the other side. Every §9.4 item that asks them to judge that
+          // contact was then answered against a different stimulus depending on
+          // a choice that is itself an outcome — and `Pooled Proxy − Direct`
+          // compared a Direct arm that always ends in conversation against a
+          // Proxy arm that sometimes does.
+          //
+          // RATIFY IS STILL A REAL DECISION AND STILL THE MEASURE. It is
+          // recorded here, where it is taken, and it still decides what the
+          // participant walks in WITH: an approver carries the proxies'
+          // package to the table, a modifier carries it as something to
+          // change, a refuser carries nothing (`openingPackage` is null and
+          // the composer starts empty). What it no longer decides is whether
+          // the conversation happens at all.
           setPhase("handover");
         }}
       />
@@ -1195,28 +1212,40 @@ export function ProxyTask({
 
   // --- handover -----------------------------------------------------------
   //
-  // Reached ONLY by a participant who asked for a change or refused the
-  // package (Ver.2.13 §7). An approver went straight to review, so the copy
-  // here can speak to a decision that has already been taken rather than
-  // presenting the conversation as the default ending.
+  // Reached by EVERY Proxy participant now, whatever they chose at RATIFY, so
+  // the copy has three cases rather than two. The decision still shows: it
+  // decides what they carry to the table, and the screen names it back to them
+  // so the conversation reads as a continuation of their own choice rather
+  // than something that happened to them.
   if (phase === "handover") {
     const refused = ratify === "rejected";
+    const approved = ratify === "approved_as_is";
     return (
       <TaskCover
         eyebrow="Phase Transition · Your Closing Conversation"
-        title={refused ? "Settle It Yourself" : "Take It Up With Them Directly"}
+        title={
+          refused
+            ? "Settle It Yourself"
+            : approved
+              ? "Confirm It With Them Directly"
+              : "Take It Up With Them Directly"
+        }
         scene="direct"
         lead={
           <>
             <p className="mb-2 text-slate-800 font-medium">
               {refused
                 ? "You refused the package your AI Proxies reached, so nothing stands. You now settle both terms with the other participant yourself."
-                : "You asked for a change to what your AI Proxies reached. You now take that up with the other participant directly."}
+                : approved
+                  ? "You approved the package your AI Proxies reached. You now speak with the other participant yourself to settle it between you."
+                  : "You asked for a change to what your AI Proxies reached. You now take that up with the other participant directly."}
             </p>
             <p className="text-slate-600 text-sm">
               {refused
                 ? "Set the levels you want on the card below the chat and put them to them."
-                : "Their proxies' package is on the table as it stands — say what you want changed."}{" "}
+                : approved
+                  ? "The package your proxies reached is already on the table — you can put it to them as it stands, or change it if you decide to."
+                  : "Their proxies' package is on the table as it stands — say what you want changed."}{" "}
               <strong>What you both agree together is the final outcome.</strong>
             </p>
           </>
@@ -1228,7 +1257,13 @@ export function ProxyTask({
                 { label: "Choose a level on each term", hint: "The package card below the chat is yours to set" },
                 { label: "Agree it with the other participant", hint: "Or end without an agreement if you cannot" },
               ]
-            : [
+            : approved
+              ? [
+                  { label: "Check what the proxies reached", hint: "Their full exchange stays pinned above the chat" },
+                  { label: "Put it to the other participant", hint: "It is already on the package card — change it if you decide to" },
+                  { label: "Settle it", hint: "Agree a package with them, or end without one" },
+                ]
+              : [
                 { label: "Check what the proxies reached", hint: "Their full exchange stays pinned above the chat" },
                 { label: "Say what you want changed", hint: "In your own words, and adjust the package card if you like" },
                 { label: "Settle it", hint: "Agree a package with them, or end without one" },

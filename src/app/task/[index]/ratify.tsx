@@ -48,17 +48,26 @@ const OPTIONS: Array<{
   label: string;
   hint: string;
 }> = [
+  // ALL THREE HINTS NAME THE SAME NEXT STEP, and that is now literally true:
+  // every choice leads to the closing conversation. What differs is what the
+  // participant carries INTO it — the package as it stands, the package as
+  // something to change, or nothing at all.
+  //
+  // Keeping the shape identical across the three is also what stops the screen
+  // recommending an answer (§7): when one option ended the task and two did
+  // not, "the task is done" read as the quick way out, and the distribution
+  // across the three IS the finding.
   {
     id: "approved_as_is",
     icon: "✓",
     label: "Approve it as it stands",
-    hint: "This becomes the final outcome, and the task is done.",
+    hint: "You put this package to the other participant yourself, as it stands.",
   },
   {
     id: "modified",
     icon: "✎",
     label: "Ask for a change",
-    hint: "You talk to the other participant directly, with this package on the table.",
+    hint: "You talk to the other participant directly, with this package on the table to change.",
   },
   {
     id: "rejected",
@@ -252,9 +261,7 @@ export function RatifyPhase({
         label={
           !tentative
             ? "Go to the closing conversation"
-            : choice === "approved_as_is"
-              ? "Confirm this package"
-              : "Continue"
+            : "Continue"
         }
         disabled={tentative ? !gated : false}
       />

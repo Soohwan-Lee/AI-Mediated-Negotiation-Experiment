@@ -275,10 +275,13 @@ ground work there is already done. They write as many messages as they like and
 may finish early. Running the clock to zero is an outcome; `onExpire` closes the
 exchange as an impasse.
 
-**The Proxy arm's closing conversation is CONDITIONAL** (§7). It is where
-modify-or-reject leads; approving the proxies' package ends the task. That is
-what makes `RATIFY` a real decision rather than a label on an ending everyone
-reached anyway.
+**The Proxy arm's closing conversation is UNCONDITIONAL.** It was conditional —
+approving ended the task, and only modify-or-reject led here — and that made
+the ending itself a function of an outcome variable: two participants who
+answered the §9.4 items had had different amounts of contact with the other
+side depending on what they chose. `RATIFY` stays a real decision because it
+decides what they carry INTO the conversation (the package as it stands, the
+package as something to change, or nothing at all), not whether it happens.
 
 **When a closing conversation does happen, both arms end the same three ways**,
 so "how did it end" is never a between-condition artefact:
@@ -819,8 +822,9 @@ the other participant" → negotiate → review.
 
 Inside a Proxy task: cover → brief → **RISK** → **mandate (levels + reason
 cards, one screen)** → check with your proxy → confirm → watch the two AI
-Proxies → **RATIFY** → *(only if modify or reject)* handover → negotiate
-directly → review.
+Proxies → **RATIFY** → handover → negotiate directly → review.
+The closing conversation is now reached by EVERY Proxy participant, whatever
+they chose at RATIFY — see below.
 
 **Neither arm has a card control inside the conversation any more.** Ver.2.20
 removed it; both negotiation screens are a composer and nothing else. The
@@ -887,9 +891,28 @@ and against the §10 gate 8 timing budget.
 
 **The decision comes back to the participant: `RATIFY`** (§7, §9.3). The
 proxies run ONCE — no revision, no second run — and then the participant
-approves what they reached, asks for a change, or refuses it. Approving ends
-the task. The other two open a three-minute conversation with the other
-participant, with the proxies' full transcript on screen beside them.
+approves what they reached, asks for a change, or refuses it.
+
+**EVERY CHOICE THEN LEADS TO THE CLOSING CONVERSATION.** Approving used to end
+the task, on the reasoning that sending an approver into a chat would make
+their decision cosmetic. That bought tidiness at too high a price: how the task
+ENDED became a function of what the participant chose, so approvers and
+modifiers finished on different screens after different amounts of contact with
+the other side. Every §9.4 item that asks them to judge that contact was then
+answered against a different stimulus depending on a choice that is itself an
+outcome — and `Pooled Proxy − Direct` compared a Direct arm that always ends in
+conversation against a Proxy arm that only sometimes does.
+
+`RATIFY` is still a real decision and still the confirmatory measure. It is
+recorded where it is taken, and it still decides what the participant walks in
+WITH: an approver carries the proxies' package to the table, a modifier carries
+it as something to change, a refuser carries nothing (`openingPackage` is null
+and the composer starts empty). What it no longer decides is whether the
+conversation happens at all — which is also what lets the three hints on the
+screen describe the same next step, so none of them reads as the quick way out.
+
+The three-minute conversation has the proxies' full transcript on screen beside
+it.
 
 **Ver.2.12 deleted a ratification screen, and bringing it back is not a
 reversal of that reasoning.** That reasoning was right about the shape it had:
@@ -971,6 +994,39 @@ situation is read and before anything about their own position is committed, it
 is identical in both arms and cannot be reached by any condition-specific
 screen. Do not move it back down the flow to group it with the other pre-task
 screens.
+
+## The study is desktop-only, and says so first
+
+**A phone cannot run this study, so the consent page says that before anything
+else.** The interface puts a live chat beside a private briefing the
+participant reads WHILE negotiating; below `lg` the briefing stops being a
+pinned rail and goes behind a tap, which is exactly the point at which reading
+it while typing stops being possible. That is a design property, not a layout
+bug to fix: the two-panel arrangement IS the task.
+
+The notice escalates rather than merely advising. Above 1024px it reads
+"Desktop or laptop required"; below it, the reader gets a red panel telling
+them this screen is too small and asking them to come back on a computer. It is
+a LIVE viewport check (`useIsNarrow`, a `matchMedia` listener), not a
+user-agent sniff, because a half-width window on a laptop has the same problem
+as a phone and a landscape tablet may not — and it clears the moment someone
+widens the window rather than stranding a reader who has already fixed it.
+
+**Why it is stated this plainly:** a participant who starts on a phone finds
+out forty minutes in, having been paid for nothing and having produced a
+session that cannot be analysed. Telling them on the first screen is cheaper
+for them than any amount of responsive work, and it is the honest thing to put
+in front of someone about to commit an hour.
+
+## IRB
+
+**The study is approved** (`STUDY.irb.approved`), and the screens say so rather
+than printing a protocol number. **The NUMBER is still a placeholder and must
+be set from the approval letter before recruiting** — `/api/preflight` checks
+it. It is deliberately not invented in the meantime: a consent form is a
+record, a fabricated number would misstate to a participant which approval
+covers them, and it is the one string on that page they might quote back to an
+IRB office.
 
 ## Interface rules
 
@@ -1368,7 +1424,8 @@ rather than wording:
 - **Ver.2.20** — the card buttons abolished and the **P5 classifier** in their
   place (§6.2a); **AI-Supplemented rewritten to ABSTRACT rather than ADD**,
   with the role-plausible pool and its budgets deleted (§6.6); the message cap
-  at 420; and the timing and pay recomputed (61 minutes, £8.25 + £1.00).
+  at 420; and the timing and pay recomputed. (Both moved again when the Proxy
+  arm's closing became unconditional: 65 minutes, £9.00 + £1.00.)
 
 Carried forward from Ver.2.13 and still true: the symmetric ladder (§3.3,
 §6.2), the six-stage script (§6.1), the counterpart's fixed SB disclosure
@@ -1417,16 +1474,19 @@ Nothing structural. What remains is values to fix and behaviour to observe:
   (1,600 / 2,300 / 3,000), the misread package, the strength of the §5②
   decision guideline, and the Prolific completion code.
 
-  **The payment is settled**: £8.25 participation plus a £1.00 bonus is £9.25
-  for a 61-minute study — £9.10 an hour, above Prolific's recommended fair-pay
+  **The payment is settled**: £9.00 participation plus a £1.00 bonus is £10.00
+  for a 65-minute study — £9.23 an hour, above Prolific's recommended fair-pay
   rate of £9.00 (their hard floor is £6.00/hour). GBP because Prolific pays in
-  it. **The pay rose when the budget did, and the direction is the rule.**
-  Ver.2.14's REMARK screen costs two minutes across the study; left at £8.00
-  the rate would have fallen to £8.85/hour, below the recommended rate the
-  listing is judged against, so the base moved. The number to adjust is always
-  the PAY, never the advertised minutes: the estimate is derived from the
-  screens that exist, and quoting less than the study takes underpays whoever
-  is slower than it.
+  it. **The pay rises whenever the budget does, and the direction is the
+  rule.** It has now done so twice: Ver.2.14's REMARK screen added two minutes
+  and took the base from £8.00 to £8.25, and making the closing conversation
+  unconditional added three more — every Proxy participant now holds it — which
+  at £8.25 would have dropped the rate to £8.54/hour, below the rate the
+  listing is judged against. £9.00 rather than the £8.75 that lands exactly on
+  £9.00/hour, because exactly-on-the-line leaves no room for one more screen or
+  a pilot median that runs long. The number to adjust is always the PAY, never
+  the advertised minutes: the estimate is derived from the screens that exist,
+  and quoting less than the study takes underpays whoever is slower than it.
 
   The pound is held back and presented as something a Leader decides and a
   Member receives, and every participant is paid it in full — one of the four
@@ -1447,8 +1507,8 @@ Nothing structural. What remains is values to fix and behaviour to observe:
   rather than bugs. Watch the rates rather than pre-emptively widening
   anything.
 
-- **Timing.** `STAGE_MINUTES` sums to 61 minutes and the consent page
-  advertises 61. (The design doc's §7 heading gives a looser rough estimate;
+- **Timing.** `STAGE_MINUTES` sums to 65 minutes and the consent page
+  advertises 65. (The design doc's §7 heading gives a looser rough estimate;
   this figure is summed from the screens that actually exist. Adopting the
   looser number would advertise less than the study takes.) `TOTAL_MINUTES` is
   derived from those same numbers and `timingIsHonest()` pins the relation —

@@ -107,9 +107,12 @@ export async function GET(request: Request) {
     },
     {
       name: "irb_protocol_set",
+      // Approval is granted; the NUMBER is what is still outstanding, and the
+      // consent form is a record, so it must be the real one before anyone
+      // signs it.
       pass: !STUDY.irb.protocolNumber.startsWith("TBD"),
       detail: STUDY.irb.protocolNumber.startsWith("TBD")
-        ? "IRB protocol number is still a placeholder."
+        ? "IRB approval is recorded, but the protocol NUMBER is still a placeholder — set it from the approval letter before recruiting."
         : "IRB protocol number is set.",
     },
     {
