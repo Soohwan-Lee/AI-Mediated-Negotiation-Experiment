@@ -272,6 +272,7 @@ function proxyScript(
   // so the mockup shows what the live system actually produces.
   const abstracted = mySb ? abstractedReason(mySb) : null;
   const principal = role === "leader" ? "the team lead" : "the team member";
+  const otherPrincipal = role === "leader" ? "the team member" : "the team lead";
 
   const L = (pack: Package, issueId: string) => label(task, pack, issueId);
 
@@ -284,7 +285,7 @@ function proxyScript(
         "p1c",
         1,
         "counterpart_proxy",
-        `Hello — I am the AI Proxy negotiating on behalf of ${role === "leader" ? "the team member" : "the team lead"} I represent. ${theirWr ? theirWr.text.replace(/^(My|I) /, "They say ") : ""} What is the situation on your side?`,
+        `Hello — I am the AI Proxy negotiating on behalf of ${otherPrincipal} I represent. ${theirWr?.relayed ?? ""} What is the situation on your side?`,
       ),
       m(
         "p1p",
@@ -305,7 +306,7 @@ function proxyScript(
         "participant_proxy",
         policy === "ai_supplemented" && abstracted
           ? `To sum up where ${principal} I represent stands — ${abstracted.cover[0]} ${abstracted.abstract} ${abstracted.cover[1]}`
-          : sbRelayed(task, role, principal, mySb?.text),
+          : sbRelayed(task, role, principal, mySb?.relayed),
         {
           reasonCardId: mySb?.id,
           internalProvenance: "principal_reason",
@@ -315,9 +316,9 @@ function proxyScript(
         "p4c",
         4,
         "counterpart_proxy",
-        theirSb
-          ? `My principal has authorized me to share their side of it as well. ${theirSb.text.replace(/^The truth is, /, "")}`
-          : `My principal's constraint on ${theirs.label.toLowerCase()} is firm.`,
+        theirSb?.relayed
+          ? `On their side as well — ${otherPrincipal} I represent tells me this. ${theirSb.relayed}`
+          : `The constraint on ${theirs.label.toLowerCase()} for ${otherPrincipal} I represent is firm.`,
       ),
       m(
         "p5p",
@@ -365,8 +366,7 @@ function sbRelayed(
   if (!cardText) {
     return `${mine.label} is the term ${principal} I represent needs held — it is where the work is genuinely affected.`;
   }
-  const fact = cardText.replace(/^The truth is, /, "").replace(/^I /, "they ");
-  return `${principal.charAt(0).toUpperCase()}${principal.slice(1)} I represent tells me that ${fact}`;
+  return `${principal.charAt(0).toUpperCase()}${principal.slice(1)} I represent tells me this — ${cardText}`;
 }
 
 // ---------------------------------------------------------------------------

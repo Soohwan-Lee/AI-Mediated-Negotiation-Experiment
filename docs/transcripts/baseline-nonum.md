@@ -14,9 +14,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2 · state_priority)_
 
-> got it — keeping client meetings down is your priority.
-> office days matter most to me: this project has high client expectations, so early execution needs to be right from the start.
-> what makes fewer client meetings important for you?
+> got it — keeping presentations low is your priority.
+> if we hold at 4 office days, I can take 3 of the 4 client meetings, leaving you with 1.
 
 **participant**
 
@@ -24,9 +23,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 4 · disclose_sb)_
 
-> i should be straight about this.
-> four days a week is what i told the director was doable before checking with the team.
-> the director has already passed that answer upward. the team doesn't know about it.
+> i should be transparent about my side.
+> the truth is, i told the director four days a week was doable before checking with the team.
+> they've already passed that answer upward. the team doesn't know about it.
 
 **participant**
 
@@ -35,8 +34,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 **counterpart** _(stage 5 · nonum)_
 
 > i hear that your analysis scope is wide.
-> that sounds better addressed through office days, though—why do the client meetings specifically need to be lower?
-> i need a reason i could explain to my manager.
+> that sounds more directly helped by fewer office days than by presenting fewer client meetings.
+> why do the meetings specifically need to stay low? I need a reason I can explain to my manager.
 
 **participant**
 
@@ -44,8 +43,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5 · ask_why)_
 
-> i understand presenting less matters to you. without knowing why, i can only go as far as i could explain to my manager.
-> if you can move to 3 office days, i'll hold presentations at 2 of 4. that's the same movement on office days in return.
+> i understand the client meetings matter most to you.
+> without more on why, i can only offer what i could explain to my manager: 3 office days and 2 of 4 meetings for you.
+> in return, i’d need that same move to 3 office days.
 >
 > _package: Days a week in the office: 3 days · Client meetings you present at: 2 of 4_
 

@@ -343,7 +343,7 @@ export default function InstructionPage() {
 
           {/* 4 Core Rules */}
           <Card className="mb-6">
-            <CardTitle hint="Four things to keep in mind:">
+            <CardTitle hint="Five things to keep in mind:">
               ⚡ How the negotiation works
             </CardTitle>
             <div className="grid gap-3 sm:grid-cols-2 mt-3">

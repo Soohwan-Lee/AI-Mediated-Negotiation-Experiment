@@ -129,13 +129,38 @@ let cachedRaw: string | null = null;
 let cached: DevSettings = DEFAULTS;
 
 /** Must be referentially stable between writes — useSyncExternalStore requires it. */
+/**
+ * Policy names stored before Ver.2.18's rename, mapped forward.
+ *
+ * The saved slot lives in one browser's localStorage and outlives a deploy, so
+ * a panel opened after the rename would carry `"explorer"` into an assignment
+ * whose type no longer has that value — and the preview would render whatever
+ * a `Record` lookup on a missing key gives back, silently. Participants are
+ * unaffected (they get a fresh assignment), which is exactly why this would
+ * have gone unnoticed.
+ */
+const LEGACY_POLICY: Record<string, string> = {
+  delegate: "user_specified",
+  explorer: "ai_supplemented",
+};
+
 function getSnapshot(): DevSettings {
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (raw !== cachedRaw) {
     cachedRaw = raw;
-    cached = raw
-      ? { ...DEFAULTS, ...(JSON.parse(raw) as Partial<DevSettings>) }
-      : DEFAULTS;
+    if (!raw) {
+      cached = DEFAULTS;
+    } else {
+      const parsed = JSON.parse(raw) as Partial<DevSettings>;
+      const policy = parsed.slot?.proxyPolicy as string | undefined;
+      if (policy && LEGACY_POLICY[policy]) {
+        parsed.slot = {
+          ...parsed.slot!,
+          proxyPolicy: LEGACY_POLICY[policy] as DevSettings["slot"]["proxyPolicy"],
+        };
+      }
+      cached = { ...DEFAULTS, ...parsed };
+    }
   }
   return cached;
 }

@@ -226,6 +226,28 @@ export interface ReasonCard {
    */
   abstract?: string;
   cover?: readonly [string, string];
+  /**
+   * The card as a PROXY reports it — third person, the principal referred to
+   * rather than speaking (Ver.2.19 §6.5).
+   *
+   * `text` is written to be said BY THE PARTICIPANT, which is what the Direct
+   * arm needs. A proxy that renders it verbatim ends up claiming the
+   * principal's situation as its own ("I never repeated that to you"), and on
+   * screen that is indistinguishable from the participant speaking — which
+   * defeats the third-person rule, whose whole job is to keep the delegation
+   * visible.
+   *
+   * Written out rather than derived. A pronoun-substitution pass was tried and
+   * produces broken sentences on exactly the clauses that carry the
+   * confession ("they'd rather the other side delivered these yourself"),
+   * because the cards address the counterpart as "you" in the middle of
+   * reporting a third party's words. Both persons of a load-bearing sentence
+   * are worth writing once.
+   *
+   * Used by the MOCKUP only. The live proxies get the rule in P3/P4 and
+   * re-voice the card themselves, which reads better than any fixed wording.
+   */
+  relayed?: string;
 }
 
 export interface NegotiationTask {

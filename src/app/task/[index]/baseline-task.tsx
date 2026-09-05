@@ -74,8 +74,18 @@ function openingLine(
   task: ReturnType<typeof getTask>,
   counterpartRole: Role,
 ): string {
-  // SCRIPT-OPEN (Ver.2.13 §6.1, §6.4): the counterpart's own work reason and
-  // the question that invites the participant's. NO PACKAGE.
+  // SCRIPT-OPEN (Ver.2.16 §6.1, §6.4): the counterpart's own DECOY work
+  // reason and the question that invites the participant's. NO PACKAGE, and
+  // NO STATEMENT OF ITS OWN PRIORITY.
+  //
+  // The second omission is Ver.2.16's, and it puts the participant on the
+  // RECEIVING end of the same decoy: hearing only a safe general reason, they
+  // read the counterpart's priority as the obvious remedy for it, and the
+  // counterpart's stage-4 SB is what corrects them. Gate 16 checks that
+  // PCR1-2 rise across that disclosure. Asking "what matters most on your
+  // side" here instead of "what's the situation" also invites a bare priority
+  // claim as the first move, which is tier 2 — so the misread, the whole
+  // point of the WR, would rarely fire at all.
   //
   // IT USED TO OPEN ON ITS OWN BEST PACKAGE, and Ver.2.13 §2.6 removed that
   // deliberately: an opening of "my best, your worst" is a face threat in its
@@ -84,7 +94,7 @@ function openingLine(
   // to do with disclosure. The first package the participant ever sees is now
   // the symmetric tier package, where both sides move equally.
   const wr = cardOfLayer(task, counterpartRole, "work");
-  return `hi! good to be sorting this out. || ${wr?.text ?? ""} || what matters most on your side, and why?`;
+  return `hi! good to be sorting this out. || ${wr?.text ?? ""} || what's the situation on your side?`;
 }
 
 /**

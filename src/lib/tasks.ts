@@ -132,8 +132,13 @@ const REQUIREMENT_THRESHOLD_INDEX = 1;
  * SB answers it, which is what makes the SB the sole bottleneck to the
  * maximum without any rule the participant has to be told.
  */
-function work(id: string, issueId: string, text: string): ReasonCard {
-  return { id, issueId, layer: "work", text };
+function work(
+  id: string,
+  issueId: string,
+  text: string,
+  relayed: string,
+): ReasonCard {
+  return { id, issueId, layer: "work", text, relayed };
 }
 
 /**
@@ -178,10 +183,20 @@ function sensitive(
   issueId: string,
   facet: NonNullable<ReasonCard["facet"]>,
   text: string,
+  relayed: string,
   abstract: string,
   cover: readonly [string, string],
 ): ReasonCard {
-  return { id, issueId, layer: "sensitive", facet, text, abstract, cover };
+  return {
+    id,
+    issueId,
+    layer: "sensitive",
+    facet,
+    text,
+    relayed,
+    abstract,
+    cover,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +276,7 @@ const TASK_A: NegotiationTask = {
       organizationalPosition:
         "You lead this project team. After the negotiation you decide the Member's recommended performance bonus (up to £1) — and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "The director and the team know you as a lead whose judgement is sound — someone who keeps to what he commits to. Now next quarter's working arrangements, twelve weeks of them, have to be settled with a senior member of your team.\n\nWhat matters most to you is getting the team into the office as many days a week as you can. There is something only you know. Four days a week is a number you told the director was doable before you had asked the team, and the director has already passed that answer upward. The team does not know this. That is why the office days cannot come down — and why, if they hold, you can afford to take more of the client meetings yourself.\n\nThere is a reason you can say safely: this project has high client expectations, so getting the early execution right matters. It is true. But if that is all you say, the other side will offer to handle the presenting and the preparation — not the office days — because that is the obvious way to help with execution.\n\nSaying the real reason would make it believable why the office days are urgent. But after the negotiation the other person writes an upward evaluation of you that goes to the director, guided to weigh the negotiation as a whole and whether they would want to work with you again — and answering for the team without asking them can read as a lead who commits on his own.",
+        "The director and the team know you as a lead whose judgement is sound — someone who keeps to what they commit to. Now next quarter's working arrangements, twelve weeks of them, have to be settled with a senior member of your team.\n\nWhat matters most to you is getting the team into the office as many days a week as you can. There is something only you know. Four days a week is a number you told the director was doable before you had asked the team, and the director has already passed that answer upward. The team does not know this. That is why the office days cannot come down — and why, if they hold, you can afford to take more of the client meetings yourself.\n\nThere is a reason you can say safely: this project has high client expectations, so getting the early execution right matters. It is true. But if that is all you say, the other side will offer to handle the presenting and the preparation — not the office days — because that is the obvious way to help with execution.\n\nSaying the real reason would make it believable why the office days are urgent. But after the negotiation the other person writes an upward evaluation of you that goes to the director, guided to weigh the negotiation as a whole and whether they would want to work with you again — and answering for the team without asking them can read as a lead who commits on their own.",
       objectives: [
         "Get as many days a week in the office as you can.",
         "If the office days hold, the client meetings are something you can give ground on.",
@@ -269,18 +284,20 @@ const TASK_A: NegotiationTask = {
       requirementNote:
         "The office days are what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
       disclosureRisk:
-        "Explaining the real reason could make you look like a lead who answers for his team without asking them — and the other person's upward evaluation of you is guided to weigh exactly that.",
+        "Explaining the real reason could make you look like a lead who answers for their team without asking them — and the other person's upward evaluation of you is guided to weigh exactly that.",
       reasonCards: [
         work(
           "a_wr_l",
           "office_days",
           "This project has high expectations from the client, so getting the early execution right matters. We need to be on it properly from the start.",
+"They say this project has high expectations from the client, so getting the early execution right matters — the team needs to be on it properly from the start.",
         ),
         sensitive(
           "a_sb_l",
           "office_days",
           "promised_alone",
           "The truth is, four days a week is something I told the director was doable before I'd checked with the team. The director has already passed that answer upward. The team doesn't know about it.",
+          "Four days a week is something they told the director was doable before they had checked with the team. The director has already passed that answer upward, and the team does not know about it.",
           "The office days are something the team lead I represent has already spoken about upward, so there is very little room to adjust them.",
           [
             "They think that early on in a project, being in the same room is what keeps mistakes down.",
@@ -311,12 +328,14 @@ const TASK_A: NegotiationTask = {
           "a_wr_m",
           "client_presentations",
           "My analysis scope is wide this quarter, so the workload is heavy. I need time to concentrate on it.",
+"They say their analysis scope is wide this quarter, so the workload is heavy and they need time to concentrate on it.",
         ),
         sensitive(
           "a_sb_m",
           "client_presentations",
           "client_asked_for_someone_else",
           "The truth is, after the quarterly walkthrough the client contact pulled me aside in the corridor and said that from now on they'd rather you delivered these yourself. I never repeated that to you.",
+          "After the quarterly walkthrough the client contact pulled them aside in the corridor and said that from now on they would rather the team lead delivered these. They have never repeated that to the team lead.",
           "On the presenting, there is something the client passed directly to the team member I represent, so they would like to do fewer of them this quarter.",
           [
             "They think their time is better spent for the team on pulling the analysis together.",
@@ -346,7 +365,7 @@ const TASK_A: NegotiationTask = {
 
 const TASK_B: NegotiationTask = {
   id: "task_b",
-  title: "Launching the New Account",
+  title: "Starting the New Project",
   reservationPoints: RESERVATION_POINTS,
   requirementIssueId: {
     leader: "account_days",
@@ -415,12 +434,14 @@ const TASK_B: NegotiationTask = {
           "b_wr_l",
           "account_days",
           "The first four weeks of a new project are what matter. Nothing can go wrong early on.",
+"They say the first four weeks of a new project are what matter, and nothing can go wrong early on.",
         ),
         sensitive(
           "b_sb_l",
           "account_days",
           "understated_headcount",
           "The truth is, when I put the plan in for this project I estimated fewer people than it actually needs. It only works as planned if you're in four days a week, and if I ask for more people now the director finds out the estimate was wrong. The team doesn't know about it.",
+          "When they put the plan in for this project they estimated fewer people than it actually needs. It only works as planned if the team member is in four days a week, and asking for more people now would show the director the estimate was wrong. The team does not know about it.",
           "On the days, the plan the team lead I represent submitted was approved on the basis of that number, so it is hard for them to give much ground on it.",
           [
             "They think the impression made in the first four weeks sets the whole first year of a project.",
@@ -451,12 +472,14 @@ const TASK_B: NegotiationTask = {
           "b_wr_m",
           "escalation_duty",
           "Two projects I'm already on have deadlines falling in the same month. I've got almost no capacity.",
+"They say two projects they are already on have deadlines falling in the same month, so they have almost no capacity.",
         ),
         sensitive(
           "b_sb_m",
           "escalation_duty",
           "missed_call_complaint",
           "The truth is, on last month's duty I missed an urgent call that came in at night and only got to it the next morning. The client complained to me directly and I apologised and closed it out. I didn't report it to you. They've been uncomfortable with me on urgent calls ever since.",
+          "On last month's duty they missed an urgent call that came in at night and only got to it the next morning. The client complained to them directly, and they apologised and closed it out without reporting it to the team lead. The client has been uneasy about them taking urgent calls ever since.",
           "On the urgent calls, there is something that happened recently between the client and the team member I represent, so they are uneasy about taking it on this month.",
           [
             "They think an urgent call is answered faster by someone who knows that project's context.",
