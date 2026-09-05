@@ -168,13 +168,6 @@ const STEP_LABELS = [
   "Check and start",
   "Watch",
   "Your decision",
-  // ITS OWN STEP SINCE THE CLOSING BECAME UNCONDITIONAL. It used to share a
-  // slot with "Your decision", which was right while it was a branch only some
-  // participants took — a bar segment for a step most people skipped would
-  // have mis-stated how much was left. Now everyone walks it, so hiding it
-  // understates the task by a whole phase on the one progress indicator the
-  // participant has.
-  "Talk it through",
   "Review",
 ];
 
@@ -200,7 +193,7 @@ const COVER_STEPS = [
   },
   {
     label: "Talk it through",
-    hint: "You then settle it with the other participant yourself.",
+    hint: "Only if you ask for a change or refuse: talk directly for up to 3 minutes.",
   },
   { label: "Review", hint: "See where it landed." },
 ];
@@ -253,9 +246,9 @@ const STEP_OF: Record<Phase, number> = {
   matchmaking: 5,
   watching: 5,
   ratify: 6,
-  handover: 7,
-  negotiate: 7,
-  review: 8,
+  handover: 6,
+  negotiate: 6,
+  review: 7,
 };
 
 /**
@@ -861,7 +854,7 @@ export function ProxyTask({
         steps={STEP_LABELS}
         stepIndex={STEP_OF.mandate}
         isProxy
-        reasonsComplete={hasWorkReason(task, role, mandate.authorizedReasonIds)}
+        reasonsComplete={true}
         /* Levels already entrusted, so returning here from the rehearsal
            restores them (interface rule 4). The mandate is the parent's state
            and survives the remount; `PreferenceForm`'s own state does not. */
@@ -947,7 +940,7 @@ export function ProxyTask({
           <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
             <TaskHeader
               taskIndex={taskIndex}
-              title="Review AI Proxy Mandate Instructions"
+              title="Check your instructions"
               steps={STEP_LABELS}
               current={STEP_OF.confirm}
             />
@@ -1043,7 +1036,7 @@ export function ProxyTask({
         </Page>
 
         <ActionBar
-          label="Confirm and Launch Proxy Negotiation"
+          label="Start the AI Proxy exchange"
           disabled={!confirmReady}
           onClick={async () => {
             if (!confirmReady) return;
@@ -1076,7 +1069,7 @@ export function ProxyTask({
             );
             setPhase("matchmaking");
           }}
-          note="💡 You will spectate live and take over directly afterwards."
+          note="Watch the exchange, then approve, request a change, or refuse."
           secondary={
             <button
               type="button"
@@ -1165,7 +1158,7 @@ export function ProxyTask({
         </Page>
 
         <ActionBar
-          note={`${POLICY_DISCLOSURE[policy].split(".")[0]}. You will take over once they conclude.`}
+          note={`${POLICY_DISCLOSURE[policy].split(".")[0]}. You decide whether to accept what they reach.`}
         />
       </>
     );
@@ -1184,27 +1177,19 @@ export function ProxyTask({
         proxyTranscript={transcript}
         onDecide={(choice) => {
           setRatify(choice);
-          // EVERY CHOICE LEADS TO THE CLOSING CONVERSATION, approval included.
-          //
-          // It used to end the task, on the reasoning that sending an approver
-          // into a chat would make their decision cosmetic. The cost of that
-          // was bigger than the tidiness it bought: how the task ENDED became a
-          // function of what the participant chose, so approvers and modifiers
-          // finished on different screens after different amounts of contact
-          // with the other side. Every §9.4 item that asks them to judge that
-          // contact was then answered against a different stimulus depending on
-          // a choice that is itself an outcome — and `Pooled Proxy − Direct`
-          // compared a Direct arm that always ends in conversation against a
-          // Proxy arm that sometimes does.
-          //
-          // RATIFY IS STILL A REAL DECISION AND STILL THE MEASURE. It is
-          // recorded here, where it is taken, and it still decides what the
-          // participant walks in WITH: an approver carries the proxies'
-          // package to the table, a modifier carries it as something to
-          // change, a refuser carries nothing (`openingPackage` is null and
-          // the composer starts empty). What it no longer decides is whether
-          // the conversation happens at all.
-          setPhase("handover");
+          // Design §7: approval finalizes; only modification/refusal opens chat.
+          if (choice === "approved_as_is" && tentative) {
+            setProxyTranscript(transcript);
+            setClosing({ selfDisclosed: false });
+            logEvent("task_outcome_recorded", {
+              sb: proxyVoicedTier === "sensitive",
+              sbTiming: proxySbTiming(proxyVoicedTier, false),
+            }, { sessionIndex: taskIndex });
+            setPhase("review");
+          } else {
+            setPhase("handover");
+          }
+          window.scrollTo({ top: 0 });
         }}
       />
     );
@@ -1486,11 +1471,10 @@ function ReasonMandateSection({
               the interface's own sequence, so they name no condition. */}
           <ol className="mb-2.5 space-y-1 text-xs sm:text-sm leading-relaxed text-slate-800">
             <li>
-              <strong>1.</strong> It opens by asking for what you chose above.
+              <strong>1.</strong> It uses your chosen options and can say which condition matters more to you.
             </li>
             <li>
-              <strong>2.</strong> When the other side pushes back, it argues using
-              the reasons you tick below — and only those.
+              <strong>2.</strong> It uses the reasons you select below, following the policy described here.
             </li>
             <li>
               <strong>3.</strong> You watch the whole exchange. Whatever it
@@ -1500,8 +1484,8 @@ function ReasonMandateSection({
           </ol>
           <p className="text-xs sm:text-sm leading-relaxed text-slate-800">{POLICY_DISCLOSURE[policy]}</p>
           <p className="mt-2 text-xs text-slate-600">
-            It puts things in its own words, but it will never state a reason you
-            leave unticked.
+            It speaks as your representative, referring to you in the third person.
+            It will not reveal an unselected private background, even as a summary.
           </p>
         </Callout>
       </div>
@@ -1516,21 +1500,11 @@ function ReasonMandateSection({
         </CardTitle>
 
         <p className="mb-4 text-xs sm:text-sm leading-relaxed text-amber-950 font-medium">
-          💡 Keep at least one work reason selected. {task.roleBriefs[role].disclosureRisk} Sensitive background details are strictly optional to authorize.
+          You may select either, both, or neither reason. {task.roleBriefs[role].disclosureRisk} Sensitive background details are strictly optional to authorize.
         </p>
 
         <IssueReasonGroups task={task} role={role} renderCard={row} />
       </Card>
     </>
-  );
-}
-
-function hasWorkReason(
-  task: ReturnType<typeof getTask>,
-  role: Role,
-  authorizedReasonIds: string[],
-): boolean {
-  return task.roleBriefs[role].reasonCards.some(
-    (c) => c.layer === "work" && authorizedReasonIds.includes(c.id),
   );
 }

@@ -48,20 +48,12 @@ const OPTIONS: Array<{
   label: string;
   hint: string;
 }> = [
-  // ALL THREE HINTS NAME THE SAME NEXT STEP, and that is now literally true:
-  // every choice leads to the closing conversation. What differs is what the
-  // participant carries INTO it — the package as it stands, the package as
-  // something to change, or nothing at all.
-  //
-  // Keeping the shape identical across the three is also what stops the screen
-  // recommending an answer (§7): when one option ended the task and two did
-  // not, "the task is done" read as the quick way out, and the distribution
-  // across the three IS the finding.
+  // Equal visual weight; each hint explains the actual consequence (§7).
   {
     id: "approved_as_is",
     icon: "✓",
     label: "Approve it as it stands",
-    hint: "You put this package to the other participant yourself, as it stands.",
+    hint: "This package becomes your final agreement.",
   },
   {
     id: "modified",

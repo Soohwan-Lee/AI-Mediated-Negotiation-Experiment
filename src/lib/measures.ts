@@ -328,15 +328,15 @@ export const BACKGROUND_BLOCKS: Block[] = [
 export const COMPREHENSION_BLOCK: Block = {
   id: "comprehension",
   title: "Quick check",
-  hint: "Three questions, so we know the setup came across. You can retry.",
+  hint: "Four questions about the setup. If needed, review the instructions and try once more.",
   items: [
     {
       kind: "choice",
       id: "COMP1",
-      text: "Who decides the senior consultant's performance bonus?",
+      text: "Who can influence the senior team member's evaluation, bonus, and future work assignments?",
       options: [
         { value: "leader", label: "The team lead" },
-        { value: "member", label: "The senior consultant" },
+        { value: "member", label: "The senior team member" },
         { value: "both", label: "Both, together" },
         { value: "neither", label: "Nobody — it is fixed" },
       ],
@@ -363,6 +363,16 @@ export const COMPREHENSION_BLOCK: Block = {
         { value: "yes", label: "Yes" },
       ],
     },
+    {
+      kind: "choice",
+      id: "COMP4",
+      text: "Which statement about sharing sensitive background is correct?",
+      options: [
+        { value: "required", label: "I must share it to reach an agreement." },
+        { value: "optional", label: "Sharing is optional, and what is shared may be considered in the later bonus or upward evaluation." },
+        { value: "protected", label: "If my AI Proxy shares it, it cannot be considered in the later evaluation." },
+      ],
+    },
   ],
 };
 
@@ -370,12 +380,14 @@ export const COMPREHENSION_ANSWERS: Record<string, string> = {
   COMP1: "leader",
   COMP2: "no",
   COMP3: "no",
+  COMP4: "optional",
 };
 
 /** Which instruction to re-show when an answer is wrong. */
 export const COMPREHENSION_REMEDIATION: Record<string, string> = {
+  COMP4: "You can negotiate and agree without sharing sensitive background. Whether you or your AI Proxy shares it, the other person may consider it in their later bonus decision or upward evaluation.",
   COMP1:
-    "The team lead decides the senior consultant's recommended bonus after each negotiation — and the senior consultant writes an upward evaluation of the lead, which goes to the director.",
+    "The team lead decides the senior team member's recommended bonus after each negotiation — and the senior team member writes an upward evaluation of the lead, which goes to the director.",
   COMP2:
     "Neither of you can fix these terms alone. Both have to be agreed by the two of you, or the work runs on the default terms.",
   COMP3:
@@ -1000,10 +1012,10 @@ export const RECV_EVAL_BLOCK: Block = {
 //      factor and rejected: tiering it would entangle the comment with the
 //      outcome the participant earned, and randomizing it would halve every
 //      cell.
-//   2. It comments on STYLE, never on the reasons. A remark about the
+//   2. It comments on DEMAND LEVEL, never on generated tone or the reasons. A remark about the
 //      disclosure would tangle with the decision to disclose and become a
 //      face attack in its own right.
-//   3. It is mildly negative ("it threw me a little"), not chen2026's
+//   3. It is mildly negative ("the demands were a bit strong"), not chen2026's
 //      "awful" — and it is TRUE in every session, because everyone opens at
 //      their preferred package on both terms.
 //   4. It is shown AFTER every confirmatory measure, so it cannot contaminate

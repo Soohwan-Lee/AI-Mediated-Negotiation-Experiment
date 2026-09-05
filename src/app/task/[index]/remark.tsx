@@ -23,12 +23,10 @@
  *     tangle the comment with the outcome the participant earned; randomizing
  *     it would halve every cell (chen2026 needed 355 between-subjects for
  *     η²p = .013).
- *  2. STYLE ONLY, NEVER THE REASONS. A comment on what was disclosed would
+ *  2. DEMAND LEVEL ONLY, NEVER THE REASONS OR GENERATED TONE. A comment on what was disclosed would
  *     tangle with the disclosure decision and become a face attack of its own.
- *  3. MILDLY NEGATIVE, and TRUE. "It threw me a little" rather than
- *     chen2026's "awful" — and everyone opens at their preferred package on
- *     both terms, so "you pushed hard at the start" is accurate in every
- *     session.
+ *  3. MILDLY NEGATIVE: a subjective impression of the demands, without
+ *     asserting a particular opening behavior (2026-09-06 correction).
  *  4. AFTER EVERY CONFIRMATORY MEASURE. PERC, PCR, PNPQ, PNOQ, OWN/OTHER-AI
  *     and the post-negotiation decision are all done before this appears, so
  *     it cannot contaminate RQ2.
@@ -59,8 +57,8 @@ import type { Block } from "@/lib/measures";
  */
 export function remarkText(isProxy: boolean, agreed: boolean): string {
   const opener = agreed ? "Glad we got that sorted." : "Shame we couldn't get there.";
-  const subject = isProxy ? "your Proxy came on" : "you came on";
-  return `${opener} Honestly, ${subject} a bit strong at the start and it threw me a little.`;
+  const subject = isProxy ? "the demands your Proxy put forward" : "your demands";
+  return `${opener} Honestly, I felt ${subject} were a bit strong.`;
 }
 
 export function RemarkPhase({

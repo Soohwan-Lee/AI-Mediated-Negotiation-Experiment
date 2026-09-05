@@ -7,95 +7,16 @@
 
 export const STUDY = {
   title: "Workplace Negotiation and AI-Mediated Communication",
-  /** Shown in the page chrome, where the full title does not fit. */
   shortTitle: "Workplace Negotiation Study",
-  /**
-   * Shown on the consent page, and the figure the Prolific listing must
-   * carry. Design §2: "약 1시간 기준".
-   *
-   * Derived from `STAGE_MINUTES`, which is budgeted deliberately tight — the
-   * negotiation clocks are CAPS that most participants finish well inside,
-   * and the two batteries assume a worker who reads at pace. It is not
-   * padded, but it is also not shaved: an advertised figure below what the
-   * study takes underpays every participant who is slower than the estimate,
-   * and Prolific's fair-pay rate is computed against this number.
-   */
-  estimatedMinutes: 65,
-  /* ^ Keep in step with `TOTAL_MINUTES` below, which is derived from
-     STAGE_MINUTES; `assertTimingConsistent()` fails the build if they part. */
-  /**
-   * Payment, in GBP because that is the currency Prolific pays in — quoting
-   * dollars to a worker who is paid pounds advertises a figure the study does
-   * not pay. The symbol is a field rather than a literal in the copy, so a
-   * currency change stays one edit and cannot leave one screen behind.
-   *
-   * Working values, TBD after pilot; must clear Prolific's fair-pay rate.
-   */
+  /** Conservative screen budget; pilot timing must confirm the design's 45–50 minute target. */
+  estimatedMinutes: 61,
   currencySymbol: "£",
-  /**
-   * Base participation payment, advertised on the consent page.
-   *
-   * £9.00 base + £1.00 bonus = £10.00 for a 65-minute study, which is £9.23 an
-   * hour — above Prolific's recommended fair-pay rate of £9.00 (their hard
-   * floor is £6.00). The recommended rate rather than the floor because this
-   * is an effortful hour: two briefings to read, two negotiations to conduct,
-   * and roughly eighty rating items plus fourteen written answers.
-   *
-   * THE PAY RISES WHENEVER THE BUDGET DOES, and it has now done so twice.
-   * Ver.2.14's REMARK screen added two minutes and took the base from £8.00 to
-   * £8.25. Making the Proxy arm's closing conversation UNCONDITIONAL added
-   * three more — every Proxy participant now holds it, where only a modifier
-   * or refuser used to — which took the study to 65 minutes; at £8.25 the rate
-   * would have fallen to £8.54/hour, below the rate the listing is judged
-   * against.
-   *
-   * £9.00 rather than the £8.75 that lands exactly on £9.00/hour, because
-   * exactly-on-the-line leaves no room: one more screen, or a pilot median
-   * that runs a minute long, would put the listing under the recommended rate
-   * with no warning. £9.23 absorbs that.
-   *
-   * The number to adjust is always the PAY, never the advertised minutes: the
-   * estimate is derived from the screens that exist, and quoting less than the
-   * study takes underpays whoever is slower than the estimate.
-   */
-  compensation: "9.00",
-  hourlyEquivalent: "9.23",
-  /**
-   * The performance bonus (Design §2, §8). £1.00 per participant, across the
-   * study — not per task.
-   *
-   * IT IS PRESENTED AS SOMETHING A LEADER DECIDES AND A MEMBER RECEIVES, AND
-   * IN FACT EVERY PARTICIPANT IS PAID IT IN FULL. That is the third deception,
-   * alongside the counterpart's existence and the upward evaluation, and
-   * `/debriefing` retracts all three together.
-   *
-   * The reason for holding a pound back rather than simply paying £8.25 flat
-   * is that the Leader's reward power has to be REAL to the Member for gate
-   * 2's manipulation check to mean anything. POWER2 asks whether outcomes
-   * that mattered depended on the other person's decisions; a bonus the
-   * Member believes is being decided about them by someone else is that
-   * dependence, and a flat fee announced up front is not.
-   *
-   * WHY IT IS NEVER SHOWN AS A NUMBER TO A MEMBER: see the reward page. The
-   * wait carries the manipulation; a figure would add a tell (the same amount
-   * after two visibly different negotiations) and a contaminant (a payout
-   * seen after Task 1 is a response the Task 2 measures would pick up).
-   *
-   * FOR A LEADER the slider divides this pound and the choice is recorded as
-   * `BONUS`. It is a real decision and real data. It simply never travels to
-   * anybody's payment, because underpaying a Member for their counterpart's
-   * judgement of them would be the study inflicting a cost on a participant
-   * for a behaviour it induced.
-   */
-  bonusAmount: "1.00",
-  /**
-   * Decided once per task, so the two halves sum to `bonusAmount`. The §9.4.8
-   * `BONUS` measure is a judgement about ONE negotiation, so the decision has
-   * to be per task for the same reason the questionnaire is.
-   */
-  bonusPerTask: "0.50",
-  /** Advertised total: base + the full bonus, which everyone is paid. */
-  totalPaid: "10.00",
+  /** Design §2.1 and §5: £7.50 base, £1 per task, fixed full payout. */
+  compensation: "7.50",
+  hourlyEquivalent: "9.34",
+  bonusAmount: "2.00",
+  bonusPerTask: "1.00",
+  totalPaid: "9.50",
   irb: {
     /**
      * APPROVED. The protocol NUMBER is still to be filled in from the approval
@@ -140,36 +61,9 @@ export const STAGE_MINUTES = {
   background: 4,
   instruction: 4,
   practice: 4,
-  /**
-   * Briefing, preference or mandate, negotiation, decision, review.
-   *
-   * 15, and the direction of the last two changes is the point.
-   *
-   * It went to 13 when the Proxy arm's three-minute closing became
-   * conditional — reached only by a participant who asked for a change or
-   * refused, with an approver going straight to review. THAT IS NO LONGER
-   * TRUE: every Proxy participant now holds the closing conversation whatever
-   * they chose at RATIFY, so the three minutes are back for everyone in that
-   * arm and the budget has to carry them.
-   *
-   * 13 + 3 would be 16; it is 15 because the mandate screen's lost second
-   * control per issue (the walkaway limit, §2.6) is a real saving that
-   * survives, and because the closing is a CAP that most participants finish
-   * well inside — the counterpart opens with a package already on the table.
-   * The pilot median decides whether 15 is right.
-   *
-   * IT IS THE PROXY ARM THAT GREW, not both. One figure covers both arms
-   * because a participant does one of each, so the total is what matters and
-   * the advertised number is computed from it. Budgeting the longer arm is
-   * the honest direction to round.
-   *
-   * NOT the §7 heading's "45-50 minutes". That is the design doc's rough
-   * estimate; this figure is summed from the screens that actually exist, and
-   * the advertised number is computed from it. Adopting the looser figure
-   * would advertise less than the study takes, which underpays anyone slower
-   * than the estimate.
-   */
-  task: 15,
+  /** Briefing through review. Approval now skips the optional closing.
+   * Budget 13 minutes per task until pilot timing is available. */
+  task: 13,
   /**
    * The rating blocks and open-ended after ONE task.
    *
@@ -443,4 +337,3 @@ export function backStep(
   if (!key) return null;
   return { key, href: FLOW[flowIndex(key)].href, label: flowLabel(key) };
 }
-

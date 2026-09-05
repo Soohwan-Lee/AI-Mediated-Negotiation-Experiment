@@ -769,3 +769,16 @@ test("foldTier carries priority through, where a ternary dropped it", () => {
   assert.equal(foldTier("priority", "sensitive"), "sensitive");
   assert.equal(foldTier("sensitive", "priority"), "sensitive");
 });
+
+for (const taskId of ["task_a", "task_b"]) {
+  for (const role of ["leader", "member"]) {
+    test(`${taskId}/${role}: an empty authorization still negotiates without disclosing a card`, () => {
+      const task = getTask(taskId);
+      const mandate = standardMandate(task, role, []);
+      const plan = buildProxyPlan(task, role, mandate);
+      assert.equal(plan.tier, "priority");
+      assert.equal(scorePackage(task, plan.tentative, role), 2300);
+      assert.equal(designatedReason(task, role, 2, [], []), null);
+    });
+  }
+}

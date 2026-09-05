@@ -1,5 +1,17 @@
 # Project notes
 
+## September 6 alignment override
+
+The user explicitly requested alignment to Design Ver.2.20 including its September 6 correction. Where older notes below conflict, the following rules apply:
+
+- RATIFY approval finalizes the package immediately; only modification/refusal opens the three-minute conversation.
+- Both reason boxes may be cleared. Work starts checked, sensitive starts unchecked.
+- REMARK evaluates the demands (participant / demands relayed by their Proxy), never generated tone or an asserted opening behavior.
+- Leader abstractions retain prior coordination/staffing judgment per the current §6.6 table.
+- COMP4 checks that disclosure is optional and may enter later evaluations.
+- Payment: £7.50 base + £1 per task = £9.50 fixed full payout. Current conservative screen budget is 61 minutes, pending pilot evidence for the design's 45–50 minute target.
+- See `docs/design-2.20-update.md` for the staged implementation and verification record.
+
 Online experiment platform for a 2027 CHI submission on AI-mediated
 negotiation. Source of truth for the design is
 `N - Experimental Design (Ver.2.20).md`. This file records the constraints that
