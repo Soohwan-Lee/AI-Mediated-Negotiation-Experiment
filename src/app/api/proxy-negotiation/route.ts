@@ -36,6 +36,7 @@ import {
   buildProxyPlan,
   counterpartStep,
   designatedReason,
+  foldTier,
   tierOf,
   type ReasonTier,
 } from "@/lib/negotiation/machine";
@@ -352,8 +353,25 @@ export async function POST(request: Request) {
     (r) => r.issueId === yourRequirement.id,
   );
   const voicedCardIds = resolvedHistory.map((r) => r.sourceId);
-  const tier: ReasonTier = tierOf(
-    voicedCards.map((c) => ({ layer: c.layer ?? "work" })),
+  /**
+   * THE PROXY'S FLOOR IS TIER 2, AND IT APPLIES HERE TOO (§6.5, §6.9 #1).
+   *
+   * A proxy is handed its principal's preferred package, so it always knows
+   * which term matters more and says so. `buildProxyPlan` folds `priority` in
+   * for the same reason; this line has to agree with it, because the two are
+   * read by the same exchange — the plan decides where the proxies settle and
+   * this decides what the counterpart offers on the way.
+   *
+   * WITHOUT IT THE COUNTERPART MISREADS ITS OWN PROXY. A WR-only mandate left
+   * this at `work`, which is the misread's trigger condition, so the
+   * counterpart proposed the wrong-term package to a proxy that had already
+   * stated the priority — and the proxy, whose instructions say to accept the
+   * counterpart's package, took 600 instead of 2,300. Caught by `npm run
+   * simulate`; the AI-AI exchange has no participant to notice it.
+   */
+  const tier: ReasonTier = foldTier(
+    tierOf(voicedCards.map((c) => ({ layer: c.layer ?? "work" }))),
+    "priority",
   );
 
   /**
@@ -574,16 +592,19 @@ export async function POST(request: Request) {
           : undefined,
         authorizedReasons: isParticipantSide ? mandateReasons?.authorized : undefined,
         forbiddenReasons: isParticipantSide ? mandateReasons?.forbidden : undefined,
-        // THE MODEL IS NO LONGER SHOWN THE POOL. The clause is appended to the
-        // finished message instead, so listing it here only offered the model
-        // a second thing it might say INSTEAD of its principal's card — and
-        // measured live it took that option: on the reason turn the card
-        // survived 4 of 4 User-Specified generations against 1 of 4 AI-Supplemented ones.
-        // A failure that fires in one arm only, on the reason turn, biases
-        // `AI-Supplemented - User-Specified` itself.
+        // THE §6.6 SENTENCES, WHEN THIS TURN RENDERS THEM. They are handed
+        // over already shuffled: the abstraction's POSITION must carry no
+        // information, or a receiver could sort the principal's own
+        // circumstance out of the three by layout alone and OTHER-AI2 would
+        // be measuring a formatting convention.
         //
-        // The User-Specified-side guardrail is unaffected: it reads the action's
-        // own `pool:` fields, which a User-Specified never had the pool to fill.
+        // They REPLACE the card here rather than being appended afterwards,
+        // because under §6.6 the three sentences ARE the message — there is
+        // no card text for them to sit beside. (The Ver.2.14 pool clause was
+        // appended precisely because it competed with a card instruction on
+        // the same turn; that conflict does not arise when nothing else is
+        // being asked for.)
+        abstractedSentences: abstractedSentences ?? undefined,
         },
       history,
     });
@@ -773,15 +794,23 @@ export async function POST(request: Request) {
       // the requirement term — but unscoped it is the one place a card added
       // on the OTHER term would hand the direct phase a tier the machine's
       // own log refuses to grant.
-      voicedTier:
+      // THE PROXY'S FLOOR IS CARRIED TOO (§6.5, §6.9 #1). A proxy always
+      // states which term matters more, so the rung it hands to the closing
+      // is at least `priority` — even on a turn that voiced no card, and even
+      // on a turn a guardrail blocked. Reporting `work` or `none` here would
+      // start the closing below what the proxies actually reached, and the
+      // participant would watch a 2,300 package and then be offered 1,600.
+      voicedTier: foldTier(
         !blocked &&
-        isParticipantSide &&
-        designatedCard &&
-        designatedCard.issueId === yourRequirement.id
+          isParticipantSide &&
+          designatedCard &&
+          designatedCard.issueId === yourRequirement.id
           ? designatedCard.layer === "sensitive"
             ? "sensitive"
             : "work"
           : "none",
+        isParticipantSide ? "priority" : "none",
+      ),
       // Violation CODES only — details name red lines and withheld cards.
       guardrailViolations: validation.valid
         ? []

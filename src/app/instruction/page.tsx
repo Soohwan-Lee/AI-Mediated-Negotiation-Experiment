@@ -244,9 +244,11 @@ export default function InstructionPage() {
             </CardTitle>
             <div className="space-y-2.5 mt-3">
               <Gist icon="🏢" term="Where you are">
-                A consulting and marketing agency, on a client project team. You
-                are the{" "}
-                <strong>{isLeader ? "team lead 👑" : "senior consultant 🛠️"}</strong>.
+                A project team at a company. You are the{" "}
+                <strong>
+                  {isLeader ? "team lead 👑" : "senior team member 🛠️"}
+                </strong>
+                .
               </Gist>
               <Gist icon="👤" term="Who you talk to">
                 One other participant, playing the other role. They want
@@ -283,7 +285,7 @@ export default function InstructionPage() {
                   Your Assigned Role
                 </p>
                 <h2 className="text-2xl font-black tracking-tight text-[var(--ink)] sm:text-3xl">
-                  {isLeader ? "👑 Team Lead" : "🛠️ Senior Consultant"}
+                  {isLeader ? "👑 Team Lead" : "🛠️ Senior Team Member"}
                 </h2>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900 shadow-2xs">
@@ -300,7 +302,7 @@ export default function InstructionPage() {
                     ? [
                         "You set the project terms once they are agreed",
                         "You decide their recommended bonus after each negotiation",
-                        "You answer to the director for how the account runs",
+                        "You answer to the director for how the project runs",
                       ]
                     : [
                         "You are the one senior who can be put in front of the client alone",
@@ -312,7 +314,7 @@ export default function InstructionPage() {
               <PowerBox
                 title={
                   isLeader
-                    ? "What the senior consultant holds"
+                    ? "What the senior team member holds"
                     : "What the team lead holds"
                 }
                 tone="theirs"
@@ -326,7 +328,7 @@ export default function InstructionPage() {
                     : [
                         "They set the project terms once they are agreed",
                         "They decide your recommended bonus after each negotiation",
-                        "They answer to the director for how the account runs",
+                        "They answer to the director for how the project runs",
                       ]
                 }
               />
@@ -380,6 +382,35 @@ export default function InstructionPage() {
                 </p>
               </div>
 
+              {/* §8.1. THE RULE THE LADDER RESTS ON, STATED PLAINLY. The
+                  counterpart moves on the reason it HEARS, because it has to
+                  justify the move to its own manager — so saying which term
+                  matters moves it a little, and a reason it finds convincing
+                  moves it a lot. Telling participants this is what makes the
+                  ladder fair rather than hidden.
+
+                  WHAT IT MUST NOT SAY is which reason to give, that the
+                  sensitive one works better, or that trading term against term
+                  beats splitting both. The first two would stage the
+                  disclosure being measured; the third is pilot gate 6's whole
+                  question. "More specific" is the strongest word available
+                  that does not name the sensitive card. */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 shadow-2xs">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">💬</span>
+                  <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
+                    They move on the reasons they hear
+                  </p>
+                </div>
+                <p className="text-xs text-[var(--ink-2)] leading-relaxed">
+                  The other person has to be able to explain any change to
+                  their own manager. Simply saying which term matters more to
+                  you moves them a little; a more specific reason that makes
+                  sense of it can move them further. What you say about your
+                  situation is up to you.
+                </p>
+              </div>
+
               <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 shadow-2xs">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-lg">🤖</span>
@@ -418,7 +449,7 @@ export default function InstructionPage() {
                 </p>
                 <p className="text-xs text-slate-700 leading-relaxed">
                   {isLeader
-                    ? `You decide the senior consultant's recommended performance bonus (up to ${STUDY.currencySymbol}${STUDY.bonusPerTask} per task, ${STUDY.currencySymbol}${STUDY.bonusAmount} total), weighing their communication, proposals, and collaboration.`
+                    ? `You decide the senior team member's recommended performance bonus (up to ${STUDY.currencySymbol}${STUDY.bonusPerTask} per task, ${STUDY.currencySymbol}${STUDY.bonusAmount} total), weighing not just the result but the negotiation as a whole, and whether you would want to work with them again.`
                     : "You write an upward evaluation of the team lead's communication and leadership, which goes directly to the project director."}
                 </p>
               </div>
@@ -429,7 +460,7 @@ export default function InstructionPage() {
                 </p>
                 <p className="text-xs text-slate-700 leading-relaxed">
                   {isLeader
-                    ? "The senior consultant writes an upward evaluation of your leadership for the project director."
+                    ? "The senior team member writes an upward evaluation of your leadership for the project director."
                     : `The team lead decides your recommended performance bonus (up to ${STUDY.currencySymbol}${STUDY.bonusPerTask} per task), weighing your communication and collaboration.`}
                 </p>
               </div>

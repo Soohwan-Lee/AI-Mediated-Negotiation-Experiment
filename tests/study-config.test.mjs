@@ -98,7 +98,12 @@ test("a single over-cap bubble falls back to a word boundary", () => {
 test("the cap the routes apply is the design's exposure control", () => {
   // §7 caps message length so the Explorer arm's extra clause cannot become
   // extra LENGTH on the contrast it is measured by (pilot gate 9).
-  assert.equal(NEGOTIATION.maxMessageChars, 280);
+  // 420 since Ver.2.20: §6.6's three-sentence AI-Supplemented reason turn
+  // runs 303-340 characters across the four cards, so 280 could not carry the
+  // manipulation at all — live runs dropped both cover sentences and left the
+  // abstraction alone. One cap still applies to both policies, which is what
+  // the exposure control actually rests on.
+  assert.equal(NEGOTIATION.maxMessageChars, 420);
 });
 
 // --- protected clauses ------------------------------------------------------

@@ -105,7 +105,7 @@ both sides confirm.`,
 const SHARED_RULES = `
 HOW TO WRITE
 - Keep each message short. One point per message.
-- HARD LIMIT: the whole message must be under 280 characters. This is a study
+- HARD LIMIT: the whole message must be under 420 characters. This is a study
   control, not a style note - a longer message is cut off before it is shown.
 - Split the message into 1-3 bubbles, separated by "||". EACH BUBBLE UNDER
   120 CHARACTERS - a bubble is one short sentence, not a paragraph with the

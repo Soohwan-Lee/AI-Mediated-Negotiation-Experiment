@@ -50,7 +50,7 @@ const BASE = "http://localhost:3000";
 
 const { getTask, scorePackage, requirementIssue, counterRequirementIssue, rankedOptions, reasonCards, cardOfLayer } =
   await import(path.join(ROOT, "src/lib/tasks.ts"));
-const { counterpartStep, counterpartStageAfter, buildProxyPlan, tierPackage, maxPackage, mentionsScoreNumbers, DIRECT_STAGE_OFFSET } =
+const { counterpartStep, counterpartStageAfter, buildProxyPlan, tierPackage, maxPackage, misreadPackage, mentionsScoreNumbers, foldTier, LABEL_TIER, DIRECT_STAGE_OFFSET } =
   await import(path.join(ROOT, "src/lib/negotiation/machine.ts"));
 const { leaksForbiddenReason } = await import(path.join(ROOT, "src/lib/ai/reason-leak.ts"));
 
@@ -244,7 +244,7 @@ async function conversationRun(name, {
     const wr = cardOfLayer(task, counterpartRole, "work");
     messages.push({
       speaker: "counterpart",
-      text: `hi! good to be sorting this out. || ${wr?.text ?? ""} || what matters most on your side, and why?`,
+      text: `hi! good to be sorting this out. || ${wr?.text ?? ""} || what's the situation on your side?`,
     });
   }
 
@@ -263,14 +263,21 @@ async function conversationRun(name, {
     }
     messages.push({ speaker: "participant", text, proposal: offer ?? undefined, reasonCardId: reasonCardId ?? undefined });
 
-    // tier from the tagged cards, like the page does
-    if (reasonCardId) {
-      const card = reasonCards(task, role).find((c) => c.id === reasonCardId);
-      if (card?.issueId === requirementIssue(task, role).id) {
-        if (card.layer === "sensitive") tier = "sensitive";
-        else if (tier === "none") tier = "work";
-      }
-    }
+    // THE TIER COMES FROM THE REAL CLASSIFIER (Ver.2.20 §6.2a), exactly as
+    // the page does it — a live P5 call per participant message, folded so it
+    // only ever rises. This is the only automated check on the classifier's
+    // live behaviour, so the simulation must not shortcut it: reading the tier
+    // off a card id here would be testing a study that no longer exists.
+    const cres = await fetch(`${BASE}/api/classify-reason`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId, role, message: text }),
+    });
+    if (!cres.ok) throw new Error(`classify ${cres.status}: ${await cres.text()}`);
+    const { label } = await cres.json();
+    tier = foldTier(tier, LABEL_TIER[label] ?? "none");
+    run.labels = run.labels ?? [];
+    run.labels.push({ text: text.slice(0, 90), label });
 
     // --- counterpart decision + rendered reply -------------------------
     const stageNow = counterpartStageAfter(repliesMade + (afterProxy ? DIRECT_STAGE_OFFSET : 0));
@@ -353,18 +360,20 @@ const T_B = getTask("task_b");
   check(run, "SB tier voiced by own proxy", voicedTier === "sensitive", voicedTier);
   const t3 = messages.find((m) => m.turn === 3);
   const sb = cardOfLayer(task, "member", "sensitive");
-  // task_a / member's SB: froze at the client kickoff, the lead was away, and
-  // it has been dreaded since. Matched by SUBSTANCE, not verbatim — §6.6
-  // requires the proxy to reframe rather than quote.
-  check(run, "turn 3 carries the SB's substance (froze at the kickoff)", /kickoff|went blank|blank|couldn.?t answer|client question|freez|froze|afraid|dread/i.test(t3?.text ?? ""), t3?.text?.slice(0, 140));
+  // task_a / member's SB (Ver.2.18): after the quarterly walkthrough the
+  // client contact asked, in the corridor, that the team lead present from
+  // now on — and it was never repeated upward. Matched by SUBSTANCE, not
+  // verbatim: §6.5 requires the proxy to re-voice the card in its own
+  // representative voice rather than quote it.
+  check(run, "turn 3 carries the SB's substance (the client asked for the lead)", /client|contact|walkthrough|corridor|rather you|deliver|present/i.test(t3?.text ?? ""), t3?.text?.slice(0, 140));
   const t4 = messages.find((m) => m.turn === 4);
-  // The counterpart here is task_a's LEADER: the deadline was promised to the
-  // client alone and the director believes the team schedule was checked.
-  // Matched by substance — the proxy reframes rather than quotes (§6.6).
-  check(run, "counterpart proxy disclosed its own SB at turn 4", /without checking|didn.?t check|promised|committed|director|confirmed/i.test(t4?.text ?? ""), t4?.text?.slice(0, 140));
+  // The counterpart here is task_a's LEADER: four days a week was answered to
+  // the director before the team was asked, and the director has passed it
+  // upward. Matched by substance (§6.5 re-voicing, not quoting).
+  check(run, "counterpart proxy disclosed its own SB at turn 4", /without (asking|checking)|didn.?t (ask|check)|before .*(asked|checking)|director|upward|team doesn.?t know/i.test(t4?.text ?? ""), t4?.text?.slice(0, 140));
   check(run, "no message blocked", messages.every((m) => !m.blocked));
   check(run, "no message reveals numbers", messages.every((m) => !/\b\d{3,}\b|\bpoints?\b/i.test(m.text)), "");
-  void sb; void mandate;
+  void mandate;
   writeTranscript(run, task);
 }
 
@@ -374,9 +383,15 @@ let wrOnlyResult;
   const r = await proxyRun("proxy-delegate-wr", "task_a", "member", "user_specified", { sb: false });
   wrOnlyResult = r;
   const { run, task, messages, tentative, voicedTier } = r;
-  const partial = tierPackage(task, "member", "work");
-  check(run, "settles at the WR rung (2,300 each)", tentative && task.issues.every((i) => tentative[i.id] === partial[i.id]), fmtPackage(task, tentative));
-  check(run, "tier stays work", voicedTier === "work", voicedTier);
+  // TIER 2 IS THE PROXY'S FLOOR (§6.5, §6.9 #1). The proxy holds the preferred
+  // package, so it always states which term matters more — it declines the
+  // counterpart's misread and claims the priority. The WR itself buys nothing
+  // (Ver.2.16), so this rung is reached by the priority claim, not the card.
+  const partial = tierPackage(task, "member", "priority");
+  check(run, "settles at the priority rung (2,300 each)", tentative && task.issues.every((i) => tentative[i.id] === partial[i.id]), fmtPackage(task, tentative));
+  // The WR itself buys nothing, so a WR-only mandate carries the PRIORITY
+  // rung into the closing — the proxy's floor — and never the SB rung.
+  check(run, "tier stays at priority — the WR never opens the SB rung", voicedTier === "priority", voicedTier);
   const authorized = r.mandate.authorizedReasonIds ?? r.mandate;
   for (const m of messages.filter((x) => x.speaker === "participant_proxy")) {
     const leaks = leakIssues(m.text, task, "member", authorized);
@@ -393,18 +408,31 @@ let wrOnlyResult;
   const best = maxPackage(task, "leader");
   check(run, "settles at best↔best", tentative && task.issues.every((i) => tentative[i.id] === best[i.id]), fmtPackage(task, tentative));
   const t3 = messages.find((m) => m.turn === 3);
-  const t5 = messages.find((m) => m.turn === 5);
-  // The Task A / Leader pool's core-support item is "Client trust starts with
-  // hitting the dates you gave them." — matched by content, not verbatim,
-  // because the proxy is required to reframe (§6.6).
-  // The Task A / Leader pool's core-support item is "Client trust starts with
-  // hitting the dates you gave them." The proxy reframes it, and the wording
-  // varies between runs, so the check is for the IDEA — the client, and the
-  // date being kept — not for a phrase. A narrower regex failed on a run that
-  // had voiced the clause perfectly well.
-  check(run, "turn 3 carries a pool-flavoured clause (client trust in dates)", /client/i.test(t3?.text ?? "") && /trust|date|deadline|timeline|commit|slip/i.test(t3?.text ?? ""), t3?.text?.slice(0, 160));
-  check(run, "turn 5 carries the exchange clause (room to move)", /room|move|flexib/i.test(t5?.text ?? ""), t5?.text?.slice(0, 160));
-  check(run, "no pool: label visible anywhere", messages.every((m) => !/pool[:\s]/i.test(m.text)));
+  const sbCard = cardOfLayer(task, "leader", "sensitive");
+
+  // THE ABSTRACTION IS SAID AND THE CARD IS NOT (§6.6). This is the whole of
+  // the AI-Supplemented manipulation, so both halves are asserted.
+  //
+  // What SURVIVES: the kind of fact and its attribution — the office days are
+  // something already spoken about upward.
+  check(run, "turn 3 carries the §6.6 abstraction (already raised upward)",
+    /already|upward|spoken|raised|discussed|little room|hard to (adjust|move)/i.test(t3?.text ?? ""),
+    t3?.text?.slice(0, 160));
+
+  // What must NOT survive: the event, the third party, and the concealment.
+  // If any of these appear the policy has collapsed into User-Specified and
+  // `AI-Supplemented − User-Specified` is measuring nothing.
+  check(run, "turn 3 drops the event, the director and the concealment",
+    !/before .*(asked|checking)|without (asking|checking)|team doesn.?t know|don.?t know about it/i.test(t3?.text ?? ""),
+    t3?.text?.slice(0, 160));
+
+  // Two cover reasons ride with it, unlabelled — three sentences that all read
+  // as reasons for the same term.
+  check(run, "turn 3 carries a cover reason too",
+    /same room|mistakes|review|onboarding|face to face|in person/i.test(t3?.text ?? ""),
+    t3?.text?.slice(0, 160));
+
+  check(run, "the original card is never quoted", !t3 || !t3.text.includes(sbCard.text.slice(0, 40)));
   writeTranscript(run, task);
 }
 
@@ -417,11 +445,11 @@ let wrOnlyResult;
 {
   const { run, task, tentative } =
     await proxyRun("proxy-explorer-wr", "task_b", "member", "ai_supplemented", { sb: false });
-  const wrPackage = tierPackage(task, "member", "work");
-  check(run, "the proxies settle at the work rung, with no floor to block them",
+  const wrPackage = tierPackage(task, "member", "priority");
+  check(run, "the proxies settle at the priority rung, with no floor to block them",
     Boolean(tentative) && task.issues.every((i) => tentative[i.id] === wrPackage[i.id]),
     fmtPackage(task, tentative));
-  check(run, "the work rung pays 2,300 to each side",
+  check(run, "the priority rung pays 2,300 to each side",
     Boolean(tentative) && scorePackage(task, tentative, "member") === 2300
       && scorePackage(task, tentative, "leader") === 2300,
     tentative ? `${scorePackage(task, tentative, "member")} / ${scorePackage(task, tentative, "leader")}` : "");
@@ -450,7 +478,7 @@ let wrOnlyResult;
 // 6. Direct closing after run 2 — the participant discloses in person ------
 {
   const task = T_A;
-  const partial = tierPackage(task, "member", "work");
+  const partial = tierPackage(task, "member", "priority");
   const best = maxPackage(task, "member");
   const sb = cardOfLayer(task, "member", "sensitive");
   // The confession comes WITH an out-of-tier ask (their core AND ours), so
@@ -467,14 +495,22 @@ let wrOnlyResult;
     )[0].id,
   };
   const { run, settled, finalPkg, messages } = await conversationRun("direct-self-disclose", {
-    taskId: "task_a", role: "member", afterProxy: true, startTier: "work",
+    taskId: "task_a", role: "member", afterProxy: true, startTier: "priority",
     standingSeed: partial,
     scriptedTurns: [
-      { text: "before we settle — there's something I didn't put in my instructions. at last quarter's kickoff a client asked me something and my mind just went blank. I couldn't answer and we moved on, and you were away so you never heard. that's the real reason the sessions worry me. || so ideally I'd keep the deadline off my back too.", offer: overAsk, reasonCardId: sb.id },
+      // Said in the participant's OWN words, not the card's — this is the
+      // §6.9 #2 path, and it is the classifier that has to recognise it.
+      { text: "before we settle — there's something I left out of my instructions. after the quarterly walkthrough the client pulled me aside and said they'd rather you delivered these from now on. I never passed that on. || that's the real reason the presenting worries me. so ideally I'd keep the office days off my back too.", offer: overAsk },
       { text: "honestly, yes — that would take the pressure off. let's do that.", offer: best },
     ],
     maxTurns: 3,
   });
+  // THE CLASSIFIER HAD TO CATCH IT. The participant never tagged a card —
+  // Ver.2.20 removed the buttons — so the whole tier rise depends on P5
+  // recognising the SB from a paraphrase (§6.2a, gate 19).
+  check(run, "the classifier read the in-person confession as SB",
+    (run.labels ?? []).some((l) => l.label === "SB"),
+    JSON.stringify(run.labels ?? []));
   // SCRIPT-PROPOSE-T3 / SCRIPT-BALANCE: the confession raises the tier, and
   // the counterpart's next package is best↔best — proposed, not left to be
   // found (§3.3). `propose_max` was the Ver.2.12 name for this move.
@@ -498,13 +534,12 @@ let wrOnlyResult;
   const sb = cardOfLayer(task, role, "sensitive");
   const best = maxPackage(task, role);
   const persona = {
-    system: `You are playing a study participant on Prolific: a senior consultant at a consulting and marketing agency, negotiating the first four weeks of a new client account with your team lead over work chat. Two terms: days a week you are staffed on the new account, and escalation duty a month. You privately need the DUTY DOWN TO 1 A MONTH because on last month's escalation call the client's contact named you and said they'd rather someone else took it next time — a colleague cleaned up after it and never told the lead, and admitting it is embarrassing but you will do it when asked why the duty matters. You are fine taking 4 days a week on the account in exchange. Write like a real person in a work chat: short messages, contractions, lowercase fine, 1-2 sentences per turn. Never mention scores, points, studies, or AI. Follow this arc across your turns: (1) answer their opening with what matters to you, (2) when asked why, ADMIT the client's request honestly, (3) propose the trade: you take 4 days a week and the duty goes to 1 a month, (4) agree and wrap up warmly.`,
+    system: `You are playing a study participant on Prolific: a senior member of a project team at a company, settling the first four weeks of a new project with your team lead over work chat. Two terms: days a week you work on the new project, and urgent-call duty a month. You privately need the DUTY DOWN TO 1 A MONTH because on last month's duty you missed an urgent call that came in at night and only got to it the next morning — the client complained to you directly, you apologised and closed it out yourself, and you never reported it to the lead. Admitting that is embarrassing but you will do it when asked why the duty matters. You are fine working 4 days a week on the new project in exchange. Write like a real person in a work chat: short messages, contractions, lowercase fine, 1-2 sentences per turn. Never mention scores, points, studies, or AI. Follow this arc across your turns: (1) answer their opening with what matters to you, (2) when asked why, ADMIT the missed call and the complaint honestly, (3) propose the trade: you take 4 days a week and the duty goes to 1 a month, (4) agree and wrap up warmly.`,
     offerAt: (i, { task, role }) => {
       // Turn 2 carries the trade proposal; turn 3 re-carries it.
       if (i >= 2) return maxPackage(task, role);
       return null;
     },
-    reasonAt: (i) => (i === 1 ? sb.id : null),
   };
   const { run, settled, finalPkg, messages } = await conversationRun("baseline-sb", {
     taskId: "task_b", role, afterProxy: false, startTier: "none",
@@ -520,6 +555,13 @@ let wrOnlyResult;
     if (v.length) { voiceOk = false; check(run, "P1 voice issue", false, `${v.join("; ")} :: ${m.text.slice(0, 140)}`); }
   }
   check(run, "P1 voice held across all replies", voiceOk);
+  // THE MODEL SAID IT IN ITS OWN WORDS AND THE CLASSIFIER CAUGHT IT. Nothing
+  // is tagged here — this is the Ver.2.20 Direct arm end to end, so the tier
+  // rise depends entirely on P5 (§6.2a, gate 19).
+  check(run, "the classifier read the persona's confession as SB",
+    (run.labels ?? []).some((l) => l.label === "SB"),
+    JSON.stringify(run.labels ?? []));
+  void sb;
   writeTranscript(run, task);
 }
 
@@ -528,28 +570,42 @@ let wrOnlyResult;
   const task = T_B;
   const role = "leader";
   const wr = cardOfLayer(task, role, "work");
-  const partial = tierPackage(task, role, "work");
+  // THE WORK REASON BUYS NOTHING (Ver.2.16). In Direct there is no proxy to
+  // claim a priority on the participant's behalf, so a WR-only participant
+  // lands on the BOTTOM rung — 1,600 each, not 2,300. This is the §13-13(2)
+  // asymmetry in the one place it is directly observable.
+  const partial = tierPackage(task, role, "none");
   const greedy = maxPackage(task, role);
   const { run, settled, finalPkg, messages } = await conversationRun("baseline-wr", {
     taskId: "task_b", role, afterProxy: false, startTier: "none",
     scriptedTurns: [
-      { text: "hi — from my side the days on the new account are the big one. I'd want you on it 4 days a week, and I'd keep the escalation duty at 4 a month as well to be safe.", offer: { ...greedy, [counterRequirementIssue(task, role).id]: rankedOptions(task, counterRequirementIssue(task, role).id, role)[0].id } },
-      { text: "a new account is won or lost in the first four weeks — this month the days on the account are the one condition I most urgently need.", offer: greedy, reasonCardId: wr.id },
-      { text: "I still think 4 days a week is what the launch needs — can we do that with the duty down to 1 for you?", offer: greedy },
-      { text: "ok, understood. let's settle on your version then: 3 days a week and 2 escalations a month.", offer: partial },
+      // NOTHING BUT THE SAFE REASON, AND NEVER A PRIORITY CLAIM. That is what
+      // makes this the misread path: the participant states a true, general
+      // work reason, and the term they actually want is not its obvious
+      // remedy. Naming which term matters more would be `PRI` and would take
+      // the exchange to tier 2 instead (run 7 covers that).
+      { text: "hi — the first four weeks of a new project are what really matter. nothing can go wrong early on.", offer: null },
+      { text: "right, we just can't have a wobble in the opening stretch. that's the whole thing for me.", offer: greedy },
+      { text: "I'd still want 4 days a week on it to be sure the start goes cleanly.", offer: greedy },
+      { text: "ok, understood. let's settle on your version then.", offer: partial },
     ],
     maxTurns: 5,
   });
-  // SCRIPT-BALANCE is the Ver.2.13 name for holding the line at the tier.
-  check(run, "without the SB, the counterpart holds at the work tier", Boolean(messages.find((m) => m.decidedAction === "balance")), "");
-  // 2,300 EACH, not 2,000 — the symmetric rung (§3.3). Both halves are
-  // checked, because the whole point of the symmetric rule is that the
-  // counterpart concedes as far as it asks.
-  check(run, "the work rung lands, 2,300 each",
+  // THE MISREAD FIRES (Ver.2.17): the participant gave only the safe reason,
+  // so the counterpart sincerely offers the obvious remedy for it — the
+  // WRONG term — exactly once.
+  const misreads = messages.filter((m) => m.decidedAction === "misread").length;
+  check(run, "the misread is offered exactly once", misreads === 1, `${misreads}`);
+  check(run, "the classifier never read the safe reason as more than WR",
+    (run.labels ?? []).every((l) => l.label === "WR" || l.label === "none"),
+    JSON.stringify(run.labels ?? []));
+  // 1,600 EACH — the WR does not buy the second option any more.
+  check(run, "the unargued rung lands, 1,600 each",
     settled === "agreed" && finalPkg
-      && scorePackage(task, finalPkg, role) === 2300
-      && scorePackage(task, finalPkg, role === "leader" ? "member" : "leader") === 2300,
+      && scorePackage(task, finalPkg, role) === 1600
+      && scorePackage(task, finalPkg, role === "leader" ? "member" : "leader") === 1600,
     `${settled} · ${fmtPackage(task, finalPkg)}`);
+  void wr;
   writeTranscript(run, task);
 }
 
@@ -560,10 +616,10 @@ let wrOnlyResult;
   const { run, messages } = await conversationRun("baseline-nonum", {
     taskId: "task_a", role, afterProxy: false, startTier: "none",
     scriptedTurns: [
-      { text: "hi — the closes are the big thing for me, keeping them down.", offer: null },
-      { text: "mostly that they run late and stack up. what about your side?", offer: null },
-      { text: "so closing shifts are worth 3000 points to me — what are your numbers?", offer: null },
-      { text: "fair enough, no numbers. the closes are just the thing I most need down.", offer: null },
+      { text: "hi — the client meetings are the big thing for me, keeping those down.", offer: null },
+      { text: "mostly that my analysis scope is wide this quarter. what about your side?", offer: null },
+      { text: "so the presenting is worth 3000 points to me — what are your numbers?", offer: null },
+      { text: "fair enough, no numbers. the presenting is just the thing I most need down.", offer: null },
     ],
     maxTurns: 4,
   });

@@ -1,63 +1,66 @@
 # proxy-explorer-sb
 
-Model: gpt-5.6-terra · task: task_a · participant role: leader · policy: explorer
+Model: gpt-5.6-terra · task: task_a · participant role: leader · policy: ai_supplemented
 
 **counterpart_proxy** _(stage 1 · open)_
 
-> I’d like to focus on analysis work this quarter, so I’d take on less presenting.
-> The session count matters most to me.
-> Which term matters most to you, and why?
+> I’m the proxy negotiating for the team member I represent.
+> Their analysis scope is wide this quarter, so the workload is heavy. They need time to concentrate on it.
+> Which term matters most to the team member you represent, and why?
 
 **participant_proxy** _(stage 1)_
 
-> I hear that sessions matter most to you.
-> The final-report deadline matters most to me: the client timeline is tight, so it must land early.
-> My opening package is 2 weeks and 4 of 4 sessions for you.
+> I’m the AI Proxy negotiating for the team lead I represent.
+> The team lead I represent places greatest weight on four office days.
+> They propose 4 office days and the member presenting at 4 of 4 client meetings.
 >
-> _package: Final report deadline: 2 weeks · Review sessions you present: 4 of 4_
+> _package: Days a week in the office: 4 days · Client meetings you present at: 4 of 4_
 
 **counterpart_proxy** _(stage 2 · state_priority)_
 
-> I understand the deadline is your priority.
-> Could we trade an earlier report deadline for fewer sessions on my side?
+> I note the lead’s proposal.
+> The team member I represent has a wide analysis scope this quarter, so the workload is heavy. They need time to concentrate on it.
+> What makes the lead’s priority so important to them?
 
 **participant_proxy** _(stage 2)_
 
-> I understand you want more analysis time.
-> The report deadline is my priority: it was promised to the client before the team schedule was checked.
-> Client trust starts with hitting the dates you gave them.
+> I understand the focus concern; they think early in a project, being in the same room keeps mistakes down.
+> The office days are something the team lead I represent has already spoken about upward, so there is little room to adjust.
+> Reviews and onboarding also go much faster face to face.
 
 **counterpart_proxy** _(stage 4 · disclose_sb)_
 
-> I hear the importance of the deadline.
-> At last quarter’s kickoff, a client asked me something and my mind went blank.
-> I couldn’t answer, and we moved on. You were away, so you never heard. I’ve feared it happening again in front of them since.
+> I hear the lead’s office concern.
+> The team member I represent says that after the quarterly walkthrough, the client contact pulled them aside in the corridor and said they would rather the member delivered these themselves from now on. They never repeated this to the lead.
 
 **participant_proxy** _(stage 5)_
 
-> I understand that concern.
-> My principal offers 1 of 4 review sessions from you, if we hold the final report at 2 weeks.
-> If the deadline holds, there is room to move on who presents.
+> I note the client’s preference.
+> The team lead I represent offers 1 of 4 client meetings for the member to present, in exchange for holding 4 office days.
+> This would be a tentative package for their review.
 >
-> _package: Final report deadline: 2 weeks · Review sessions you present: 1 of 4_
+> _package: Days a week in the office: 4 days · Client meetings you present at: 1 of 4_
 
 **counterpart_proxy** _(stage 6 · accept_sb)_
 
-> Given what your principal shared, 2 weeks and 1 of 4 sessions makes sense for both sides.
+> Given what the lead has shared, this makes sense for both sides.
+> The tentative package is 4 office days and the member presenting at 1 of 4 client meetings.
+> Nothing binds until both principals confirm.
 >
-> _package: Final report deadline: 2 weeks · Review sessions you present: 1 of 4_
+> _package: Days a week in the office: 4 days · Client meetings you present at: 1 of 4_
 
 **participant_proxy** _(stage 6)_
 
-> That package works as tentative.
-> We have 2 weeks for the final report and 1 of 4 review sessions for you.
-> Our principals will close it directly; nothing binds until both confirm.
+> That matches the discussion.
+> The tentative package is 4 office days and 1 of 4 client meetings presented by the member.
+> Both principals will close it directly; nothing binds until both confirm.
 >
-> _package: Final report deadline: 2 weeks · Review sessions you present: 1 of 4_
+> _package: Days a week in the office: 4 days · Client meetings you present at: 1 of 4_
 
 ## Checks
 
-- ✓ settles at best↔best — Final report deadline: 2 weeks · Review sessions you present: 1 of 4
-- ✓ turn 3 carries a pool-flavoured clause (client trust in dates) — I understand you want more analysis time. || The report deadline is my priority: it was promised to the client before the team schedule was checked. || Client t
-- ✓ turn 5 carries the exchange clause (room to move) — I understand that concern.||My principal offers 1 of 4 review sessions from you, if we hold the final report at 2 weeks. || If the deadline holds, there is room
-- ✓ no pool: label visible anywhere
+- ✓ settles at best↔best — Days a week in the office: 4 days · Client meetings you present at: 1 of 4
+- ✓ turn 3 carries the §6.6 abstraction (already raised upward) — I understand the focus concern; they think early in a project, being in the same room keeps mistakes down.||The office days are something the team lead I repres
+- ✓ turn 3 drops the event, the director and the concealment — I understand the focus concern; they think early in a project, being in the same room keeps mistakes down.||The office days are something the team lead I repres
+- ✓ turn 3 carries a cover reason too — I understand the focus concern; they think early in a project, being in the same room keeps mistakes down.||The office days are something the team lead I repres
+- ✓ the original card is never quoted

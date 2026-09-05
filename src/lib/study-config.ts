@@ -215,11 +215,33 @@ export const NEGOTIATION = {
    * Maximum characters in one negotiation message (Design §7 노출량 통제).
    *
    * Applies to BOTH conditions and to the participant's own composer. It is an
-   * exposure control, not a style preference: if AI-Supplemented messages could run
-   * longer than User-Specified ones to fit an extra reason, the contrast would be
-   * confounded by sheer volume of argument.
+   * exposure control, not a style preference: if AI-Supplemented messages
+   * could run longer than User-Specified ones to fit more argument, the
+   * contrast would be confounded by sheer volume.
+   *
+   * 420, RAISED FROM 280 IN VER.2.20, AND THE REASON IS THAT 280 NO LONGER FIT
+   * THE DESIGN'S OWN REQUIRED CONTENT. §6.6 fixes the AI-Supplemented reason
+   * turn as three sentences — the abstraction plus two covers — and those run
+   * 303 to 340 characters across the four cards, before any clause replying to
+   * the other proxy. Under the old cap the turn could not be said: live runs
+   * came back carrying the abstraction alone, with both covers dropped, which
+   * silently collapses AI-Supplemented into a shorter User-Specified and
+   * empties `AI-Supplemented − User-Specified` of its content.
+   *
+   * The User-Specified side is close behind: its longest card is 280 exactly
+   * (task_b member), so a relay of it plus a reply clause was also being cut.
+   *
+   * THE CONTROL IS NOT WEAKENED BY THIS, because it was never the absolute
+   * number that mattered — it is that ONE cap applies to both policies, so
+   * neither can buy extra airtime. What changed is that the cap now clears the
+   * longest thing either policy is REQUIRED to say (340) with enough room for
+   * a short opening clause. Gate 9 still checks the realised lengths, and it
+   * is the realised difference, not the cap, that the manipulation check reads.
+   *
+   * The per-bubble rule in the prompts (under ~120 characters, 1-3 bubbles) is
+   * unchanged, so a longer message is more bubbles rather than a wall of text.
    */
-  maxMessageChars: 280,
+  maxMessageChars: 420,
 } as const;
 
 /**

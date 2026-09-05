@@ -173,7 +173,11 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b1c",
         1,
         "counterpart",
-        `hi! good to be sorting this out. || ${theirWr ? lowerFirst(theirWr.text) : `${theirs.label.toLowerCase()} is the one I really need.`} || which one matters most on your side, and why?`,
+        // SCRIPT-OPEN (Ver.2.16): its own DECOY work reason, and NO statement
+        // of which term it needs. Withholding that is what puts the
+        // participant on the receiving end of the same decoy — they misread
+        // the counterpart's priority, and its stage-4 SB corrects it.
+        `hi! good to be sorting this out. || ${theirWr ? lowerFirst(theirWr.text) : "there's a bit of pressure on my side this quarter."} || what's the situation on yours?`,
       ),
       m(
         "b1p",
@@ -186,7 +190,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b2c",
         2,
         "counterpart",
-        `so opposite priorities, which actually helps. || tell me why it matters that much — I'd rather move on something I understand.`,
+        `got it. || tell me why it's that one specifically — I'd rather move on something I can explain upstairs.`,
       ),
       m(
         "b2p",
