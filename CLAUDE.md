@@ -1117,6 +1117,70 @@ and they do not hide anything from a participant. Only the variable does.
 
 `?dev=1` / `?dev=0` in the URL forces the toggle.
 
+## Launch readiness: the study refuses to start unconfigured
+
+**The one failure that voids a collection run without announcing itself is a
+missing `OPENAI_API_KEY`.** With no key, `generateAction` returns a canned
+"[SCAFFOLD] No model configured…" action and every route still answers 200 —
+so the negotiation RUNS. Packages settle, the ladder codes a tier, and the
+questionnaire records judgements about a counterpart that never said anything.
+Nothing in the UI, the transcript or the export marks the session as void. The
+run looks like it worked, which is what makes this the worst class of bug here.
+
+**`npm run simulate` structurally cannot catch it**: it reads `.env.local`
+directly, so it is always configured. The gap is between "the code works" and
+"the DEPLOYMENT is configured", and only the deployed process can answer that.
+
+Three layers, and the order matters:
+
+1. **The entry gate.** The consent page asks `/api/preflight?gate=1` before
+   `beginStudy()` and refuses to start if the answer is no. This is the one
+   that carries the guarantee, because entry is the only point where refusing
+   is FREE — nothing is recorded and the participant can return the submission
+   uncharged. They see a plain "not available right now" with **no technical
+   detail**: naming a model or a key would tell every participant who saw that
+   screen what the counterpart is.
+2. **The backstop**, for what entry cannot cover — the environment changing
+   while a participant is already inside. `assertNotLiveWithoutModel` sits at
+   all three stub branches in `lib/ai/client.ts`. It **throws** rather than
+   returning, because every caller wraps these in a try/catch that answers
+   5xx, while a returned value would be swallowed (see below).
+3. **`/api/preflight`** reports the whole launch state in one GET: key
+   configured, dev panel off, completion code and IRB number set, advertised
+   timing against the real budget. Token-gated via `PREFLIGHT_TOKEN`; with no
+   token set it answers only when this is NOT a live study, so forgetting to
+   set one closes the route rather than opening it. It never prints the key,
+   not even masked — a mask still leaks length and tail.
+
+**Why the gate is not per-turn, which was the first design and is wrong.**
+Both facts were established by tracing the clients:
+
+- A 503 from `/api/classify-reason` is **swallowed**. Both callers read
+  `if (data.label) label = data.label` inside a try/catch, so a body with no
+  `label` silently leaves the tier at `none` — the very silence the guard
+  exists to break, one layer down.
+- The Direct arm has **no error state at all**. Its counterpart fetch has no
+  catch and falls through to "sorry, lost my train of thought there", so a
+  mid-negotiation refusal would have a participant watch the counterpart
+  apologise forever, forty minutes in, with half their data collected.
+
+**`ModelNotConfiguredError` is a named class for one reason**: the classifier
+must tell it apart from an ordinary model failure. `{label:"none"}` is correct
+for a call that FAILED — recoverable, since the tier only rises and the
+participant can say it again — but the same answer for a study with no model
+at all would floor every message of every session in silence. Same shape,
+opposite meaning, so they cannot share a catch.
+
+**The scaffold is deliberately untouched where it belongs.** Dev-tools-on with
+no key still returns it at 200: walking the whole flow without credentials is
+what it is for, and no participant can reach a dev build. `isLiveStudy()` is
+`NEXT_PUBLIC_DEV_TOOLS === "off" || VERCEL_ENV === "production"` — either
+signal alone, because they fail in opposite directions and the errors are not
+symmetric. A false positive costs one confusing local error; a false negative
+costs a whole run. `getApiKey` treats a blank value as absent, which is how
+this actually goes wrong: a variable left in the dashboard with its value
+deleted. `tests/model-readiness.test.mjs` pins the matrix.
+
 Wiring, when adding a page: gate the Continue button on `useDevGate(complete)`
 rather than `complete`, register a filler with `useDevAutofill`, and register
 phase jumps with `useDevActions` for state the URL cannot reach. All are no-ops
@@ -1140,7 +1204,8 @@ fills once and every screen after it inside the same component arrives empty.
 | Counterpart moves, the justification ladder, outcome coding | `lib/negotiation/machine.ts` |
 | The scripted ideal exchanges for mockup mode | `lib/negotiation/script.ts` |
 | The live end-to-end simulation | `scripts/simulate-negotiation.mjs` — `npm run simulate` |
-| Model / reasoning effort | `lib/ai/config.ts` |
+| Model / reasoning effort, the live-study guard | `lib/ai/config.ts` |
+| Launch readiness report and the entry gate | `app/api/preflight/route.ts` |
 | Agent behavior rules (P0–P4, the rehearsal, the classifier) | `lib/ai/prompts.ts` |
 | Guardrails, the message cap and its protected clauses | `lib/ai/validator.ts` |
 | REMARK and ATTR | `src/app/task/[index]/remark.tsx` |
