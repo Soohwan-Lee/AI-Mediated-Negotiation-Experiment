@@ -20,7 +20,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { OptionChips } from "@/components/issues";
 import {
   CountdownTimer,
@@ -234,6 +234,9 @@ export function BaselineTask({
   const counterpartRole: Role = role === "leader" ? "member" : "leader";
 
   const [phase, setPhase] = useState<Phase>("intro");
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [phase]);
   /**
    * How many replies the counterpart has made. Its script position is derived
    * from this, so the participant can send as many messages as they like

@@ -41,7 +41,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PROXY_TOTAL_TURNS as TOTAL_TURNS } from "@/lib/negotiation/proxy-protocol";
 import {
   SpectatorBanner,
@@ -339,6 +339,9 @@ export function ProxyTask({
   // between-condition difference in what participants were told before the
   // task rather than a layout slip.
   const [phase, setPhase] = useState<Phase>("intro");
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [phase]);
   const [mandate, setMandate] = useState<Mandate>(() =>
     emptyMandate(task, role, taskIndex),
   );

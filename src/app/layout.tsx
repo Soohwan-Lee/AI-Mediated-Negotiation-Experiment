@@ -46,6 +46,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${plexSans.variable} ${plexSerif.variable} ${plexMono.variable}`}
     >
       <body className="min-h-screen">
