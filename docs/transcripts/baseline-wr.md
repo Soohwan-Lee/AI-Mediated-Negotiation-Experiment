@@ -14,8 +14,8 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 2 · state_priority)_
 
-> i get that — the start needs to run smoothly.
-> two projects i'm already on have deadlines falling in the same month. i've got almost no capacity.
+> i hear that — getting the start right matters.
+> two projects i'm already on have deadlines falling in the same month, so i've got almost no capacity.
 > which term matters most to you, and why?
 
 **participant**
@@ -26,9 +26,9 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 4 · disclose_sb)_
 
-> i need to be candid about something.
-> on last month's duty, i missed an urgent night call and only dealt with it the next morning. the client complained to me directly; i apologised and closed it out.
-> i didn't report it to you. they've been uncomfortable with me on urgent calls ever since.
+> i need to be upfront about something.
+> last month, i missed an urgent call overnight and only dealt with it the next morning.
+> the client complained directly; i apologised and closed it out, but didn't report it to you. they've been uncomfortable with me on urgent calls since.
 
 **participant**
 
@@ -38,8 +38,9 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 5 · misread)_
 
-> i hear you — a clean opening matters.
-> given the capacity pressure, if we set the new project at 1 day a week, i'll take 3 urgent-call duties a month.
+> i hear you on needing a clean opening.
+> given the capacity pressure, i can make this work at 1 day a week on the new project and 3 urgent-call duties a month.
+> if that works for you, we can lock in both terms.
 >
 > _package: Days a week on the new project: 1 day a week · Urgent-call duty: 3 a month_
 
@@ -51,9 +52,8 @@ Model: gpt-5.6-terra · task: task_b · participant role: leader
 
 **counterpart** _(stage 6 · accept)_
 
-> that package works for me.
-> 2 days a week on the new project and 3 urgent-call duties a month.
-> nothing's final until we both confirm it.
+> thanks, that works for me.
+> to confirm, we're discussing 2 days a week on the new project and 3 urgent-call duties a month. nothing binds until we both confirm.
 >
 > _package: Days a week on the new project: 2 days a week · Urgent-call duty: 3 a month_
 

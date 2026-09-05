@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { NEGOTIATION } from "@/lib/study-config";
+import { NEGOTIATION, bubbleDelayMs } from "@/lib/study-config";
 import type { Speaker } from "@/lib/types";
 import { Button, cx } from "./ui";
 
@@ -120,25 +120,129 @@ export interface DisplayMessage {
   text: string;
 }
 
+/**
+ * "||" marks bubble breaks (Design §12 P1): one turn is one to three short
+ * bubbles, the way a person types in a work chat. Rendering the marker
+ * literally was a tell in itself — no human sends "||".
+ */
+function splitBubbles(text: string): string[] {
+  return text
+    .split("||")
+    .map((b) => b.trim())
+    .filter(Boolean);
+}
+
+/**
+ * How many bubbles of the LAST message are on screen yet.
+ *
+ * A turn is split on `||` into one to three bubbles and they all painted in
+ * the same frame, which is not how anyone sends three messages — it is the
+ * single loudest "this is a machine" cue left in the transcript, because a
+ * person's second bubble always trails their first. Only the newest message
+ * staggers: replaying the stagger for the whole history on every render would
+ * re-animate the transcript each time a message arrived.
+ *
+ * Own messages never stagger. The participant pressed Send once and knows what
+ * they wrote; drip-feeding it back would read as lag, not as typing.
+ */
+function useBubbleReveal(
+  lastId: string | undefined,
+  bubbleLengths: readonly number[],
+  enabled: boolean,
+): number {
+  const bubbleCount = bubbleLengths.length;
+  // Keyed by message id rather than stored as a bare count: the reveal state
+  // belongs to ONE message, so a new message must not inherit the previous
+  // one's progress. Deriving it during render (rather than resetting it from
+  // an effect) is also what keeps a fresh turn from painting whole for a frame
+  // before snapping back to one bubble.
+  const [progress, setProgress] = useState<{ id?: string; shown: number }>({
+    id: lastId,
+    shown: 1,
+  });
+
+  useEffect(() => {
+    if (!enabled || bubbleCount <= 1) return;
+    let cancelled = false;
+    const timers: number[] = [];
+    let elapsed = 0;
+    for (let i = 1; i < bubbleCount; i += 1) {
+      elapsed += bubbleDelayMs(bubbleLengths[i]);
+      timers.push(
+        window.setTimeout(() => {
+          if (cancelled) return;
+          setProgress((p) =>
+            p.id === lastId && p.shown >= i + 1
+              ? p
+              : { id: lastId, shown: i + 1 },
+          );
+        }, elapsed),
+      );
+    }
+    return () => {
+      cancelled = true;
+      timers.forEach((t) => window.clearTimeout(t));
+    };
+    // `bubbleLengths` is derived from the message `lastId` names, so the id
+    // and the count pin it; listing the array itself would restart the
+    // stagger every render, since it is rebuilt each time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastId, enabled, bubbleCount]);
+
+  if (!enabled) return bubbleCount;
+  // A message the timers have not spoken for yet shows its first bubble only.
+  return progress.id === lastId ? progress.shown : 1;
+}
+
 export function Transcript({
   messages,
   pending,
+  pendingSpeaker = "counterpart",
   emptyHint,
   flow,
   endRef: externalEndRef,
 }: {
   messages: DisplayMessage[];
   pending?: boolean;
+  /**
+   * WHO the pending indicator represents. It defaults to the ostensible human
+   * counterpart because that is the case where getting it wrong costs the
+   * most: the indicator was hardcoded to a 🤖 avatar and the word "Replying",
+   * so in the Direct arm a participant who must believe they are talking to
+   * another Prolific worker watched a ROBOT think before every reply. That is
+   * the deception failing on the one screen it has to hold (design "Things the
+   * participant must never learn mid-study" #1), and no unit test reads an
+   * emoji. A person gets "typing…"; a proxy is openly an AI and gets its own
+   * label.
+   */
+  pendingSpeaker?: Speaker;
   emptyHint?: string;
   flow?: boolean;
   endRef?: React.Ref<HTMLDivElement>;
 }) {
   const ownEndRef = useRef<HTMLDivElement>(null);
 
+  // The newest message, and whether it is one that should arrive bubble by
+  // bubble. `flow` is the review screen's static replay of a finished
+  // transcript, so nothing staggers there.
+  const last = messages[messages.length - 1];
+  const lastBubbles = splitBubbles(last?.text ?? "");
+  const staggerLast =
+    !flow &&
+    last !== undefined &&
+    last.speaker !== "participant" &&
+    last.speaker !== "system" &&
+    lastBubbles.length > 1;
+  const shownOfLast = useBubbleReveal(
+    last?.id,
+    lastBubbles.map((b) => b.length),
+    staggerLast,
+  );
+
   useEffect(() => {
     if (flow) return;
     ownEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length, pending, flow]);
+  }, [messages.length, pending, flow, shownOfLast]);
 
   return (
     <div
@@ -174,16 +278,12 @@ export function Transcript({
           );
         }
 
-        // "||" marks bubble breaks (Design §12 P1): one turn arrives as one
-        // to three short bubbles, the way a person actually types in a work
-        // chat. Rendering the marker literally was a tell in itself — no
-        // human sends "||" — so the turn is split here, one bubble per
-        // segment under a single speaker header, with a short stagger so
-        // later bubbles land the way follow-up messages do.
-        const bubbles = m.text
-          .split("||")
-          .map((b) => b.trim())
-          .filter(Boolean);
+        // One bubble per segment under a single speaker header. The newest
+        // incoming turn reveals them one at a time (see `useBubbleReveal`);
+        // everything already in the history is whole.
+        const all = splitBubbles(m.text);
+        const bubbles =
+          staggerLast && m.id === last?.id ? all.slice(0, shownOfLast) : all;
 
         return (
           <div
@@ -222,23 +322,42 @@ export function Transcript({
         );
       })}
 
-      {pending ? (
-        <div className="flex items-start gap-2 pt-1">
-          <span className="text-xs mt-1">🤖</span>
-          <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-4 py-3 shadow-2xs">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="text-xs font-medium text-[var(--ink-3)] mr-1">Replying</span>
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="h-2 w-2 animate-bounce rounded-full bg-[var(--accent)]"
-                  style={{ animationDelay: `${i * 0.15}s` }}
-                />
-              ))}
-            </span>
-          </div>
-        </div>
-      ) : null}
+      {pending
+        ? (() => {
+            const p = SPEAKER_CONFIG[pendingSpeaker] ?? SPEAKER_CONFIG.counterpart;
+            // A person is "typing"; a proxy is not pretending to be one, so it
+            // gets the neutral word. The verb is the whole tell.
+            const verb =
+              pendingSpeaker === "participant_proxy" ||
+              pendingSpeaker === "counterpart_proxy"
+                ? "working"
+                : "typing";
+            return (
+              <div className="flex flex-col items-start gap-1">
+                <div className="flex items-center gap-1.5 px-1">
+                  <span className="text-xs">{p.avatar}</span>
+                  <span className="text-xs font-bold text-[var(--ink-3)]">
+                    {p.label}
+                  </span>
+                </div>
+                <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-4 py-3 shadow-2xs">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-[var(--ink-3)] mr-1">
+                      {verb}
+                    </span>
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="h-2 w-2 animate-bounce rounded-full bg-[var(--accent)]"
+                        style={{ animationDelay: `${i * 0.15}s` }}
+                      />
+                    ))}
+                  </span>
+                </div>
+              </div>
+            );
+          })()
+        : null}
 
       <div ref={ownEndRef} />
       <div ref={externalEndRef} />

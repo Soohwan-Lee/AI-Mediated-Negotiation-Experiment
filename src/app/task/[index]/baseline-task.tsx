@@ -49,7 +49,7 @@ import {
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
-import { counterpartDelayMs, nextHref } from "@/lib/study-config";
+import { awaitCounterpartDelay, nextHref } from "@/lib/study-config";
 import { cardOfLayer, getTask, requirementIssue } from "@/lib/tasks";
 import type { Package, Role, TaskId } from "@/lib/types";
 import { ReviewPhase } from "./review";
@@ -486,6 +486,10 @@ export function BaselineTask({
     }
 
     setPending(true);
+    // The reply budget is counted from HERE, not from when the text came
+    // back, so generation time is spent out of the delay rather than added to
+    // it — and so mockup mode waits the same as a live run.
+    const turnStartedAt = Date.now();
     try {
       let reply: string;
       let counterProposal: Package | null = null;
@@ -522,7 +526,6 @@ export function BaselineTask({
             (m) => m.stage === 6 && m.speaker === "counterpart",
           );
         reply = scripted?.text ?? "";
-        await new Promise((r) => setTimeout(r, 400));
       } else {
         const res = await fetch("/api/counterpart", {
           method: "POST",
@@ -566,13 +569,15 @@ export function BaselineTask({
         // Direct` for a case that is supposed to be impossible.
         counterProposal = decision.proposal;
 
-        // The reply is delayed in proportion to its own length and jittered,
-        // so the exchange does not answer a one-line question and a full
-        // counterpackage in the same beat.
-        await new Promise((r) =>
-          setTimeout(r, counterpartDelayMs(reply.length)),
-        );
       }
+
+      // The reply is delayed in proportion to its own length and jittered, so
+      // the exchange does not answer a one-line question and a full
+      // counterpackage in the same beat. Applied to BOTH branches from one
+      // place: it used to sit inside the live branch only, which left mockup
+      // mode — the default off-production, and so the thing anyone walking a
+      // preview actually sees — answering in 400ms.
+      await awaitCounterpartDelay(reply.length, turnStartedAt);
 
       // The visible package card follows the counterproposal, so "accept the
       // package on the table" always names what the button actually sends.

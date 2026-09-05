@@ -265,6 +265,52 @@ export function pauseMs(range: { minMs: number; maxMs: number }): number {
 }
 
 /**
+ * Wait out a counterpart's reply delay, counting time ALREADY SPENT.
+ *
+ * Two things this fixes, and both were making the exchange read wrong.
+ *
+ * ONE: the live path awaited the full `counterpartDelayMs` AFTER the model
+ * call returned, so the participant actually waited the delay PLUS ~7.5s of
+ * generation. The delay is a realism budget, not a penalty to add on top of
+ * one — a reply that took 7.5s to produce has already spent 7.5s of the time
+ * a person would have spent typing it.
+ *
+ * TWO: mockup mode skipped the budget entirely and used a flat 400-500ms, so
+ * the counterpart answered a full counterpackage in half a second. That is
+ * the "chat is far too fast" a walkthrough sees, and it is also the state the
+ * DEPLOYED preview runs in, since `mockAi` is on by default off-production.
+ *
+ * Passing `startedAt` makes the wall-clock gap the same whether the text came
+ * from a live model or a script.
+ */
+export async function awaitCounterpartDelay(
+  messageLength: number,
+  startedAt?: number,
+): Promise<void> {
+  const budget = counterpartDelayMs(messageLength);
+  const spent = startedAt === undefined ? 0 : Date.now() - startedAt;
+  const remaining = Math.max(0, budget - spent);
+  if (remaining > 0) {
+    await new Promise((r) => setTimeout(r, remaining));
+  }
+}
+
+/**
+ * How long one bubble of a multi-bubble turn waits before it appears.
+ *
+ * A turn is split on `||` into one to three bubbles, and they all landed in
+ * the same frame — which is not how anyone sends three messages. The delay is
+ * proportional to the bubble's own length so a three-word follow-up lands fast
+ * and a long one does not, and it is capped so a turn never outstays the
+ * reply budget it was already given.
+ */
+export function bubbleDelayMs(bubbleLength: number): number {
+  const ms = 350 + bubbleLength * 22;
+  const jitter = 0.85 + Math.random() * 0.3;
+  return Math.round(Math.min(ms * jitter, 2600));
+}
+
+/**
  * Ordered page flow. `href` values map 1:1 to routes under src/app.
  *
  * THE SHAPE CHANGED IN ver.2.4. The questionnaire and the reward decision used

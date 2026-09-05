@@ -525,9 +525,12 @@ export function ProxyTask({
       let playedCount = 0;
       for (let i = 0; i < scripted.length; i += 1) {
         if (stopped.current) break;
-        // Short in mockup mode: the point is to read the flow, and a real
-        // 8-12 second gap times ten would make that unusable.
-        await new Promise((r) => setTimeout(r, 400));
+        // Shortened in mockup mode: the point there is to read the flow, and
+        // a real 8-12 second gap times ten would make that unusable. But 400ms
+        // was too short to READ, which defeats the same purpose from the other
+        // side — the messages stacked faster than the eye follows. ~2s is the
+        // compromise: fast enough to walk the flow, slow enough to watch it.
+        await new Promise((r) => setTimeout(r, 1700 + Math.random() * 800));
         setTranscript(
           scripted.slice(0, i + 1).map((m) => ({
             id: m.id,
@@ -1102,6 +1105,14 @@ export function ProxyTask({
               <Transcript
                 messages={transcript}
                 pending={!showStopped && progress.done < progress.total}
+                // Whichever proxy has NOT just spoken is the one being waited
+                // on. Both are openly AI, so neither is shown as "typing".
+                pendingSpeaker={
+                  transcript[transcript.length - 1]?.speaker ===
+                  "participant_proxy"
+                    ? "counterpart_proxy"
+                    : "participant_proxy"
+                }
                 emptyHint="The two AI Proxies are initiating negotiations…"
               />
             </Card>

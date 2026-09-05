@@ -69,7 +69,7 @@ import { useParticipant } from "@/lib/participant-context";
 import {
   NEGOTIATION,
   STAGE_MINUTES,
-  counterpartDelayMs,
+  awaitCounterpartDelay,
   pauseMs,
 } from "@/lib/study-config";
 import { getStore } from "@/lib/store";
@@ -993,6 +993,9 @@ export function DirectNegotiation({
     }
 
     setPending(true);
+    // Counted from here so generation time comes OUT of the reply budget
+    // rather than being added on top of it.
+    const turnStartedAt = Date.now();
     try {
       const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
       const mentioned = numbersEver || mentionsScoreNumbers(text);
@@ -1014,7 +1017,6 @@ export function DirectNegotiation({
         reply = decision.accepts
           ? DIRECT_MOCK_REPLIES[1]
           : DIRECT_MOCK_REPLIES[Math.min(replies, DIRECT_MOCK_REPLIES.length - 1)];
-        await new Promise((r) => setTimeout(r, 500));
       } else {
         const res = await fetch("/api/counterpart", {
           method: "POST",
@@ -1046,8 +1048,13 @@ export function DirectNegotiation({
           proposal?: Package | null;
         };
         reply = data.message ?? "sorry — could you say that again?";
-        await new Promise((r) => setTimeout(r, counterpartDelayMs(reply.length)));
       }
+
+      // One delay for both branches, counting the generation time already
+      // spent. Same fix and same reason as the Direct arm: the budget used to
+      // apply only to the live branch, so mockup mode replied in 500ms, and it
+      // was ADDED to the model's own latency rather than absorbing it.
+      await awaitCounterpartDelay(reply.length, turnStartedAt);
 
       // THE VISIBLE CARD FOLLOWS THE COUNTERPROPOSAL, and this is not
       // cosmetic. `offer` is the "Current Negotiation Package" chip card;
@@ -1428,7 +1435,10 @@ export function RehearsalChat({
     setError(null);
 
     if (mockAi) {
-      await new Promise((r) => setTimeout(r, 500));
+      // The participant's OWN proxy, which is openly an AI — so this one does
+      // not need a human's typing rhythm, only enough of a beat that the
+      // answer does not appear in the same frame as the question.
+      await new Promise((r) => setTimeout(r, 1400 + Math.random() * 900));
       const reply: DisplayMessage = {
         id: `r-proxy-${history.length}`,
         speaker: "participant_proxy",
@@ -1518,6 +1528,8 @@ export function RehearsalChat({
             <Transcript
               messages={messages}
               pending={pending}
+              // The participant's own proxy, not the counterpart.
+              pendingSpeaker="participant_proxy"
               emptyHint="Ask a question below, e.g. &ldquo;What will you open with?&rdquo; or &ldquo;How will you defend my main priority?&rdquo;"
             />
             <MessageComposer
