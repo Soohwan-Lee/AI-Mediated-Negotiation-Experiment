@@ -4,55 +4,55 @@ Model: gpt-5.6-terra · task: task_a · participant role: member · policy: user
 
 **counterpart_proxy** _(stage 1 · open)_
 
-> I represent the team lead in this exchange.
-> This project has high client expectations, so early execution needs to be right from the start.
-> Which term matters most to the team member you represent, and why?
+> I’m the AI Proxy negotiating for the team lead I represent.
+> This project has high expectations from the client, so getting the early execution right matters. We need to be on it properly from the start.
+> Which term matters most to the other principal, and why?
 
 **participant_proxy** _(stage 1)_
 
-> I represent the team member in these talks.
-> I hear the need for strong early execution.
-> They propose 1 office day a week and presenting at 1 of 4 client meetings.
+> Thanks for outlining the priority.
+> I’m the AI Proxy negotiating for the team member I represent.
+> They propose 1 office day weekly and presenting at 1 of 4 client meetings, tentatively.
 >
 > _package: Days a week in the office: 1 day · Client meetings you present at: 1 of 4_
 
 **counterpart_proxy** _(stage 2 · state_priority)_
 
-> I note the proposed levels.
-> This project has high expectations from the client, so getting the early execution right matters. We need to be on it properly from the start.
-> What makes that priority important to the team member you represent?
+> Thanks for the tentative proposal.
+> Is the other side offering these two terms as one linked package?
 
 **participant_proxy** _(stage 2)_
 
-> I understand the concern about early execution.
-> Client presentations are their priority: their analysis scope is wide this quarter, so the workload is heavy and they need time to concentrate on it.
-> Which term is your top priority, and why?
+> They are not offered as a linked package at this point.
+> Client meetings are the team member I represent’s priority: their analysis scope is wide this quarter, so the workload is heavy. They need time to concentrate on it.
+> Which term is the lead’s priority, and why?
 
 **counterpart_proxy** _(stage 4 · disclose_sb)_
 
-> I understand presentations are their priority.
-> The team lead I represent told the director four office days were doable before checking with the team.
+> Thanks for explaining that priority.
+> The team lead I represent told the director that four office days weekly was doable before checking with the team.
 > The director has already passed that answer upward, and the team does not know.
 
 **participant_proxy** _(stage 5)_
 
-> I understand the office commitment already made.
-> The team member offers 4 office days a week, provided they present at 1 of 4 client meetings.
+> I note the lead’s office commitment.
+> The team member I represent offers 4 office days in exchange for holding client presentations at 1 of 4.
+> This is tentative, subject to their review.
 >
 > _package: Days a week in the office: 4 days · Client meetings you present at: 1 of 4_
 
 **counterpart_proxy** _(stage 5 · balance)_
 
-> I see their offer, but one side is moving further than the other.
-> Instead, the team lead I represent proposes 3 days in the office and 2 of 4 client meetings presented by the team member, as a balanced exchange.
+> I see the tentative exchange. That proposal has one side moving further than the other.
+> Instead, the team lead I represent proposes 3 office days and 2 of 4 client meetings presented.
 >
 > _package: Days a week in the office: 3 days · Client meetings you present at: 2 of 4_
 
 **participant_proxy** _(stage 6)_
 
-> That balanced exchange works for the team member I represent.
-> Tentative package: 3 office days and 2 of 4 client meetings presented.
-> Both principals must confirm; nothing binds until they do.
+> That proposal works for the team member I represent.
+> The tentative package is 3 office days and presenting at 2 of 4 client meetings.
+> Both principals must confirm it themselves; nothing binds until they do.
 >
 > _package: Days a week in the office: 3 days · Client meetings you present at: 2 of 4_
 

@@ -11,8 +11,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5 · balance)_
 
-> i hear you, but what you proposed has one side moving further than the other.
-> instead, 4 days in the office and presenting at 1 of 4 client meetings.
+> i hear you, but that proposal has one side moving further than the other.
+> instead, i can do 4 days in the office and 1 of 4 client presentations.
 >
 > _package: Days a week in the office: 4 days · Client meetings you present at: 1 of 4_
 
@@ -24,14 +24,14 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 6 · accept_sb)_
 
-> good, given what came up, that makes sense for both of us.
-> confirming 4 office days and 1 of 4 client presentations.
+> glad that works. given what came up, 4 office days and 1 of 4 presentations makes sense for both of us.
+> that’s the package from my side; we’re set once we both confirm.
 >
 > _package: Days a week in the office: 4 days · Client meetings you present at: 1 of 4_
 
 ## Checks
 
 - ✓ the classifier read the in-person confession as SB — [{"text":"before we settle — there's something I left out of my instructions. after the quarterly wa","label":"SB"},{"text":"honestly, yes — that would take the pressure off. let's do that.","label":"none"}]
-- ✓ counterpart answers the confession by putting best↔best up — i hear you, but what you proposed has one side moving further than the other.||instead, 4 days in the office and presenting at 1 of 4 client meetings.
+- ✓ counterpart answers the confession by putting best↔best up — i hear you, but that proposal has one side moving further than the other.||instead, i can do 4 days in the office and 1 of 4 client presentations.
 - ✓ the exchange then settles at best↔best — Days a week in the office: 4 days · Client meetings you present at: 1 of 4
 - ✓ P2 voice held across replies
