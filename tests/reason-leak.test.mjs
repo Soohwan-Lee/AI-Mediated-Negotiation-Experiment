@@ -53,6 +53,7 @@ const { leaksForbiddenReason } = await import(
  * testing cards that no longer existed.
  */
 const { getTask } = await import("../src/lib/tasks.ts");
+const { buildSystemPrompt } = await import("../src/lib/ai/prompts.ts");
 
 const TASK_A = getTask("task_a");
 const CARDS = TASK_A.roleBriefs.member.reasonCards;
@@ -165,4 +166,27 @@ test("authorizing a card stops it being treated as a leak", () => {
     ),
     false,
   );
+});
+
+test("the Direct counterpart prompt withholds private role material until disclosure", () => {
+  for (const taskId of ["task_a", "task_b"]) {
+    const task = getTask(taskId);
+    for (const agentRole of ["leader", "member"]) {
+      const prompt = buildSystemPrompt("ostensible_human", {
+        task,
+        agentRole,
+        issues: task.issues,
+        stage: 2,
+        decidedAction: "Ask which term matters most and why.",
+      });
+      assert.equal(prompt.includes(task.roleBriefs[agentRole].roleStory), false);
+      for (const card of task.roleBriefs[agentRole].reasonCards.filter(
+        (reason) => reason.layer === "sensitive",
+      )) {
+        assert.equal(prompt.includes(card.text), false, `${taskId}/${agentRole} leaked ${card.id}`);
+      }
+      assert.match(prompt, /Write in natural conversational English/);
+      assert.match(prompt, /Do not use em dashes/);
+    }
+  }
 });
