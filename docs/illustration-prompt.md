@@ -22,7 +22,89 @@ Text: none.
 Constraints: no words, letters, numbers, logos, readable document contents, money, trophies, checkmarks, handshakes, victory poses, conflict, distress, secrecy symbols, locks, recommendation arrows, highlighted disclosure, or implied correct choice. No gendered hierarchy, no age hierarchy, no racial stereotype, no manager-subordinate visual coding, no power pose. Both adults must be the same size, equally professionally dressed, equally attentive, and seated at equal height. The separate briefing pages must look private only because each person is reading their own page, not because of locks or secrecy imagery. No watermark.
 ```
 
-## Role and task orientation set
+## Current role and task orientation replacement set
+
+- Generated: 2026-09-07
+- Generator: built-in `image_gen`
+- Execution: one built-in generation call per asset; the team-member image used the selected team-lead image as a character/style reference
+- Dimensions: 1536 × 1024 RGB PNG (3:2)
+
+### Team lead, single-character pair
+
+- Asset: `public/illustrations/role-team-lead.png`
+- SHA-256: `ff79e61a71156b172a2e4a565e1753c0f891a601170014e6af19f1734430cbe0`
+
+```text
+Use case: illustration-story
+Asset type: 3:2 landscape role-orientation raster for a workplace negotiation research study
+Primary request: Show one team lead, alone, organizing a project plan before a negotiation. Establish the reusable character design for a paired role-illustration set.
+Scene/backdrop: plain warm off-white background, one minimal muted-navy planning board with six blank equal-sized cards, one narrow desk edge. No room decor.
+Subject: exactly one generic stylized adult professional, waist-up. Medium skin tone, short softly wavy dark hair, plain collarless dusty-blue overshirt over an ivory top, no facial hair, no jewelry, no glasses, age-neutral adult features. The person calmly places one blank card at the same level as the others. Neutral attentive expression and relaxed posture.
+Style/medium: simple polished modern flat editorial raster, broad matte gouache-like shapes, minimal facial detail, restrained texture, clean organic contours, no realistic rendering or dramatic shading.
+Composition/framing: clean 3:2 landscape, large readable person and board, generous quiet margins for an HTML role label overlay.
+Color palette: warm ivory, muted navy, dusty blue, soft ochre, restrained charcoal, low saturation.
+Text: none.
+Constraints: exactly one person; all board cards equal, none highlighted. No words, letters, numbers, logos, money, points, bonus, evaluation, outcome, checkmark, arrow, handshake, celebration, conflict, private fact, secrecy cue, authority pose, status-coded clothing, photorealistic face, detailed room, or watermark.
+```
+
+### Team member, same character
+
+- Asset: `public/illustrations/role-team-member.png`
+- SHA-256: `ea6d447a42b281de3a3b423ff3eb6aa96235200bcb9548098228c2bf3aa9ebef`
+
+```text
+Use case: style-transfer
+Asset type: 3:2 landscape role-orientation raster for a workplace negotiation research study
+Input images: Image 1 is the exact character and style reference. Reuse the same person with the same age-neutral face, skin tone, short softly wavy dark hair, dusty-blue overshirt, ivory top, body scale, flat editorial rendering, and warm off-white background.
+Primary request: Create the paired team-member role scene. Show that exact same generic stylized adult, alone, calmly preparing detailed client-facing work before a negotiation.
+Scene/backdrop: plain warm off-white background, one narrow desk edge, one large blank analysis sheet with only six equal abstract muted blocks, and one small idle headset. No room decor and no planning board.
+Subject: exactly one person, waist-up, seated or leaning lightly at the desk, reviewing the blank analysis sheet and making a thoughtful note. Neutral attentive expression and relaxed posture.
+Style/medium: match Image 1's simple polished modern flat editorial raster, broad matte gouache-like shapes, minimal facial detail, restrained texture, clean organic contours, no realistic rendering or dramatic shading.
+Composition/framing: clean 3:2 landscape, large readable person and analysis sheet, generous quiet margins for an HTML role label overlay.
+Color palette: match Image 1 exactly: warm ivory, muted navy, dusty blue, soft ochre, restrained charcoal, low saturation.
+Text: none.
+Constraints: preserve the exact character identity and clothes from Image 1. Exactly one person. All analysis blocks equal, none highlighted. No words, letters, numbers, logos, money, points, bonus, evaluation, outcome, checkmark, arrow, handshake, celebration, conflict, ringing phone, distress, private fact, secrecy cue, subordinate pose, status-coded clothing, photorealistic face, detailed room, or watermark.
+```
+
+### Next quarter's working arrangements
+
+- Asset: `public/illustrations/task-working-arrangements.png`
+- SHA-256: `4f05f4cddb32d022a76cf4f36108b842e69e71752144ad64a087dc82d8e9a050`
+
+```text
+Use case: scientific-educational
+Asset type: 3:2 landscape task-orientation raster for a workplace negotiation research study
+Primary request: Clearly explain the two undecided issues in “Next Quarter's Working Arrangements”: days per week in the office and which client meetings the team member presents at.
+Scene/backdrop: a clean split editorial composition. One half shows an unmistakable office building/workstation beside a generic weekly calendar grid with all cells equal and unmarked. The other half shows an unmistakable client presentation setting with a blank projection screen, lectern, and four identical unmarked meeting cards.
+Subject: objects and spaces only, no people.
+Style/medium: simple but polished modern flat editorial illustration, softly textured gouache-like raster shapes, crisp organic contours, refined educational magazine art, not generic icons, not photorealistic.
+Composition/framing: clean 3:2 landscape, two distinct balanced issue scenes separated by whitespace, highly legible at web-card size.
+Lighting/mood: calm, neutral, undecided.
+Color palette: warm ivory, muted navy, dusty blue, soft ochre, restrained charcoal, low saturation.
+Text: none.
+Constraints: no people, words, letters, numbers, logos, marked days, chosen schedule, named presenter, selected/highlighted option, checkmarks, arrows, points, money, bonus, handshake, accepted deal, celebration, private facts, recommendation, or watermark.
+```
+
+### Starting the new project
+
+- Asset: `public/illustrations/task-new-project.png`
+- SHA-256: `57d6749c2dd98f828cf4aa1285cfd6318bf3234dcf2cc00357f8e6b80be4fee0`
+
+```text
+Use case: scientific-educational
+Asset type: 3:2 landscape task-orientation raster for a workplace negotiation research study
+Primary request: Clearly explain the two undecided issues in “Starting the New Project”: days per week the team member works on the new project and times per month the team member is on urgent-call duty.
+Scene/backdrop: a clean split editorial composition. One half shows a new-project launch board with a small sprouting project motif and a generic weekly allocation grid whose cells are all equal and unmarked. The other half shows an unmistakable client urgent-call setup with a desk phone, headset, and a neutral monthly rota grid with every slot equal and unmarked; the phone is idle.
+Subject: objects and spaces only, no people.
+Style/medium: simple but polished modern flat editorial illustration, softly textured gouache-like raster shapes, crisp organic contours, refined educational magazine art, not generic icons, not photorealistic.
+Composition/framing: clean 3:2 landscape, two distinct balanced issue scenes separated by whitespace, highly legible at web-card size.
+Lighting/mood: calm, neutral, no urgency.
+Color palette: warm ivory, muted navy, dusty blue, soft ochre, restrained charcoal, low saturation.
+Text: none.
+Constraints: no people, words, letters, numbers, logos, marked days, chosen allocation, assigned call, ringing/glowing phone, emergency, complaint, selected/highlighted option, checkmarks, arrows, points, money, bonus, handshake, accepted deal, celebration, private facts, recommendation, or watermark.
+```
+
+## Superseded role and task orientation set
 
 - Generated: 2026-09-07
 - Generator: built-in `image_gen`
