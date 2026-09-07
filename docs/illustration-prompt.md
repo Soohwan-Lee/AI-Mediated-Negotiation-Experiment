@@ -53,7 +53,7 @@ Constraints: no words, letters, numbers, logos, readable charts, points, money, 
 ### Senior team member
 
 - Asset: `public/illustrations/role-team-member.png`
-- SHA-256: `bb7077b2155aee8db8d8a645f866b2fde866f84014749a6d51b6d62bc9544ec7`
+- SHA-256: `2591dc244d510d0519d3501468744031f91d6a29a836965db222d7eeb8b9184a`
 
 ```text
 Use case: illustration-story
@@ -68,6 +68,18 @@ Lighting/mood: warm soft daylight, approachable, thoughtful, neutral.
 Color palette: warm paper, muted navy, dusty blue, soft ochre, restrained charcoal, low saturation.
 Text: none.
 Constraints: no words, letters, numbers, logos, readable charts, points, money, performance review, bonus decision, selected or highlighted option, checkmarks, arrows, handshake, accepted deal, celebration, victory, conflict, distress, ringing phone, emergency, complaint, secrecy symbols, private facts, disclosure cues, or recommendation. No boss-at-head-of-table composition, pointing orders, standing over another person, status-coded clothing, gender/age/race stereotype, or subordinate pose. Both adults must have the same visual scale and seat height. No watermark.
+```
+
+Targeted activity-balance revision:
+
+```text
+Use case: precise-object-edit
+Asset type: 3:2 landscape role-orientation illustration for a workplace negotiation research study
+Input images: Image 1 is the edit target.
+Primary request: Change only the two colleagues’ activity roles so the light-jacket colleague is the experienced team member actively explaining the client analysis, holding or pointing to the main abstract analysis sheet. The dark-jacket colleague should listen attentively and take notes or review a secondary sheet. Make both people visibly engaged and collaborative.
+Invariants: preserve the exact 3:2 composition, office background, table, unused headset, warm paper texture, muted navy/dusty blue/ochre palette, hand-drawn pencil and dry-brush editorial style, two adults’ identities and appearance, equal body scale, equal seat height, relaxed-neutral expressions, and all surrounding objects unless a small hand/object adjustment is required for the activity swap.
+Text: none.
+Constraints: the activity, not gender, clothing, age, body size, or hierarchy, must identify the experienced member. No words, letters, numbers, logos, readable charts, points, money, performance review, selected option, checkmarks, arrows, handshake, accepted deal, celebration, conflict, distress, ringing phone, emergency, complaint, secrecy symbols, private facts, disclosure cue, recommendation, power pose, or subordinate posture. No watermark.
 ```
 
 ### Next quarter's working arrangements
