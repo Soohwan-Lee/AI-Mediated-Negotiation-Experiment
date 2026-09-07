@@ -41,8 +41,7 @@ these are the four things that still need doing.
    `online` event, or the next `settle`. An attempt budget was tried and is the
    wrong shape: once spent while the network was down it could never be
    unspent, so a failing item rotated to the back of the queue stopped every
-   later drain dead. `attempts` survives as diagnostics only, and is reset for a
-   queue restored from a previous session.
+   later drain dead. No per-item counter is kept at all.
 
    `settle()` logs and continues rather than throwing. Refusing to advance
    until the server answers turns a dropped connection into a dead end in the

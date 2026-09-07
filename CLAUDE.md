@@ -1583,6 +1583,12 @@ Nothing structural. What remains is values to fix and behaviour to observe:
   approve goes straight to review, modify keeps the package on the table,
   refuse clears it.
 
+- **A failed counterpart turn, retried, re-sends the participant's message.**
+  In both arms the message is appended, persisted and classified before the
+  fetch, so the catch restores the draft and a retry appends a second copy.
+  Same behaviour in Direct and in the Proxy closing, so it is not a condition
+  artefact; fix it in both at once or in neither.
+
 - Fixed vs. jittered counterpart delay · final IRB language (four deceptions
   now: the counterpart's existence, the bonus, the upward evaluation being
   forwarded, and the parting comment) · a pass over the item wording against

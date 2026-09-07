@@ -151,7 +151,7 @@ export class WriteQueue {
    * them. An earlier version retried the head item up to six times within a
    * single drain, sleeping up to thirty seconds between tries — ninety seconds
    * of a drain that `flush()` awaited, during which the study appeared frozen.
-   * Worse, the item was then rotated to the back still carrying six attempts,
+   * Worse, the item was then rotated to the back still carrying its spent budget,
    * so every later drain broke on it immediately and the queue never moved
    * again. Retries now come from the events that mean "conditions changed":
    * another `push`, coming back online, or the next `flush`.

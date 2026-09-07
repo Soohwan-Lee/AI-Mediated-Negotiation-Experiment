@@ -157,15 +157,15 @@ test("flush awaits an in-flight drain instead of resolving early", async () => {
   assert.equal(pendingWhenResolved, 0, "flush must see an empty queue");
 });
 
-test("a queue restored from a previous session is not refused", async () => {
-  // Simulate yesterday's tab dying with writes that had already failed several
-  // times. A retry budget carried across sessions is what made the queue
-  // permanently refuse to drain.
+test("a queue restored from a previous session still drains", async () => {
+  // Simulate yesterday's tab dying with writes still queued. A retry budget
+  // carried across sessions is what once made the queue permanently refuse to
+  // drain; there is no such counter now, so a restored queue simply drains.
   store.clear();
   store.set(
     "amne:writequeue",
     JSON.stringify([
-      { id: "old-1", op: "appendMessage", payload: { turn: 9 }, attempts: 6, queuedAt: "x" },
+      { id: "old-1", op: "appendMessage", payload: { turn: 9 }, queuedAt: "x" },
     ]),
   );
   globalThis.fetch = ok;

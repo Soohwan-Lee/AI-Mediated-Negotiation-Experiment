@@ -27,6 +27,7 @@ export const runtime = "nodejs";
 
 interface RequestBody {
   participantKey: string;
+  // Unused by the local stand-in; the Supabase RPC records it on the slot.
   prolificPid?: string | null;
 }
 
