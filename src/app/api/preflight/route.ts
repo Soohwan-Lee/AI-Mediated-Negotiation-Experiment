@@ -106,14 +106,11 @@ export async function GET(request: Request) {
         : "Completion code is set.",
     },
     {
-      name: "irb_protocol_set",
-      // Approval is granted; the NUMBER is what is still outstanding, and the
-      // consent form is a record, so it must be the real one before anyone
-      // signs it.
-      pass: !STUDY.irb.protocolNumber.startsWith("TBD"),
-      detail: STUDY.irb.protocolNumber.startsWith("TBD")
-        ? "IRB approval is recorded, but the protocol NUMBER is still a placeholder — set it from the approval letter before recruiting."
-        : "IRB protocol number is set.",
+      name: "irb_exemption_set",
+      pass: !STUDY.irb.exemptionNumber.startsWith("TBD"),
+      detail: STUDY.irb.exemptionNumber.startsWith("TBD")
+        ? "IRB exemption number is still a placeholder — set it from the exemption determination before recruiting."
+        : "IRB exemption number is set.",
     },
     {
       name: "timing_honest",

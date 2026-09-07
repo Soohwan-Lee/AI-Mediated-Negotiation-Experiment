@@ -17,12 +17,10 @@
  * everything else: what is collected, that stopping is free, and that some
  * details are withheld until the end.
  *
- * THE STUDY IS IRB-APPROVED (`STUDY.irb.approved`), so the screens state that
- * rather than showing a protocol number that is not yet filled in. The NUMBER
- * itself is still a placeholder and must be set from the approval letter
- * before recruiting — /api/preflight checks it. It is not invented in the
- * meantime: a consent form is a record, and a made-up number would misstate to
- * a participant which approval covers them.
+ * UNIST IRB DETERMINED THE STUDY EXEMPT. An exemption is not an approval, so
+ * the participant-facing copy says exactly that and shows the exemption number
+ * supplied by the IRB. /api/preflight checks that the number is not a
+ * placeholder before recruiting.
  */
 
 import { useRouter } from "next/navigation";
@@ -423,10 +421,8 @@ export default function ConsentPage() {
                 {STUDY.irb.institution} IRB
                 <br />
                 <span className="text-slate-600 font-medium">
-                  {STUDY.irb.approved
-                    ? "Reviewed and approved"
-                    : `Protocol #${STUDY.irb.protocolNumber}`}{" "}
-                  · {STUDY.irb.contactEmail}
+                  Determined exempt · Exemption #{STUDY.irb.exemptionNumber} ·{" "}
+                  {STUDY.irb.contactEmail}
                 </span>
               </dd>
             </div>

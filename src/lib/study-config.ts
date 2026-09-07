@@ -19,22 +19,15 @@ export const STUDY = {
   totalPaid: "9.50",
   irb: {
     /**
-     * APPROVED. The protocol NUMBER is still to be filled in from the approval
-     * letter, and it is left as a placeholder rather than invented, because a
-     * consent form is a record: a made-up number on it would misstate to a
-     * participant which approval covers them, and it is the one string here
-     * they might actually quote back to an IRB office.
-     *
-     * `approved` is what the copy keys off, so the screens can state that the
-     * study has been reviewed and approved — which is true — without printing
-     * a number that is not. Set `protocolNumber` before recruiting; the
-     * preflight route checks it.
+     * The UNIST IRB determined this study exempt. An exemption is not an IRB
+     * approval, so participant-facing copy must use that exact status rather
+     * than saying the study or its methodology was approved.
      */
-    approved: true,
-    protocolNumber: "TBD-IRB-0000",
+    reviewStatus: "exempt",
+    exemptionNumber: "UNISTIRB-26-073 -C",
     institution: "UNIST",
     principalInvestigator: "[PI Name]",
-    /** IRB office address — TBD, must be the approved one before recruitment. */
+    /** IRB office address — TBD, must be the official one before recruitment. */
     contactEmail: "[irb-contact@unist.ac.kr]",
     researcherEmail: "soohwanlee@unist.ac.kr",
   },

@@ -71,7 +71,7 @@ export default function DebriefingPage() {
         <div className="mb-6">
           <Callout title="⚠️ Important: Please Read Carefully" tone="warning">
             <p className="text-xs sm:text-sm leading-relaxed text-amber-950">
-              Some elements of this study were not disclosed in full detail prior to the tasks in order to investigate genuine interpersonal dynamics. This methodology was approved by our Institutional Review Board. Everything is explained below.
+              Some elements of this study were not disclosed in full detail prior to the tasks in order to investigate genuine interpersonal dynamics. Our Institutional Review Board reviewed this study and determined it exempt. Everything is explained below.
             </p>
           </Callout>
         </div>
@@ -220,7 +220,7 @@ export default function DebriefingPage() {
               </h2>
             </div>
             <p className="text-xs sm:text-sm leading-relaxed text-slate-600">
-              Questions? Contact <span className="font-semibold text-slate-800">{STUDY.irb.researcherEmail}</span> or {STUDY.irb.institution} IRB at <span className="font-semibold text-slate-800">{STUDY.irb.contactEmail}</span>{STUDY.irb.approved ? "" : ` (Protocol #${STUDY.irb.protocolNumber})`}.
+              Questions? Contact <span className="font-semibold text-slate-800">{STUDY.irb.researcherEmail}</span> or {STUDY.irb.institution} IRB at <span className="font-semibold text-slate-800">{STUDY.irb.contactEmail}</span> (Exemption #{STUDY.irb.exemptionNumber}).
             </p>
           </Card>
         </div>

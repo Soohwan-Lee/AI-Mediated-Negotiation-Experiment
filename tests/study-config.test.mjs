@@ -19,6 +19,13 @@ import { NEGOTIATION } from "../src/lib/study-config.ts";
 
 const money = (s) => Number(s);
 
+test("IRB metadata records an exemption determination, not an approval", () => {
+  assert.equal(STUDY.irb.institution, "UNIST");
+  assert.equal(STUDY.irb.reviewStatus, "exempt");
+  assert.equal(STUDY.irb.exemptionNumber, "UNISTIRB-26-073 -C");
+  assert.ok(!STUDY.irb.exemptionNumber.startsWith("TBD"));
+});
+
 test("the advertised time does not undercut the flow's own budget", () => {
   assert.ok(
     timingIsHonest(),
