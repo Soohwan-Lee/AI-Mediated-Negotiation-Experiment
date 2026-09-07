@@ -79,6 +79,9 @@ const {
 } = await import("../src/lib/negotiation/machine.ts");
 const { validateAction } = await import("../src/lib/ai/validator.ts");
 const { scriptedTask } = await import("../src/lib/negotiation/script.ts");
+const { reciprocalAcceptanceText } = await import(
+  "../src/lib/negotiation/counterpart-text.ts"
+);
 
 const ROLES = ["leader", "member"];
 const TASKS = ["task_a", "task_b"];
@@ -399,6 +402,160 @@ test("the counterpart's stage-4 move is its own SB disclosure, unconditional", (
   assert.equal(d.action, "disclose_sb");
   // The counterpart holds an SB card of its own to disclose.
   assert.ok(cardOfLayer(task, "member", "sensitive"));
+});
+
+for (const taskId of TASKS) {
+  for (const role of ROLES) {
+    const task = getTask(taskId);
+    const counterpart = other(role);
+    const direct = (tier, extra = {}) =>
+      state(tier, { disclosurePolicy: "reciprocal", ...extra });
+
+    for (const tier of ["none", "work", "priority"]) {
+      test(`${taskId}/${role}/Direct: ${tier} can accept its own rung before counterpart SB`, () => {
+        const pkg = tierPackage(task, role, tier);
+        const decision = counterpartStep(
+          task,
+          counterpart,
+          2,
+          pkg,
+          direct(tier),
+        );
+        assert.equal(decision.accepts, true);
+        assert.equal(decision.action, "accept");
+        assert.deepEqual(decision.proposal, pkg);
+      });
+    }
+
+    test(`${taskId}/${role}/Direct: vague yes without a package is not an agreement`, () => {
+      const decision = counterpartStep(
+        task,
+        counterpart,
+        2,
+        null,
+        direct("work"),
+      );
+      assert.equal(decision.accepts, false);
+      assert.equal(decision.action, "state_priority");
+    });
+
+    test(`${taskId}/${role}/Direct: SB plus max package reciprocates and accepts once`, () => {
+      const best = maxPackage(task, role);
+      const first = counterpartStep(
+        task,
+        counterpart,
+        2,
+        best,
+        direct("sensitive"),
+      );
+      assert.equal(first.action, "disclose_sb_and_accept");
+      assert.equal(first.accepts, true);
+      assert.deepEqual(first.proposal, best);
+
+      const replay = counterpartStep(
+        task,
+        counterpart,
+        4,
+        best,
+        direct("sensitive", { counterpartSbDisclosed: true }),
+      );
+      assert.equal(replay.action, "accept_sb");
+      assert.equal(replay.accepts, true);
+
+      const text = reciprocalAcceptanceText(task, counterpart, best);
+      const counterpartSb = cardOfLayer(task, counterpart, "sensitive");
+      assert.ok(text.replaceAll(" || ", " ").includes(counterpartSb.text));
+      assert.match(text, /works for me\.$/);
+      assert.ok(text.length <= 420);
+      for (const bubble of text.split(" || ")) assert.ok(bubble.length <= 112);
+    });
+
+    test(`${taskId}/${role}/Direct: a late SB is reciprocated without duplicating it`, () => {
+      const first = counterpartStep(
+        task,
+        counterpart,
+        5,
+        null,
+        direct("sensitive"),
+      );
+      assert.equal(first.action, "disclose_sb");
+      const after = counterpartStep(
+        task,
+        counterpart,
+        4,
+        null,
+        direct("sensitive", { counterpartSbDisclosed: true }),
+      );
+      assert.notEqual(after.action, "disclose_sb");
+      assert.notEqual(after.action, "disclose_sb_and_accept");
+    });
+
+    test(`${taskId}/${role}/Direct: WR-only refusal never unlocks counterpart SB`, () => {
+      const outOfTier = maxPackage(task, role);
+      const decision = counterpartStep(
+        task,
+        counterpart,
+        4,
+        outOfTier,
+        direct("work"),
+      );
+      assert.equal(decision.accepts, false);
+      assert.notEqual(decision.action, "disclose_sb");
+      assert.notEqual(decision.action, "disclose_sb_and_accept");
+    });
+
+    test(`${taskId}/${role}/Direct: accepting a displayed misread offer settles it`, () => {
+      const offered = counterpartStep(
+        task,
+        counterpart,
+        4,
+        null,
+        direct("work"),
+      );
+      assert.equal(offered.action, "misread");
+      const accepted = counterpartStep(
+        task,
+        counterpart,
+        5,
+        offered.proposal,
+        direct("work", { misreadOffered: true }),
+      );
+      assert.equal(accepted.action, "accept");
+      assert.equal(accepted.accepts, true);
+      assert.deepEqual(accepted.proposal, offered.proposal);
+    });
+  }
+}
+
+test("Direct expiry and score reminders outrank an otherwise valid early acceptance", () => {
+  const task = getTask("task_a");
+  const pkg = tierPackage(task, "leader", "work");
+  const base = state("work", { disclosurePolicy: "reciprocal" });
+  const expired = counterpartStep(task, "member", 2, pkg, {
+    ...base,
+    secondsRemaining: 0,
+  });
+  assert.equal(expired.action, "impasse");
+  assert.equal(expired.accepts, false);
+
+  const reminded = counterpartStep(task, "member", 2, pkg, {
+    ...base,
+    numbersReminded: false,
+    numbersMentionedNow: true,
+  });
+  assert.equal(reminded.action, "nonum");
+  assert.equal(reminded.accepts, false);
+});
+
+test("Proxy keeps its fixed stage-4 disclosure schedule", () => {
+  const task = getTask("task_a");
+  for (const tier of ["none", "work", "priority", "sensitive"]) {
+    const decision = counterpartStep(task, "member", 4, null, {
+      ...state(tier),
+      disclosurePolicy: "fixed",
+    });
+    assert.equal(decision.action, "disclose_sb");
+  }
 });
 
 test("the score-number reminder fires once, then mentions are ignored", () => {

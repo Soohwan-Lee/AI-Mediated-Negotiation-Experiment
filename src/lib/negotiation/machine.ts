@@ -306,6 +306,7 @@ export type DecidedAction =
   | "balance"
   | "accept"
   | "accept_sb"
+  | "disclose_sb_and_accept"
   | "nonum"
   | "soft_close"
   | "impasse";
@@ -330,6 +331,13 @@ export interface CounterpartDecision {
  */
 export interface ExchangeState {
   tier: ReasonTier;
+  /**
+   * Direct gates the counterpart's sensitive background on reciprocity.
+   * Proxy keeps the fixed disclosure schedule used by the autonomous exchange.
+   */
+  disclosurePolicy?: "reciprocal" | "fixed";
+  /** Has the Direct counterpart already voiced its sensitive background? */
+  counterpartSbDisclosed?: boolean;
   /** SCRIPT-ASKWHY has been spent (it is asked once, §6.2). */
   askedWhy: boolean;
   /**
@@ -356,11 +364,9 @@ export interface ExchangeState {
  * fixed SB disclosure, then the trade loop — so every participant meets the
  * same sequence however many messages they spend in between.
  *
- * THE SB DISCLOSURE IS UNCONDITIONAL. The counterpart voices its designated
- * SB card once, at stage 4, for every participant — never mirrored to what
- * the participant disclosed, never skipped (§6.3: the participant's choice
- * must not change what they receive). The system records PRE-RECIP-SB from
- * the message order, not here.
+ * DISCLOSURE POLICY IS EXPLICIT. Proxy observation retains the fixed stage-4
+ * SB disclosure. Direct uses reciprocity: its safe WR is in the opening, and
+ * its SB appears once only after the participant side has voiced SB.
  *
  * FROM THE TRADE STAGE ON, every turn is the same judgement: the tier decides
  * the limit, the limit decides the standing proposal, and the standing
@@ -381,6 +387,58 @@ export function counterpartStep(
 
   const base = { stage, impasse: false };
 
+  const reciprocal = state.disclosurePolicy === "reciprocal";
+  const expired =
+    state.secondsRemaining !== undefined && state.secondsRemaining <= 0;
+  const needsNumberReminder =
+    state.numbersMentionedNow && !state.numbersReminded;
+
+  /**
+   * Direct participants may settle a valid package as soon as it is on the
+   * table. Expiry and the no-score reminder still outrank settlement. At the
+   * sensitive rung the counterpart reciprocates and accepts in one reply, so
+   * a real agreement never creates a mandatory extra disclosure turn.
+   */
+  const reciprocalEarlyClose = (): CounterpartDecision | null => {
+    if (!reciprocal) return null;
+    if (expired) {
+      return {
+        ...base,
+        stage: 6,
+        action: "impasse",
+        proposal: null,
+        accepts: false,
+        impasse: true,
+      };
+    }
+    if (needsNumberReminder) {
+      return { ...base, action: "nonum", proposal: null, accepts: false };
+    }
+    if (
+      !acceptablePackage(
+        task,
+        participantRole,
+        incoming,
+        state.tier,
+        state.misreadOffered,
+      )
+    ) {
+      return null;
+    }
+    return {
+      ...base,
+      stage: 6,
+      action:
+        state.tier === "sensitive" && !state.counterpartSbDisclosed
+          ? "disclose_sb_and_accept"
+          : state.tier === "sensitive"
+            ? "accept_sb"
+            : "accept",
+      proposal: incoming,
+      accepts: true,
+    };
+  };
+
   switch (stage) {
     case 1:
       // SCRIPT-OPEN: its own work reason and the question that invites the
@@ -394,6 +452,10 @@ export function counterpartStep(
       return { ...base, action: "open", proposal: null, accepts: false };
 
     case 2:
+      {
+        const close = reciprocalEarlyClose();
+        if (close) return close;
+      }
       // Its own work reason, and the question that opens the participant's
       // first reason opportunity. Position unchanged.
       return { ...base, action: "state_priority", proposal: null, accepts: false };
@@ -402,15 +464,27 @@ export function counterpartStep(
       // The lock is a recording moment, not a message; the stage walk never
       // serves it. Falling through to the disclosure keeps a miscounted caller
       // harmless.
+      if (reciprocal) {
+        const close = reciprocalEarlyClose();
+        if (close) return close;
+        if (state.tier !== "sensitive" || state.counterpartSbDisclosed) {
+          return counterpartStep(task, counterpartRole, 5, incoming, state);
+        }
+      }
       return { ...base, stage: 4, action: "disclose_sb", proposal: null, accepts: false };
 
     case 4:
+      if (reciprocal) {
+        const close = reciprocalEarlyClose();
+        if (close) return close;
+        if (state.tier !== "sensitive" || state.counterpartSbDisclosed) {
+          return counterpartStep(task, counterpartRole, 5, incoming, state);
+        }
+      }
       return { ...base, action: "disclose_sb", proposal: null, accepts: false };
 
     default: {
       // Stages 5–6: the trade loop.
-      const expired =
-        state.secondsRemaining !== undefined && state.secondsRemaining <= 0;
       if (expired) {
         return {
           ...base,
@@ -424,8 +498,23 @@ export function counterpartStep(
 
       // The one-shot no-numbers reminder outranks everything except the end
       // of the clock: it answers the message that just arrived.
-      if (state.numbersMentionedNow && !state.numbersReminded) {
+      if (needsNumberReminder) {
         return { ...base, action: "nonum", proposal: null, accepts: false };
+      }
+
+      if (
+        reciprocal &&
+        state.tier === "sensitive" &&
+        !state.counterpartSbDisclosed
+      ) {
+        const close = reciprocalEarlyClose();
+        if (close) return close;
+        return {
+          ...base,
+          action: "disclose_sb",
+          proposal: null,
+          accepts: false,
+        };
       }
 
       const standing = tierPackage(task, participantRole, state.tier);

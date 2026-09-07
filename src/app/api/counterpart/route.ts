@@ -18,12 +18,14 @@ import { NextResponse } from "next/server";
 import { generateAction } from "@/lib/ai/client";
 import { NEGOTIATION } from "@/lib/study-config";
 import { capMessageLength, compactChatBubbles, validateAction } from "@/lib/ai/validator";
+import { leaksForbiddenReason } from "@/lib/ai/reason-leak";
 import {
   counterpartStep,
   mentionsScoreNumbers,
   type DecidedAction,
   type ReasonTier,
 } from "@/lib/negotiation/machine";
+import { reciprocalAcceptanceText } from "@/lib/negotiation/counterpart-text";
 import {
   cardOfLayer,
   counterRequirementIssue,
@@ -57,6 +59,8 @@ interface RequestBody {
   tier?: ReasonTier;
   /** SCRIPT-ASKWHY already spent. */
   askedWhy?: boolean;
+  /** SCRIPT-MISREAD has been shown and remains acceptable if taken up. */
+  misreadOffered?: boolean;
   /** SCRIPT-NONUM already spent. */
   numbersReminded?: boolean;
   /**
@@ -80,6 +84,10 @@ interface RequestBody {
   secondsRemaining?: number;
   /** SCRIPT-CLOSE already offered. */
   softCloseOffered?: boolean;
+  /** Direct uses reciprocal disclosure; Proxy closing retains its fixed history. */
+  disclosurePolicy?: "reciprocal" | "fixed";
+  /** Has the Direct counterpart already shared its sensitive background? */
+  counterpartSbDisclosed?: boolean;
   /**
    * True in the direct closing that follows a Proxy exchange, where the
    * counterpart has already opened, argued and disclosed through its own
@@ -95,15 +103,16 @@ interface RequestBody {
  */
 function fallbackText(
   task: NegotiationTask,
+  counterpartRole: Role,
   action: DecidedAction,
   proposal: Package | null,
 ): string {
   if (action === "ask_why")
     return "can I ask why that one matters so much on your side?";
   if (action === "nonum")
-    return "we're not supposed to talk scores — let's stick to the counts.";
-  if (action === "disclose_sb")
-    return "there's something on my side I should be honest about — one sec.";
+    return "we're not supposed to talk scores. let's stick to the counts.";
+  const sb = cardOfLayer(task, counterpartRole, "sensitive")?.text ?? "";
+  if (action === "disclose_sb") return sb;
   if (action === "impasse")
     return "I don't think we're going to get there on these terms.";
   if (!proposal) return "let me think about that and come back to you.";
@@ -111,6 +120,9 @@ function fallbackText(
     .map((i) => i.options.find((o) => o.id === proposal[i.id])?.label)
     .filter(Boolean)
     .join(", ");
+  if (action === "disclose_sb_and_accept") {
+    return reciprocalAcceptanceText(task, counterpartRole, proposal);
+  }
   return `where I am right now: ${terms}.`;
 }
 
@@ -152,10 +164,13 @@ export async function POST(request: Request) {
     {
       tier: body.tier ?? "none",
       askedWhy: body.askedWhy ?? false,
+      misreadOffered: body.misreadOffered ?? false,
       numbersReminded: body.numbersReminded ?? false,
       numbersMentionedNow: mentionedNumbers,
       secondsRemaining: body.secondsRemaining,
       softCloseOffered: body.softCloseOffered ?? false,
+      disclosurePolicy: body.disclosurePolicy ?? (body.afterProxy ? "fixed" : "reciprocal"),
+      counterpartSbDisclosed: body.counterpartSbDisclosed ?? false,
     },
   );
 
@@ -182,8 +197,8 @@ export async function POST(request: Request) {
         // best, your worst" is itself a face threat (§2.6). And withholding
         // its priority puts the participant on the receiving end of the same
         // decoy: hearing only the safe reason, they misread which term the
-        // counterpart actually needs, and the counterpart's own SB at stage 4
-        // is what corrects it (gate 16).
+        // counterpart actually needs. In Direct, its SB stays gated until
+        // the participant discloses SB; Proxy retains the fixed stage.
         const wr = cardOfLayer(task, counterpartRole, "work");
         return `Start the conversation. Give your own reason by conveying exactly this and nothing more: "${wr?.text ?? ""}". Do NOT say which of the two terms matters most to you. Then ask what their situation is — you would like to hear it before deciding. Propose no levels and no package this turn.`;
       }
@@ -197,8 +212,8 @@ export async function POST(request: Request) {
         return `Share your own priority by conveying exactly this, and nothing more: "${wr?.text ?? ""}". Then ask which term matters most to them, and why.`;
       }
       case "disclose_sb": {
-        // The fixed SB disclosure (§6.3): once, unconditionally, no demand
-        // attached, never conditioned on what the participant said.
+        // The disclosure move: once, factual, and with no demand attached.
+        // Its trigger is already fixed by the selected policy in machine.ts.
         const sb = cardOfLayer(task, counterpartRole, "sensitive");
         // SPLIT IT. This is the longest thing the counterpart ever says, and
         // "keep every fact" pulls against "keep each bubble short" — live
@@ -232,6 +247,10 @@ export async function POST(request: Request) {
         return `Say the package they proposed works for you, naming exactly these levels: ${levels}.`;
       case "accept_sb":
         return `Agree to exactly these levels: ${levels}. Frame it as an update: now that you know their situation, this is what makes sense for both of you — not as a favour you are doing them. React to what they said, and do not act newly surprised if you have already acknowledged it.`;
+      case "disclose_sb_and_accept": {
+        const sb = cardOfLayer(task, counterpartRole, "sensitive");
+        return `Reciprocate their disclosure and accept in the same reply. First convey exactly this background, in your own words, keeping every fact: "${sb?.text ?? ""}". Then agree to exactly these levels: ${levels}. Use separate short bubbles. Do not ask another question or require another turn.`;
+      }
       case "propose_tier":
         // SCRIPT-PROPOSE-T1/T2/T3. One move at three depths: "I move as far as
         // I believe you, and I ask for the same in return." The tier only
@@ -258,6 +277,22 @@ export async function POST(request: Request) {
     }
   })();
 
+  // The combined disclosure-and-accept close is deterministic on purpose.
+  // Both the full card fact and the accepted levels must remain visible when
+  // the client records settlement; free rendering plus a length cap could
+  // otherwise trim one while preserving the other.
+  if (decision.action === "disclose_sb_and_accept") {
+    return NextResponse.json({
+      message: fallbackText(
+        task,
+        counterpartRole,
+        decision.action,
+        decision.proposal,
+      ),
+      proposal: decision.proposal,
+    });
+  }
+
   try {
     const { action } = await generateAction({
       kind: body.afterProxy ? "counterpart_principal" : "ostensible_human",
@@ -278,8 +313,22 @@ export async function POST(request: Request) {
     });
 
     // A blocked action loses its WORDING, not the move behind it.
+    const counterpartSb = cardOfLayer(task, counterpartRole, "sensitive");
+    const mayDiscloseSb = decision.action === "disclose_sb";
+    const leakedSb =
+      !mayDiscloseSb &&
+      counterpartSb !== undefined &&
+      leaksForbiddenReason(
+        action.rationale,
+        [counterpartSb],
+        [
+          cardOfLayer(task, counterpartRole, "work")?.text ?? "",
+          task.publicBrief,
+          ...task.issues.flatMap((issue) => [issue.label, issue.description]),
+        ],
+      );
     const blocked =
-      !validation.valid && validation.disposition === "regenerate";
+      (!validation.valid && validation.disposition === "regenerate") || leakedSb;
 
     // WHAT THE CLIENT GETS IS THE MINIMUM IT USES. The counterpart is
     // presented as another participant, so `accepts`, `impasse`, the decided
@@ -290,7 +339,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       message: compactChatBubbles(capMessageLength(
         blocked
-          ? fallbackText(task, decision.action, decision.proposal)
+          ? fallbackText(task, counterpartRole, decision.action, decision.proposal)
           : action.rationale,
         NEGOTIATION.maxMessageChars,
       )),

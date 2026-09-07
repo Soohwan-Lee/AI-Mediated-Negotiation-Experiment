@@ -356,6 +356,7 @@ export async function POST(request: Request) {
       body.lastParticipantPackage ?? plan.tradeProposal,
       {
         tier,
+        disclosurePolicy: "fixed",
         // The AI-AI exchange has no spare turn for a deferred "why?", so the
         // grace question is spent: the ladder answers directly.
         askedWhy: true,
@@ -472,6 +473,7 @@ export async function POST(request: Request) {
       case 0: {
         const decision = counterpartStep(task, counterpartRole, 1, null, {
           tier,
+          disclosurePolicy: "fixed",
           askedWhy: true,
           numbersReminded: true,
         });
@@ -515,7 +517,7 @@ export async function POST(request: Request) {
       }
       case 5: {
         const decision = counterpartStep(task, counterpartRole, 5, null, {
-          tier, askedWhy: true, numbersReminded: true,
+          tier, disclosurePolicy: "fixed", askedWhy: true, numbersReminded: true,
         });
         proposal = decision.proposal;
         counterpartAction = decision.action;
