@@ -274,15 +274,74 @@ export function TaskCover({
  * written with a different number of paragraphs this falls back to rendering
  * it whole rather than mislabelling it.
  */
-/** Headings follow the four paragraphs in the current design's role story. */
-export function RoleStory({ story }: { story: string }) {
+/**
+ * `**...**` in a story string becomes `<strong>`, and nothing else is markup.
+ *
+ * The emphasis is on STRUCTURAL signposts only — the term that cannot move,
+ * "there is something only you know", "a reason you can say safely", "if that
+ * is all you say". It never falls on a clause that reads as advice to disclose
+ * or to withhold: the disclosure decision is the study's primary outcome, so a
+ * screen that leans on it would be staging what it measures. Odd segments of
+ * the split are the emphasised ones; an unpaired `**` therefore renders as
+ * plain text rather than swallowing the rest of the paragraph.
+ */
+function emphasise(text: string) {
+  return text.split("**").map((segment, index) =>
+    index % 2 === 1
+      ? <strong key={index} className="font-semibold text-[var(--private-strong)]">{segment}</strong>
+      : <span key={index}>{segment}</span>,
+  );
+}
+
+/**
+ * Headings follow the four paragraphs in the current design's role story.
+ *
+ * The emoji is a scanning aid, not decoration: the four sections do four
+ * different jobs and a reader mid-negotiation is looking for one of them. The
+ * last section sits in its own box because it is the one that describes a
+ * cost — but the box stays in the private (sand) tone, because the surface is
+ * what says who can see the content (interface rule 1) and this is all
+ * private.
+ *
+ * `compact` is what the briefing rail passes: the same treatment at the rail's
+ * 13px, with no figure and tighter spacing. The illustration lives on the
+ * TaskBrief page and never in the rail.
+ */
+export function RoleStory({ story, compact = false }: { story: string; compact?: boolean }) {
   const paragraphs = story.split("\n\n").map(p => p.trim()).filter(Boolean);
-  const headings = ["Your role on the team", "What matters to you", "Your work situation", "What sharing could mean"];
-  return <div className="space-y-5">
-    {paragraphs.map((paragraph, index) => <section key={index}>
-      {paragraphs.length === 4 ? <h3 className="mb-2 text-sm font-bold text-[var(--private-strong)]">{headings[index]}</h3> : null}
-      <p className="text-sm leading-7 text-[var(--private-ink)]">{paragraph}</p>
-    </section>)}
+  const headings = [
+    { emoji: "👤", label: "Your role on the team" },
+    { emoji: "🎯", label: "What matters to you" },
+    { emoji: "💼", label: "Your work situation" },
+    { emoji: "⚖️", label: "What sharing could mean" },
+  ];
+  const labelled = paragraphs.length === headings.length;
+  return <div className={compact ? "space-y-3" : "space-y-4"}>
+    {paragraphs.map((paragraph, index) => {
+      const heading = labelled ? headings[index] : null;
+      const boxed = labelled && index === headings.length - 1;
+      return <section
+        key={index}
+        className={boxed
+          ? cx(
+            "rounded-xl border border-[var(--private-line)] bg-white/60",
+            compact ? "px-2.5 py-2" : "px-4 py-3.5",
+          )
+          : undefined}
+      >
+        {heading ? <h3 className={cx(
+          "flex items-baseline gap-1.5 font-bold tracking-tight text-[var(--private-strong)]",
+          compact ? "mb-1 text-[0.8125rem]" : "mb-1.5 text-[0.9375rem]",
+        )}>
+          <span aria-hidden="true" className={compact ? "text-[0.75rem]" : "text-sm"}>{heading.emoji}</span>
+          {heading.label}
+        </h3> : null}
+        <p className={cx(
+          "text-[var(--private-ink)]",
+          compact ? "text-[0.8125rem] leading-6" : "text-sm leading-7",
+        )}>{emphasise(paragraph)}</p>
+      </section>;
+    })}
   </div>;
 }
 
@@ -426,7 +485,7 @@ export function BriefingPanel({
         hidden={currentTab !== "situation"}
         className="rounded-xl border border-[var(--private-line)] bg-[var(--private-surface)] p-3"
       >
-        <RoleStory story={brief.roleStory} />
+        <RoleStory story={brief.roleStory} compact />
       </section>
 
       <section

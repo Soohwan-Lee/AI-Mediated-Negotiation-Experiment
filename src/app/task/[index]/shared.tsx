@@ -200,6 +200,9 @@ export function TaskBrief({
   const taskImage = task.id === "task_a"
     ? "/illustrations/task-working-arrangements.png?v=20260907b"
     : "/illustrations/task-new-project.png?v=20260907b";
+  const roleImage = role === "leader"
+    ? "/illustrations/role-team-lead.png?v=20260907b"
+    : "/illustrations/role-team-member.png?v=20260907b";
   const labels = ["The task", "Your situation", "Your points", "Your reasons"];
   function move(next: number) {
     logEvent("page_complete", { briefingPage: page + 1 }, { sessionIndex: taskIndex });
@@ -251,7 +254,31 @@ export function TaskBrief({
             <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
               <CardTitle>{brief.title} · Your private situation</CardTitle><PrivateTag />
             </div>
-            <RoleStory story={brief.roleStory} />
+            {/*
+              The role portrait sits beside the story on a wide screen and above
+              it on a narrow one, the same figure treatment page 0 gives the task
+              image. It is only here: the briefing rail renders RoleStory in
+              compact form with no figure, because a 1536x1024 image in a 13px
+              rail would push the story itself off the screen.
+            */}
+            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
+              <RoleStory story={brief.roleStory} />
+              <figure className="order-first overflow-hidden rounded-xl border border-[var(--private-line)] bg-[#f4efe5] lg:order-none lg:sticky lg:top-24">
+                <Image
+                  src={roleImage}
+                  width={1536}
+                  height={1024}
+                  sizes="(min-width: 1024px) 16rem, (min-width: 640px) 44rem, 100vw"
+                  alt={role === "leader"
+                    ? "A team lead at a desk facing a planning board, with the team working behind them."
+                    : "A senior team member at their own desk, with a client meeting room behind them."}
+                  className="h-auto w-full"
+                />
+                <figcaption className="border-t border-[var(--private-line)] bg-white/95 px-3 py-2.5 text-center text-xs font-semibold leading-relaxed text-[var(--private-strong)]">
+                  You in this task · {brief.title}
+                </figcaption>
+              </figure>
+            </div>
           </Card>
         ) : page === 2 ? (
           <Card tone="private">
