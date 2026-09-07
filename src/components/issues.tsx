@@ -17,6 +17,7 @@
  */
 
 import type { Issue, Package, Role } from "@/lib/types";
+import { comparePointsToFallback } from "@/lib/points-display";
 import { cx } from "./ui";
 
 /** Share of the best value on this issue, for the bar width. */
@@ -124,7 +125,7 @@ export function PackageValue({
   role,
   selection,
   reservationPoints,
-  label = "This package pays you",
+  label = "Your points for this package",
 }: {
   issues: Issue[];
   role: Role;
@@ -139,14 +140,11 @@ export function PackageValue({
   if (chosen.some((o) => o === null)) return null;
 
   const total = chosen.reduce((sum, o) => sum + (o?.points[role] ?? 0), 0);
-  const clears = total >= reservationPoints;
+  const comparison = comparePointsToFallback(total, reservationPoints);
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--private-line)] bg-[var(--private-surface)] p-3.5 sm:p-4 shadow-2xs">
-      <div className="flex items-center gap-2.5 min-w-0">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-lg shadow-2xs">
-          {clears ? "🏆" : "⚠️"}
-        </span>
+      <div className="min-w-0">
         <div>
           <p className="text-xs font-semibold text-[var(--private-strong)] uppercase tracking-wide">
             {label}
@@ -157,16 +155,12 @@ export function PackageValue({
         </div>
       </div>
 
-      <div className="flex items-center">
-        {clears ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 shadow-2xs">
-            <span>✓</span> Above fallback ({reservationPoints.toLocaleString()})
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400 bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 shadow-2xs">
-            <span>⚠️</span> Below fallback ({reservationPoints.toLocaleString()})
-          </span>
-        )}
+      <div className="rounded-lg border border-[var(--private-line)] bg-white/75 px-3 py-2 text-xs font-semibold text-[var(--private-strong)]">
+        {comparison === "above"
+          ? `Above fallback (${reservationPoints.toLocaleString()} pts)`
+          : comparison === "below"
+            ? `Below fallback (${reservationPoints.toLocaleString()} pts)`
+            : `Equal to fallback (${reservationPoints.toLocaleString()} pts)`}
       </div>
     </div>
   );

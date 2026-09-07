@@ -141,6 +141,7 @@ export function RatifyPhase({
                     role={role}
                     selection={tentative}
                     reservationPoints={task.reservationPoints}
+                    label="If you approve, your points would be"
                   />
                 </div>
               </>

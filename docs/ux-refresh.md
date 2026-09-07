@@ -86,9 +86,47 @@ mobile drawer scrolled independently, Points opened by default, and Arrow,
 Home, and End keys moved focus and selection between tabs. The implementation
 was released in commit `6f817e9`.
 
+## Stage 6: visual role and task guide
+
+- Split the role and after-task responsibilities into separate reading pages,
+  keeping every bonus, evaluation, and shared-instruction disclosure before
+  the comprehension check.
+- Add role-specific and task-specific editorial illustrations only where they
+  establish who the participant is or what the two public conditions are.
+  Images do not depict private reasons, points, outcomes, or a preferred trade.
+- Clarify COMP2 as "Can either person make the final decision on both working
+  conditions without the other person agreeing?" This wording change is
+  explicitly authorized as a comprehension-only exception. Its ID, answer
+  (`no`), construct, order, logging, and retry behavior remain unchanged.
+
+Browser verification with autofill and validation bypass disabled confirmed
+that Back returns from the check to Rules (page 4 of 4), preserves existing
+answers, and resets the scroll position. A wrong COMP2 answer showed only its
+remediation; Retry cleared only COMP2, and the revised `no` answer passed.
+
+## Stage 7: confirmed point breakdown
+
+- Show the participant's own point value for each agreed condition and a final
+  total on the shared Direct and Proxy result screen. Do not show the other
+  person's points, a joint score, or progress toward an ideal package.
+- Keep Proxy packages explicitly provisional before approval. Running point
+  changes are not shown during negotiation because proposals may still change
+  and are not confirmed outcomes. The breakdown appears at the existing result
+  timing, so the added salience should be watched during pilot usability checks.
+- For no agreement, show the fallback total without inventing an issue-level
+  breakdown. Describe values above, equal to, or below the fallback exactly
+  and neutrally; points remain separate from the later bonus decision.
+
+Focused browser checks covered both task illustrations at 1,280 × 800 and the
+confirmed Team Lead result at 1,024 × 768. Both images were served through
+Next image optimization at their full 3:2 aspect ratio. The result showed two
+issue rows whose private point values summed to the final total, retained the
+private sand treatment, and had no horizontal overflow.
+
 ## Non-negotiable study boundaries
 
-- Do not change questionnaire item text, IDs, or order.
+- Apart from the explicitly authorized COMP2 clarification in Stage 6, do not
+  change questionnaire item text, IDs, or order.
 - Keep sensitive disclosure optional and its notice neutral.
 - Keep private and shared information visually distinct.
 - Preserve `briefing -> RISK -> preference/mandate -> negotiation`.

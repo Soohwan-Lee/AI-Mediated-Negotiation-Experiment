@@ -319,12 +319,14 @@ export function ReviewPhase({
             <Card className="border-slate-200 bg-white">
               <CardTitle
                 hint={
-                  hoped
+                  !tentative
+                    ? "The fallback conditions apply."
+                    : hoped
                     ? "What you set out to get, next to what was agreed:"
                     : "Settled option for each term:"
                 }
               >
-                📦 Final Agreed Package
+                {tentative ? "📦 Final Agreed Package" : "No agreed package"}
               </CardTitle>
               <div className="mt-3">
                 {tentative ? (

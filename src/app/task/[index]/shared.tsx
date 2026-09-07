@@ -69,6 +69,7 @@ import { ReadingProgress, PreviousReading } from "@/components/briefing-guide";
 import { Callout, Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { dummyAnswer, riskBlock } from "@/lib/measures";
+import { comparePointsToFallback } from "@/lib/points-display";
 import { useParticipant } from "@/lib/participant-context";
 import {
   NEGOTIATION,
@@ -743,27 +744,80 @@ export function OutcomeValue({
   const requirement = requirementIssue(task, role);
   const value = terms ? packageValue(task, terms) : null;
   const mine = value ? value[role] : task.reservationPoints;
+  const comparison = comparePointsToFallback(mine, task.reservationPoints);
+  const breakdown = terms
+    ? task.issues.map((issue) => {
+        const option = issue.options.find((candidate) => candidate.id === terms[issue.id]);
+        return {
+          issueId: issue.id,
+          issueLabel: issue.label,
+          optionLabel: option?.label ?? "Not settled",
+          points: option?.points[role] ?? 0,
+        };
+      })
+    : [];
   const held = terms
     ? preservesRequirement(task, role, terms[requirement.id])
     : false;
 
   return (
-    <Card tone="private" className="text-[var(--private-ink)] border-amber-300 bg-amber-50/60 shadow-2xs">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-xs font-extrabold uppercase tracking-wider text-amber-900 min-w-0">
-          🏆 Your Score & Payoff
-        </span>
-        <span className="tabular text-xl sm:text-2xl font-black text-amber-950 font-mono shrink-0 whitespace-nowrap">
-          {mine.toLocaleString()} pts
-        </span>
+    <Card tone="private" className="border-amber-300 bg-amber-50/60 text-[var(--private-ink)] shadow-2xs">
+      <div className="mb-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-amber-900">
+          Your points
+        </p>
+        <h3 className="mt-1 text-base font-bold text-[var(--ink)]">
+          {terms ? "Confirmed result" : "No agreement"}
+        </h3>
       </div>
-      <p className="text-xs sm:text-sm font-medium leading-relaxed">
-        {terms
-          ? mine >= task.reservationPoints
-            ? `✓ Above your fallback score of ${task.reservationPoints.toLocaleString()} pts.`
-            : `⚠️ Below your fallback score of ${task.reservationPoints.toLocaleString()} pts.`
-          : `⚠️ No agreement reached — fallback score of ${task.reservationPoints.toLocaleString()} pts applies.`}
-      </p>
+
+      {terms ? (
+        <dl className="space-y-2.5">
+          {breakdown.map((row) => (
+            <div key={row.issueId} className="rounded-xl border border-amber-200/80 bg-white/80 p-3">
+              <dt className="text-xs font-semibold leading-snug text-[var(--private-ink)]">
+                {row.issueLabel}
+              </dt>
+              <dd className="mt-1 flex items-baseline justify-between gap-3">
+                <span className="text-xs leading-snug text-[var(--private-ink)]/80">
+                  {row.optionLabel}
+                </span>
+                <strong className="shrink-0 text-sm tabular-nums text-[var(--ink)]">
+                  {row.points.toLocaleString()} pts
+                </strong>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="rounded-xl border border-amber-200/80 bg-white/80 p-3 text-sm leading-relaxed">
+          There are no agreed terms to break down. Your fallback total applies.
+        </p>
+      )}
+
+      <div className="mt-3 border-t border-amber-200 pt-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-sm font-bold text-[var(--ink)]">
+            {terms ? "Final total" : "Fallback total"}
+          </span>
+          <span className="shrink-0 text-xl font-black tabular-nums text-amber-950">
+            {mine.toLocaleString()} pts
+          </span>
+        </div>
+        {terms ? (
+          <p className="mt-1 text-xs leading-relaxed text-[var(--private-ink)]/80">
+            {comparison === "above"
+              ? `${(mine - task.reservationPoints).toLocaleString()} points above your fallback.`
+              : comparison === "below"
+                ? `${(task.reservationPoints - mine).toLocaleString()} points below your fallback.`
+                : "Equal to your fallback."}
+          </p>
+        ) : (
+          <p className="mt-1 text-xs leading-relaxed text-[var(--private-ink)]/80">
+            No agreement reached, so the fallback score applies.
+          </p>
+        )}
+      </div>
       {/* THE REQUIREMENT ISSUE IS NOT NAMED HERE. This line used to read
           "{requirement.label}: ✓ At or above your required threshold", which
           with three terms singled out one of three and with two terms is a
@@ -779,12 +833,10 @@ export function OutcomeValue({
           they held what they needed — which is the outcome they care about —
           without naming the term back to them. */}
       {terms ? (
-        <div className="mt-3 border-t border-amber-200/80 pt-3 text-xs sm:text-sm font-semibold text-amber-900">
-          <span className={held ? "text-emerald-700" : "text-amber-800"}>
-            {held
-              ? "✓ You held the level you said you needed."
-              : "⚠️ You ended below the level you said you needed."}
-          </span>
+        <div className="mt-3 border-t border-amber-200/80 pt-3 text-xs sm:text-sm font-medium leading-relaxed text-[var(--private-ink)]">
+          {held
+            ? "This agreement meets the level you said you needed."
+            : "This agreement is below the level you said you needed."}
         </div>
       ) : null}
     </Card>
