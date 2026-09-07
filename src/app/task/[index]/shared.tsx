@@ -1003,10 +1003,48 @@ export function DirectNegotiation({
   const [confirmDecline, setConfirmDecline] = useState(false);
   /** Synchronous mirror of `settled`, so two callers in one tick cannot both win. */
   const settledRef = useRef(false);
+  /**
+   * The proposal drawer opens ONCE, by itself, the first time the counterpart
+   * puts a package on the table — identical to the Direct arm's rule and for
+   * the same reason. It is seeded open when the participant arrives carrying
+   * the proxies' package, because that package IS what this conversation is
+   * about: the screen tells them to confirm, adjust or decline it, so the
+   * thing being confirmed cannot start hidden.
+   */
+  const [proposalOpen, setProposalOpen] = useState(Boolean(openingPackage));
+  const openedOnCounterProposal = useRef(Boolean(openingPackage));
 
+  // THE PACKAGE IS OPTIONAL IN BOTH ARMS, and it has to be: this screen and
+  // the Direct arm's are the two places a participant speaks for themselves,
+  // so an interface difference between them would land on
+  // `Pooled Proxy − Direct` itself. A HALF package is still refused, quietly,
+  // for the same reason — it is not a position anyone can answer, and the
+  // machine would read it as a lopsided proposal rather than as talk.
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const complete = chosen === task.issues.length;
-  const canSend = useDevGate(complete) && !settled;
+  const partial = chosen > 0 && !complete;
+  /**
+   * What will travel with the next message, said on the closed drawer —
+   * identical to the Direct arm's, and load-bearing for the same reason: the
+   * package is pre-filled here too (from the proxies' own settlement), so a
+   * collapsed drawer without this would have the participant send a package
+   * they never saw attached.
+   */
+  const attachedSummary = partial
+    ? "Choose both terms, or neither."
+    : complete
+      ? `Attached to your next message: ${task.issues
+          .map(
+            (issue) =>
+              issue.options.find((o) => o.id === offer[issue.id])?.label ?? "",
+          )
+          .filter(Boolean)
+          .join(" · ")}`
+      : "No proposal attached — you are just talking.";
+  const canSend = useDevGate(!partial) && !settled;
+  // One cue on the screen, and it is the composer's (interface rule 9). The
+  // package card is not waiting for anything now that a message may be sent
+  // without one, so it carries no ring and no pill.
   const yourTurn = !pending && canSend && !settled;
 
   /**
@@ -1069,6 +1107,17 @@ export function DirectNegotiation({
   }
 
   async function send(text: string, sentOffer: Package = offer) {
+    /**
+     * NO PACKAGE IS `null`, NOT `{}`. Same normalization and same reason as
+     * the Direct arm: `counterpartStep` branches on
+     * `incoming ? "balance" : "propose_tier"` and `{}` is truthy, so a
+     * message carrying no package at all would be answered with
+     * SCRIPT-BALANCE — "that package is lopsided" about a package that does
+     * not exist. Done in both arms at once, because a difference here is a
+     * difference in how a turn is coded along the primary contrast.
+     */
+    const sentPackage: Package | null =
+      Object.keys(sentOffer).length > 0 ? sentOffer : null;
     const own: DisplayMessage = {
       id: `d-p${messages.length}`,
       speaker: "participant",
@@ -1142,7 +1191,7 @@ export function DirectNegotiation({
         // before" — those were machine calls, where it changed behaviour; this
         // one is the audit trail, where it quietly mislabels the data instead.
         stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET - 1),
-        proposal: Object.keys(sentOffer).length > 0 ? sentOffer : undefined,
+        proposal: sentPackage ?? undefined,
         // Same audit trail as the Direct arm: this is the other place a
         // participant speaks for themselves, so it is the other place the
         // classifier can be wrong (§6.2a, §6.9 #15-16).
@@ -1159,7 +1208,7 @@ export function DirectNegotiation({
       const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
       const mentioned = numbersEver || mentionsScoreNumbers(text);
       if (mentioned !== numbersEver) setNumbersEver(mentioned);
-      const decision = counterpartStep(task, counterpartRole, stageNow, sentOffer, {
+      const decision = counterpartStep(task, counterpartRole, stageNow, sentPackage, {
         tier: tierNow,
         disclosurePolicy: "fixed",
         askedWhy,
@@ -1185,7 +1234,7 @@ export function DirectNegotiation({
             taskId: task.id,
             participantRole: role,
             stage: stageNow,
-            incoming: sentOffer,
+            incoming: sentPackage,
             tier: tierNow,
             askedWhy,
             numbersReminded,
@@ -1248,6 +1297,13 @@ export function DirectNegotiation({
       if (decision.proposal) {
         setLastCounterpartPackage(decision.proposal);
         setOffer(decision.proposal);
+        // The drawer opens itself the FIRST time a package arrives, so
+        // countering it is one click away. Once only, and identical to the
+        // Direct arm's rule.
+        if (!openedOnCounterProposal.current) {
+          openedOnCounterProposal.current = true;
+          setProposalOpen(true);
+        }
       }
 
       const counter: DisplayMessage = {
@@ -1282,7 +1338,7 @@ export function DirectNegotiation({
       if (!settledRef.current && (decision.accepts || decision.impasse)) {
         settle(
           decision.accepts ? "agreed" : "impasse",
-          decision.accepts ? (decision.proposal ?? sentOffer) : null,
+          decision.accepts ? (decision.proposal ?? sentPackage) : null,
           decision.accepts ? "agreed" : "impasse",
         );
       }
@@ -1350,9 +1406,17 @@ export function DirectNegotiation({
                           // an Accept button that is correctly not rendered —
                           // but telling a refuser their proxies "did not
                           // settle" contradicts the screen they just left.
+                          //
+                          // NEITHER LINE TELLS THEM TO PICK LEVELS FIRST any
+                          // more. A message may be sent with no package at
+                          // all, so an instruction to choose levels before
+                          // speaking would describe a gate that no longer
+                          // exists — and would put the selector back at the
+                          // centre of a screen whose subject is the
+                          // conversation.
                           refused
-                          ? "You refused what the proxies reached, so nothing is on the table. Choose a level on each term below, then put it to the other participant."
-                          : "Your proxies did not settle on a package. Choose a level on each term below, then put it to the other participant."}
+                          ? "You refused what the proxies reached, so nothing is on the table. Talk it through with the other participant, and attach a proposal below when you want to put one up."
+                          : "Your proxies did not settle on a package. Talk it through with the other participant, and attach a proposal below when you want to put one up."}
                 </p>
               </div>
               <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -1369,9 +1433,7 @@ export function DirectNegotiation({
                   <Cue tone="quiet">Waiting for reply…</Cue>
                 ) : yourTurn ? (
                   <Cue>Your Turn</Cue>
-                ) : (
-                  <Cue tone="quiet">Select terms first</Cue>
-                )}
+                ) : null}
               </div>
           </div>
 
@@ -1382,7 +1444,7 @@ export function DirectNegotiation({
               emptyHint={
                 openingPackage
                   ? "The proxies are done. Say hello and settle it — or accept the package below."
-                  : "Set the levels you want below, then put them to the other participant."
+                  : "Write to the other participant to get started."
               }
             />
             <MessageComposer
@@ -1396,7 +1458,7 @@ export function DirectNegotiation({
                   ? "This conversation has concluded."
                   : canSend
                     ? "Type your message to the other participant…"
-                    : "Please choose an option for each term first."
+                    : "Choose both terms below, or neither, before sending."
               }
             />
             {turnError ? (
@@ -1451,18 +1513,35 @@ export function DirectNegotiation({
             </div>
           ) : null}
 
-          <Card cue={!complete} className="mb-6">
-            <CardTitle
-              hint="Proposal package currently on the table. Adjust options as you negotiate:"
-              aside={
-                !complete ? (
-                  <Cue>{task.issues.length - chosen} term(s) left</Cue>
-                ) : null
-              }
-            >
-              📦 Current Negotiation Package
-            </CardTitle>
-            <div className="space-y-4 mt-3">
+          {/* THE PROPOSAL SELECTOR, DEMOTED — identical in copy, position and
+              behaviour to the Direct arm's (baseline-task.tsx). The two must
+              match: these are the two places a participant speaks for
+              themselves, so any difference between them lands on
+              `Pooled Proxy − Direct`, which is the contrast the study is
+              built to make. If you change one, change the other in the same
+              commit. */}
+          <details
+            open={proposalOpen}
+            onToggle={(e) => setProposalOpen(e.currentTarget.open)}
+            className="mb-6 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-sm)]"
+          >
+            <summary className="cursor-pointer list-none rounded-[var(--radius-lg)] px-5 py-4 sm:px-7">
+              <span className="flex items-center justify-between gap-4">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-bold leading-snug tracking-tight text-[var(--ink)] sm:text-lg">
+                    📦 Attach a proposal (optional)
+                  </span>
+                  {/* Live, not a static hint — see the Direct arm. */}
+                  <span className="mt-1 block text-sm leading-relaxed text-[var(--ink-3)]">
+                    {attachedSummary}
+                  </span>
+                </span>
+                <span className="shrink-0 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-bold text-[var(--ink-2)]">
+                  {proposalOpen ? "▲ Hide" : "▼ Show"}
+                </span>
+              </span>
+            </summary>
+            <div className="space-y-4 px-5 pb-5 sm:px-7 sm:pb-7">
               {task.issues.map((issue) => (
                 <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
                   <p className="mb-2 text-xs sm:text-sm font-bold text-[var(--ink)]">
@@ -1481,8 +1560,11 @@ export function DirectNegotiation({
                   />
                 </div>
               ))}
+              {/* A half package is the one blocked state, said quietly in the
+                  SUMMARY so it is visible with the drawer shut. No cue ring
+                  and no pill (interface rule 9). */}
             </div>
-          </Card>
+          </details>
         </TaskLayout>
       </Page>
 
@@ -1499,11 +1581,9 @@ export function DirectNegotiation({
           }
         />
       ) : (
-        <ActionBar
-          note={`${chosen} of ${task.issues.length} terms selected${
-            secondsRemaining <= 0 ? " · time expired" : ""
-          }`}
-        />
+        // No term count: selecting terms is not outstanding business any
+        // more. Same line as the Direct arm's.
+        <ActionBar note={secondsRemaining <= 0 ? "Time expired" : undefined} />
       )}
     </>
   );

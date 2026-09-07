@@ -30,7 +30,7 @@ import {
 } from "@/components/negotiation";
 import { BriefingPanel, TaskHeader, TaskLayout } from "@/components/session";
 import { ActionBar } from "@/components/study-chrome";
-import { Card, CardTitle, Cue, Page } from "@/components/ui";
+import { Card, Cue, Page } from "@/components/ui";
 import {
   useDevActions,
   useDevAutofill,
@@ -311,33 +311,76 @@ export function BaselineTask({
 
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(null);
+  /**
+   * The proposal drawer opens ONCE, by itself, the first time the counterpart
+   * puts a package on the table — so countering it is one click away rather
+   * than a thing to go looking for. It is not forced open again after that:
+   * a participant who closed it has said they are talking, not proposing, and
+   * re-opening the drawer under them on every counterpart turn would put the
+   * selector back at the centre of the screen, which is what this change
+   * exists to undo.
+   */
+  const [proposalOpen, setProposalOpen] = useState(false);
+  const openedOnCounterProposal = useRef(false);
 
   const mockAi = useDevMockAi();
 
-  // An opening package needs every term chosen; later stages may reply without
-  // changing the offer. Computed here rather than beside the composer because
-  // the phase branches below return early, and a hook cannot sit behind that.
-  // A first message needs a complete package on the table; after that the
-  // participant may write anything, including a reply that changes nothing.
+  // THE PACKAGE IS OPTIONAL, AND THAT IS THE POINT OF THE DEMOTION. A message
+  // may carry no package at all: the participant is talking, and talking is
+  // what the classifier reads and the ladder is driven off. What is still
+  // refused is a HALF package — one term chosen and the other left blank —
+  // because that is not a position anyone can answer, and the counterpart
+  // would read it as a lopsided proposal (SCRIPT-BALANCE) rather than as talk.
+  //
+  // Computed here rather than beside the composer because the phase branches
+  // below return early, and a hook cannot sit behind that.
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const complete = chosen === task.issues.length;
+  const partial = chosen > 0 && !complete;
+  /**
+   * WHAT WILL TRAVEL WITH THE NEXT MESSAGE, said on the closed drawer.
+   *
+   * Collapsing the selector without this makes the attachment INVISIBLE: the
+   * levels are pre-filled from the preference screen, so a participant who
+   * never opens the drawer would send a package they had not seen attached.
+   * That is a worse fault than the prominence this change exists to fix — a
+   * prominent control at least tells you what it is about to do.
+   *
+   * Read in `task.issues` order and off each issue's own options, which is
+   * exactly what `OptionChips` renders below, so the sentence and the chips
+   * can never name the levels in a different order.
+   */
+  const attachedSummary = partial
+    ? "Choose both terms, or neither."
+    : complete
+      ? `Attached to your next message: ${task.issues
+          .map(
+            (issue) =>
+              issue.options.find((o) => o.id === offer[issue.id])?.label ?? "",
+          )
+          .filter(Boolean)
+          .join(" · ")}`
+      : "No proposal attached — you are just talking.";
   // `settled` is OUTSIDE the dev gate on purpose. `useDevGate` exists to let a
   // walkthrough past an unfilled form, but "the conversation is over" is not a
   // validation to skip — bypassing it let the send loop keep firing after the
   // counterpart had accepted, which logged the same ending five times.
-  const canSend = useDevGate(complete) && !settled;
+  const canSend = useDevGate(!partial) && !settled;
 
-  // The three states of the conversation, named once so the composer, the
-  // terms card and the pill above them cannot disagree about which one it is.
+  // ONE CUE ON THE SCREEN, AND IT IS THE COMPOSER'S (interface rule 9).
   //
-  // These are exact complements (`canSend` / `!canSend`), which is what keeps
-  // interface rule 9's "at most one ring on a screen" true: the composer's cue
-  // and the terms card's cue can never both be lit. That was already the case
-  // when the cue was a flat outline and merely tidy; now that it is a diffuse
-  // glow, two at once would read as a rendering fault, so it is worth stating
-  // rather than leaving to be re-derived.
+  // This used to be a pair of exact complements — the composer lit when the
+  // package was complete, the package card lit when it was not — which kept
+  // "at most one ring" true by never letting both be unlit at once. That is
+  // no longer the shape of the rule: a package is optional now, so the thing
+  // the screen is waiting for is always the same thing, a message. The
+  // package card is not waiting for anything and carries no ring and no pill.
+  //
+  // A half package is the one state that blocks the send, and it is answered
+  // by a quiet inline sentence under the chips rather than by a cue: a cue
+  // says "this is what the screen wants next", and what the screen wants is
+  // still a message, not a second chip.
   const yourTurn = !pending && canSend;
-  const needsTerms = !pending && !canSend;
 
   /**
    * The written exchange for this cell, used in mockup mode.
@@ -396,6 +439,24 @@ export function BaselineTask({
   }, `baseline-t${taskIndex}-${phase}-${replies}`);
 
   async function send(text: string, sentOffer: Package = offer) {
+    /**
+     * NO PACKAGE IS `null`, NOT `{}` — and the difference is a whole move.
+     *
+     * `counterpartStep` branches on `incoming ? "balance" : "propose_tier"`,
+     * and `{}` is truthy, so a message carrying no package at all would be
+     * answered with SCRIPT-BALANCE: "that package is lopsided, here is the
+     * symmetric one". There is no package to call lopsided. Since Ver.2.20 a
+     * participant may simply talk — that is what the classifier reads and
+     * what the ladder is driven off — so an empty selector has to reach the
+     * machine as the absence it is, and be answered with the counterpart's
+     * own stage move (ask_why, misread, propose_tier) instead.
+     *
+     * Normalized HERE rather than inside the machine so the same value goes
+     * to the local decision, to the route, and to the stored transcript, and
+     * the client and the server cannot code the same turn differently.
+     */
+    const sentPackage: Package | null =
+      Object.keys(sentOffer).length > 0 ? sentOffer : null;
     const own: DisplayMessage = {
       id: `p${messages.length}`,
       speaker: "participant",
@@ -492,7 +553,7 @@ export function BaselineTask({
         text,
         createdAt: new Date().toISOString(),
         stage: counterpartStageAfter(replies),
-        proposal: Object.keys(sentOffer).length > 0 ? sentOffer : undefined,
+        proposal: sentPackage ?? undefined,
         // The classifier's verdict on THIS message, stored per message. It is
         // the source of the post-hoc κ that gate 19 turns on (§6.2a) — and it
         // is never rendered, because showing a participant which of their
@@ -517,7 +578,7 @@ export function BaselineTask({
 
       const mentioned = numbersEver || mentionsScoreNumbers(text);
       if (mentioned !== numbersEver) setNumbersEver(mentioned);
-      const decision = counterpartStep(task, counterpartRole, stageNow, sentOffer, {
+      const decision = counterpartStep(task, counterpartRole, stageNow, sentPackage, {
         tier: tierNow,
         askedWhy,
         misreadOffered,
@@ -570,7 +631,7 @@ export function BaselineTask({
             taskId,
             participantRole: role,
             stage: stageNow,
-            incoming: sentOffer,
+            incoming: sentPackage,
             tier: tierNow,
             askedWhy,
             misreadOffered,
@@ -641,6 +702,13 @@ export function BaselineTask({
       if (counterProposal) {
         setLastCounterpartPackage(counterProposal);
         setOffer(counterProposal);
+        // The drawer opens itself the FIRST time a package arrives, so
+        // countering it is one click away rather than something to go
+        // looking for. Once only — see `openedOnCounterProposal`.
+        if (!openedOnCounterProposal.current) {
+          openedOnCounterProposal.current = true;
+          setProposalOpen(true);
+        }
       }
 
       if (reply) {
@@ -675,7 +743,7 @@ export function BaselineTask({
         (decision.accepts || decision.impasse)
       ) {
         settledRef.current = true;
-        setTentative(decision.accepts ? (decision.proposal ?? sentOffer) : null);
+        setTentative(decision.accepts ? (decision.proposal ?? sentPackage) : null);
         setSettled(decision.accepts ? "agreed" : "impasse");
         logEvent(
           "negotiation_ended",
@@ -907,9 +975,7 @@ export function BaselineTask({
                   <Cue tone="quiet">Waiting for reply…</Cue>
                 ) : yourTurn ? (
                   <Cue>Your Turn</Cue>
-                ) : (
-                  <Cue tone="quiet">Select terms first</Cue>
-                )}
+                ) : null}
               </div>
           </div>
 
@@ -932,7 +998,7 @@ export function BaselineTask({
                   ? "This conversation has concluded."
                   : canSend
                     ? "Type your message here…"
-                    : "Please choose an option for both terms below first."
+                    : "Choose both terms below, or neither, before sending."
               }
             />
             {turnError ? (
@@ -955,18 +1021,45 @@ export function BaselineTask({
             </div>
           ) : null}
 
-          <Card cue={needsTerms} className="mb-6">
-            <CardTitle
-              hint="Select options below to build or modify your current proposal:"
-              aside={
-                needsTerms ? (
-                  <Cue>{task.issues.length - chosen} term(s) left</Cue>
-                ) : null
-              }
-            >
-              📦 Your Active Offer Package
-            </CardTitle>
-            <div className="space-y-4 mt-3">
+          {/* THE PROPOSAL SELECTOR, DEMOTED (Ver.2.20 round two).
+
+              It sits BELOW the composer and starts collapsed, because the
+              conversation is the task and a chip grid above the transcript
+              read as the thing being asked for. It cannot be REMOVED: it is
+              the only channel by which the participant's package reaches
+              `machine.ts`, and reading a package out of their prose would
+              hand a negotiation decision to a model (§6.7).
+
+              It is `<details>` rather than state for the same reason the
+              briefing panel's sections are: a live negotiation re-renders on
+              every tick and every bubble, find-in-page still reaches a closed
+              section, and the open/closed state survives without a hook.
+              `open` is controlled here only so the drawer can open itself
+              once when a package first arrives. */}
+          <details
+            open={proposalOpen}
+            onToggle={(e) => setProposalOpen(e.currentTarget.open)}
+            className="mb-6 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-sm)]"
+          >
+            <summary className="cursor-pointer list-none rounded-[var(--radius-lg)] px-5 py-4 sm:px-7">
+              <span className="flex items-center justify-between gap-4">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-bold leading-snug tracking-tight text-[var(--ink)] sm:text-lg">
+                    📦 Attach a proposal (optional)
+                  </span>
+                  {/* LIVE, not a static hint: this is the only place a
+                      participant with the drawer shut can see what their next
+                      message will carry. */}
+                  <span className="mt-1 block text-sm leading-relaxed text-[var(--ink-3)]">
+                    {attachedSummary}
+                  </span>
+                </span>
+                <span className="shrink-0 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-bold text-[var(--ink-2)]">
+                  {proposalOpen ? "▲ Hide" : "▼ Show"}
+                </span>
+              </span>
+            </summary>
+            <div className="space-y-4 px-5 pb-5 sm:px-7 sm:pb-7">
               {task.issues.map((issue) => (
                 <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
                   <div className="mb-2">
@@ -987,8 +1080,15 @@ export function BaselineTask({
                   />
                 </div>
               ))}
+              {/* A HALF PACKAGE IS THE ONE BLOCKED STATE, and it is said
+                  quietly — in the SUMMARY, which is visible whether the
+                  drawer is open or shut, rather than here where a participant
+                  with it closed would never see why their composer had gone
+                  quiet. No cue ring and no pill: a cue names the thing the
+                  screen is waiting for, and the screen is waiting for a
+                  message, not for a second chip (interface rule 9). */}
             </div>
-          </Card>
+          </details>
         </TaskLayout>
       </Page>
 
@@ -1009,11 +1109,10 @@ export function BaselineTask({
           }
         />
       ) : (
-        <ActionBar
-          note={`${chosen} of ${task.issues.length} terms selected${
-            outOfTime ? " · time expired" : ""
-          }`}
-        />
+        // NO TERM COUNT HERE ANY MORE. "x of 2 terms selected" told the
+        // participant, on the one persistent bar of the screen, that
+        // selecting terms was the outstanding business. It is optional now.
+        <ActionBar note={outOfTime ? "Time expired" : undefined} />
       )}
     </>
   );
