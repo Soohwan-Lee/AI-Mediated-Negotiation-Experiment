@@ -401,7 +401,20 @@ export function counterpartStep(
    */
   const reciprocalEarlyClose = (): CounterpartDecision | null => {
     if (!reciprocal) return null;
-    if (expired) {
+    const acceptable = acceptablePackage(
+      task,
+      participantRole,
+      incoming,
+      state.tier,
+      state.misreadOffered,
+    );
+    // ACCEPTANCE OUTRANKS THE CLOCK, and only here. `secondsRemaining` is read
+    // BEFORE the reply delay, so a participant who puts the tier package up in
+    // the last seconds has genuinely made an acceptable offer and would have
+    // been answered with an impasse — 600 instead of the rung they paid for,
+    // decided by when the message happened to land. Everything else the clock
+    // still outranks: it only ever costs a turn that was going to refuse.
+    if (expired && !acceptable) {
       return {
         ...base,
         stage: 6,
@@ -411,18 +424,12 @@ export function counterpartStep(
         impasse: true,
       };
     }
-    if (needsNumberReminder) {
+    // Past zero the reminder yields to an acceptable package for the same
+    // reason as in the trade loop: there is no later turn left to accept in.
+    if (needsNumberReminder && !(expired && acceptable)) {
       return { ...base, action: "nonum", proposal: null, accepts: false };
     }
-    if (
-      !acceptablePackage(
-        task,
-        participantRole,
-        incoming,
-        state.tier,
-        state.misreadOffered,
-      )
-    ) {
+    if (!acceptable) {
       return null;
     }
     return {
@@ -485,7 +492,21 @@ export function counterpartStep(
 
     default: {
       // Stages 5–6: the trade loop.
-      if (expired) {
+      //
+      // ACCEPTANCE OUTRANKS THE CLOCK — see `reciprocalEarlyClose`.
+      // `secondsRemaining` is captured before the reply delay, so the exact
+      // tier package sent in the last seconds is a real agreement and must not
+      // be coded as an impasse worth 600.
+      if (
+        expired &&
+        !acceptablePackage(
+          task,
+          participantRole,
+          incoming,
+          state.tier,
+          state.misreadOffered,
+        )
+      ) {
         return {
           ...base,
           stage: 6,
@@ -497,8 +518,22 @@ export function counterpartStep(
       }
 
       // The one-shot no-numbers reminder outranks everything except the end
-      // of the clock: it answers the message that just arrived.
-      if (needsNumberReminder) {
+      // of the clock: it answers the message that just arrived. Past zero it
+      // yields to an acceptable package, because there is no later turn left
+      // to accept in and the reminder would cost the participant the rung.
+      if (
+        needsNumberReminder &&
+        !(
+          expired &&
+          acceptablePackage(
+            task,
+            participantRole,
+            incoming,
+            state.tier,
+            state.misreadOffered,
+          )
+        )
+      ) {
         return { ...base, action: "nonum", proposal: null, accepts: false };
       }
 

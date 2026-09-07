@@ -1053,10 +1053,35 @@ export function DirectNegotiation({
   /** Any participant message so far mentioned score numbers (one-shot pool). */
   const [numbersEver, setNumbersEver] = useState(false);
   const [softCloseOffered, setSoftCloseOffered] = useState(false);
+  /**
+   * SCRIPT-MISREAD is once per task, and the flag has to travel — identical
+   * to the Direct arm's. Untracked it did two things at once: the counterpart
+   * could re-offer the misread on every work-rung turn, and
+   * `acceptablePackage` would refuse its own good-faith offer when the
+   * participant took it (§6.2 keeps the misread acceptable once made).
+   */
+  const [misreadOffered, setMisreadOffered] = useState(false);
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(openingPackage);
-  /** Two-step guard on "end without agreement". */
-  const [confirmDecline, setConfirmDecline] = useState(false);
+  /**
+   * The rung the standing package was put up at.
+   *
+   * "✓ Accept the package on the table" sends that package back through the
+   * machine, and the machine accepts only the CURRENT tier's package. So once
+   * a message raises the tier, the package still on screen is superseded: the
+   * machine answers `propose_tier` with `accepts: false` and the button does
+   * nothing visible, on the one control that exists so no model has to read
+   * the participant's words to decide whether they agreed.
+   *
+   * The rule is deliberately narrow — clear it only when a counterpart turn
+   * brings no replacement package AND the tier has moved past the rung this
+   * one was offered at. A turn that carries a proposal replaces it anyway,
+   * and a tier that has not moved leaves it acceptable, so neither case may
+   * take a live Accept button away from the participant.
+   *
+   * The proxies' opening package is seeded at the tier the proxies earned.
+   */
+  const [standingTier, setStandingTier] = useState<ReasonTier>(proxyVoicedTier);
   /** Synchronous mirror of `settled`, so two callers in one tick cannot both win. */
   const settledRef = useRef(false);
   /**
@@ -1064,7 +1089,7 @@ export function DirectNegotiation({
    * puts a package on the table — identical to the Direct arm's rule and for
    * the same reason. It is seeded open when the participant arrives carrying
    * the proxies' package, because that package IS what this conversation is
-   * about: the screen tells them to confirm, adjust or decline it, so the
+   * about: the screen tells them to confirm or adjust it, so the
    * thing being confirmed cannot start hidden.
    */
   const [proposalOpen, setProposalOpen] = useState(Boolean(openingPackage));
@@ -1156,9 +1181,10 @@ export function DirectNegotiation({
    * which is a different behaviour on a confirmatory outcome.
    */
   function finish(kind: "agreed" | "impasse", pkg: Package | null) {
-    // How it ended — "declined" vs "timeout" — is already on the
-    // `negotiation_ended` event that `settle()` writes, which is where an
-    // audit looks for it.
+    // How it ended is already on the `negotiation_ended` event that `settle()`
+    // writes, which is where an audit looks for it. Only "timeout" and
+    // "agreed" reach it now: the participant-initiated "declined" route was
+    // removed so both arms end the same three ways (see the composer below).
     onSettled(kind === "agreed" ? pkg : null, { selfDisclosed });
   }
 
@@ -1181,15 +1207,30 @@ export function DirectNegotiation({
     };
     const next = [...messages, own];
     setTurnError(null);
+    // Lock the composer before classification starts, exactly as the Direct
+    // arm does. The classifier is part of this turn, and a second Send while
+    // it is in flight would produce two participant messages and two
+    // counterpart turns from the same state.
+    setPending(true);
     setMessages(next);
     setDraft("");
-    setConfirmDecline(false);
 
     // The classifier reads this message (§6.2a); the rung it earns counts
     // from THIS turn, because a confession should land the moment it is made.
     type ReasonLabel = "none" | "WR" | "PRI" | "SB";
     let label: ReasonLabel = "none";
     let confidence: number | undefined;
+    /**
+     * Did the CANNED classifier answer this message?
+     *
+     * `{label:"none"}` is byte-identical whether the participant genuinely
+     * gave no reason, the call failed, or there is no model configured at
+     * all. The route already distinguishes the third case; nothing was
+     * reading it. Logged here so a scaffolded classifier is visible in the
+     * data rather than showing up as a whole arm that happened to say
+     * nothing — which is what gate 19's κ would otherwise be computed off.
+     */
+    let classifierStubbed = false;
     if (!mockAi) {
       try {
         const res = await fetch("/api/classify-reason", {
@@ -1200,9 +1241,11 @@ export function DirectNegotiation({
         const data = (await res.json()) as {
           label?: ReasonLabel;
           confidence?: number;
+          stubbed?: boolean;
         };
         if (data.label) label = data.label;
         confidence = data.confidence;
+        classifierStubbed = data.stubbed === true;
       } catch (error) {
         console.warn("[classify-reason] failed", error);
       }
@@ -1221,6 +1264,8 @@ export function DirectNegotiation({
         secondsRemaining,
         requirementOption: sentOffer[requirement.id] ?? null,
         reasonLabel: label,
+        reasonConfidence: confidence,
+        classifierStubbed,
         tier: tierNow,
       },
       { sessionIndex: taskIndex },
@@ -1256,7 +1301,6 @@ export function DirectNegotiation({
       });
     }
 
-    setPending(true);
     // Counted from here so generation time comes OUT of the reply budget
     // rather than being added on top of it.
     const turnStartedAt = Date.now();
@@ -1268,6 +1312,7 @@ export function DirectNegotiation({
         tier: tierNow,
         disclosurePolicy: "fixed",
         askedWhy,
+        misreadOffered,
         numbersReminded,
         numbersMentionedNow: mentioned,
         secondsRemaining,
@@ -1276,6 +1321,7 @@ export function DirectNegotiation({
       if (decision.action === "ask_why") setAskedWhy(true);
       if (decision.action === "nonum") setNumbersReminded(true);
       if (decision.action === "soft_close") setSoftCloseOffered(true);
+      if (decision.action === "misread") setMisreadOffered(true);
 
       let reply: string;
       if (mockAi) {
@@ -1293,6 +1339,7 @@ export function DirectNegotiation({
             incoming: sentPackage,
             tier: tierNow,
             askedWhy,
+            misreadOffered,
             numbersReminded,
             // Sent, not re-derived server-side: the client codes the outcome
             // from its own `counterpartStep`, so every input to that call has
@@ -1352,6 +1399,7 @@ export function DirectNegotiation({
       // the commitment it was meant to inform.
       if (decision.proposal) {
         setLastCounterpartPackage(decision.proposal);
+        setStandingTier(tierNow);
         setOffer(decision.proposal);
         // The drawer opens itself the FIRST time a package arrives, so
         // countering it is one click away. Once only, and identical to the
@@ -1360,6 +1408,12 @@ export function DirectNegotiation({
           openedOnCounterProposal.current = true;
           setProposalOpen(true);
         }
+      } else if (tierNow !== standingTier) {
+        // See `standingTier`: nothing came back to replace it and the rung has
+        // moved, so the package on screen can no longer be accepted. Take the
+        // button away rather than leave one that silently does nothing.
+        setLastCounterpartPackage(null);
+        setStandingTier(tierNow);
       }
 
       const counter: DisplayMessage = {
@@ -1453,12 +1507,12 @@ export function DirectNegotiation({
                     : settled === "impasse"
                       ? "⚠️ The negotiation ended without an agreement."
                       : openingPackage
-                        ? "You are talking directly with the other participant. Confirm, adjust, or decline what the proxies reached."
+                        ? "You are talking directly with the other participant. Confirm or adjust what the proxies reached."
                         : // NO STANDING PACKAGE, and two different things
                           // bring a participant here: they refused what their
                           // proxies reached, or the exchange never produced
                           // one. Either way there is nothing to confirm or
-                          // decline — saying otherwise sent them looking for
+                          // adjust — saying otherwise sent them looking for
                           // an Accept button that is correctly not rendered —
                           // but telling a refuser their proxies "did not
                           // settle" contradicts the screen they just left.
@@ -1524,48 +1578,24 @@ export function DirectNegotiation({
             ) : null}
           </Card>
 
-          {!settled ? (
+          {/* NO PARTICIPANT-INITIATED IMPASSE. A closing conversation ends the
+              same three ways as the Direct arm's: a package the counterpart
+              accepts by the ladder, this explicit Accept, or the clock. The
+              "End without agreement" control was only ever here, so it gave
+              the Proxy arm a route to the 600 fallback that Direct has no
+              counterpart for — on the primary contrast, taken by the
+              participant rather than by the machine. Restore it only in BOTH
+              arms at once, if at all. */}
+          {!settled && lastCounterpartPackage ? (
             <div className="mb-6 flex flex-wrap items-center gap-3">
-              {lastCounterpartPackage ? (
-                <button
-                  type="button"
-                  onClick={acceptStanding}
-                  disabled={pending}
-                  className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-2xs transition-colors hover:bg-emerald-100 disabled:opacity-50"
-                >
-                  ✓ Accept the package on the table
-                </button>
-              ) : null}
               <button
                 type="button"
-                onClick={() => {
-                  if (!confirmDecline) {
-                    setConfirmDecline(true);
-                    return;
-                  }
-                  settle("impasse", null, "declined");
-                }}
+                onClick={acceptStanding}
                 disabled={pending}
-                className={cx(
-                  "rounded-xl border px-4 py-2.5 text-sm font-bold shadow-2xs transition-colors disabled:opacity-50",
-                  confirmDecline
-                    ? "border-red-400 bg-red-50 text-red-800 hover:bg-red-100"
-                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
-                )}
+                className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-2xs transition-colors hover:bg-emerald-100 disabled:opacity-50"
               >
-                {confirmDecline
-                  ? "Really end without an agreement? Click again to confirm."
-                  : "✗ End without agreement"}
+                ✓ Accept the package on the table
               </button>
-              {confirmDecline ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDecline(false)}
-                  className="text-xs font-semibold text-slate-500 underline underline-offset-4"
-                >
-                  Keep talking
-                </button>
-              ) : null}
             </div>
           ) : null}
 

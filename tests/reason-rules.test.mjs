@@ -527,17 +527,10 @@ for (const taskId of TASKS) {
   }
 }
 
-test("Direct expiry and score reminders outrank an otherwise valid early acceptance", () => {
+test("the score reminder outranks an otherwise valid early acceptance", () => {
   const task = getTask("task_a");
   const pkg = tierPackage(task, "leader", "work");
   const base = state("work", { disclosurePolicy: "reciprocal" });
-  const expired = counterpartStep(task, "member", 2, pkg, {
-    ...base,
-    secondsRemaining: 0,
-  });
-  assert.equal(expired.action, "impasse");
-  assert.equal(expired.accepts, false);
-
   const reminded = counterpartStep(task, "member", 2, pkg, {
     ...base,
     numbersReminded: false,
@@ -545,6 +538,57 @@ test("Direct expiry and score reminders outrank an otherwise valid early accepta
   });
   assert.equal(reminded.action, "nonum");
   assert.equal(reminded.accepts, false);
+});
+
+test("the tier package sent in the last seconds is accepted, not read as impasse", () => {
+  // `secondsRemaining` is captured BEFORE the reply delay, so a participant
+  // who puts the tier package up near the end reaches the machine at zero.
+  // Answering that with an impasse pays 600 instead of the rung they earned,
+  // and which one they got would be decided by when the message landed.
+  // Checked in BOTH policies: the Direct arm's early close and the trade loop
+  // are separate branches and each had the expiry check in front.
+  const task = getTask("task_a");
+  for (const tier of ["none", "work", "priority", "sensitive"]) {
+    const pkg = tierPackage(task, "leader", tier);
+
+    const direct = counterpartStep(task, "member", 2, pkg, {
+      ...state(tier, { disclosurePolicy: "reciprocal" }),
+      secondsRemaining: 0,
+      // The sensitive rung reciprocates and accepts in one reply, so this
+      // says "already disclosed" and the action is the plain accept wording.
+      counterpartSbDisclosed: true,
+    });
+    assert.equal(direct.accepts, true, `direct ${tier}`);
+    assert.deepEqual(direct.proposal, pkg);
+
+    const trade = counterpartStep(task, "member", 5, pkg, {
+      ...state(tier),
+      secondsRemaining: 0,
+    });
+    assert.equal(trade.accepts, true, `trade ${tier}`);
+    assert.deepEqual(trade.proposal, pkg);
+  }
+
+  // Off-tier at zero is still an impasse — the clock outranks everything the
+  // counterpart was going to refuse anyway.
+  const greedy = maxPackage(task, "leader");
+  const refused = counterpartStep(task, "member", 5, greedy, {
+    ...state("work"),
+    secondsRemaining: 0,
+  });
+  assert.equal(refused.action, "impasse");
+  assert.equal(refused.accepts, false);
+
+  // And a first score mention at zero must not cost the rung: with no turn
+  // left to accept in, the acceptance wins over the one-shot reminder.
+  const pkg = tierPackage(task, "leader", "priority");
+  const mentioned = counterpartStep(task, "member", 5, pkg, {
+    ...state("priority"),
+    secondsRemaining: 0,
+    numbersReminded: false,
+    numbersMentionedNow: true,
+  });
+  assert.equal(mentioned.accepts, true);
 });
 
 test("Proxy keeps its fixed stage-4 disclosure schedule", () => {
@@ -623,7 +667,17 @@ test("every ExchangeState field can change the decision, so all of them travel",
   // The same for the other one-shots, so none of them is quietly dropped
   // from a request body later.
   assert.equal(decide({ tier: "work" }).accepts, false);
-  assert.equal(decide({ secondsRemaining: 0 }).impasse, true);
+  // The clock, on an OFF-TIER package: acceptance outranks expiry now (a tier
+  // package sent in the last seconds is a real agreement), so the field has
+  // to be read where the counterpart was going to refuse anyway.
+  assert.equal(
+    counterpartStep(task, "leader", 5, best, {
+      ...base,
+      tier: "work",
+      secondsRemaining: 0,
+    }).impasse,
+    true,
+  );
 });
 
 test("a low clock offers SCRIPT-CLOSE once, expiry is an impasse", () => {

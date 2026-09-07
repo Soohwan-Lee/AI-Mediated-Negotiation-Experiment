@@ -67,6 +67,47 @@ function assertNotLiveWithoutModel(): void {
   }
 }
 
+/** Hard deadline on a single model call — see `postToModel`. */
+const MODEL_TIMEOUT_MS = 45_000;
+
+/**
+ * The Responses call, with a hard deadline.
+ *
+ * WHY 45 SECONDS. The routes are budgeted at `maxDuration = 60`, and
+ * `/api/proxy-negotiation` may retry a turn whose card clause was dropped, so
+ * the timeout has to leave room for a second attempt inside the same request.
+ * Without one, a hung connection held the route until the platform killed it —
+ * which reaches the client as a bare failure with no error body, and in the
+ * Direct arm that is a participant watching an empty conversation.
+ *
+ * AN ABORT SURFACES AS THE SAME ERROR CLASS AS AN HTTP FAILURE. `AbortSignal`
+ * rejects with a `DOMException`, which no caller catches by name; every caller
+ * here already handles a plain `Error` as "the model failed, floor or 5xx".
+ * `ModelNotConfiguredError` is the only distinction that may exist, and it is
+ * thrown before this is ever reached.
+ */
+async function postToModel(
+  apiKey: string,
+  body: unknown,
+): Promise<Response> {
+  try {
+    return await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new Error(`LLM request timed out after ${MODEL_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  }
+}
+
 /** Used when no API key is configured, so the UI is still exercisable. */
 function stubAction(ctx: PromptContext): NegotiationAction {
   const first = ctx.issues[0];
@@ -97,30 +138,23 @@ export async function generateAction(
 
   const system = `${buildSystemPrompt(args.kind, args.ctx)}\n${STRUCTURED_OUTPUT_INSTRUCTION}`;
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: AI_CONFIG.model,
-      // No `temperature`: this model family rejects it (see ai/config.ts).
-      reasoning: { effort: AI_CONFIG.reasoningEffort },
-      max_output_tokens: AI_CONFIG.maxOutputTokens,
-      input: [
-        { role: "system", content: system },
-        ...args.history.map((m) => ({ role: m.role, content: m.content })),
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "negotiation_action",
-          strict: true,
-          schema: NEGOTIATION_ACTION_SCHEMA,
-        },
+  const response = await postToModel(apiKey, {
+    model: AI_CONFIG.model,
+    // No `temperature`: this model family rejects it (see ai/config.ts).
+    reasoning: { effort: AI_CONFIG.reasoningEffort },
+    max_output_tokens: AI_CONFIG.maxOutputTokens,
+    input: [
+      { role: "system", content: system },
+      ...args.history.map((m) => ({ role: m.role, content: m.content })),
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "negotiation_action",
+        strict: true,
+        schema: NEGOTIATION_ACTION_SCHEMA,
       },
-    }),
+    },
   });
 
   if (!response.ok) {
@@ -168,22 +202,15 @@ export async function generateText(args: {
     };
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: AI_CONFIG.model,
-      // No `temperature` — see ai/config.ts.
-      reasoning: { effort: AI_CONFIG.reasoningEffort },
-      max_output_tokens: AI_CONFIG.maxOutputTokens,
-      input: [
-        { role: "system", content: buildSystemPrompt(args.kind, args.ctx) },
-        ...args.history.map((m) => ({ role: m.role, content: m.content })),
-      ],
-    }),
+  const response = await postToModel(apiKey, {
+    model: AI_CONFIG.model,
+    // No `temperature` — see ai/config.ts.
+    reasoning: { effort: AI_CONFIG.reasoningEffort },
+    max_output_tokens: AI_CONFIG.maxOutputTokens,
+    input: [
+      { role: "system", content: buildSystemPrompt(args.kind, args.ctx) },
+      ...args.history.map((m) => ({ role: m.role, content: m.content })),
+    ],
   });
 
   if (!response.ok) {
@@ -278,29 +305,22 @@ export async function classifyReason(args: {
     return { label: "none", confidence: 0, stubbed: true };
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: AI_CONFIG.model,
-      // No `temperature` — see ai/config.ts.
-      reasoning: { effort: AI_CONFIG.reasoningEffort },
-      max_output_tokens: AI_CONFIG.maxOutputTokens,
-      input: [
-        { role: "system", content: buildClassifierPrompt(args.ctx) },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "reason_classification",
-          strict: true,
-          schema: CLASSIFIER_SCHEMA,
-        },
+  const response = await postToModel(apiKey, {
+    model: AI_CONFIG.model,
+    // No `temperature` — see ai/config.ts.
+    reasoning: { effort: AI_CONFIG.reasoningEffort },
+    max_output_tokens: AI_CONFIG.maxOutputTokens,
+    input: [
+      { role: "system", content: buildClassifierPrompt(args.ctx) },
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "reason_classification",
+        strict: true,
+        schema: CLASSIFIER_SCHEMA,
       },
-    }),
+    },
   });
 
   if (!response.ok) {

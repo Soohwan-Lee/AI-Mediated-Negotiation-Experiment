@@ -176,7 +176,7 @@ export function StudyOrientation({
             </Card>
             <Card>
               <CardTitle>Choose what to explain</CardTitle>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">You can explain your priorities and ask about the other person&apos;s situation. They adjust conditions based on the reasons they hear. A more specific explanation can help them justify a larger change.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">You can explain your priorities and ask about the other person&apos;s situation. They adjust conditions based on the reasons they hear.</p>
               <p className="mt-3 text-sm leading-relaxed text-slate-900">Sharing sensitive background is optional. You can negotiate and reach an agreement without it. If you or your AI Proxy shares it, the other person may consider it in their later bonus decision or upward evaluation.</p>
             </Card>
             <Card>

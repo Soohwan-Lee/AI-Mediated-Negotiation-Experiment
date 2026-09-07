@@ -41,18 +41,29 @@ export function CountdownTimer({
     onTickRef.current = onTick;
   });
 
+  /**
+   * THE COUNT LIVES IN A REF, AND THE CALLBACKS FIRE FROM THE INTERVAL BODY.
+   *
+   * They used to fire from inside the `setRemaining` updater, which React runs
+   * TWICE in strict mode — so every second reported the tick twice and the
+   * final second fired `onExpire` twice. `onExpire` settles the exchange, and
+   * `onTick` is what feeds `secondsRemaining` into the machine, so a doubled
+   * updater is a doubled terminal event on the clock the outcome is coded
+   * against. An updater must be pure; the state is the mirror, not the source.
+   */
+  const remainingRef = useRef(seconds);
+
   useEffect(() => {
     if (!running) return;
     const id = window.setInterval(() => {
-      setRemaining((r) => {
-        const next = Math.max(0, r - 1);
-        window.setTimeout(() => onTickRef.current?.(next), 0);
-        if (next === 0) {
-          window.clearInterval(id);
-          window.setTimeout(() => onExpireRef.current?.(), 0);
-        }
-        return next;
-      });
+      const next = Math.max(0, remainingRef.current - 1);
+      remainingRef.current = next;
+      setRemaining(next);
+      onTickRef.current?.(next);
+      if (next === 0) {
+        window.clearInterval(id);
+        onExpireRef.current?.();
+      }
     }, 1000);
     return () => window.clearInterval(id);
   }, [running]);

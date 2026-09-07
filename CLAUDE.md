@@ -1264,10 +1264,14 @@ Both facts were established by tracing the clients:
   `if (data.label) label = data.label` inside a try/catch, so a body with no
   `label` silently leaves the tier at `none` — the very silence the guard
   exists to break, one layer down.
-- The Direct arm has **no error state at all**. Its counterpart fetch has no
-  catch and falls through to "sorry, lost my train of thought there", so a
-  mid-negotiation refusal would have a participant watch the counterpart
-  apologise forever, forty minutes in, with half their data collected.
+- **A mid-negotiation refusal is now visible, but as an ordinary network
+  failure.** Both arms throw on a non-200, restore the participant's draft and
+  show one retry prompt — the fetch used to fall through to "sorry, lost my
+  train of thought there", so a refusal read as a conversational turn. What the
+  retry prompt cannot say is that the study is misconfigured, so the
+  participant would keep retrying a 503 that will never clear. That is why the
+  guarantee stays at ENTRY: refusing there is free, and by here half the data
+  is already collected.
 
 **`ModelNotConfiguredError` is a named class for one reason**: the classifier
 must tell it apart from an ordinary model failure. `{label:"none"}` is correct
@@ -1600,6 +1604,14 @@ Nothing structural. What remains is values to fix and behaviour to observe:
   fetch, so the catch restores the draft and a retry appends a second copy.
   Same behaviour in Direct and in the Proxy closing, so it is not a condition
   artefact; fix it in both at once or in neither.
+
+- **The Proxy closing's "End without agreement" control was removed on
+  2026-09-07**, and it may be restored only in BOTH arms at once. It let a
+  Proxy participant take the 600 fallback by hand, on the primary contrast,
+  where a Direct participant has no such button — so "how did it end" carried
+  an arm-specific route that appears in no design record. Both arms now end
+  the same three ways: a package the counterpart accepts by the ladder, the
+  explicit Accept button, or the clock.
 
 - Fixed vs. jittered counterpart delay · final IRB language (four deceptions
   now: the counterpart's existence, the bonus, the upward evaluation being

@@ -312,6 +312,24 @@ export function BaselineTask({
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(null);
   /**
+   * The rung the standing package was put up at.
+   *
+   * "✓ Accept the package on the table" sends that package back through the
+   * machine, which accepts only the CURRENT tier's package. Once a message
+   * raises the tier the package still on screen is superseded: the machine
+   * answers `propose_tier` with `accepts: false` and the button silently does
+   * nothing, on the one control that exists so no model has to read the
+   * participant's words to decide whether they agreed.
+   *
+   * Cleared only when a counterpart turn brings NO replacement package and
+   * the tier has moved past this rung — a turn carrying a proposal replaces
+   * it anyway, and an unmoved tier leaves it acceptable. Same rule and same
+   * wording in the Proxy arm's closing (shared.tsx): these are the two places
+   * a participant speaks for themselves, so a difference lands on
+   * `Pooled Proxy − Direct`.
+   */
+  const [standingTier, setStandingTier] = useState<ReasonTier>("none");
+  /**
    * The proposal drawer opens ONCE, by itself, the first time the counterpart
    * puts a package on the table — so countering it is one click away rather
    * than a thing to go looking for. It is not forced open again after that:
@@ -484,6 +502,17 @@ export function BaselineTask({
      */
     let label: "none" | "WR" | "PRI" | "SB" = "none";
     let confidence: number | undefined;
+    /**
+     * Did the CANNED classifier answer this message?
+     *
+     * `{label:"none"}` is byte-identical whether the participant genuinely
+     * gave no reason, the call failed, or there is no model configured at
+     * all. The route already distinguishes the third case; nothing was
+     * reading it. Logged here so a scaffolded classifier is visible in the
+     * data rather than showing up as a whole arm that happened to say
+     * nothing — which is what gate 19's κ would otherwise be computed off.
+     */
+    let classifierStubbed = false;
     if (!mockAi) {
       try {
         const res = await fetch("/api/classify-reason", {
@@ -494,9 +523,11 @@ export function BaselineTask({
         const data = (await res.json()) as {
           label?: typeof label;
           confidence?: number;
+          stubbed?: boolean;
         };
         if (data.label) label = data.label;
         confidence = data.confidence;
+        classifierStubbed = data.stubbed === true;
       } catch (error) {
         console.warn("[classify-reason] failed", error);
       }
@@ -540,6 +571,8 @@ export function BaselineTask({
         // the post-hoc human re-coding and the κ that gate 19 turns on
         // (§6.2). Not shown to anyone.
         reasonLabel: label,
+        reasonConfidence: confidence,
+        classifierStubbed,
         tier: tierNow,
       },
       { sessionIndex: taskIndex },
@@ -701,6 +734,7 @@ export function BaselineTask({
       // so the two arms cannot differ on how an agreement gets committed.
       if (counterProposal) {
         setLastCounterpartPackage(counterProposal);
+        setStandingTier(tierNow);
         setOffer(counterProposal);
         // The drawer opens itself the FIRST time a package arrives, so
         // countering it is one click away rather than something to go
@@ -709,6 +743,12 @@ export function BaselineTask({
           openedOnCounterProposal.current = true;
           setProposalOpen(true);
         }
+      } else if (tierNow !== standingTier) {
+        // See `standingTier`: nothing came back to replace it and the rung has
+        // moved, so what is on screen can no longer be accepted. Take the
+        // button away rather than leave one that does nothing.
+        setLastCounterpartPackage(null);
+        setStandingTier(tierNow);
       }
 
       if (reply) {

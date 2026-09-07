@@ -37,6 +37,13 @@ import { ModelNotConfiguredError } from "@/lib/ai/config";
 import { getTask } from "@/lib/tasks";
 import type { Role, TaskId } from "@/lib/types";
 
+// Same runtime and budget as the sibling AI routes. Without them this one ran
+// on the default edge runtime and the default duration, so a slow classifier
+// call could be cut short where the counterpart's own turn would not be — on
+// the route the Direct arm's tier is decided by.
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 interface RequestBody {
   taskId: TaskId;
   /** The participant's own role — the cards read are theirs. */

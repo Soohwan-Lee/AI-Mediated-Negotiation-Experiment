@@ -80,6 +80,14 @@ function useHydrated(): boolean {
 function newParticipantKey(): string {
   // Pseudonymous research key. The raw Prolific PID is stored separately so
   // exports can be de-identified (Methods §Data logging).
+  //
+  // `randomUUID` where the browser has it: the fallback draws about 40 bits
+  // from `Math.random`, which is not a collision guarantee across 120
+  // participants' worth of keys and is not required to be unpredictable. The
+  // fallback stays for the non-secure contexts that have no `crypto` at all.
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `P-${crypto.randomUUID()}`;
+  }
   return `P-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
 }
 

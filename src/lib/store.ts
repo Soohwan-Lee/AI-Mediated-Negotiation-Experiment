@@ -120,15 +120,30 @@ function key(...parts: (string | number)[]) {
   return [NS, ...parts].join(":");
 }
 
+// BOTH SIDES SWALLOW, as `store-supabase.ts`'s queue mirror does. A private
+// window, blocked site data or a full quota makes `localStorage` THROW, and
+// these are called from the middle of a negotiation turn: an unhandled quota
+// error there would take the whole exchange down over a write whose only job
+// is durability across a reload. A read that throws is the same case — the
+// absent value is the correct answer to "nothing readable is stored".
 function read<T>(k: string): T | null {
   if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(k);
-  return raw ? (JSON.parse(raw) as T) : null;
+  try {
+    const raw = window.localStorage.getItem(k);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
 }
 
 function write(k: string, value: unknown) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(k, JSON.stringify(value));
+  try {
+    window.localStorage.setItem(k, JSON.stringify(value));
+  } catch {
+    // Nothing useful to do here: the value is already in memory for this
+    // session, and the participant must not see a negotiation turn fail.
+  }
 }
 
 class LocalStore implements Store {
