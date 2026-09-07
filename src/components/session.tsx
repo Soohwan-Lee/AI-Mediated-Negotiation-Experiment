@@ -15,11 +15,15 @@
  * wherever they can be. Nothing here may hint at which condition a task is.
  */
 
-import { useState, type ReactNode } from "react";
+import {
+  useId,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { IssueValueTable } from "./issues";
 import { ActionBar } from "./study-chrome";
 import { Card, CardTitle, Page, PrivateTag, cx } from "./ui";
-import { cardOfLayer } from "@/lib/tasks";
 import type { NegotiationTask, Role } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -257,113 +261,6 @@ export function TaskCover({
 // ---------------------------------------------------------------------------
 
 /**
- * The briefing in three lines, for the negotiation rail only.
- *
- * WHY IT EXISTS. The briefing is about 470 words at one uniform visual
- * weight — role, story, objectives, two payoff tables, two cards, fallback —
- * so everything is stated and nothing is foregrounded. Mid-negotiation, with
- * the story folded shut and a clock running, a participant needs the shape of
- * their own position in one glance, not a re-read.
- *
- * WHY NOT ON THE BRIEF SCREEN. There every section is expanded, so a summary
- * of the page you are already reading is the same words twice and makes the
- * wall longer rather than shorter. `defaultOpen` marks that screen and this
- * is hidden on it.
- *
- * IT ADDS NO CONTENT AND QUOTES NOTHING AT LENGTH. The goal line is the
- * participant's own first objective; the other two are one short fixed
- * sentence each, pointing at the cards rather than repeating them — the
- * sensitive card's own text sits a few centimetres below in "Permitted
- * Reasons", and printing it twice was how the first version of this made the
- * panel longer instead of clearer.
- *
- * WHAT IT MAY NOT DO. It names neither issue and shows no points: naming the
- * requirement issue in a heading is what §5 principle 1 forbids, and a
- * summary quoting "3,000" beside one term would hand over the shape of the
- * logroll (pilot gate 6).
- */
-export function BriefingSummary({
-  task,
-  role,
-}: {
-  task: NegotiationTask;
-  role: Role;
-}) {
-  const brief = task.roleBriefs[role];
-  const sensitive = cardOfLayer(task, role, "sensitive");
-  if (!brief.objectives.length || !sensitive) return null;
-
-  const rows: Array<{
-    icon: string;
-    label: string;
-    body: string;
-    badge: string;
-    badgeClass: string;
-  }> = [
-    {
-      icon: "🎯",
-      label: "What You Want",
-      badge: "Goal",
-      badgeClass: "bg-blue-100 text-blue-900 border-blue-200",
-      body: brief.objectives[0],
-    },
-    {
-      icon: "🔒",
-      label: "What Only You Know",
-      badge: "Private",
-      badgeClass: "bg-amber-100 text-amber-900 border-amber-200",
-      body: "Your sensitive background below — saying it is entirely your choice.",
-    },
-    {
-      icon: "⚖️",
-      label: "Your Dilemma",
-      badge: "Decision",
-      badgeClass: "bg-purple-100 text-purple-900 border-purple-200",
-      body: "Saying it makes your case credible, but the other side evaluates you afterwards.",
-    },
-  ];
-
-  return (
-    <div className="mb-4 rounded-2xl border border-[var(--private-line)] bg-gradient-to-br from-[var(--private-soft)] via-amber-50/50 to-white p-3.5 sm:p-4 shadow-2xs">
-      <div className="flex items-center gap-2 mb-2.5">
-        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-200/80 text-xs">
-          💡
-        </span>
-        <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--private-strong)]">
-          At a Glance · Your 3 Key Priorities
-        </p>
-      </div>
-      <div className="grid grid-cols-1 gap-2.5">
-        {rows.map((row) => (
-          <div
-            key={row.label}
-            className="rounded-xl border border-amber-200/60 bg-white/90 p-2.5 sm:p-3 shadow-2xs"
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="flex items-center gap-1.5 text-xs font-bold text-slate-900 min-w-0">
-                <span className="shrink-0">{row.icon}</span>
-                <span className="truncate">{row.label}</span>
-              </span>
-              <span
-                className={cx(
-                  "rounded-full border px-2 py-0.5 text-2xs font-extrabold shrink-0 whitespace-nowrap",
-                  row.badgeClass,
-                )}
-              >
-                {row.badge}
-              </span>
-            </div>
-            <p className="text-xs leading-relaxed text-slate-700 font-medium break-words">
-              {row.body}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
  * The role story, split at the paragraph breaks it already has.
  *
  * All four cells are written to the same three-beat shape (§4's face
@@ -392,140 +289,204 @@ export function RoleStory({ story }: { story: string }) {
 export function BriefingPanel({
   task,
   role,
-  defaultOpen,
 }: {
   task: NegotiationTask;
   role: Role;
-  defaultOpen?: boolean;
 }) {
   const brief = task.roleBriefs[role];
+  const [activeTab, setActiveTab] = useState<"situation" | "points" | "reasons">("points");
+  const tabId = useId();
+  const hasReasons = brief.reasonCards.length > 0;
+  const tabs: Array<{ id: "situation" | "points" | "reasons"; label: string }> = [
+    { id: "situation" as const, label: "Situation" },
+    { id: "points" as const, label: "Points" },
+    ...(hasReasons ? [{ id: "reasons" as const, label: "Reasons" }] : []),
+  ];
+  const currentTab = tabs.some((tab) => tab.id === activeTab) ? activeTab : "points";
+  const maximumPoints = task.issues.reduce(
+    (sum, issue) => sum + Math.max(...issue.options.map((option) => option.points[role])),
+    0,
+  );
+
+  function selectTab(index: number) {
+    const next = tabs[index];
+    setActiveTab(next.id);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`${tabId}-tab-${next.id}`)?.focus();
+    });
+  }
+
+  function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let next: number | null = null;
+    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+    if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = tabs.length - 1;
+    if (next === null) return;
+    event.preventDefault();
+    selectTab(next);
+  }
+
+  const memberContext =
+    role === "member" && !/senior|experienced/i.test(brief.organizationalPosition)
+      ? "You are an experienced member of the project team. "
+      : "";
 
   return (
-    <Card tone="private" className="text-[var(--private-ink)]">
-      <div className="mb-4 flex items-center justify-between gap-2 border-b border-[var(--private-line)] pb-3">
-        <h2 className="text-base font-bold text-[var(--private-strong)]">
-          Your Briefing
-        </h2>
+    <Card padded={false} tone="private" className="p-4 text-[var(--private-ink)]">
+      <div className="mb-3 flex items-start justify-between gap-3 border-b border-[var(--private-line)] pb-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--private-strong)]">
+            Your private briefing
+          </p>
+          <h2 className="mt-0.5 text-sm font-semibold leading-snug text-[var(--ink)]">
+            {task.title}
+          </h2>
+        </div>
         <PrivateTag />
       </div>
 
-      <div className="mb-4 rounded-2xl border border-[var(--private-line)] bg-[var(--private-soft)] p-4 shadow-2xs">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--private-strong)]">
-            Your Role in this Scenario
-          </p>
-          <span className="rounded-full border border-amber-300 bg-amber-100/80 px-2.5 py-0.5 text-2xs font-bold text-amber-900">
-            {role === "leader" ? "👑 Team Lead" : "Senior Team Member"}
-          </span>
-        </div>
-        <p className="text-lg font-black text-[var(--ink)]">
-          {brief.title}
+      <section aria-labelledby={`${tabId}-role`} className="mb-3 rounded-xl border border-amber-200 bg-white/75 p-3">
+        <p id={`${tabId}-role`} className="text-xs font-bold uppercase tracking-wider text-[var(--private-strong)]">
+          Your role
         </p>
-        <p className="mt-1 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)]/90">
-          {brief.organizationalPosition}
+        <h3 className="mt-0.5 text-base font-bold leading-snug text-[var(--ink)]">
+          {role === "leader" ? "Team lead" : "Team member"}
+        </h3>
+        <p className="mt-1 text-sm leading-relaxed text-[var(--private-ink)]/90">
+          {memberContext}{brief.organizationalPosition}
         </p>
-      </div>
+      </section>
 
+      <section aria-labelledby={`${tabId}-goals`} className="mb-3 rounded-xl bg-amber-100/55 p-3">
+        <h3 id={`${tabId}-goals`} className="text-sm font-bold text-[var(--ink)]">
+          Your goals
+        </h3>
+        <ul className="mt-2 space-y-2 text-sm leading-relaxed">
+          {brief.objectives.map((objective, index) => (
+            <li key={objective} className="flex items-start gap-2">
+              <span className="tabular mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-amber-300 bg-white text-[0.6875rem] font-bold text-[var(--private-strong)]">
+                {index + 1}
+              </span>
+              <span>{objective}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
-
-      <div className="space-y-3">
-        <Fold title="📄 Your Situation" defaultOpen={defaultOpen}>
-          <RoleStory story={brief.roleStory} />
-        </Fold>
-
-        <Fold title="🎯 What You Want (Priorities)" defaultOpen={defaultOpen}>
-          <ul className="list-disc space-y-1.5 pl-4 text-xs sm:text-sm leading-relaxed">
-            {brief.objectives.map((o) => (
-              <li key={o}>{o}</li>
-            ))}
-          </ul>
-        </Fold>
-
-        <Fold title="🔢 Point Values per Term" defaultOpen>
-          <IssueValueTable
-            issues={task.issues}
-            role={role}
-            reservationPoints={task.reservationPoints}
-          />
-        </Fold>
-
-        {brief.reasonCards.length ? (
-          <Fold title="💬 Reasons you can share" defaultOpen>
-            <p className="mb-2.5 rounded-lg border border-[var(--private-line)] bg-amber-100/60 p-2.5 text-xs leading-relaxed font-medium">
-              {brief.requirementNote}
-            </p>
-            {/* `disclosureRisk` belongs HERE, in the panel both arms render, and
-                not only on the Proxy mandate screen. It frames what saying a
-                sensitive reason may cost — which is the construct PERC measures
-                and the thing the study manipulates. Showing it in one arm only
-                puts a condition-confounded stimulus directly on the primary
-                contrast (`Pooled Proxy − Direct`): the Proxy arm would be
-                warned about evaluative risk and Direct would not, so any
-                difference in disclosure could be the warning rather than the
-                delegation. Design Ver.2.11 §5 makes the same requirement of its
-                own guidance text — "전 조건에서 동일하게 적용함". */}
-            {/* "You have a work reason and a sensitive background" — NOT "each
-                term carries" one. The cards sit on one issue now, so a sentence
-                promising a pair per term is contradicted by the screen below
-                it, and the contradiction tells the participant which term the
-                study is about just as surely as a heading would. Say what they
-                hold, not where it sits. */}
-            <p className="mb-2.5 max-w-prose text-xs leading-relaxed text-[var(--private-ink)]/80">
-              You hold a <strong>work reason</strong> — nothing awkward about
-              saying it — and a piece of{" "}
-              <strong>sensitive background</strong> that is yours to keep.{" "}
-              {brief.disclosureRisk}
-            </p>
-            <IssueReasonGroups task={task} role={role} />
-          </Fold>
-        ) : null}
-
-        <Fold title="⚠️ Fallback Outcome" defaultOpen last>
-          <p className="text-xs sm:text-sm leading-relaxed font-medium">{brief.batnaSummary}</p>
-        </Fold>
-      </div>
-
-      <p className="mt-5 border-t border-[var(--private-line)] pt-3 text-center text-xs font-semibold text-[var(--private-strong)]">
-        🔒 The other side has their own briefing and cannot see yours.
-      </p>
-    </Card>
-  );
-}
-
-function Fold({
-  title,
-  children,
-  defaultOpen,
-  last,
-}: {
-  title: string;
-  children: ReactNode;
-  defaultOpen?: boolean;
-  last?: boolean;
-}) {
-  return (
-    <details
-      open={defaultOpen}
-      className={cx(
-        "group rounded-2xl border border-[var(--private-line)] bg-white/80 overflow-hidden shadow-2xs transition-all",
-        last ? "" : "mb-3",
+      {hasReasons ? (
+        <p className="mb-3 rounded-lg border border-[var(--private-line)] bg-white/70 px-3 py-2 text-xs leading-relaxed text-[var(--private-ink)]">
+          Sharing sensitive background is optional. The other person cannot see this briefing.
+        </p>
+      ) : (
+        <p className="mb-3 rounded-lg border border-[var(--private-line)] bg-white/70 px-3 py-2 text-xs leading-relaxed text-[var(--private-ink)]">
+          The other person cannot see this briefing.
+        </p>
       )}
-    >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3.5 text-xs sm:text-sm font-bold tracking-tight text-[var(--ink)] hover:bg-amber-50/60 select-none [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2 min-w-0 font-bold">
-          <span className="truncate">{title}</span>
-        </span>
-        <span
-          aria-hidden
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100/70 text-xs font-black text-[var(--private-strong)] transition-transform duration-200 group-open:rotate-90"
-        >
-          ›
-        </span>
-      </summary>
-      <div className="border-t border-[var(--private-line)] p-4 bg-[var(--private-surface)] text-[var(--private-ink)]">
-        {children}
+
+      <div
+        role="tablist"
+        aria-label="Briefing sections"
+        className={cx(
+          "mb-3 grid gap-1 rounded-xl border border-amber-200 bg-amber-100/55 p-1",
+          hasReasons ? "grid-cols-3" : "grid-cols-2",
+        )}
+      >
+        {tabs.map((tab, index) => {
+          const selected = currentTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              id={`${tabId}-tab-${tab.id}`}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls={`${tabId}-panel-${tab.id}`}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(event) => moveTab(event, index)}
+              className={cx(
+                "min-w-0 rounded-lg px-2 py-2 text-sm font-semibold transition-colors",
+                selected
+                  ? "bg-white text-[var(--ink)] shadow-2xs"
+                  : "text-[var(--private-strong)] hover:bg-white/60",
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
-    </details>
+
+      <section
+        id={`${tabId}-panel-situation`}
+        role="tabpanel"
+        aria-labelledby={`${tabId}-tab-situation`}
+        tabIndex={0}
+        hidden={currentTab !== "situation"}
+        className="rounded-xl border border-[var(--private-line)] bg-[var(--private-surface)] p-3"
+      >
+        <RoleStory story={brief.roleStory} />
+      </section>
+
+      <section
+        id={`${tabId}-panel-points`}
+        role="tabpanel"
+        aria-labelledby={`${tabId}-tab-points`}
+        tabIndex={0}
+        hidden={currentTab !== "points"}
+      >
+        <p className="mb-2 text-xs leading-relaxed text-[var(--private-ink)]/85">
+          More points mean an option fits your goals better. These values are private.
+        </p>
+        <dl className="mb-3 grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-lg border border-[var(--private-line)] bg-white/75 px-2.5 py-2">
+            <dt className="font-medium text-[var(--private-ink)]/75">Maximum</dt>
+            <dd className="mt-0.5 font-bold tabular-nums text-[var(--ink)]">
+              {maximumPoints.toLocaleString()} pts
+            </dd>
+          </div>
+          <div className="rounded-lg border border-[var(--private-line)] bg-white/75 px-2.5 py-2">
+            <dt className="font-medium text-[var(--private-ink)]/75">No agreement</dt>
+            <dd className="mt-0.5 font-bold tabular-nums text-[var(--ink)]">
+              {task.reservationPoints.toLocaleString()} pts
+            </dd>
+          </div>
+        </dl>
+        <IssueValueTable
+          issues={task.issues}
+          role={role}
+          reservationPoints={task.reservationPoints}
+          showKey={false}
+          compact
+        />
+        <div className="mt-3 rounded-xl border border-[var(--private-line)] bg-white/75 p-3">
+          <p className="text-xs font-bold uppercase tracking-wider text-[var(--private-strong)]">
+            If there is no agreement
+          </p>
+          <p className="mt-1 text-sm leading-relaxed">{brief.batnaSummary}</p>
+        </div>
+      </section>
+
+      {hasReasons ? (
+        <section
+          id={`${tabId}-panel-reasons`}
+          role="tabpanel"
+          aria-labelledby={`${tabId}-tab-reasons`}
+          tabIndex={0}
+          hidden={currentTab !== "reasons"}
+        >
+          <p className="mb-2.5 rounded-lg border border-[var(--private-line)] bg-amber-100/60 p-2.5 text-xs font-medium leading-relaxed">
+            {brief.requirementNote}
+          </p>
+          <p className="mb-2.5 text-xs leading-relaxed text-[var(--private-ink)]/85">
+            You hold a <strong>work reason</strong> that is not awkward to say
+            and <strong>sensitive background</strong> that is yours to keep. {brief.disclosureRisk}
+          </p>
+          <IssueReasonGroups task={task} role={role} />
+        </section>
+      ) : null}
+    </Card>
   );
 }
 
@@ -670,6 +631,7 @@ export function TaskLayout({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        aria-expanded={open}
         className={cx(
           "fixed right-4 z-20 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-400 px-5 py-3 text-xs sm:text-sm font-extrabold text-slate-900 shadow-xl lg:hidden cursor-pointer hover:scale-105 active:scale-95 transition-all",
           // Above the action bar where there is one; well clear of the
@@ -690,7 +652,11 @@ export function TaskLayout({
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div className="absolute inset-y-0 right-0 flex w-[min(26rem,100%)] flex-col bg-[var(--private-surface)] shadow-2xl">
+          <div
+            role="region"
+            aria-label="Your private briefing"
+            className="absolute inset-y-0 right-0 flex w-[min(26rem,100%)] flex-col bg-[var(--private-surface)] shadow-2xl"
+          >
             <div className="flex items-center justify-between border-b border-[var(--private-line)] px-4 py-3.5 bg-amber-100/50">
               <span className="text-sm font-extrabold text-[var(--private-strong)]">
                 Your Briefing (Private)

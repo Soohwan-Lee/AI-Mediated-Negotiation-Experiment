@@ -178,15 +178,17 @@ export function IssueValueTable({
   reservationPoints,
   showPoints = true,
   showKey = true,
+  compact = false,
 }: {
   issues: Issue[];
   role: Role;
   reservationPoints: number;
   showPoints?: boolean;
   showKey?: boolean;
+  compact?: boolean;
 }) {
   return (
-    <div className="space-y-6">
+    <div className={compact ? "space-y-3" : "space-y-6"}>
       {showPoints && showKey ? (
         <PointsKey
           issues={issues}
@@ -196,7 +198,13 @@ export function IssueValueTable({
         />
       ) : null}
       {issues.map((issue) => (
-        <div key={issue.id} className="rounded-2xl border border-[var(--private-line)] bg-white/80 p-4 sm:p-5 shadow-2xs">
+        <div
+          key={issue.id}
+          className={cx(
+            "border border-[var(--private-line)] bg-white/80 shadow-2xs",
+            compact ? "rounded-xl p-3" : "rounded-2xl p-4 sm:p-5",
+          )}
+        >
           {/* No badge marks which issue is this role's priority, and none may
               be added. Design §5 principle 1 is explicit that issue type and
               core-requirement marking are not displayed: a star on one issue
@@ -212,14 +220,25 @@ export function IssueValueTable({
           <p className="mb-2 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)]/80">
             {issue.description}
           </p>
-          <div className="mb-3 rounded-xl border border-amber-200/80 bg-amber-50/70 p-2.5 text-xs sm:text-[0.8125rem] leading-relaxed text-[var(--private-ink)] font-medium">
+          <div
+            className={cx(
+              "rounded-xl border border-amber-200/80 bg-amber-50/70 text-xs sm:text-[0.8125rem] leading-relaxed text-[var(--private-ink)] font-medium",
+              compact ? "mb-2 p-2" : "mb-3 p-2.5",
+            )}
+          >
             <span className="font-bold text-amber-950">💡 Why it matters to you: </span>
             <span>{issue.rationale[role]}</span>
           </div>
 
-          <ul className="space-y-2">
+          <ul className={compact ? "space-y-1.5" : "space-y-2"}>
             {issue.options.map((o) => (
-              <li key={o.id} className="flex items-center gap-2.5 text-xs sm:text-sm rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+              <li
+                key={o.id}
+                className={cx(
+                  "flex items-center gap-2.5 text-xs sm:text-sm rounded-xl bg-white border border-slate-100 shadow-2xs",
+                  compact ? "p-2" : "p-2.5",
+                )}
+              >
                 <span className="min-w-0 flex-1 font-semibold text-[var(--ink)] leading-snug break-words">{o.label}</span>
                 {showPoints ? (
                   <div className="flex items-center gap-2 shrink-0">

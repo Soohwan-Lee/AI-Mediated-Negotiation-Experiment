@@ -64,6 +64,21 @@ on/off replies, wrong and correct PRAC1 attempts, Back-state preservation, and
 top-of-step scrolling. No paid model request was made. TypeScript, lint, the
 production build, and all 178 unit tests passed.
 
+## Stage 5: at-a-glance private briefing
+
+- Lead with a plain-language role label and keep seniority or experience in
+  the supporting sentence instead of a large badge.
+- Keep the participant's two goals visible, then organize the complete
+  briefing into Situation, Points, and Reasons tabs. Practice briefings omit
+  Reasons because they do not include prepared reason cards.
+- Preserve every story paragraph, objective, option value, rationale, fallback,
+  requirement note, disclosure warning, and work or sensitive reason. The
+  compact point table changes spacing only and does not mark a preferred term
+  or trade.
+- Keep the private sand treatment and independently scrolling desktop rail.
+  The mobile briefing remains a labelled drawer, and the tabs support arrow,
+  Home, and End keys.
+
 ## Non-negotiable study boundaries
 
 - Do not change questionnaire item text, IDs, or order.
