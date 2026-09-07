@@ -29,34 +29,30 @@ import {
 export type Answers = SurveyResponses;
 
 /**
- * Show each item's id above its question — `PERC-F1`, `OE-P4`, `SUS1`.
+ * Prefixes each item's wording with its id — `(PERC-F1) Explaining my reasons…`,
+ * `(OE-P4) …`, `(SUS1) …` — in muted monospace, on every screen.
  *
  * FOR THE RESEARCHER READING THE SCREENS, NOT FOR THE PARTICIPANT. The ids are
  * the column names in the export (Interface rule 7), so having them on screen
  * is what makes a walk-through checkable against Design §9 without counting
- * questions. Flip this one constant to hide every one of them.
+ * questions. A participant has no way to know what `PERC-F1` means, so it reads
+ * as an item number rather than as a hint about what the item is for.
  *
- * It is rendered as a SIBLING of the control and never reaches an answer: the
- * `statement` and `label` strings passed down are exactly what `lib/measures`
- * holds, so nothing an id could contaminate is saved or logged.
- *
- * OFF IN A RECRUITING BUILD, BY THE SAME SWITCH THAT DROPS THE DEV PANEL. Some
- * of these ids are tells — `SUS1` on the suspicion probe names what that probe
- * is for, and the `OWN-AI` / `OTHER-AI` prefixes label a whole block by its
- * construct. Tying it to `NEXT_PUBLIC_DEV_TOOLS=off` means there is one thing
- * to set before recruiting, not two, and a preview deployment keeps the tags.
+ * IT IS A RENDER-TIME PREFIX AND NEVER ENTERS AN ANSWER. The node is built here
+ * and handed to the control as a `ReactNode`; `item.text` in `lib/measures` is
+ * untouched, so nothing saved, logged or exported can carry an id inside a
+ * value. It is also `aria-hidden` where a control mirrors its wording for a
+ * screen reader — `Scale` takes the plain string as `srStatement` — so the id
+ * is visual only.
  */
-export const SHOW_ITEM_IDS = process.env.NEXT_PUBLIC_DEV_TOOLS !== "off";
-
-function ItemTag({ id }: { id: string }) {
-  if (!SHOW_ITEM_IDS) return null;
+function withId(id: string, text: string) {
   return (
-    <span
-      aria-hidden
-      className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-[var(--ink-3)]"
-    >
-      {id}
-    </span>
+    <>
+      <span aria-hidden className="font-mono text-[0.9em] text-[var(--ink-3)]">
+        ({id}){" "}
+      </span>
+      {text}
+    </>
   );
 }
 
@@ -163,32 +159,24 @@ function MeasureItem({
   const asNumber = typeof value === "number" ? value : null;
 
   if (item.kind === "scale") {
-    // The tag is a sibling rather than part of `statement`: `Scale` types the
-    // statement as a string and mirrors it into its own `<legend>`, so folding
-    // the id in would read the id out to a screen reader as part of the
-    // question. `Scale` keeps the `q-` anchor.
-    //
-    // THE SEPARATOR MOVES OUT WITH IT. `Scale`'s own rule is
-    // `border-b … last:border-b-0`, which counts siblings — wrap each scale in
-    // a div and every one becomes an only child, so `last:` matches them all
-    // and the whole block loses its rules. So the scale is asked for `compact`
-    // (no rule of its own) and the wrapper carries the rule instead, where it
-    // is still one per item and still dropped on the last.
+    // No wrapper here: `Scale`'s own `border-b … last:border-b-0` already draws
+    // one rule per item and drops it on the last, and it counts SIBLINGS — a
+    // div around each scale would make every one an only child, so `last:`
+    // would match them all and the block would lose its rules entirely.
+    // `Scale` keeps the `q-` anchor. The plain wording goes to `srStatement`
+    // so the `<legend>` a screen reader announces carries no id.
     return (
-      <div className="border-b border-[var(--line)] py-4 last:border-b-0">
-        <ItemTag id={item.id} />
-        <Scale
-          id={item.id}
-          statement={item.text}
-          value={asNumber}
-          onChange={(v) => onChange(item.id, v)}
-          lowAnchor={item.low}
-          highAnchor={item.high}
-          points={item.points}
-          flagged={flagged}
-          compact
-        />
-      </div>
+      <Scale
+        id={item.id}
+        statement={withId(item.id, item.text)}
+        srStatement={item.text}
+        value={asNumber}
+        onChange={(v) => onChange(item.id, v)}
+        lowAnchor={item.low}
+        highAnchor={item.high}
+        points={item.points}
+        flagged={flagged}
+      />
     );
   }
 
@@ -198,8 +186,11 @@ function MeasureItem({
   if (item.kind === "amount") {
     return (
       <div id={`q-${item.id}`} className="scroll-mt-24">
-        <ItemTag id={item.id} />
-        <Field label={item.text} required={!optional} flagged={flagged}>
+        <Field
+          label={withId(item.id, item.text)}
+          required={!optional}
+          flagged={flagged}
+        >
           <AmountScale
             id={item.id}
             value={asNumber}
@@ -214,8 +205,11 @@ function MeasureItem({
 
   return (
     <div id={`q-${item.id}`} className="scroll-mt-24">
-      <ItemTag id={item.id} />
-      <Field label={item.text} required={!optional} flagged={flagged}>
+      <Field
+        label={withId(item.id, item.text)}
+        required={!optional}
+        flagged={flagged}
+      >
         {item.kind === "choice" ? (
           <ChoiceList
             name={item.id}

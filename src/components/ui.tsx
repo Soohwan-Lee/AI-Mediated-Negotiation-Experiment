@@ -347,7 +347,9 @@ export function Field({
   required,
   flagged,
 }: {
-  label: string;
+  // ReactNode, not string: the item id is rendered as an inline prefix inside
+  // the label (see `measure.tsx`), so a label is a fragment rather than text.
+  label: ReactNode;
   hint?: string;
   children: ReactNode;
   required?: boolean;
@@ -532,6 +534,7 @@ export function Checkbox({
 export function Scale({
   id,
   statement,
+  srStatement,
   value,
   onChange,
   lowAnchor = "Strongly disagree",
@@ -541,7 +544,13 @@ export function Scale({
   compact,
 }: {
   id: string;
-  statement?: string;
+  // ReactNode, not string: the item id is rendered as an inline prefix inside
+  // the statement (see `measure.tsx`), so a statement is a fragment rather
+  // than text. `srStatement` is the plain wording for the `<legend>`, which is
+  // what a screen reader announces — the id is a researcher's marker and has
+  // no business being read out as part of the question.
+  statement?: ReactNode;
+  srStatement?: string;
   value: number | null;
   onChange: (v: number) => void;
   lowAnchor?: string;
@@ -561,9 +570,11 @@ export function Scale({
       )}
       id={`q-${id}`}
     >
-      {statement ? <legend className="sr-only">{statement}</legend> : null}
+      {statement ? (
+        <legend className="sr-only">{srStatement ?? statement}</legend>
+      ) : null}
 
-      <div className={cx(statement && "lg:flex lg:items-center lg:gap-6")}>
+      <div className={cx(!!statement && "lg:flex lg:items-center lg:gap-6")}>
         {statement ? (
           <p
             aria-hidden
