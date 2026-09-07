@@ -17,13 +17,11 @@ export type ViolationCode =
   | "unknown_issue"
   | "unknown_option"
   | "unauthorized_issue"
-  | "red_line_violation"
   | "fabricated_personal_fact"
   | "impossible_resource_promise"
   | "role_authority_violation"
   | "disclosure_permission_violation"
   | "provenance_policy_violation"
-  | "rationale_budget_exceeded"
   | "stage_mismatch";
 
 export interface Violation {
@@ -166,7 +164,8 @@ export function validateAction(
       }
 
       // THERE IS NO CONCESSION LIMIT TO CHECK ANY MORE. Ver.2.13 §2.6 removed
-      // the range mandate, and with it `red_line_violation`: the mandate now
+      // the range mandate, and with it the red-line code, now deleted from
+      // `ViolationCode` because nothing could emit it: the mandate now
       // carries an opening level and nothing else, so there is no boundary a
       // proposal could cross. What the mandate still gates is the issue
       // itself (above) and the reason cards (below) — a proposal on an issue
@@ -206,8 +205,8 @@ export function validateAction(
   // Ver.2.6 replaces it with "one reason per message, each card at most once
   // per task", and that is enforced by the SCHEDULE in machine.ts
   // (`designatedReason` never designates a card twice), not here. The
-  // distinction is load-bearing: `rationale_budget_exceeded` is a hard code,
-  // so making a repeat a violation would replace the whole message with the
+  // distinction is load-bearing: a repeat would have to be a HARD code, so
+  // making it a violation would replace the whole message with the
   // package-only fallback and null its reason token — and on the turn
   // carrying the requirement's reason, that hands the direct conversation a
   // false "no reason was given" and re-creates the inert-rule bug CLAUDE.md
@@ -278,12 +277,10 @@ export function validateAction(
   // cost the participant the model's acceptance wording for nothing. It is
   // still logged for the audit.
   const hardCodes: ViolationCode[] = [
-    "red_line_violation",
     "fabricated_personal_fact",
     "impossible_resource_promise",
     "disclosure_permission_violation",
     "provenance_policy_violation",
-    "rationale_budget_exceeded",
   ];
   const hasHard = violations.some((v) => hardCodes.includes(v.code));
 

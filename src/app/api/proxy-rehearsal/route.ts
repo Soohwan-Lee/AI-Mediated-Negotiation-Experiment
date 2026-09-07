@@ -37,9 +37,10 @@ import { NextResponse } from "next/server";
 import { generateText } from "@/lib/ai/client";
 import { leaksForbiddenReason } from "@/lib/ai/reason-leak";
 import { getTask, requirementIssue } from "@/lib/tasks";
-import type { Mandate, Role, TaskId } from "@/lib/types";
+import type { Mandate, NegotiationTask, Role, TaskId } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 interface RequestBody {
   taskId: TaskId;
@@ -53,7 +54,7 @@ interface RequestBody {
 
 /** The mandate in words, for the prompt. */
 function mandateSummary(
-  task: ReturnType<typeof getTask>,
+  task: NegotiationTask,
   mandate: Mandate,
 ): string {
   return mandate.issues

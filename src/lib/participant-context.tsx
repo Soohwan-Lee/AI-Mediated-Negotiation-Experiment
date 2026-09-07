@@ -18,7 +18,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { claimSlot, resolveAssignment } from "./assignment";
+import { resolveAssignment } from "./assignment";
 import { useDevMode } from "./dev-mode";
 import { getStore } from "./store";
 import type {
@@ -179,11 +179,28 @@ export function ParticipantProvider({
 
     await store.createParticipant(participantKey, state.prolific);
 
-    // TODO(supabase): this becomes a POST to /api/assign so the slot claim is
-    // atomic and server-authoritative.
+    // THE CLAIM IS THE SERVER'S, NOT THE BROWSER'S. The local idempotency
+    // check comes first — a refresh must never reassign — and only a genuinely
+    // new participant asks the route for a slot. Doing the claim here in the
+    // browser meant `/api/assign` had no caller at all, so the planned swap to
+    // the atomic `claim_assignment_slot` RPC would have taken effect nowhere.
     const existing = await store.loadAssignment(participantKey);
-    const assignment = existing ?? (await claimSlot(participantKey));
-    if (!existing) await store.saveAssignment(assignment);
+    let assignment = existing;
+    if (!assignment) {
+      const res = await fetch("/api/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          participantKey,
+          prolificPid: state.prolific.prolificPid ?? null,
+        }),
+      });
+      if (!res.ok) throw new Error(`Assignment failed with ${res.status}`);
+      const data = (await res.json()) as { assignment?: Assignment };
+      if (!data.assignment) throw new Error("Assignment failed: no slot");
+      assignment = data.assignment;
+      await store.saveAssignment(assignment);
+    }
 
     await store.logEvent({
       type: "assignment_created",

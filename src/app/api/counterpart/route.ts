@@ -41,6 +41,7 @@ import type {
 } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 interface RequestBody {
   taskId: TaskId;
@@ -137,6 +138,11 @@ export async function POST(request: Request) {
   const task = getTask(body.taskId);
   if (!task) {
     return NextResponse.json({ error: "Unknown task" }, { status: 400 });
+  }
+  // A bad role reaches `requirementIssue`'s non-null assertion and 500s with
+  // no JSON body, where every sibling route answers a clean 400.
+  if (body.participantRole !== "leader" && body.participantRole !== "member") {
+    return NextResponse.json({ error: "Unknown role" }, { status: 400 });
   }
 
   const counterpartRole: Role =

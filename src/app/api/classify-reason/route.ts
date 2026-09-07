@@ -56,6 +56,11 @@ export async function POST(request: Request) {
   if (!task) {
     return NextResponse.json({ error: "Unknown task" }, { status: 400 });
   }
+  // A bad role reaches `requirementIssue`'s non-null assertion and 500s with
+  // no JSON body, where every sibling route answers a clean 400.
+  if (body.role !== "leader" && body.role !== "member") {
+    return NextResponse.json({ error: "Unknown role" }, { status: 400 });
+  }
   if (typeof body.message !== "string" || !body.message.trim()) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }

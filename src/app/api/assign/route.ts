@@ -50,5 +50,5 @@ export async function POST(request: Request) {
   // exhausted so the study can be closed cleanly.
   const assignment = await claimSlot(body.participantKey);
 
-  return NextResponse.json({ assignment, stubbed: true });
+  return NextResponse.json({ assignment });
 }

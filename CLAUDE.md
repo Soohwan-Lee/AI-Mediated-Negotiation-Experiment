@@ -506,7 +506,10 @@ prompt before you touch the wording.
 
 **Message SHAPE is enforced on the text, not asked for in a prompt.** Two
 things travel together in `capMessageLength`, and both were prompt-only once
-and both failed:
+and both failed. `compactChatBubbles` runs on the Direct counterpart only
+(`counterpart/route.ts`), because that voice is a person typing short bubbles
+while the proxies speak in plain third-person sentences
+(`proxy-negotiation/route.ts`):
 
 - **Every AI message is bubble-split and under 420 characters**
   (`NEGOTIATION.maxMessageChars`). The `||` rule lived in `HUMAN_CHAT_STYLE`,

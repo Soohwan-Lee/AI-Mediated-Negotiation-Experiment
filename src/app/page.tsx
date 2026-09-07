@@ -188,7 +188,16 @@ export default function ConsentPage() {
         setUnavailable(true);
         return;
       }
-      await beginStudy();
+      try {
+        await beginStudy();
+      } catch {
+        // The slot claim is the server's now, so it can fail the way any
+        // request can — and a participant with no assignment has no study to
+        // enter. Same plain wording as the readiness refusal above: nothing
+        // technical, because the screen is read by participants.
+        setUnavailable(true);
+        return;
+      }
       router.push(nextHref("welcome"));
     } finally {
       setBusy(false);

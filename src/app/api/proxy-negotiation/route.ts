@@ -45,6 +45,7 @@ import {
 } from "@/lib/tasks";
 import type {
   Mandate,
+  NegotiationTask,
   Package,
   ReasonCard,
   Role,
@@ -83,7 +84,8 @@ interface RequestBody {
 
 /** The mandate, written out for the proxy's prompt. */
 function mandateSummary(mandate: Mandate, taskId: TaskId): string {
-  const task = getTask(taskId);
+  // Non-null: only reached from POST, which has already rejected an unknown id.
+  const task = getTask(taskId)!;
   const byId = new Map(task.issues.map((i) => [i.id, i]));
   const label = (issueId: string, optionId: string | null) =>
     byId.get(issueId)?.options.find((o) => o.id === optionId)?.label ??
@@ -107,7 +109,8 @@ function mandateSummary(mandate: Mandate, taskId: TaskId): string {
  * while never putting them into words.
  */
 function reasonsFor(taskId: TaskId, role: Role, mandate: Mandate) {
-  const task = getTask(taskId);
+  // Non-null: only reached from POST, which has already rejected an unknown id.
+  const task = getTask(taskId)!;
   const cards = task.roleBriefs[role].reasonCards;
   const issueLabel = (issueId: string) =>
     task.issues.find((i) => i.id === issueId)?.label;
@@ -129,7 +132,7 @@ function reasonsFor(taskId: TaskId, role: Role, mandate: Mandate) {
  * to have been blocked.
  */
 function fallbackText(
-  task: ReturnType<typeof getTask>,
+  task: NegotiationTask,
   proposal: Package | null,
   isParticipantSide: boolean,
 ): string {
@@ -186,7 +189,7 @@ function resolveReasonTokens(
       layer: ReasonCard["layer"] | null;
     }
   >();
-  for (const card of getTask(taskId).roleBriefs[role].reasonCards) {
+  for (const card of getTask(taskId)!.roleBriefs[role].reasonCards) {
     byToken.set(reasonToken(card.id), {
       sourceId: card.id,
       issueId: card.issueId,
@@ -228,30 +231,6 @@ function mentionsCard(message: string, cardText: string): boolean {
 
 
 /**
- * The AI-Supplemented's one added clause for this turn (§6.6) is NOT requested in
- * the decidedAction — it is appended to the finished message instead.
- *
- * It rode in the instruction first, and lost. It competed with the card
- * instruction on the same turn, and a card instruction is the more forceful
- * one; the clause survived about one generation in four. Rewording both
- * helped and did not fix it, and softening the card instruction to make room
- * ("no other CARD") then cost the card itself: messages came back carrying
- * the added argument and not the principal's own reason.
- *
- * Both failures are validity defects rather than wording problems. The pool
- * clause IS the AI-Supplemented manipulation, and `voicedPoolId` spends the §6.6
- * budget from the SCHEDULE — so a dropped clause was recorded as voiced and
- * `AI-Supplemented - User-Specified` compared User-Specified against a mostly-User-Specified AI-Supplemented.
- * The card, meanwhile, drives the credibility ladder, so a dropped card
- * credited a participant with a disclosure nobody heard.
- *
- * Appending settles both: the model is asked for exactly one thing (its
- * principal's card), and the addition is placed afterwards, as its own
- * bubble, which is also how §6.6 describes it. `designatedPool` still decides
- * WHETHER and WHICH, so the per-issue and per-task budgets are unchanged.
- */
-
-/**
  * Order the §6.6 sentences so their POSITION carries nothing.
  *
  * If the abstraction always came first (or last), a receiver could sort the
@@ -274,7 +253,7 @@ function shuffle<T>(items: readonly T[]): T[] {
  * counterpackage" left the model inventing levels in live testing.
  */
 function packageSentence(
-  task: ReturnType<typeof getTask>,
+  task: NegotiationTask,
   pkg: Package,
 ): string {
   return task.issues
@@ -296,6 +275,11 @@ export async function POST(request: Request) {
   const task = getTask(body.taskId);
   if (!task) {
     return NextResponse.json({ error: "Unknown task" }, { status: 400 });
+  }
+  // A bad role reaches `requirementIssue`'s non-null assertion and 500s with
+  // no JSON body, where every sibling route answers a clean 400.
+  if (body.participantRole !== "leader" && body.participantRole !== "member") {
+    return NextResponse.json({ error: "Unknown role" }, { status: 400 });
   }
 
   const turn = Number.isInteger(body.turn) ? body.turn : 0;

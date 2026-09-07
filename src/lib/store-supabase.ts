@@ -51,14 +51,6 @@ interface QueuedWrite {
   /** Which server-route operation this is. */
   op: string;
   payload: unknown;
-  /**
-   * How many times this item has been tried. Diagnostics only — nothing is
-   * dropped or reordered on a count. Retries are triggered by events that mean
-   * conditions actually changed (another push, `online`, the next flush), not
-   * by a budget being spent, because a budget spent while the network was down
-   * used to leave the queue permanently refusing to drain.
-   */
-  attempts: number;
   queuedAt: string;
 }
 
@@ -99,10 +91,6 @@ export class WriteQueue {
 
   constructor(private endpoint: string) {
     this.queue = readQueue();
-    // Anything left from a previous session had its attempts counted against a
-    // server that may since have come back. Start it fresh, or a queue that
-    // exhausted its retries yesterday would refuse to drain today.
-    for (const item of this.queue) item.attempts = 0;
     if (this.queue.length) void this.drain();
     if (typeof window !== "undefined") {
       // A tab closing mid-flush is the common case, not an edge case: the
@@ -113,7 +101,6 @@ export class WriteQueue {
       // Coming back online is the moment a stalled queue should retry, and it
       // costs nothing to wait for it rather than backing off blindly.
       window.addEventListener("online", () => {
-        for (const item of this.queue) item.attempts = 0;
         void this.drain();
       });
     }
@@ -125,7 +112,6 @@ export class WriteQueue {
       id: `${Date.now()}-${this.seq}`,
       op,
       payload,
-      attempts: 0,
       queuedAt: new Date().toISOString(),
     });
     writeQueue(this.queue);
@@ -186,13 +172,15 @@ export class WriteQueue {
         const response = await fetch(this.endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ op: item.op, payload: item.payload }),
+          // `id` travels so `/api/persist` can dedupe: a beacon that lands
+          // and a drain that retries the same item are the ordinary case, not
+          // an edge one, and the queue never drops an item to prevent it.
+          body: JSON.stringify({ id: item.id, op: item.op, payload: item.payload }),
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         this.queue.shift();
         writeQueue(this.queue);
       } catch {
-        item.attempts += 1;
         writeQueue(this.queue);
         // Nothing is discarded and nothing is reordered: the queue is a
         // transcript and its order is data. Stop here and let the next push,
