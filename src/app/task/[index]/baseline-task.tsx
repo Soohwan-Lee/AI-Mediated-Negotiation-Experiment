@@ -52,7 +52,7 @@ import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { awaitCounterpartDelay, nextHref } from "@/lib/study-config";
 import { cardOfLayer, getTask, requirementIssue } from "@/lib/tasks";
-import type { Package, Role, TaskId } from "@/lib/types";
+import type { NegotiationTask, Package, Role, TaskId } from "@/lib/types";
 import { ReviewPhase } from "./review";
 import {
   Matchmaking,
@@ -72,7 +72,7 @@ import {
  * anchor their reply is measured against.
  */
 function openingLine(
-  task: ReturnType<typeof getTask>,
+  task: NegotiationTask,
   counterpartRole: Role,
 ): string {
   // SCRIPT-OPEN (Ver.2.16 §6.1, §6.4): the counterpart's own DECOY work
@@ -225,7 +225,10 @@ export function BaselineTask({
   usePageEnter(`task-${taskIndex}`);
   const router = useRouter();
   const { logEvent, participantKey } = useParticipant();
-  const task = getTask(taskId);
+  // Non-null: the route only renders a task page for a valid id, and `TaskId`
+  // is the compile-time story — the lookup's `undefined` is for API callers
+  // reading an id off a JSON body, which guard it themselves.
+  const task = getTask(taskId)!;
   const requirement = requirementIssue(task, role);
   const counterpartRole: Role = role === "leader" ? "member" : "leader";
 

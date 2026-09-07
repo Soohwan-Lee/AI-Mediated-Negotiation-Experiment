@@ -77,6 +77,7 @@ import {
   requirementIssue,
 } from "@/lib/tasks";
 import type {
+  NegotiationTask,
   Issue,
   IssueMandate,
   Mandate,
@@ -274,7 +275,7 @@ const POLICY_DISCLOSURE: Record<"user_specified" | "ai_supplemented", string> = 
 };
 
 function emptyMandate(
-  task: ReturnType<typeof getTask>,
+  task: NegotiationTask,
   role: Role,
   taskIndex: 1 | 2,
 ): Mandate {
@@ -327,7 +328,10 @@ export function ProxyTask({
   usePageEnter(`task-${taskIndex}`);
   const router = useRouter();
   const { logEvent, participantKey } = useParticipant();
-  const task = getTask(taskId);
+  // Non-null: the route only renders a task page for a valid id, and `TaskId`
+  // is the compile-time story — the lookup's `undefined` is for API callers
+  // reading an id off a JSON body, which guard it themselves.
+  const task = getTask(taskId)!;
   const requirement = requirementIssue(task, role);
   const reasonCards = task.roleBriefs[role].reasonCards;
 
@@ -1320,7 +1324,7 @@ function ReasonMandateSection({
   mandate,
   onToggle,
 }: {
-  task: ReturnType<typeof getTask>;
+  task: NegotiationTask;
   role: Role;
   policy: "user_specified" | "ai_supplemented";
   mandate: Mandate;

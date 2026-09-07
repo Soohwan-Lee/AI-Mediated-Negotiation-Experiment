@@ -583,7 +583,12 @@ const TASKS: Record<TaskId, NegotiationTask> = {
   task_b: TASK_B,
 };
 
-export function getTask(id: TaskId): NegotiationTask {
+/**
+ * UNDEFINED IS REACHABLE. `TaskId` is the compile-time story; the runtime
+ * callers are API routes reading an id off a JSON body, so the return type has
+ * to admit the miss the routes' own `if (!task)` guards already check for.
+ */
+export function getTask(id: TaskId): NegotiationTask | undefined {
   return TASKS[id];
 }
 

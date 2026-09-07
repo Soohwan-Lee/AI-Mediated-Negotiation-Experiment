@@ -966,6 +966,7 @@ export function DirectNegotiation({
 
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
+  const [turnError, setTurnError] = useState<string | null>(null);
   const [replies, setReplies] = useState(0);
   const [settled, setSettled] = useState<"agreed" | "impasse" | null>(null);
   const [finalPackage, setFinalPackage] = useState<Package | null>(
@@ -1063,6 +1064,7 @@ export function DirectNegotiation({
       text,
     };
     const next = [...messages, own];
+    setTurnError(null);
     setMessages(next);
     setDraft("");
     setConfirmDecline(false);
@@ -1191,11 +1193,24 @@ export function DirectNegotiation({
             })),
           }),
         });
+        // MIRRORS THE DIRECT ARM EXACTLY. This read a missing message as an
+        // apology from the counterpart, so a failed request became an ordinary
+        // conversational turn — a reply the participant answers, a turn
+        // counted, and no trace that the model never ran. Direct throws and
+        // offers a retry; a failure mode that differs by arm is a failure mode
+        // correlated with the primary contrast.
+        if (!res.ok) {
+          throw new Error(`Counterpart request failed with ${res.status}`);
+        }
+
         const data = (await res.json()) as {
           message?: string;
           proposal?: Package | null;
         };
-        reply = data.message ?? "sorry — could you say that again?";
+        if (!data.message?.trim()) {
+          throw new Error("Counterpart returned no message");
+        }
+        reply = data.message;
       }
 
       // One delay for both branches, counting the generation time already
@@ -1260,6 +1275,14 @@ export function DirectNegotiation({
           decision.accepts ? "agreed" : "impasse",
         );
       }
+    } catch (error) {
+      console.error("[counterpart] turn failed", error);
+      // Keep the participant's text available for a deliberate retry. No
+      // reply, disclosure flag, or settlement is recorded on a failed turn.
+      setDraft(text);
+      setTurnError(
+        "We couldn’t get a reply. Your message is still here. Please try sending it again.",
+      );
     } finally {
       setPending(false);
     }
@@ -1365,6 +1388,11 @@ export function DirectNegotiation({
                     : "Please choose an option for each term first."
               }
             />
+            {turnError ? (
+              <p className="px-4 pb-4 text-sm text-red-700" role="alert">
+                {turnError}
+              </p>
+            ) : null}
           </Card>
 
           {!settled ? (
