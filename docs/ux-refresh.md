@@ -30,9 +30,9 @@ conditions, instruments, ordering, payoff logic, or disclosure policy.
 Baseline before this stage: the single consent page contained 469 rendered
 words (2,996 characters) and was 2,799 px tall in a 1,280 × 919 browser
 viewport. After the split, the three pages contain 208, 185, and 121 rendered
-words and are 1,219 px, 1,134 px, and 983 px tall in the same viewport. None
-has horizontal overflow. The total includes short recap text on the final page;
-the maximum reading load at one time fell by 56%.
+words when measured at 1,280 × 800, and none has horizontal overflow. The
+total includes short recap text on the final page; the maximum reading load at
+one time fell by 56%.
 
 ## Stage 3: illustration and full-flow verification
 
@@ -78,6 +78,13 @@ production build, and all 178 unit tests passed.
 - Keep the private sand treatment and independently scrolling desktop rail.
   The mobile briefing remains a labelled drawer, and the tabs support arrow,
   Home, and End keys.
+
+Focused browser checks covered the Team Lead at 1,280 × 800, the Team Member
+at 1,024 × 768, and the mobile briefing drawer at 768 × 800. All showed the
+expected role and sections without horizontal overflow. The desktop rail and
+mobile drawer scrolled independently, Points opened by default, and Arrow,
+Home, and End keys moved focus and selection between tabs. The implementation
+was released in commit `6f817e9`.
 
 ## Non-negotiable study boundaries
 
