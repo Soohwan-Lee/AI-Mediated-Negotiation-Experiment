@@ -29,6 +29,7 @@
 import { useRouter } from "next/navigation";
 import {
   PreviousReading,
+  STUDY_GUIDE_LAST_PAGE,
   StudyOrientation,
 } from "@/components/briefing-guide";
 import { useMemo, useState } from "react";
@@ -229,7 +230,7 @@ export default function InstructionPage() {
         secondary={
           <PreviousReading
             onClick={() => {
-              setGuideStartPage(2);
+              setGuideStartPage(STUDY_GUIDE_LAST_PAGE);
               setPart("read");
               window.scrollTo({ top: 0 });
             }}

@@ -346,7 +346,7 @@ export const COMPREHENSION_BLOCK: Block = {
       id: "COMP2",
       // "The two terms", not "the schedule" — §9.7-5 fixed the wording for the
       // two-issue shape, and the scenario has no schedule any more.
-      text: "Can one of you fix both terms without the other agreeing?",
+      text: "Can either person make the final decision on both working conditions without the other person agreeing?",
       columns: 2,
       options: [
         { value: "no", label: "No" },
@@ -389,7 +389,7 @@ export const COMPREHENSION_REMEDIATION: Record<string, string> = {
   COMP1:
     "The team lead decides the senior team member's recommended bonus after each negotiation — and the senior team member writes an upward evaluation of the lead, which goes to the director.",
   COMP2:
-    "Neither of you can fix these terms alone. Both have to be agreed by the two of you, or the work runs on the default terms.",
+    "Neither person can decide the working conditions alone. Both people must agree on both conditions; otherwise, the default conditions apply.",
   COMP3:
     "Your point sheet is private. You can explain why a term matters to you and ask about the other side's situation — but not show the numbers.",
 };

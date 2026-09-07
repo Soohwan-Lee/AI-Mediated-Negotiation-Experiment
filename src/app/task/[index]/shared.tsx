@@ -36,6 +36,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import Image from "next/image";
 import { MeasureBlock, type Answers } from "@/components/measure";
 import {
   CountdownTimer,
@@ -195,6 +196,9 @@ export function TaskBrief({
   const [page, setPage] = useState(0);
   const { logEvent } = useParticipant();
   const brief = task.roleBriefs[role];
+  const taskImage = task.id === "task_a"
+    ? "/illustrations/task-working-arrangements.png"
+    : "/illustrations/task-new-project.png";
   const labels = ["The task", "Your situation", "Your points", "Your reasons"];
   function move(next: number) {
     logEvent("page_complete", { briefingPage: page + 1 }, { sessionIndex: taskIndex });
@@ -209,9 +213,28 @@ export function TaskBrief({
         {page === 0 ? (
           <div className="space-y-5">
             <Card>
-              <CardTitle>{task.title}</CardTitle>
-              <p className="mt-3 text-base leading-relaxed text-slate-700">{task.publicBrief}</p>
-              <p className="mt-3 text-sm text-slate-500">Both people know this project background.</p>
+              <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                <div>
+                  <CardTitle>{task.title}</CardTitle>
+                  <p className="mt-3 text-base leading-relaxed text-slate-700">{task.publicBrief}</p>
+                  <p className="mt-3 text-sm text-slate-500">Both people know this project background.</p>
+                </div>
+                <figure className="overflow-hidden rounded-xl border border-slate-200 bg-[#f4efe5]">
+                  <Image
+                    src={taskImage}
+                    width={1536}
+                    height={1024}
+                    sizes="(min-width: 1024px) 20rem, (min-width: 640px) 44rem, 100vw"
+                    alt={task.id === "task_a"
+                      ? "Two colleagues consider a blank office schedule and prepare a presentation room."
+                      : "Two colleagues review a blank project board and an unused headset and desk phone."}
+                    className="h-auto w-full"
+                  />
+                  <figcaption className="border-t border-slate-200 bg-white/90 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+                    Two conditions. One complete agreement.
+                  </figcaption>
+                </figure>
+              </div>
             </Card>
             <div className="grid gap-4 sm:grid-cols-2">
               {task.issues.map(issue => <Card key={issue.id}>

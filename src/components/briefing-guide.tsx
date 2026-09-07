@@ -41,7 +41,8 @@ export function PreviousReading({
   </button>;
 }
 
-const GUIDE_PAGES = ["The setting", "Your role", "The rules"] as const;
+const GUIDE_PAGES = ["The setting", "Your role", "After each task", "The rules"] as const;
+export const STUDY_GUIDE_LAST_PAGE = GUIDE_PAGES.length - 1;
 
 export function StudyOrientation({
   role,
@@ -54,6 +55,9 @@ export function StudyOrientation({
 }) {
   const [page, setPage] = useState(initialPage);
   const isLeader = role === "leader";
+  const roleImage = isLeader
+    ? "/illustrations/role-team-lead.png"
+    : "/illustrations/role-team-member.png";
   function move(next: number) {
     setPage(next);
     window.scrollTo({ top: 0 });
@@ -62,9 +66,9 @@ export function StudyOrientation({
     <>
       <Page>
         <ReadingProgress labels={GUIDE_PAGES} current={page} />
-        <PageHeader eyebrow={`Study guide · ${page + 1} of 3`}
-          title={["Two colleagues. Two working conditions.", `You are the ${isLeader ? "team lead" : "senior team member"}`, "What to do in each negotiation"][page]}
-          subtitle={["You will play a role in a company project team. Here is the setting before you see your first task.", "You keep this role in both tasks. The other participant plays the other role.", "Read these rules before a short check and one practice round."][page]} />
+        <PageHeader eyebrow={`Study guide · ${page + 1} of ${GUIDE_PAGES.length}`}
+          title={["Two colleagues. Two working conditions.", `You are the ${isLeader ? "team lead" : "team member"}`, "What happens after each task", "What to do in each negotiation"][page]}
+          subtitle={["You will play a role in a company project team. Here is the setting before you see your first task.", "You keep this role in both tasks. The other participant plays the other role.", "Both people make one decision about the other after every negotiation.", "Read these rules before a short check and one practice round."][page]} />
 
         {page === 0 ? (
           <div className="grid items-center gap-6 lg:grid-cols-[1.05fr_1fr]">
@@ -102,20 +106,43 @@ export function StudyOrientation({
             </ol>
           </div>
         ) : page === 1 ? (
-          <div className="space-y-5">
+          <div className="grid items-start gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+            <figure className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--private-line)] bg-[var(--private-soft)] shadow-[var(--shadow-sm)]">
+              <Image
+                src={roleImage}
+                width={1536}
+                height={1024}
+                sizes="(min-width: 1024px) 26rem, (min-width: 640px) 48rem, 100vw"
+                alt={isLeader
+                  ? "Two colleagues review an unlabeled project board while one arranges a planning card and the other takes notes."
+                  : "Two colleagues review unlabeled project analysis sheets beside an unused headset."}
+                className="h-auto w-full"
+              />
+              <figcaption className="border-t border-[var(--private-line)] bg-white/90 px-4 py-3 text-xs leading-relaxed text-[var(--private-ink)]">
+                {isLeader ? "You coordinate the project." : "You bring client-facing experience to the team."}
+              </figcaption>
+            </figure>
+
             <Card tone="private">
-              <CardTitle>Your role</CardTitle>
+              <CardTitle>{isLeader ? "Team lead" : "Team member"}</CardTitle>
               <p className="mt-2 text-base leading-relaxed">{isLeader
                 ? "You lead the project and answer to the director. You finalize the working conditions once both people agree. You also influence the member's evaluation and future work assignments."
                 : "You are an experienced team member trusted to work directly with the client. You can ask for changes or refuse a proposed package."}</p>
             </Card>
+          </div>
+        ) : page === 2 ? (
+          <div className="space-y-5">
             <Card>
-              <CardTitle>After each task</CardTitle>
-              <dl className="mt-4 space-y-4 text-sm leading-relaxed">
-                <div><dt className="font-bold text-slate-900">The team lead decides a bonus</dt>
-                  <dd className="mt-1 text-slate-600">The lead chooses the member&apos;s recommended performance bonus, up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task.</dd></div>
-                <div><dt className="font-bold text-slate-900">The member evaluates the lead</dt>
-                  <dd className="mt-1 text-slate-600">The member writes an upward evaluation of the lead that goes to the project director.</dd></div>
+              <CardTitle>Two separate decisions</CardTitle>
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl bg-slate-50 p-4 text-sm leading-relaxed">
+                  <dt className="font-bold text-slate-900">The team lead decides a bonus</dt>
+                  <dd className="mt-1.5 text-slate-600">The lead chooses the member&apos;s recommended performance bonus, up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task.</dd>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-4 text-sm leading-relaxed">
+                  <dt className="font-bold text-slate-900">The member evaluates the lead</dt>
+                  <dd className="mt-1.5 text-slate-600">The member writes an upward evaluation of the lead that goes to the project director.</dd>
+                </div>
               </dl>
             </Card>
             <Card>
@@ -148,9 +175,9 @@ export function StudyOrientation({
           </div>
         )}
       </Page>
-      <ActionBar label={page === 2 ? "Continue to the quick check" : `Next: ${GUIDE_PAGES[page + 1].toLowerCase()}`}
-        onClick={() => page === 2 ? onContinue() : move(page + 1)}
-        note={`Guide page ${page + 1} of 3`}
+      <ActionBar label={page === STUDY_GUIDE_LAST_PAGE ? "Continue to the quick check" : `Next: ${GUIDE_PAGES[page + 1].toLowerCase()}`}
+        onClick={() => page === STUDY_GUIDE_LAST_PAGE ? onContinue() : move(page + 1)}
+        note={`Guide page ${page + 1} of ${GUIDE_PAGES.length}`}
         secondary={page > 0 ? <PreviousReading onClick={() => move(page - 1)} /> : <BackButton from="instruction" />} />
     </>
   );
