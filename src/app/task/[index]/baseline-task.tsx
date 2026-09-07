@@ -669,6 +669,7 @@ export function BaselineTask({
         task={task}
         role={role}
         steps={STEP_LABELS}
+        onBack={() => setPhase("intro")}
         onContinue={() => setPhase("risk")}
       />
     );

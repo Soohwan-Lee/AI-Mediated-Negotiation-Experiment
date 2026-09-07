@@ -1,14 +1,12 @@
 "use client";
 
 /**
- * Welcome + informed consent. Everything a participant agrees to is on this
- * one screen.
+ * Welcome + informed consent. Everything a participant agrees to is presented
+ * on this route before the consent action becomes available.
  *
- * It is laid out rather than written out: the facts as a row, the study as a
- * numbered sequence with times, the recorded data as a short list. A consent
- * form that reads as an essay gets skimmed, and skimmed consent is not
- * consent — the point of the structure is that the obligations are legible in
- * one pass.
+ * The information is divided into three short reading pages. This keeps the
+ * obligations legible without collecting consent early: `beginStudy` is only
+ * reachable from the final page, after overview and privacy/rights.
  *
  * IRB NOTE: this study uses deception — the counterpart is a controlled LLM
  * presented as another participant, and the reward decision is scenario-level
@@ -25,19 +23,25 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  PreviousReading,
+  ReadingProgress,
+} from "@/components/briefing-guide";
 import { ActionBar } from "@/components/study-chrome";
 import {
   Callout,
   Card,
   CardTitle,
   Checkbox,
-  KeyPoint,
   Page,
   PageHeader,
-  SummaryGrid,
   cx,
 } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
+import {
+  CONSENT_INFORMATION_PAGES,
+  canBeginConsent,
+} from "@/lib/consent-flow";
 import { useParticipant } from "@/lib/participant-context";
 import { STAGE_MINUTES, STUDY, nextHref } from "@/lib/study-config";
 
@@ -50,7 +54,7 @@ const STEPS = [
   },
   {
     title: "Instructions, and a short check",
-    detail: "Your role in the scenario, then three questions on it.",
+    detail: "Learn your role and the rules, then complete a quick check.",
     minutes: STAGE_MINUTES.instruction,
   },
   {
@@ -61,7 +65,7 @@ const STEPS = [
   {
     title: "Two negotiation tasks",
     detail:
-      "A briefing, the negotiation itself, then some questions and a decision about the other person.",
+      "Negotiate directly once and use a software representative once. Questions follow each task.",
     minutes: 2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward),
   },
   {
@@ -73,10 +77,9 @@ const STEPS = [
 
 const RECORDED = [
   "Your survey answers",
-  "The messages and offers you send",
-  "The instructions and limits you set for the software tool",
+  "Messages, offers, and negotiation transcripts",
+  "The goals and sharing choices you give the software tool",
   "Clicks, decisions, and timestamps",
-  "The negotiation transcripts",
 ];
 
 /**
@@ -113,6 +116,7 @@ function useIsNarrow(): boolean {
 export default function ConsentPage() {
   const router = useRouter();
   const { beginStudy, prolific } = useParticipant();
+  const [infoPage, setInfoPage] = useState(0);
   const [agreed, setAgreed] = useState(false);
   const [isAdult, setIsAdult] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -141,8 +145,17 @@ export default function ConsentPage() {
 
   const canProceed = useDevGate(agreed && isAdult);
 
+  function moveInfo(next: number) {
+    setInfoPage(next);
+    window.scrollTo({ top: 0 });
+  }
+
   async function handleConsent() {
-    if (!canProceed) return;
+    // Consent can only be collected after both information pages have been
+    // shown. The ActionBar already enforces this in the UI; keep the same
+    // boundary here so a later refactor cannot wire this handler to an early
+    // page and begin a session prematurely.
+    if (!canBeginConsent(infoPage, canProceed)) return;
     setBusy(true);
     setUnavailable(false);
     try {
@@ -185,294 +198,264 @@ export default function ConsentPage() {
   return (
     <>
       <Page>
-        <PageHeader
-          eyebrow="Interactive Simulation · Workplace Study"
-          title={STUDY.title}
-          subtitle="An interactive study exploring how colleagues communicate priorities and reach agreement on workplace arrangements."
-        />
+        <ReadingProgress labels={CONSENT_INFORMATION_PAGES} current={infoPage} ariaLabel="Consent information" />
 
-        {/* 3 Core Stats Cards */}
-        <div className="mb-6 grid grid-cols-1 gap-3.5 sm:grid-cols-3 sm:gap-4">
-          <StatCard
-            icon="⏱️"
-            label="Estimated Time"
-            value={`~${STUDY.estimatedMinutes} min`}
-            hint="5 short parts"
-            tone="blue"
-          />
-          <StatCard
-            icon="💵"
-            label="Compensation"
-            value={`${STUDY.currencySymbol}${STUDY.compensation}`}
-            hint={`+ up to ${STUDY.currencySymbol}${STUDY.bonusAmount} bonus`}
-            tone="emerald"
-          />
-          <StatCard
-            icon="📈"
-            label="Equivalent Rate"
-            value={`${STUDY.currencySymbol}${STUDY.hourlyEquivalent}/hr`}
-            hint="At Prolific's fair-pay rate"
-            tone="indigo"
-          />
-        </div>
+        {infoPage === 0 ? (
+          <>
+            <PageHeader
+              eyebrow="Welcome · Information 1 of 3"
+              title={STUDY.title}
+              subtitle="Before you decide, see what you will do, how long it takes, and how payment works."
+            />
 
-        {/*
-          DEVICE REQUIREMENT, NOT A RECOMMENDATION.
-          
-          It read "highly recommended" while the study is in practice not
-          completable on a phone: the briefing sits behind a drawer, the
-          negotiation composer and the package card compete for a 390px column,
-          and a participant who starts on mobile discovers this forty minutes
-          in, having already been paid for nothing. Saying so plainly on the
-          first screen is cheaper for them than any layout fix, and it is the
-          honest thing to put in front of a paid worker before they commit
-          an hour.
+            <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <StatCard
+                icon="⏱"
+                label="Time"
+                value={`~${STUDY.estimatedMinutes} min`}
+                hint="From consent to debrief"
+                tone="blue"
+              />
+              <StatCard
+                icon="£"
+                label="Payment"
+                value={`${STUDY.currencySymbol}${STUDY.compensation}`}
+                hint={`+ up to ${STUDY.currencySymbol}${STUDY.bonusAmount} bonus`}
+                tone="emerald"
+              />
+              <StatCard
+                icon="↗"
+                label="Rate"
+                value={`${STUDY.currencySymbol}${STUDY.hourlyEquivalent}/hr`}
+                hint="Equivalent total rate"
+                tone="indigo"
+              />
+            </div>
 
-          The screen-width test is a live check rather than a user-agent
-          sniff — what matters is the viewport the study will actually run in,
-          and a small window on a laptop has the same problem as a phone.
-        */}
-        <div
-          className={cx(
-            "mb-6 flex items-start gap-3 rounded-2xl border p-3.5 sm:p-4 text-xs sm:text-sm font-medium shadow-2xs",
-            isNarrow
-              ? "border-red-300 bg-red-50 text-red-950"
-              : "border-amber-200 bg-amber-50/80 text-amber-950",
-          )}
-        >
-          <span className="text-xl shrink-0">{isNarrow ? "⚠️" : "💻"}</span>
-          <div className="min-w-0 flex-1 leading-relaxed">
-            {isNarrow ? (
-              <>
-                <strong className="font-extrabold text-red-900">
-                  This screen is too small for the study.{" "}
-                </strong>
-                <span>
-                  Please open this link on a desktop or laptop — or widen this
-                  window if you are on one. The study has a live chat beside a
-                  private briefing you need to read while negotiating, and that
-                  does not fit here. If you continue on this device you are
-                  likely to be unable to finish, so we would rather you came
-                  back on a larger screen.
-                </span>
-              </>
-            ) : (
-              <>
-                <strong className="font-extrabold text-amber-900">
-                  Desktop or laptop required:{" "}
-                </strong>
-                <span>
-                  This study puts a live chat beside a private briefing you read
-                  while negotiating. It is not usable on a phone or a small
-                  tablet, so please take part on a computer.
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Quick Summary Card */}
-        <Card className="mb-6 border-blue-100 bg-gradient-to-br from-blue-50/50 to-indigo-50/30">
-          <div className="flex items-start gap-3.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-xl shadow-2xs border border-blue-200">
-              💡
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-base font-bold text-slate-900 mb-1">
-                What will you do?
-              </h2>
-              <p className="text-sm sm:text-base leading-relaxed text-slate-700">
-                You will take part in <strong>two short workplace negotiation scenarios</strong>, agreeing working arrangements with another participant. In one scenario, a <strong>software tool negotiates on your behalf</strong> before you finish the conversation. Afterwards, you will answer short questions about how each went.
+            <div
+              className={cx(
+                "mb-5 flex items-start gap-3 rounded-2xl border p-3.5 text-sm font-medium shadow-2xs",
+                isNarrow
+                  ? "border-red-300 bg-red-50 text-red-950"
+                  : "border-amber-200 bg-amber-50/80 text-amber-950",
+              )}
+            >
+              <span aria-hidden className="mt-0.5 text-lg">{isNarrow ? "⚠" : "▣"}</span>
+              <p className="min-w-0 flex-1 leading-relaxed">
+                <strong>{isNarrow ? "This screen is too small. " : "Computer required. "}</strong>
+                {isNarrow
+                  ? "Open this link on a desktop or laptop, or widen this window. The live chat and private briefing must fit side by side."
+                  : "Please use a desktop or laptop. The live chat and private briefing are not usable on a phone or small tablet."}
               </p>
             </div>
-          </div>
-        </Card>
 
-        {/* Study Overview Cards */}
-        <div className="mb-6">
-          <SummaryGrid cols={3}>
-            <KeyPoint icon="💬" title="Negotiation Tasks">
-              Take part in 2 simulated workplace scenarios (~10 mins each).
-            </KeyPoint>
-            <KeyPoint icon="🤖" title="AI Assistance">
-              Test direct negotiation vs. delegating to an AI Proxy agent.
-            </KeyPoint>
-            <KeyPoint icon="📝" title="Short Surveys">
-              Share your perspective, feelings, and decision experience.
-            </KeyPoint>
-          </SummaryGrid>
-        </div>
-
-        {/* Study Timeline Steps */}
-        <Card className="mb-6">
-          {/* The total is SUMMED FROM THE STEPS, never written in. A
-              hardcoded figure here said "approx. 25-30 minutes" directly
-              under a badge reading ~55 min, and called five steps four —
-              the first thing a participant reads about how long this takes,
-              contradicting itself twice. */}
-          <CardTitle
-            hint={`${STEPS.length} parts, about ${STEPS.reduce((n, s) => n + s.minutes, 0) + STAGE_MINUTES.consent} minutes in total:`}
-          >
-            🗺️ Study Flow Timeline
-          </CardTitle>
-          <ol className="relative mt-4 space-y-3.5">
-            {STEPS.map((step, i) => (
-              <li key={step.title} className="relative flex items-start gap-3.5">
-                {i < STEPS.length - 1 ? (
-                  <span
-                    aria-hidden
-                    className="absolute left-[17px] top-9 h-[calc(100%+0.5rem)] w-[2px] bg-slate-200"
-                  />
-                ) : null}
-                <span
-                  aria-hidden
-                  className="tabular relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-indigo-200 bg-indigo-50 text-xs font-black text-[var(--accent)] shadow-2xs"
-                >
-                  {i + 1}
-                </span>
-                <div className="min-w-0 flex-1 rounded-xl bg-slate-50/70 p-3 border border-slate-100 shadow-2xs">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">{step.title}</p>
-                    <span className="tabular shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-2xs font-bold text-[var(--ink-2)] shadow-2xs">
-                      ⏱️ {step.minutes}m
+            <Card>
+              <CardTitle hint="Your study at a glance">
+                What you will do
+              </CardTitle>
+              <p className="mb-4 max-w-prose text-sm leading-relaxed text-slate-700 sm:text-base">
+                You will negotiate two workplace arrangements with another
+                participant. In one task you chat directly. In the other, a
+                software tool speaks for you first, then you decide what to do
+                with its proposed agreement.
+              </p>
+              <ol className="grid gap-2.5 sm:grid-cols-2">
+                {STEPS.map((step, i) => (
+                  <li
+                    key={step.title}
+                    className={cx(
+                      "flex items-start gap-3 rounded-xl bg-slate-50 p-3",
+                      i === STEPS.length - 1 && "sm:col-span-2",
+                    )}
+                  >
+                    <span className="tabular flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-border)] bg-white text-xs font-bold text-[var(--accent)]">
+                      {i + 1}
                     </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-[var(--ink-2)] leading-relaxed">
-                    {step.detail}
-                  </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="text-sm font-bold text-slate-900">{step.title}</p>
+                        <span className="tabular shrink-0 text-xs font-semibold text-slate-500">
+                          {step.minutes} min
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{step.detail}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          </>
+        ) : infoPage === 1 ? (
+          <>
+            <PageHeader
+              eyebrow="Before You Decide · Information 2 of 3"
+              title="Your data and your choice"
+              subtitle="Here is what we record, how we store it, and what taking part means for you."
+            />
+
+            <div className="mb-5 grid gap-4 sm:grid-cols-2">
+              <Card>
+                <CardTitle hint="Used for research analysis">
+                  What we record
+                </CardTitle>
+                <ul className="space-y-2.5">
+                  {RECORDED.map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-sm leading-relaxed text-slate-700">
+                      <span aria-hidden className="mt-0.5 font-bold text-emerald-700">✓</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+
+              <Card>
+                <CardTitle hint="Stored under a research ID">
+                  How we protect it
+                </CardTitle>
+                <p className="text-sm leading-relaxed text-slate-700">
+                  Responses are stored under an anonymous research ID. Your
+                  Prolific ID is used only to process payment.
+                </p>
+                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
+                  Please do not enter real names or personal contact information
+                  in text boxes.
+                </p>
+              </Card>
+            </div>
+
+            <Card className="mb-5">
+              <CardTitle>Important to know</CardTitle>
+              <dl className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <dt className="text-sm font-bold text-slate-900">Risks and benefits</dt>
+                  <dd className="mt-1 text-sm leading-relaxed text-slate-600">
+                    The tasks involve minimal, everyday workplace discussion.
+                    There is no direct benefit beyond the advertised payment.
+                  </dd>
                 </div>
-              </li>
-            ))}
-          </ol>
-        </Card>
+                <div>
+                  <dt className="text-sm font-bold text-slate-900">Taking part is voluntary</dt>
+                  <dd className="mt-1 text-sm leading-relaxed text-slate-600">
+                    You may stop at any time by closing this tab, without a
+                    penalty on Prolific.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-bold text-slate-900">Full explanation at the end</dt>
+                  <dd className="mt-1 text-sm leading-relaxed text-slate-600">
+                    Some study details are withheld until the debrief so the
+                    tasks work as intended.
+                  </dd>
+                </div>
+              </dl>
+            </Card>
 
-        {/* Data & Privacy Section */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-2">
-          <Card>
-            <CardTitle hint="Recorded strictly for research analysis">
-              📝 What is Recorded
-            </CardTitle>
-            <ul className="space-y-2 mt-2">
-              {RECORDED.map((item) => (
-                <li
-                  key={item}
-                  className="flex items-center gap-2 text-xs sm:text-sm text-[var(--ink-2)]"
-                >
-                  <span aria-hidden className="text-emerald-600 font-bold">✓</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
+            <Card tone="muted">
+              <CardTitle>Questions or concerns</CardTitle>
+              <dl className="grid gap-4 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Research team
+                  </dt>
+                  <dd className="mt-1 font-semibold text-slate-800">
+                    {STUDY.irb.principalInvestigator}, {STUDY.irb.institution}
+                    <br />
+                    <a href={`mailto:${STUDY.irb.researcherEmail}`} className="font-bold text-[var(--accent)] hover:underline">
+                      {STUDY.irb.researcherEmail}
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    {STUDY.irb.institution} IRB
+                  </dt>
+                  <dd className="mt-1 font-semibold text-slate-800">
+                    Determined exempt · #{STUDY.irb.exemptionNumber}
+                    <br />
+                    <span className="font-medium text-slate-600">{STUDY.irb.contactEmail}</span>
+                  </dd>
+                </div>
+              </dl>
+            </Card>
+          </>
+        ) : (
+          <>
+            <PageHeader
+              eyebrow="Your Choice · Information 3 of 3"
+              title="Would you like to take part?"
+              subtitle="Check the two boxes below only if you understand the study information and want to continue."
+            />
 
-          <Card>
-            <CardTitle hint="Confidential & completely anonymous">
-              🛡️ How Data is Kept
-            </CardTitle>
-            <p className="text-xs sm:text-sm leading-relaxed text-[var(--ink-2)]">
-              All responses are stored under an anonymous research ID. Your Prolific ID is used solely for compensation payout.
-            </p>
-            <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-2xs sm:text-xs leading-relaxed text-amber-900 font-medium">
-              ⚠️ Please do not enter real names or personal contact info in text boxes.
-            </div>
-          </Card>
-        </div>
+            <Card className="mb-5" tone="muted">
+              <CardTitle>One last review</CardTitle>
+              <ul className="grid gap-3 text-sm leading-relaxed text-slate-700 sm:grid-cols-2">
+                <li><strong>Time:</strong> about {STUDY.estimatedMinutes} minutes on a desktop or laptop.</li>
+                <li><strong>Payment:</strong> {STUDY.currencySymbol}{STUDY.compensation}, plus up to {STUDY.currencySymbol}{STUDY.bonusAmount} bonus.</li>
+                <li><strong>Activities:</strong> background questions, practice, two negotiations, and surveys.</li>
+                <li><strong>Your choice:</strong> you can stop at any time without penalty.</li>
+              </ul>
+            </Card>
 
-        {/* Important Terms / IRB obligations */}
-        <Card className="mb-6">
-          <CardTitle>📋 Important Participant Information</CardTitle>
-          <div className="space-y-2.5 mt-3">
-            <KeyPoint icon="⚖️" title="Risks & Benefits">
-              Minimal everyday workplace discussion tasks. No direct benefit beyond advertised compensation.
-            </KeyPoint>
-            <KeyPoint icon="🚪" title="Voluntary Participation">
-              You may withdraw at any time by closing this tab without penalty on Prolific.
-            </KeyPoint>
-            <KeyPoint icon="🔎" title="Full Debriefing">
-              Complete research context and study design details will be provided at the end.
-            </KeyPoint>
-          </div>
-        </Card>
+            <Card className="border-2 border-indigo-200 bg-indigo-50/20 shadow-sm">
+              <CardTitle hint="Both confirmations are required to begin.">
+                Your informed consent
+              </CardTitle>
+              <div className="mt-3 space-y-3">
+                <Checkbox checked={isAdult} onChange={setIsAdult}>
+                  <strong className="font-bold text-[var(--ink)]">Age and location: </strong>
+                  I am at least 18 years old and currently reside in the United States.
+                </Checkbox>
+                <Checkbox checked={agreed} onChange={setAgreed}>
+                  <strong className="font-bold text-[var(--ink)]">Voluntary consent: </strong>
+                  I have read and understood the information above. I understand
+                  that participation is voluntary, and I agree to take part.
+                </Checkbox>
+              </div>
+            </Card>
 
-        {/* Researcher details */}
-        <Card className="mb-6" tone="muted">
-          <CardTitle>Research Team & Contacts</CardTitle>
-          <dl className="grid gap-4 sm:grid-cols-2 text-xs sm:text-sm mt-2">
-            <div>
-              <dt className="text-2xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-1">
-                Principal Investigator
-              </dt>
-              <dd className="font-semibold text-slate-800">
-                {STUDY.irb.principalInvestigator}, {STUDY.irb.institution}
-                <br />
-                <a
-                  href={`mailto:${STUDY.irb.researcherEmail}`}
-                  className="text-[var(--accent)] hover:underline font-bold mt-0.5 inline-block"
-                >
-                  {STUDY.irb.researcherEmail}
-                </a>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-2xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-1">
-                Institutional Review Board (IRB)
-              </dt>
-              <dd className="font-semibold text-slate-800">
-                {STUDY.irb.institution} IRB
-                <br />
-                <span className="text-slate-600 font-medium">
-                  Determined exempt · Exemption #{STUDY.irb.exemptionNumber} ·{" "}
-                  {STUDY.irb.contactEmail}
-                </span>
-              </dd>
-            </div>
-          </dl>
-        </Card>
-
-        {/* Consent Section */}
-        <Card className="border-2 border-indigo-200 bg-indigo-50/20 shadow-sm">
-          <CardTitle hint="Please confirm eligibility and consent to proceed:">
-            Your Informed Consent
-          </CardTitle>
-          <div className="space-y-3 mt-3">
-            <Checkbox checked={isAdult} onChange={setIsAdult}>
-              <strong className="font-bold text-[var(--ink)]">Age & Location: </strong>
-              I am at least 18 years old and currently reside in the United States.
-            </Checkbox>
-            <Checkbox checked={agreed} onChange={setAgreed}>
-              <strong className="font-bold text-[var(--ink)]">Voluntary Consent: </strong>
-              I have read and understood the information above. I understand that my participation is voluntary and I agree to participate in this study.
-            </Checkbox>
-          </div>
-        </Card>
-
-        {unavailable ? (
-          /*
-           * NO TECHNICAL DETAIL, and that is deliberate on two counts. The
-           * reader is a paid worker who needs to know whether to wait or to
-           * return the submission — not to debug someone else's deployment —
-           * and naming a model or an API key would disclose the counterpart's
-           * nature to every participant who ever saw this screen, which is the
-           * first item on the "must never learn mid-study" list.
-           */
-          <Callout tone="warning" title="The study is not available right now">
-            Something on our side is not ready, so we cannot start your session.
-            Please close this page and try again in a few minutes. If it still
-            does not work, return your submission on Prolific — you will not be
-            penalised for it, and nothing has been recorded.
-          </Callout>
-        ) : null}
+            {unavailable ? (
+              <div className="mt-5">
+                <Callout tone="warning" title="The study is not available right now">
+                  Something on our side is not ready, so we cannot start your
+                  session. Please try again in a few minutes. If it still does
+                  not work, return your submission on Prolific. Nothing has been
+                  recorded.
+                </Callout>
+              </div>
+            ) : null}
+          </>
+        )}
       </Page>
 
       <ActionBar
-        label="Agree and Begin Study"
-        onClick={handleConsent}
-        disabled={!canProceed}
-        busy={busy}
+        label={
+          infoPage === 0
+            ? "Next: privacy and rights"
+            : infoPage === 1
+              ? "Next: consent"
+              : "Agree and begin study"
+        }
+        onClick={
+          infoPage < CONSENT_INFORMATION_PAGES.length - 1
+            ? () => moveInfo(infoPage + 1)
+            : handleConsent
+        }
+        disabled={infoPage === CONSENT_INFORMATION_PAGES.length - 1 && !canProceed}
+        busy={infoPage === CONSENT_INFORMATION_PAGES.length - 1 && busy}
+        secondary={
+          infoPage > 0 ? (
+            <PreviousReading
+              onClick={() => moveInfo(infoPage - 1)}
+              disabled={busy}
+            />
+          ) : undefined
+        }
         note={
-          prolific.prolificPid
-            ? "✓ Prolific ID detected."
-            : "Preview mode (No Prolific ID detected)."
+          infoPage === CONSENT_INFORMATION_PAGES.length - 1
+            ? prolific.prolificPid
+              ? "Prolific ID detected."
+              : "Preview mode: no Prolific ID detected."
+            : `Information ${infoPage + 1} of ${CONSENT_INFORMATION_PAGES.length}`
         }
       />
     </>

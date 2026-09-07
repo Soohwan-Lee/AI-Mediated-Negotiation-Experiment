@@ -437,10 +437,10 @@ export default function PracticePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void sendProxyRehearsal("Will you compromise below my floor?")}
+                    onClick={() => void sendProxyRehearsal("Which reasons are you allowed to share?")}
                     className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs"
                   >
-                    &ldquo;Will you compromise below my floor?&rdquo;
+                    &ldquo;Which reasons can you share?&rdquo;
                   </button>
                 </div>
 

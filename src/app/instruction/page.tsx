@@ -27,7 +27,10 @@
  */
 
 import { useRouter } from "next/navigation";
-import { StudyOrientation } from "@/components/briefing-guide";
+import {
+  PreviousReading,
+  StudyOrientation,
+} from "@/components/briefing-guide";
 import { useMemo, useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
 import {
@@ -80,6 +83,7 @@ export default function InstructionPage() {
   const router = useRouter();
   const { assignment, logEvent, saveResponses } = useParticipant();
   const [part, setPart] = useState<"read" | "check">("read");
+  const [guideStartPage, setGuideStartPage] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [attempt, setAttempt] = useState(1);
@@ -136,10 +140,16 @@ export default function InstructionPage() {
 
   // Same orientation and optional-disclosure instruction in both modes.
   if (part === "read") {
-    return <StudyOrientation role={assignment?.role ?? "member"} onContinue={() => {
-      setPart("check");
-      window.scrollTo({ top: 0 });
-    }} />;
+    return (
+      <StudyOrientation
+        role={assignment?.role ?? "member"}
+        initialPage={guideStartPage}
+        onContinue={() => {
+          setPart("check");
+          window.scrollTo({ top: 0 });
+        }}
+      />
+    );
   }
 
   // --- part 2: comprehension check ---------------------------------------
@@ -215,6 +225,15 @@ export default function InstructionPage() {
             : submitted && allCorrect
               ? "🎉 All answers correct! Ready to proceed."
               : ""
+        }
+        secondary={
+          <PreviousReading
+            onClick={() => {
+              setGuideStartPage(2);
+              setPart("read");
+              window.scrollTo({ top: 0 });
+            }}
+          />
         }
       />
     </>

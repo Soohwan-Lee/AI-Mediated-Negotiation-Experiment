@@ -44,9 +44,17 @@ export function WorkplaceScene({ scene }: { scene: "team" | "terms" | "private" 
   );
 }
 
-export function ReadingProgress({ labels, current }: { labels: readonly string[]; current: number }) {
+export function ReadingProgress({
+  labels,
+  current,
+  ariaLabel = "Reading pages",
+}: {
+  labels: readonly string[];
+  current: number;
+  ariaLabel?: string;
+}) {
   return (
-    <ol aria-label="Briefing pages" className="mb-7 flex flex-wrap gap-x-5 gap-y-2 border-b border-slate-200 pb-4">
+    <ol aria-label={ariaLabel} className="mb-7 flex flex-wrap gap-x-5 gap-y-2 border-b border-slate-200 pb-4">
       {labels.map((label, index) => (
         <li key={label} aria-current={index === current ? "step" : undefined}
           className={`text-sm ${index === current ? "font-bold text-slate-900" : "text-slate-500"}`}>
@@ -57,17 +65,31 @@ export function ReadingProgress({ labels, current }: { labels: readonly string[]
   );
 }
 
-export function PreviousReading({ onClick }: { onClick: () => void }) {
-  return <button type="button" onClick={onClick}
-    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+export function PreviousReading({
+  onClick,
+  disabled = false,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return <button type="button" onClick={onClick} disabled={disabled}
+    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
     Back
   </button>;
 }
 
 const GUIDE_PAGES = ["The setting", "Your role", "The rules"] as const;
 
-export function StudyOrientation({ role, onContinue }: { role: Role; onContinue: () => void }) {
-  const [page, setPage] = useState(0);
+export function StudyOrientation({
+  role,
+  onContinue,
+  initialPage = 0,
+}: {
+  role: Role;
+  onContinue: () => void;
+  initialPage?: number;
+}) {
+  const [page, setPage] = useState(initialPage);
   const isLeader = role === "leader";
   function move(next: number) {
     setPage(next);

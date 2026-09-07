@@ -183,12 +183,13 @@ export function TaskIntro({
 
 /** All pages are read in both modes before RISK or any mandate decision. */
 export function TaskBrief({
-  taskIndex, task, role, steps, onContinue,
+  taskIndex, task, role, steps, onBack, onContinue,
 }: {
   taskIndex: 1 | 2;
   task: NegotiationTask;
   role: Role;
   steps: string[];
+  onBack: () => void;
   onContinue: () => void;
 }) {
   const [page, setPage] = useState(0);
@@ -262,7 +263,11 @@ export function TaskBrief({
             window.scrollTo({ top: 0 });
           }
         }}
-        secondary={page > 0 ? <PreviousReading onClick={() => move(page - 1)} /> : undefined}
+        secondary={
+          <PreviousReading
+            onClick={() => (page > 0 ? move(page - 1) : onBack())}
+          />
+        }
         note={`Briefing ${page + 1} of 4 · Available throughout the task`}
       />
     </>
