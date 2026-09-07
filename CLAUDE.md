@@ -288,13 +288,15 @@ ground work there is already done. They write as many messages as they like and
 may finish early. Running the clock to zero is an outcome; `onExpire` closes the
 exchange as an impasse.
 
-**The Proxy arm's closing conversation is UNCONDITIONAL.** It was conditional —
-approving ended the task, and only modify-or-reject led here — and that made
-the ending itself a function of an outcome variable: two participants who
-answered the §9.4 items had had different amounts of contact with the other
-side depending on what they chose. `RATIFY` stays a real decision because it
-decides what they carry INTO the conversation (the package as it stands, the
-package as something to change, or nothing at all), not whether it happens.
+**The Proxy arm's closing conversation is CONDITIONAL on RATIFY** (September 6
+correction; the override at the top of this file governs). Approving finalizes
+the package and ends the task; only modify-or-reject leads here. It was
+unconditional for a while, and the cost of reversing that is recorded in full
+under RATIFY below: the amount of contact with the other side is no longer
+constant within the Proxy arm, and it covaries with an outcome variable. What
+buys that cost back is that `RATIFY` is the confirmatory measure of the
+construct the study is about, and an approval that changes nothing about what
+happens next is not a decision.
 
 **When a closing conversation does happen, both arms end the same three ways**,
 so "how did it end" is never a between-condition artefact:
@@ -839,8 +841,10 @@ the other participant" → negotiate → review.
 Inside a Proxy task: cover → brief → **RISK** → **mandate (levels + reason
 cards, one screen)** → check with your proxy → confirm → watch the two AI
 Proxies → **RATIFY** → handover → negotiate directly → review.
-The closing conversation is now reached by EVERY Proxy participant, whatever
-they chose at RATIFY — see below.
+RATIFY decides whether the last two steps happen: approval finalizes the
+package and goes straight to review; only modification or refusal opens the
+three-minute closing conversation (Ver.2.20 §7, September 6 correction — see
+the override at the top of this file).
 
 **Neither arm has a card control inside the conversation any more.** Ver.2.20
 removed it; both negotiation screens are a composer and nothing else. The
@@ -909,39 +913,45 @@ and against the §10 gate 8 timing budget.
 proxies run ONCE — no revision, no second run — and then the participant
 approves what they reached, asks for a change, or refuses it.
 
-**EVERY CHOICE THEN LEADS TO THE CLOSING CONVERSATION.** Approving used to end
-the task, on the reasoning that sending an approver into a chat would make
-their decision cosmetic. That bought tidiness at too high a price: how the task
-ENDED became a function of what the participant chose, so approvers and
-modifiers finished on different screens after different amounts of contact with
-the other side. Every §9.4 item that asks them to judge that contact was then
-answered against a different stimulus depending on a choice that is itself an
-outcome — and `Pooled Proxy − Direct` compared a Direct arm that always ends in
-conversation against a Proxy arm that only sometimes does.
+**APPROVAL FINALIZES; ONLY MODIFICATION OR REFUSAL OPENS THE CONVERSATION**
+(September 6 correction, and the override at the top of this file governs).
+An approver's task ends at RATIFY and goes to review. A modifier and a refuser
+go on to the three-minute closing, and what they carry in differs: a modifier
+takes the proxies' package as something to change, a refuser takes nothing
+(`openingPackage` is null and the composer starts empty). `RATIFY` is recorded
+where the decision is taken.
 
-`RATIFY` is still a real decision and still the confirmatory measure. It is
-recorded where it is taken, and it still decides what the participant walks in
-WITH: an approver carries the proxies' package to the table, a modifier carries
-it as something to change, a refuser carries nothing (`openingPackage` is null
-and the composer starts empty). What it no longer decides is whether the
-conversation happens at all — which is also what lets the three hints on the
-screen describe the same next step, so none of them reads as the quick way out.
+The ending was unconditional for a while, and the reason it was is worth
+keeping in view because it is a real cost of the current rule. Under the
+unconditional version every Proxy participant finished in conversation, so
+"how the task ended" could not be a function of a choice that is itself an
+outcome — approvers and modifiers answered the §9.4 items against the same
+stimulus, and `Pooled Proxy − Direct` compared two arms that both always end
+in conversation. Ver.2.20's September 6 correction reversed it and accepts
+that cost: sending an approver into a chat makes the approval cosmetic, and
+`RATIFY` is the confirmatory measure of exactly the construct this study is
+about — delegation of VOICE with retention of the DECISION. A decision that
+changes nothing about what happens next is not the decision being measured.
+The consequence to carry into the analysis is that amount of contact with the
+other side is not constant within the Proxy arm, and it covaries with RATIFY.
 
-The three-minute conversation has the proxies' full transcript on screen beside
-it.
+The three-minute conversation, where it happens, has the proxies' full
+transcript on screen beside it.
 
 **Ver.2.12 deleted a ratification screen, and bringing it back is not a
 reversal of that reasoning.** That reasoning was right about the shape it had:
 when BOTH arms ended with the participant agreeing a package in conversation,
 asking "do you accept this?" afterwards made them re-decide what they had just
 decided, and handed the Proxy arm a way to undo an agreement Direct could
-not. §7 changes the shape — the conversation is no longer the default ending —
-and the retained decision IS the construct this study is built on: delegation
-of VOICE with retention of the DECISION (§2.6).
+not. §7 changes the shape — the conversation is no longer the ending every
+Proxy participant reaches — and the retained decision IS the construct this
+study is built on: delegation of VOICE with retention of the DECISION (§2.6).
 
 **Three rules the screen must keep.** It may not recommend an answer: the three
 controls carry equal weight, none is pre-selected, and no copy suggests what a
 sensible participant does — the distribution across the three is the finding.
+That is harder to hold now that approval is the shorter path, so the hints must
+not let approval read as the quick way out.
 `RATIFY` is recorded where the decision is taken, never inferred from the final
 package: a participant who asked for a change and then agreed the same package
 is a modifier, and reading it back off the outcome would call them an approver.

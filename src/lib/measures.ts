@@ -1043,6 +1043,29 @@ export const ATTR_BLOCK: Block = {
   ],
 };
 
+/**
+ * The line the participant may leave back (§6.8).
+ *
+ * NEVER ANALYSED. It exists so a one-way comment does not read as odd — the
+ * other participant left something, and a screen that gives no way to answer
+ * makes the exchange feel staged, which is the one thing this deception cannot
+ * afford. It is optional, Continue is not gated on it, and no §9 measure reads
+ * it.
+ *
+ * It sits with the comment rather than inside ATTR_BLOCK: the ATTR items ask
+ * the participant to REFLECT on what they read, and a reply box among them
+ * would turn "what went through your mind" into a second draft of the reply.
+ */
+export const REMARK_REPLY_ITEM: Item = {
+  kind: "text",
+  id: "REMARK_REPLY",
+  // The block heading already asks the question, so the item text says what to
+  // write rather than asking it again.
+  text: "Anything you would like to say back to them.",
+  placeholder: "Optional — say something back, or leave this empty.",
+  rows: 2,
+};
+
 /** ATTR2 — Proxy tasks only: who the comment felt aimed at (chen2026). */
 export const ATTR_PROXY_ITEM: Item = {
   kind: "scale",
@@ -1222,7 +1245,15 @@ const MOCK_TEXT: Record<string, string> = {
     "The one they kept coming back to felt like theirs — you do not hold a line that hard for an argument you were handed. The tidier, more general points felt added; they sounded like something out of a handbook rather than a person with a problem.",
   "OE-F1":
     "Doing it all myself I was managing how I came across from the first message. With the AI going first, the difficult part was already said by the time I joined in, so I was defending a position rather than opening one. Easier, but less mine.",
-  "OE-F2": "",
+  "OE-F2":
+    "Only that the second one felt longer than the first, though I think that is because I was reading everything twice by then. The instructions were clear enough.",
+  // The parting comment's own two boxes. `OE-ATTR` is analysed; `REMARK_REPLY`
+  // is not (§6.8) — it is filled here for the same reason as every other entry,
+  // so the screen can be READ rather than looked at empty.
+  "OE-ATTR":
+    "It landed harder than I expected for one line. I knew I had pushed on the one thing I could not give up, and seeing it said back to me made it sound less reasonable than it felt at the time. It was about me, I think — I was the one asking, whatever went between us.",
+  REMARK_REPLY:
+    "Fair enough — it mattered more to me than I could really explain at the time. Good working with you.",
   "RECV-EVAL-C":
     "Reasonable to work with, though the early insistence on the busiest slots felt like it came from somewhere they were not saying.",
   SUS2:

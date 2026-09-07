@@ -5,8 +5,8 @@
  *
  * WHAT IT IS. After the post-negotiation decision, the participant is shown
  * one line "the other participant left for you". It is scripted, identical for
- * everyone, and the participant may leave one back (optional, never analysed —
- * it is there so a one-way comment does not read as odd).
+ * everyone, and the participant may leave one back (`REMARK_REPLY` — optional,
+ * never analysed, and it is there so a one-way comment does not read as odd).
  *
  * WHY IT EXISTS. Transplanted from chen2026's "AI phantom limb" procedure: a
  * client leaves a one-line comment for an agent, and the finding is that
@@ -43,6 +43,7 @@ import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import {
   ATTR_BLOCK,
   ATTR_PROXY_ITEM,
+  REMARK_REPLY_ITEM,
   blockForTask,
   dummyAnswer,
   requiredIds,
@@ -86,13 +87,31 @@ export function RemarkPhase({
       : ATTR_BLOCK,
     taskIndex,
   );
+  /**
+   * The reply box, as a block of its own so it can sit WITH the comment rather
+   * than among the ATTR items — see `REMARK_REPLY_ITEM`. It is never in
+   * `required`, so Continue is not gated on it.
+   */
+  const replyBlock: Block = blockForTask(
+    {
+      id: "remark_reply",
+      title: "Would you like to say anything back?",
+      hint: "Optional",
+      items: [REMARK_REPLY_ITEM],
+      optional: [REMARK_REPLY_ITEM.id],
+    },
+    taskIndex,
+  );
+
   const required = requiredIds(block);
   const missing = required.filter((id) => answers[id] === undefined);
   const canContinue = useDevGate(missing.length === 0);
 
   useDevAutofill(() => {
     const filled: Answers = {};
-    for (const item of block.items) filled[item.id] = dummyAnswer(item);
+    for (const item of [...replyBlock.items, ...block.items]) {
+      filled[item.id] = dummyAnswer(item);
+    }
     setAnswers((prev) => ({ ...prev, ...filled }));
   }, `remark-${taskIndex}`);
 
@@ -108,7 +127,24 @@ export function RemarkPhase({
           <blockquote className="mt-3 border-l-2 border-[var(--accent)] pl-4 text-sm leading-relaxed text-[var(--ink)]">
             {remarkText(isProxy, agreed)}
           </blockquote>
+
         </Card>
+
+        {/* THE REPLY, AND IT IS NOT A MEASURE (§6.8). Nothing reads it; it is
+            here so a one-way comment does not read as odd — the other side
+            left something, and a screen with no way to answer makes the
+            exchange read as staged. It comes BEFORE the ATTR items and after
+            the comment, so replying is answering the person rather than a
+            first draft of "what went through your mind". Optional, and
+            Continue is not gated on it: pressing on without answering has to
+            stay as ordinary as answering. */}
+        <MeasureBlock
+          block={replyBlock}
+          answers={answers}
+          onChange={(id, value) =>
+            setAnswers((prev) => ({ ...prev, [id]: value }))
+          }
+        />
 
         <MeasureBlock
           block={block}

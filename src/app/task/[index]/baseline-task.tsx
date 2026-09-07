@@ -984,7 +984,12 @@ export function BaselineTask({
           <div className="sticky top-[calc(var(--header-h)+0.25rem)] z-20 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/95 px-4 py-3 shadow-sm backdrop-blur-md sm:px-5">
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
-                  💬 Live Direct Negotiation
+                  {/* NOT "Direct" — the arm names are never on screen (§8.1,
+                      "which condition they are in"). The Proxy arm's closing
+                      banner says "Close It Together" for the same reason: both
+                      describe what is happening on the screen, neither names
+                      the condition. */}
+                  💬 Live Negotiation
                 </p>
                 <p className="text-xs text-[var(--ink-2)] leading-relaxed break-words">
                   {settled === "agreed"

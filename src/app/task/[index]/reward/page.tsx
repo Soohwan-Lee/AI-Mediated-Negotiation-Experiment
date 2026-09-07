@@ -352,9 +352,17 @@ export default function TaskRewardPage({
                 />
               ))}
             </span>
-            <p className="text-lg sm:text-xl font-bold text-slate-900">
+            {/* A HEADING, NOT A PARAGRAPH. This is the page's own title and
+                the two sibling screens in this file (the Leader's decision and
+                the Member's evaluation) both title themselves with an `h1`, so
+                a bold `<p>` here left the Member's wait as the one screen in
+                the flow with no heading in its outline — invisible to a screen
+                reader moving by headings, on the screen that carries the power
+                manipulation. `h1` rather than `h2` to match those siblings:
+                each of these is the whole page. */}
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900">
               The team lead is deciding your study bonus…
-            </p>
+            </h1>
             <p className="mt-2 max-w-prose text-xs sm:text-sm text-slate-600">
               They were asked to consider the negotiation result together with
               what they learned during the negotiation.

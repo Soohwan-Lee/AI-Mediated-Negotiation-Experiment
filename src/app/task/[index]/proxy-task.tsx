@@ -1086,7 +1086,8 @@ export function ProxyTask({
                         What it may say for you
                       </p>
                       <p className="mt-0.5 text-xs text-[var(--private-ink)]/80">
-                        The reasons you ticked.
+                        The reasons you ticked, in the words your proxy will
+                        use.
                       </p>
                       {checked.length ? (
                         <ul className="mt-3 space-y-2">
@@ -1095,7 +1096,21 @@ export function ProxyTask({
                               key={c.id}
                               className="rounded-lg border border-emerald-200 bg-white/80 p-2.5 text-xs sm:text-sm leading-relaxed text-slate-800"
                             >
-                              {c.text}
+                              {/* THE `relayed` TEXT, NOT THE CARD'S OWN. This
+                                  list is the proxy reading back what it will
+                                  SAY, and Ver.2.19 requires a proxy to speak
+                                  in the third person ("the team lead I
+                                  represent…"). Showing the card verbatim here
+                                  would have the proxy claim the participant's
+                                  own confession as its own, which is exactly
+                                  the failure the `relayed` field was written
+                                  to prevent — and this screen is where the
+                                  participant decides what to authorize, so it
+                                  is where the delegation has to be visible.
+                                  The MANDATE screen's checkbox cards stay as
+                                  `text`: that is the participant's own
+                                  briefing, in their own voice. */}
+                              {c.relayed ?? c.text}
                             </li>
                           ))}
                         </ul>
