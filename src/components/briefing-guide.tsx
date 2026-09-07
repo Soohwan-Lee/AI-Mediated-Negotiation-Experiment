@@ -1,48 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { ActionBar, BackButton } from "./study-chrome";
 import { Card, CardTitle, Page, PageHeader } from "./ui";
 import { STUDY } from "@/lib/study-config";
 import type { Role } from "@/lib/types";
-
-/** Neutral workplace scenes: no secret, recommended trade, or emotional reaction. */
-export function WorkplaceScene({ scene }: { scene: "team" | "terms" | "private" | "decision" }) {
-  return (
-    <svg viewBox="0 0 240 120" className="h-28 w-full" aria-hidden="true" focusable="false">
-      <rect x="1" y="1" width="238" height="118" rx="12" fill="#f1f5f9" />
-      {scene === "team" ? (
-        <g stroke="#334155" strokeWidth="2" fill="none">
-          <rect x="22" y="18" width="60" height="43" rx="3" stroke="#94a3b8" />
-          <path d="M52 18v43M22 40h60M28 98h184M65 98v-9q0-23 23-23t23 23v9M130 98v-9q0-23 23-23t23 23v9" />
-          <circle cx="88" cy="48" r="13" fill="#cbd5e1" />
-          <circle cx="153" cy="48" r="13" fill="#cbd5e1" />
-          <path d="M185 21h32v23h-20l-9 7v-7h-3z" fill="#fff" stroke="#94a3b8" />
-        </g>
-      ) : scene === "terms" ? (
-        <g stroke="#334155" strokeWidth="2" fill="#fff">
-          <rect x="43" y="21" width="65" height="78" rx="6" />
-          <rect x="131" y="21" width="65" height="78" rx="6" />
-          <path d="M56 39h39M144 39h39M70 55h25M158 55h25M70 71h25M158 71h25M70 87h25M158 87h25" stroke="#94a3b8" />
-          {[55, 71, 87].map(y => <g key={y}><circle cx="59" cy={y} r="3" /><circle cx="147" cy={y} r="3" /></g>)}
-        </g>
-      ) : scene === "private" ? (
-        <g stroke="#8b652f" strokeWidth="2" fill="#fff8ea">
-          <rect x="69" y="17" width="85" height="86" rx="5" />
-          <path d="M84 36h54M84 50h41M84 64h34M84 78h24" stroke="#c5a574" />
-          <rect x="134" y="67" width="36" height="29" rx="4" />
-          <path d="M142 67v-9a10 10 0 0 1 20 0v9" />
-          <circle cx="152" cy="81" r="3" fill="#8b652f" />
-        </g>
-      ) : (
-        <g stroke="#334155" strokeWidth="2" fill="#fff">
-          <path d="M38 27h73v38H63L48 77V65H38zM131 51h72v37h-10v13l-15-13h-47z" />
-          <path d="M53 41h41M53 51h28M146 65h41M146 75h28" stroke="#94a3b8" />
-        </g>
-      )}
-    </svg>
-  );
-}
 
 export function ReadingProgress({
   labels,
@@ -104,19 +67,39 @@ export function StudyOrientation({
           subtitle={["You will play a role in a company project team. Here is the setting before you see your first task.", "You keep this role in both tasks. The other participant plays the other role.", "Read these rules before a short check and one practice round."][page]} />
 
         {page === 0 ? (
-          <div className="grid gap-5 sm:grid-cols-2">
-            {[
-              { scene: "team" as const, title: "1. Work on the same team", text: "You and another participant play a team lead and a senior team member at the same company." },
-              { scene: "terms" as const, title: "2. Set two working conditions", text: "Choose one option for each condition. Both people must agree to the complete package." },
-              { scene: "private" as const, title: "3. Read your own briefing", text: "You each have private goals, background information, and a point sheet. You cannot see the other person's sheet." },
-              { scene: "decision" as const, title: "4. Negotiate, then reflect", text: "In one task you chat directly. In the other, an AI Proxy speaks for you. Questions and a bonus decision or evaluation follow each task." },
-            ].map(item => (
-              <section key={item.scene} className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
-                <WorkplaceScene scene={item.scene} />
-                <h2 className="mt-4 text-base font-bold text-slate-900">{item.title}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.text}</p>
-              </section>
-            ))}
+          <div className="grid items-center gap-6 lg:grid-cols-[1.05fr_1fr]">
+            <figure className="overflow-hidden rounded-[var(--radius-xl)] border border-slate-200 bg-[#f4efe5] shadow-[var(--shadow-md)]">
+              <Image
+                src="/illustrations/workplace-story.png"
+                width={1536}
+                height={1024}
+                sizes="(min-width: 1024px) 27rem, (min-width: 640px) 48rem, 100vw"
+                alt="Two colleagues separately read their briefings, then consider two unlabeled workplace choices together."
+                className="h-auto w-full"
+              />
+              <figcaption className="border-t border-slate-200/80 bg-white/90 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                One shared project, two private briefings.
+              </figcaption>
+            </figure>
+
+            <ol className="space-y-2">
+              {[
+                ["Work on the same team", "You play colleagues with different roles."],
+                ["Set two conditions", "Choose one option for each. Both people must agree."],
+                ["Use private briefings", "Only you can see your goals, background, and points."],
+                ["Negotiate, then reflect", "Chat directly once and use an AI Proxy once. Questions follow each task."],
+              ].map(([title, text], index) => (
+                <li key={title} className="flex items-start gap-3 rounded-xl bg-white p-3 shadow-[var(--shadow-xs)]">
+                  <span className="tabular flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-border)] bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent)]">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900">{title}</h2>
+                    <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{text}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </div>
         ) : page === 1 ? (
           <div className="space-y-5">

@@ -64,7 +64,7 @@ import {
 } from "@/components/session";
 import { OptionChips, PackageValue, PointsKey, IssueValueTable } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
-import { WorkplaceScene, ReadingProgress, PreviousReading } from "@/components/briefing-guide";
+import { ReadingProgress, PreviousReading } from "@/components/briefing-guide";
 import { Callout, Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { dummyAnswer, riskBlock } from "@/lib/measures";
@@ -208,7 +208,6 @@ export function TaskBrief({
         <ReadingProgress labels={labels} current={page} />
         {page === 0 ? (
           <div className="space-y-5">
-            <div className="mx-auto max-w-xs"><WorkplaceScene scene="terms" /></div>
             <Card>
               <CardTitle>{task.title}</CardTitle>
               <p className="mt-3 text-base leading-relaxed text-slate-700">{task.publicBrief}</p>
