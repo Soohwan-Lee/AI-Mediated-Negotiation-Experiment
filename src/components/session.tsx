@@ -274,6 +274,107 @@ export function TaskCover({
  * written with a different number of paragraphs this falls back to rendering
  * it whole rather than mislabelling it.
  */
+// ---------------------------------------------------------------------------
+// The AI Proxy, as a representative rather than a form
+// ---------------------------------------------------------------------------
+
+/**
+ * What each policy is allowed to do with the participant's reasons (§7).
+ *
+ * BOTH principals must be told the policy; neither may ever be told the
+ * CONDITION NAME. The two strings are deliberately matched in length and
+ * shape — if one arm read as a longer or more careful explanation than the
+ * other, the disclosure itself would become a cue about which arm a
+ * participant is in, on the very contrast it exists to support.
+ *
+ * It lives here rather than in the proxy task because the mandate, the
+ * rehearsal and the confirm screen all show the same identity block, and the
+ * policy sentence is the ONLY thing in that block that differs between the two
+ * policies.
+ */
+export const POLICY_DISCLOSURE: Record<
+  "user_specified" | "ai_supplemented",
+  string
+> = {
+  user_specified:
+    "Both AI Proxies in this task pass on the reasons their own person ticked as they are, changing only the wording. Nothing is added or left out, on either side.",
+  ai_supplemented:
+    "Both AI Proxies in this task shorten a sensitive reason to the kind of situation it is, leaving the specifics out, and say it alongside other reasons anyone in that role might give. Neither proxy marks which reason came from their own person.",
+};
+
+/**
+ * One block, three screens: who this thing is and what it will do.
+ *
+ * The mandate, the rehearsal and the confirm sheet are the whole of the
+ * delegation, and they read as three unrelated forms unless the same
+ * representative is standing at the top of each one. The avatar and the label
+ * are the ones the transcript uses for `participant_proxy` (see
+ * `SPEAKER_CONFIG` in components/negotiation.tsx), so the proxy a participant
+ * briefs here is visibly the proxy they later watch speak.
+ *
+ * DECEPTION INTEGRITY: the two policies render an IDENTICAL block apart from
+ * `POLICY_DISCLOSURE`. Nothing else here may branch on the policy, and the
+ * condition name appears nowhere.
+ */
+export function ProxyIdentity({
+  policy,
+  status,
+  footnote,
+  className,
+}: {
+  policy: "user_specified" | "ai_supplemented";
+  status?: string;
+  /** One muted line under the policy sentence — the mandate screen uses it to
+      say what happens after this screen. Never anything policy-specific. */
+  footnote?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cx(
+        "rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 sm:p-5 shadow-2xs",
+        className,
+      )}
+    >
+      <div className="flex items-start gap-4">
+        {/* The avatar is deliberately larger than a list glyph. This is the
+            representative the participant is about to hand a mandate to, and
+            on three otherwise form-shaped screens it is the only thing that
+            says so before a word is read. Same glyph as the transcript's
+            `participant_proxy`, so it is visibly the same proxy throughout. */}
+        <span
+          aria-hidden
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[1.75rem] ring-4 ring-white/70 shadow-2xs"
+        >
+          🤖
+        </span>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <p className="text-[0.6875rem] font-extrabold uppercase tracking-wider text-indigo-700">
+            Your AI Proxy
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-indigo-950 font-medium">
+            It will negotiate with the other participant&rsquo;s AI Proxy on
+            your behalf, saying only what you hand it here.
+          </p>
+          {status ? (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-2.5 py-0.5 text-[0.6875rem] font-bold text-indigo-900">
+              {status}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <p className="mt-3.5 border-t border-indigo-200/70 pt-3.5 text-xs sm:text-sm leading-relaxed text-indigo-950/90">
+        {POLICY_DISCLOSURE[policy]}
+      </p>
+      {footnote ? (
+        <p className="mt-2 text-xs leading-relaxed text-indigo-900/70">
+          {footnote}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * `**...**` in a story string becomes `<strong>`, and nothing else is markup.
  *

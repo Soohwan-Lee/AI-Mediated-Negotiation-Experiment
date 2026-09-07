@@ -56,6 +56,7 @@ import {
 } from "@/lib/negotiation/machine";
 import {
   BriefingPanel,
+  ProxyIdentity,
   RoleStory,
   IssueReasonGroups,
   TaskCover,
@@ -355,6 +356,7 @@ export function PreferenceForm({
   steps,
   stepIndex,
   isProxy,
+  identity,
   reasons,
   reasonsComplete = true,
   initial,
@@ -366,6 +368,10 @@ export function PreferenceForm({
   steps: string[];
   stepIndex: number;
   isProxy: boolean;
+  /* The Proxy arm's representative, shown above the term cards. Direct passes
+     none — there is nobody to brief — and the two term cards below are
+     byte-for-byte the same in both arms (§5 principle 4). */
+  identity?: ReactNode;
   reasons?: ReactNode;
   reasonsComplete?: boolean;
   initial?: Preferences;
@@ -416,21 +422,26 @@ export function PreferenceForm({
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <TaskHeader
             taskIndex={taskIndex}
-            title={
-              isProxy
-                ? "Set your goals and choose what to share"
-                : "Choose your starting goals"
-            }
+            title={isProxy ? "Brief your AI Proxy" : "Choose your starting goals"}
             steps={steps}
             current={stepIndex}
           />
 
+          {identity ? <div className="mb-6">{identity}</div> : null}
+
           <div className="mb-6">
-            <Callout tone="private" title="🔒 Private to You · Set Your Goals">
+            <Callout
+              tone="private"
+              title={
+                isProxy
+                  ? "🔒 Private to you · Your instructions"
+                  : "🔒 Private to You · Set Your Goals"
+              }
+            >
               <p className="text-xs sm:text-sm leading-relaxed">
                 Select the option you would like to aim for on each condition. This form is private.{" "}
                 {isProxy
-                  ? "Your AI Proxy uses these choices to negotiate for you."
+                  ? "These are the instructions your AI Proxy will follow: it aims for the options you pick here and says only the reasons you tick below."
                   : "Afterwards, you will see your original goals beside the final agreed package."}
               </p>
 
@@ -1615,7 +1626,7 @@ export function RehearsalChat({
       const reply: DisplayMessage = {
         id: `r-proxy-${history.length}`,
         speaker: "participant_proxy",
-        text: "I'll hold your main term at the level you set and offer movement on the other two instead. If they push back on it I'll give one of the reasons you've ticked — I won't raise anything you left unticked.",
+        text: "I'll hold your main term at the level you set and offer movement on the other term instead. If they push back on it I'll give one of the reasons you've ticked — I won't raise anything you left unticked.",
       };
       setMessages([...history, reply]);
       void record(reply);
@@ -1671,18 +1682,29 @@ export function RehearsalChat({
         >
           <TaskHeader
             taskIndex={taskIndex}
-            title="Q&A with Your AI Proxy (Optional)"
+            title="Meet your AI Proxy (optional)"
             steps={steps}
             current={stepIndex}
           />
 
+          {/* The same representative as the mandate and the confirm sheet, so
+              the three screens read as one delegation rather than three forms.
+              The policy sentence inside it is the only thing that differs
+              between the two policies. */}
           <div className="mb-6">
-            <Callout title="💬 Ask Anything About Your Instructions" tone="neutral">
+            <ProxyIdentity
+              policy={policy}
+              status="Ready to answer questions about your instructions"
+            />
+          </div>
+
+          <div className="mb-6">
+            <Callout title="Ask it anything about your instructions" tone="neutral">
               <p className="mb-1 text-sm leading-relaxed text-slate-800">
                 You can ask how it plans to open, where it will hold the line, or which reasons it will voice. The other participant cannot see this chat.
               </p>
               <p className="text-xs text-slate-600">
-                This check is optional — you can proceed immediately or go back to adjust your mandate instructions.
+                This is optional — you can go straight on, or go back and change your instructions.
               </p>
             </Callout>
           </div>
@@ -1698,7 +1720,7 @@ export function RehearsalChat({
           <Card padded={false} className="flex flex-col overflow-hidden border-slate-200">
             <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
               <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
-                🤖 AI Proxy Strategy Consultation
+                🤖 Your AI Proxy
               </p>
             </div>
             <Transcript

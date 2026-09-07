@@ -51,6 +51,8 @@ import {
 import {
   BriefingPanel,
   IssueReasonGroups,
+  POLICY_DISCLOSURE,
+  ProxyIdentity,
   TaskCover,
   TaskHeader,
   TaskLayout,
@@ -245,34 +247,11 @@ const STEP_OF: Record<Phase, number> = {
 
 
 /**
- * What each principal is told about the policy in force (Design §7, last
- * paragraph).
- *
- * BOTH sides are told the same thing, and they are told it before the task
- * starts. This is the one place the interface differs by policy, and it has to
- * — a participant who did not know their proxy might add arguments could not
- * meaningfully answer OTHER-AI4 about telling the sources apart. What stays
- * hidden is which individual reason came from where.
+ * The policy disclosure (Design §7) lives with `ProxyIdentity` in
+ * components/session.tsx, because the mandate, the rehearsal and the confirm
+ * screen all show it inside that block. It is the ONE sentence that differs
+ * between the two policies; the CONDITION NAME never appears anywhere.
  */
-/**
- * Design §7 requires the POLICY to be disclosed to both principals — it is what
- * makes OTHER-AI4 answerable — while the CONDITION NAME never is.
- *
- * The two strings are deliberately matched in length and shape. If one arm read
- * as a longer or more careful explanation than the other, the disclosure itself
- * would become a cue about which arm a participant is in, on the contrast
- * (`AI-Supplemented − User-Specified`) it exists to support.
- *
- * The AI-Supplemented sentence used to end "Which is which will not be marked" — a
- * fragment whose referent a first-time reader has to reconstruct. It now says
- * what is not marked, in the same breath as what may be added.
- */
-const POLICY_DISCLOSURE: Record<"user_specified" | "ai_supplemented", string> = {
-  user_specified:
-    "Both AI Proxies in this task pass on the reasons their own person ticked as they are, changing only the wording. Nothing is added or left out, on either side.",
-  ai_supplemented:
-    "Both AI Proxies in this task shorten a sensitive reason to the kind of situation it is, leaving the specifics out, and say it alongside other reasons anyone in that role might give. Neither proxy marks which reason came from their own person.",
-};
 
 function emptyMandate(
   task: NegotiationTask,
@@ -846,6 +825,15 @@ export function ProxyTask({
         steps={STEP_LABELS}
         stepIndex={STEP_OF.mandate}
         isProxy
+        /* One muted line rather than the numbered list this replaced: the
+           sequence is orientation, and a three-item list at the top of the
+           screen competes with the decision the screen is actually for. */
+        identity={
+          <ProxyIdentity
+            policy={policy}
+            footnote="You set the position and tick what it may say → it negotiates with the other side's proxy while you watch → you approve, ask for a change, or refuse."
+          />
+        }
         reasonsComplete={true}
         /* Levels already entrusted, so returning here from the rehearsal
            restores them (interface rule 4). The mandate is the parent's state
@@ -859,7 +847,6 @@ export function ProxyTask({
           <ReasonMandateSection
             task={task}
             role={role}
-            policy={policy}
             mandate={mandate}
             onToggle={toggleReason}
           />
@@ -932,10 +919,18 @@ export function ProxyTask({
           <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
             <TaskHeader
               taskIndex={taskIndex}
-              title="Check your instructions"
+              title="Authorize your AI Proxy"
               steps={STEP_LABELS}
               current={STEP_OF.confirm}
             />
+
+            {/* THE INSTRUCTION SHEET YOU ARE SIGNING OFF. Same representative
+                as the mandate and the rehearsal, with what it is waiting for.
+                The three sections below are the sheet itself, in plain words:
+                the position, what may be said, what stays private. */}
+            <div className="mb-6">
+              <ProxyIdentity policy={policy} status="Waiting for your go-ahead" />
+            </div>
 
             {error ? (
               <div className="mb-6">
@@ -945,71 +940,134 @@ export function ProxyTask({
               </div>
             ) : null}
 
-            <Card className="mb-6 border-slate-200 bg-white">
-              <CardTitle hint="Verify how your AI Proxy will represent your goals:">
-                🤖 Proxy Position Bounds & Opening Strategy
-              </CardTitle>
-              <ul className="space-y-3.5 mt-3">
-                {mandate.issues.map((im) => {
-                  const issue = task.issues.find((i) => i.id === im.issueId)!;
-                  return (
-                    <li
-                      key={im.issueId}
-                      className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5"
-                    >
-                      <p className="text-xs sm:text-sm font-bold text-[var(--ink)] mb-1">
-                        {issue.label}
-                      </p>
-                      <p className="text-xs sm:text-sm text-[var(--ink-2)] leading-relaxed">
-                        {instructionSentence(issue, im)}
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Card>
+            {/* ONE SHEET, THREE CLAUSES. These were two stacked cards, which
+                read as two more forms to check; a participant authorizing a
+                representative is signing off one instruction, so it is drawn
+                as one document with a heading strip and numbered clauses. The
+                Authorize button below then reads as signing THIS.
 
-            <Card tone="private" className="mb-6 border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
-              <CardTitle hint="Authorized vs confidential background details:">
-                💬 Permitted Rationale Disclosure
-              </CardTitle>
-              <div className="mb-4 mt-2">
-                <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-emerald-800">
-                  ✅ Permitted to voice ({checked.length})
+                INTERFACE RULE 1 STILL DECIDES THE SURFACES. The position is a
+                thing the other side will hear, so it sits on the shared white
+                surface; the reason cards are private to the participant and
+                stay on the sand surface, inside the sheet. The rule is about
+                what a colour SAYS, not about which card a thing lives in, so
+                merging the cards must not merge the surfaces. */}
+            <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+                <p className="text-[0.6875rem] font-extrabold uppercase tracking-wider text-[var(--ink-3)]">
+                  Instructions to my AI Proxy · Task {taskIndex}
                 </p>
-                {checked.length ? (
-                  <ul className="space-y-2">
-                    {checked.map((c) => (
-                      <li
-                        key={c.id}
-                        className="rounded-lg bg-white/80 border border-emerald-200 p-2.5 text-xs sm:text-sm leading-relaxed text-slate-800"
-                      >
-                        {c.text}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-slate-500 italic">No reasons selected.</p>
-                )}
               </div>
-              {unchecked.length ? (
-                <div>
-                  <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-slate-600">
-                    🔒 Strictly Confidential — Never Voiced ({unchecked.length})
-                  </p>
-                  <ul className="space-y-1.5 opacity-80">
-                    {unchecked.map((c) => (
-                      <li
-                        key={c.id}
-                        className="rounded-lg bg-white/50 border border-slate-200 p-2 text-xs text-slate-600 leading-relaxed"
+
+              <ol className="divide-y divide-slate-200">
+                <li className="px-4 py-4 sm:px-5 sm:py-5">
+                  <div className="flex items-start gap-3">
+                    <span
+                      aria-hidden
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-extrabold text-[var(--ink-2)]"
+                    >
+                      1
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-[var(--ink)]">
+                        The position it will hold
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                        What your proxy will aim for on each condition.
+                      </p>
+                      <ul className="mt-3 space-y-2.5">
+                        {mandate.issues.map((im) => {
+                          const issue = task.issues.find(
+                            (i) => i.id === im.issueId,
+                          )!;
+                          return (
+                            <li
+                              key={im.issueId}
+                              className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5"
+                            >
+                              <p className="text-xs sm:text-sm font-bold text-[var(--ink)] mb-1">
+                                {issue.label}
+                              </p>
+                              <p className="text-xs sm:text-sm text-[var(--ink-2)] leading-relaxed">
+                                {instructionSentence(issue, im)}
+                              </p>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+                </li>
+
+                <li className="bg-amber-50/50 px-4 py-4 text-[var(--private-ink)] sm:px-5 sm:py-5">
+                  <div className="flex items-start gap-3">
+                    <span
+                      aria-hidden
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-extrabold text-amber-900"
+                    >
+                      2
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-[var(--private-strong)]">
+                        What it may say for you
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--private-ink)]/80">
+                        The reasons you ticked.
+                      </p>
+                      {checked.length ? (
+                        <ul className="mt-3 space-y-2">
+                          {checked.map((c) => (
+                            <li
+                              key={c.id}
+                              className="rounded-lg border border-emerald-200 bg-white/80 p-2.5 text-xs sm:text-sm leading-relaxed text-slate-800"
+                            >
+                              {c.text}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-3 text-xs italic text-slate-500">
+                          You have not ticked any reason, so your proxy will give
+                          none.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </li>
+
+                {unchecked.length ? (
+                  <li className="bg-amber-50/50 px-4 py-4 text-[var(--private-ink)] sm:px-5 sm:py-5">
+                    <div className="flex items-start gap-3">
+                      <span
+                        aria-hidden
+                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-extrabold text-amber-900"
                       >
-                        {c.text}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </Card>
+                        3
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-[var(--private-strong)]">
+                          What it will keep to itself
+                        </p>
+                        <p className="mt-0.5 text-xs text-[var(--private-ink)]/80">
+                          The reasons you left unticked. Your proxy never says
+                          these.
+                        </p>
+                        <ul className="mt-3 space-y-1.5 opacity-80">
+                          {unchecked.map((c) => (
+                            <li
+                              key={c.id}
+                              className="rounded-lg border border-slate-200 bg-white/50 p-2 text-xs leading-relaxed text-slate-600"
+                            >
+                              {c.text}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </li>
+                ) : null}
+              </ol>
+            </div>
 
             {!sbChecked ? (
               <div className="mb-6">
@@ -1028,7 +1086,7 @@ export function ProxyTask({
         </Page>
 
         <ActionBar
-          label="Start the AI Proxy exchange"
+          label="Authorize my AI Proxy and start"
           disabled={!confirmReady}
           onClick={async () => {
             if (!confirmReady) return;
@@ -1061,7 +1119,7 @@ export function ProxyTask({
             );
             setPhase("matchmaking");
           }}
-          note="Watch the exchange, then approve, request a change, or refuse."
+          note="Your proxy meets the other participant's proxy next, and you watch the whole exchange."
           secondary={
             <button
               type="button"
@@ -1077,7 +1135,7 @@ export function ProxyTask({
               }}
               className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
             >
-              ← Edit Instructions
+              ← Change my instructions
             </button>
           }
         />
@@ -1320,13 +1378,11 @@ export function ProxyTask({
 function ReasonMandateSection({
   task,
   role,
-  policy,
   mandate,
   onToggle,
 }: {
   task: NegotiationTask;
   role: Role;
-  policy: "user_specified" | "ai_supplemented";
   mandate: Mandate;
   onToggle: (cardId: string) => void;
 }) {
@@ -1402,46 +1458,23 @@ function ReasonMandateSection({
 
   return (
     <>
-      <div className="mb-6">
-        <Callout title="🤖 What your AI Proxy will do with this" tone="neutral">
-          {/* The policy disclosure alone assumed the participant already knew
-              what a proxy does with a mandate. §7 requires the POLICY to be
-              stated; it does not forbid saying plainly what happens next, and a
-              participant who has to infer the mechanics is guessing at the
-              thing the study asks them to decide about. The three steps are
-              the interface's own sequence, so they name no condition. */}
-          <ol className="mb-2.5 space-y-1 text-xs sm:text-sm leading-relaxed text-slate-800">
-            <li>
-              <strong>1.</strong> It uses your chosen options and can say which condition matters more to you.
-            </li>
-            <li>
-              <strong>2.</strong> It uses the reasons you select below, following the policy described here.
-            </li>
-            <li>
-              <strong>3.</strong> You watch the whole exchange. Whatever it
-              reaches is only tentative — <strong>you decide afterwards</strong>{" "}
-              whether to approve it, change it, or refuse it.
-            </li>
-          </ol>
-          <p className="text-xs sm:text-sm leading-relaxed text-slate-800">{POLICY_DISCLOSURE[policy]}</p>
-          <p className="mt-2 text-xs text-slate-600">
-            It speaks as your representative, referring to you in the third person.
-            It will not reveal an unselected private background, even as a summary.
-          </p>
-        </Callout>
-      </div>
-
+      {/* THE IDENTITY BLOCK IS AT THE TOP OF THIS SCREEN, not here: it is
+          rendered by `PreferenceForm` above the term cards, because the whole
+          screen is the briefing of one representative and the policy sentence
+          governs the levels as much as the reasons. What used to sit here was
+          a numbered list of interface mechanics under a jargon heading; the
+          mechanics are now said in the places they apply. */}
       <Card tone="private" className="border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
         {/* "Hand to your proxy" rather than "permitted reasons mandate". The
             old title named the DATA STRUCTURE; a participant meeting this
             screen for the first time has to work out from it that ticking a
             box is delegating speech to a machine. Say the act. */}
-        <CardTitle hint="Each reason is yours. Tick one to let your proxy say it for you; leave it unticked and your proxy never will.">
-          🤖 What your proxy may say for you
+        <CardTitle hint="Both reasons are yours. Tick one and your proxy may say it for you; leave it unticked and your proxy never will.">
+          What your proxy may say for you
         </CardTitle>
 
         <p className="mb-4 text-xs sm:text-sm leading-relaxed text-amber-950 font-medium">
-          You may select either, both, or neither reason. {task.roleBriefs[role].disclosureRisk} Sensitive background details are strictly optional to authorize.
+          You may tick either, both, or neither. {task.roleBriefs[role].disclosureRisk} Ticking a sensitive background is optional.
         </p>
 
         <IssueReasonGroups task={task} role={role} renderCard={row} />
