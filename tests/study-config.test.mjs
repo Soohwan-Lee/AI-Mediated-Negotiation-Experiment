@@ -23,6 +23,9 @@ test("IRB metadata records an exemption determination, not an approval", () => {
   assert.equal(STUDY.irb.institution, "UNIST");
   assert.equal(STUDY.irb.reviewStatus, "exempt");
   assert.equal(STUDY.irb.exemptionNumber, "UNISTIRB-26-073 -C");
+  assert.equal(STUDY.irb.principalInvestigator, "Soohwan Lee");
+  assert.equal(STUDY.irb.researcherEmail, "soohwanlee@unist.ac.kr");
+  assert.ok(!("contactEmail" in STUDY.irb));
   assert.ok(!STUDY.irb.exemptionNumber.startsWith("TBD"));
 });
 

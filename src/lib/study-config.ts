@@ -26,9 +26,7 @@ export const STUDY = {
     reviewStatus: "exempt",
     exemptionNumber: "UNISTIRB-26-073 -C",
     institution: "UNIST",
-    principalInvestigator: "[PI Name]",
-    /** IRB office address — TBD, must be the official one before recruitment. */
-    contactEmail: "[irb-contact@unist.ac.kr]",
+    principalInvestigator: "Soohwan Lee",
     researcherEmail: "soohwanlee@unist.ac.kr",
   },
   /** Issued on the completion page. Replace with the real Prolific code. */

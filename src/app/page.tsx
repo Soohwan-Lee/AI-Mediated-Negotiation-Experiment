@@ -367,12 +367,11 @@ export default function ConsentPage() {
                 </div>
                 <div>
                   <dt className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    {STUDY.irb.institution} IRB
+                    Ethics review
                   </dt>
                   <dd className="mt-1 font-semibold text-slate-800">
-                    Determined exempt · #{STUDY.irb.exemptionNumber}
-                    <br />
-                    <span className="font-medium text-slate-600">{STUDY.irb.contactEmail}</span>
+                    {STUDY.irb.institution} IRB determined this study exempt
+                    <br />#{STUDY.irb.exemptionNumber}
                   </dd>
                 </div>
               </dl>

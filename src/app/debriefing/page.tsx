@@ -220,7 +220,7 @@ export default function DebriefingPage() {
               </h2>
             </div>
             <p className="text-xs sm:text-sm leading-relaxed text-slate-600">
-              Questions? Contact <span className="font-semibold text-slate-800">{STUDY.irb.researcherEmail}</span> or {STUDY.irb.institution} IRB at <span className="font-semibold text-slate-800">{STUDY.irb.contactEmail}</span> (Exemption #{STUDY.irb.exemptionNumber}).
+              Questions about the study or your participation? Contact principal investigator {STUDY.irb.principalInvestigator} at <span className="font-semibold text-slate-800">{STUDY.irb.researcherEmail}</span>. {STUDY.irb.institution} IRB determined this study exempt (#{STUDY.irb.exemptionNumber}).
             </p>
           </Card>
         </div>
