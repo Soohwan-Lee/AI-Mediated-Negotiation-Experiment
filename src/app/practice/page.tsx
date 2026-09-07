@@ -29,6 +29,7 @@ import {
 } from "@/components/negotiation";
 import { BriefingPanel, TaskCover, TaskLayout } from "@/components/session";
 import { ActionBar, BackButton } from "@/components/study-chrome";
+import { Coach, CoachAnchor } from "@/components/tutorial";
 import {
   Callout,
   Card,
@@ -164,6 +165,19 @@ export default function PracticePage() {
   }
 
   const baselineOfferChosen = Object.keys(offer).length >= task.issues.length;
+  /**
+   * Which term still needs a pick at step 2 — the one control the coach's
+   * ring goes on, in both branches. `-1` once both are set, which takes the
+   * ring off the screen: the step is done and nothing is waiting.
+   *
+   * Tested with `in`, not truthiness: the Direct branch offers "Not
+   * specified", whose value is the empty string, and that is a real answer.
+   */
+  const stepTwoPicks = isProxy ? proxyPreferred : offer;
+  const firstUnpickedIssueIndex =
+    tutorialStep === 2
+      ? task.issues.findIndex((issue) => !(issue.id in stepTwoPicks))
+      : -1;
   const baselineExchangeDone = messages.some(
     (message) => message.speaker === "counterpart",
   );
@@ -252,28 +266,49 @@ export default function PracticePage() {
     "Quick check",
   ];
 
+  /**
+   * What the coach bubble says at each step, and which way its tail points.
+   *
+   * Every line says WHAT to do and where the control is. None of them says
+   * which option to pick, which reason to share, or which answer is right —
+   * a cue may say that something is expected, never what (interface rule 9).
+   * Step 1's bubble points RIGHT, at the briefing rail; the rest point DOWN,
+   * at the control rendered immediately beneath them.
+   */
   const coachCopy = [
     {
-      title: "First, get oriented",
-      body: "Read the shared situation below, then glance at your private points and workplace context in the side panel.",
+      title: "First, read your briefing",
+      body: "Your situation, your points and your private workplace context are in the panel on the right. Only you can see them.",
+      point: "right" as const,
     },
     {
       title: isProxy ? "Now set your practice goals" : "Now build a practice proposal",
       body: isProxy
-        ? "Choose one option on each term. These choices tell your AI Proxy what you would like."
-        : "Choose one option on each term. Together, they make one proposal package.",
+        ? "Pick one option on each of the two terms below. They are what your AI Proxy would open with."
+        : "Pick one option on each of the two terms below. Together they make the package you would open with.",
+      point: "down" as const,
     },
     {
-      title: isProxy ? "Try one private Proxy question" : "Try one message",
+      title: isProxy ? "Now ask your AI Proxy" : "Now send a message",
       body: isProxy
-        ? "Ask the AI Proxy a practice question and wait for the sample reply."
-        : "Send a short practice message and wait for the sample reply.",
+        ? "Type a question in the box below, or tap one of the suggestions, and wait for the practice reply."
+        : "Write a short message in the box below and send it, then wait for the practice reply.",
+      point: "down" as const,
     },
     {
-      title: "Last, answer one quick check",
-      body: "Use the practice briefing to connect the point values with the workplace reason.",
+      title: "Last, one quick check",
+      body: "Answer the question below. Your briefing stays on the right while you do.",
+      point: "down" as const,
     },
   ][tutorialStep - 1];
+
+  // Steps 2, 3 and 4 end when the participant picks, sends or answers
+  // something, so the bubble needs no button of its own. Step 1 is reading,
+  // which has no completion action — it gets the one "Next".
+  const coachNext =
+    tutorialStep === 1
+      ? () => showTutorialStep(2)
+      : undefined;
 
   const actionLabel =
     tutorialStep === 1
@@ -336,7 +371,30 @@ export default function PracticePage() {
   return (
     <>
       <Page width="wide">
-        <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
+        <TaskLayout
+          briefing={
+            // Step 1 points at the briefing, so the step's single cue ring
+            // goes here — on the panel, which IS the control that step asks
+            // the participant to use. The wrapper carries no colour of its
+            // own: it is a transparent border that the ring paints, so the
+            // panel's own sand surface still says the contents are private
+            // (interface rule 1). Every later step drops it, because the ring
+            // moves to that step's control and there is only ever one.
+            //
+            // `TaskLayout` renders this node twice — the `lg` rail and the
+            // mobile drawer — but only one is ever ON SCREEN (the rail is
+            // `hidden lg:block`, the drawer `lg:hidden` and only mounted when
+            // opened), so the participant never sees two rings.
+            <div
+              className={cx(
+                "rounded-2xl border border-transparent",
+                tutorialStep === 1 ? "cue-ring" : "",
+              )}
+            >
+              <BriefingPanel task={task} role={role} />
+            </div>
+          }
+        >
           <PageHeader
             eyebrow="Practice Sandbox"
             title="Let’s Try It Together"
@@ -369,19 +427,23 @@ export default function PracticePage() {
             })}
           </ol>
 
-          <section className="mb-4 flex gap-3 rounded-2xl border border-blue-200 bg-blue-50/70 p-3">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-700 text-sm font-black text-white">
-              {tutorialStep}
-            </div>
-            <div>
-              <p className="text-base font-extrabold text-blue-950">
-                {coachCopy.title}
-              </p>
-              <p className="mt-0.5 text-sm leading-relaxed text-blue-900">
-                {coachCopy.body}
-              </p>
-            </div>
-          </section>
+          {/*
+            The bubble and the control it points at are one unit: the anchor
+            keeps them adjacent in the flow so the tail always lands on the
+            card immediately below (or, at step 1, on the rail beside it).
+          */}
+          <CoachAnchor>
+            <Coach
+              step={tutorialStep}
+              total={4}
+              title={coachCopy.title}
+              point={coachCopy.point}
+              onNext={coachNext}
+              nextLabel="I've read it"
+            >
+              <p>{coachCopy.body}</p>
+            </Coach>
+          </CoachAnchor>
 
           {tutorialStep === 1 ? (
             <Card className="mb-6 border-blue-300 bg-white p-4" padded={false}>
@@ -391,6 +453,11 @@ export default function PracticePage() {
               <p className="mt-3 text-sm leading-relaxed text-slate-700">
                 {task.publicBrief}
               </p>
+              {/*
+                Step 1's cue ring lives on the briefing panel, passed into
+                `TaskLayout` below — the panel IS the control this step asks
+                the participant to use — so this card carries none.
+              */}
               <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
                 Your private points and workplace context are in the side panel.
                 You will use both in the next steps.
@@ -415,10 +482,17 @@ export default function PracticePage() {
                 comes back to you for a decision.
               </p>
               <div className="mt-4 space-y-4">
-                {task.issues.map((issue) => (
+                {task.issues.map((issue, index) => (
                   <div
                     key={issue.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5"
+                    className={cx(
+                      "rounded-xl border border-slate-200 bg-slate-50/70 p-3.5",
+                      // ONE ring on the screen (rule 9): it sits on the FIRST
+                      // unanswered term, and moves to the second once that one
+                      // is picked. It marks where the participant is, and says
+                      // nothing about which chip inside it to press.
+                      firstUnpickedIssueIndex === index ? "cue-ring" : "",
+                    )}
                   >
                     <p className="text-sm font-bold text-slate-900">{issue.label}</p>
                     <p className="mt-1 text-sm font-medium leading-relaxed text-slate-600">
@@ -465,10 +539,15 @@ export default function PracticePage() {
                 this step.
               </p>
               <div className="mt-4 space-y-4">
-                {task.issues.map((issue) => (
+                {task.issues.map((issue, index) => (
                   <div
                     key={issue.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5"
+                    className={cx(
+                      "rounded-xl border border-slate-200 bg-slate-50/70 p-3.5",
+                      // Same single ring as the Proxy branch above: the first
+                      // term still to be picked, then the second.
+                      firstUnpickedIssueIndex === index ? "cue-ring" : "",
+                    )}
                   >
                     <p className="text-sm font-bold text-slate-900">{issue.label}</p>
                     <p className="mt-1 text-sm font-medium leading-relaxed text-slate-600">
@@ -558,6 +637,10 @@ export default function PracticePage() {
                 disabled={proxyPending}
                 placeholder="Type a practice question…"
                 sendLabel="Ask Proxy"
+                // Step 3's single ring, on the control the bubble points at.
+                // `MessageComposer` drops it as soon as there is a draft, so
+                // it stops marking a box that is no longer empty.
+                cue={!proxyPending}
               />
             </Card>
           ) : null}
@@ -589,6 +672,9 @@ export default function PracticePage() {
                 }}
                 disabled={pending}
                 placeholder="Type a practice message…"
+                // Step 3's single ring in the Direct branch. Same rule as the
+                // Proxy composer above.
+                cue={!pending}
               />
             </Card>
           ) : null}
@@ -601,6 +687,10 @@ export default function PracticePage() {
                 reasonSubmitted && reasonCorrect
                   ? "border-emerald-300 bg-emerald-50/20"
                   : "",
+                // Step 4's single ring, on the question the coach points at.
+                // It marks that an answer is expected and never which one
+                // (rule 9), and it comes off the moment one is selected.
+                !reasonAnswer ? "cue-ring" : "",
               )}
               padded={false}
             >
