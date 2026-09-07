@@ -126,8 +126,22 @@ export const NEGOTIATION = {
    * three-word question and a full counterpackage in the same 2.5 seconds,
    * and the suspicion probe is a pilot gate. Proportional-plus-jitter is what
    * the design asks for.
+   *
+   * THE PERSON THESE NUMBERS DESCRIBE IS A FAST TYPIST, and that is the change
+   * from 8000/25000/55. A 200-character reply used to buy 8000 + 200×55 =
+   * 19,000ms of budget; it now buys 4500 + 200×45 = 13,500ms. The floor moves
+   * with it, because a three-word reply that takes eight seconds is as odd as
+   * one that takes half a second, and the Direct clock is ten minutes total —
+   * every second of budget is a second the participant cannot spend talking.
+   *
+   * THE MODEL'S OWN ~7.5s OF GENERATION IS COUNTED INSIDE THIS BUDGET, not
+   * added to it: `awaitCounterpartDelay` subtracts the time already spent. So
+   * the 13,500ms above is the whole wall-clock gap the participant sees, of
+   * which roughly 7.5s was real work. That is also why the floor can go this
+   * low without the pacing collapsing — on the live path generation alone
+   * usually exceeds it.
    */
-  counterpartDelay: { minMs: 8000, maxMs: 25000, msPerChar: 55 },
+  counterpartDelay: { minMs: 4500, maxMs: 16000, msPerChar: 45 },
   /** Gap between messages while the participant spectates two AI Proxies. */
   proxyMessageGap: { minMs: 8000, maxMs: 12000 },
   /**
@@ -222,11 +236,19 @@ export async function awaitCounterpartDelay(
  * proportional to the bubble's own length so a three-word follow-up lands fast
  * and a long one does not, and it is capped so a turn never outstays the
  * reply budget it was already given.
+ *
+ * The per-character rate moved 22 → 15 and the cap 2600 → 1800, for the same
+ * reason the reply budget shrank: this is a fast typist. A 120-character
+ * bubble — the per-bubble length the prompts ask for — went from 350 + 120×22
+ * = 2,990ms (clamped to 2,600) to 350 + 120×15 = 2,150ms, and the new cap
+ * takes it to 1,800. A three-bubble turn therefore drips out in about 5.4
+ * seconds rather than 7.8, which keeps the drip comfortably inside the reply
+ * budget above even at its 4,500ms floor plus the model's own generation time.
  */
 export function bubbleDelayMs(bubbleLength: number): number {
-  const ms = 350 + bubbleLength * 22;
+  const ms = 350 + bubbleLength * 15;
   const jitter = 0.85 + Math.random() * 0.3;
-  return Math.round(Math.min(ms * jitter, 2600));
+  return Math.round(Math.min(ms * jitter, 1800));
 }
 
 /**

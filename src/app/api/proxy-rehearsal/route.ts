@@ -89,6 +89,47 @@ export async function POST(request: Request) {
   if (!brief) {
     return NextResponse.json({ error: "Unknown role" }, { status: 400 });
   }
+  // The policy decides which prompt this proxy speaks under, so an unknown one
+  // would silently pick a behaviour rather than fail.
+  if (
+    body.policy !== "user_specified" &&
+    body.policy !== "ai_supplemented"
+  ) {
+    return NextResponse.json({ error: "Unknown policy" }, { status: 400 });
+  }
+  // The same shape guard the siblings have. Without it a body missing
+  // `mandate` or `mandate.issues` reached `.map` on undefined and came back as
+  // a 502 through the catch below — an operator reading the log saw "the proxy
+  // could not answer" where the truth was a malformed request.
+  if (
+    typeof body.mandate !== "object" ||
+    body.mandate === null ||
+    !Array.isArray(body.mandate.issues) ||
+    !Array.isArray(body.mandate.authorizedReasonIds)
+  ) {
+    return NextResponse.json(
+      { error: "mandate.issues and mandate.authorizedReasonIds are required" },
+      { status: 400 },
+    );
+  }
+  // Each entry is checked too, not just the array: a turn with the wrong
+  // shape ({speaker, text}) went through to the model as role "" and came back
+  // as a 400 from OpenAI, which the catch below reported as a 502.
+  if (
+    !Array.isArray(body.history) ||
+    !body.history.every(
+      (h) =>
+        h &&
+        (h.role === "user" || h.role === "assistant") &&
+        typeof h.content === "string" &&
+        h.content.trim().length > 0,
+    )
+  ) {
+    return NextResponse.json(
+      { error: "history must be an array of {role, content} turns" },
+      { status: 400 },
+    );
+  }
   const cards = brief.reasonCards;
   const authorized = cards.filter((c) =>
     body.mandate.authorizedReasonIds.includes(c.id),
