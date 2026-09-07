@@ -57,6 +57,7 @@ import {
   TaskHeader,
   TaskLayout,
 } from "@/components/session";
+import { ProxyFigure } from "@/components/proxy-art";
 import { ActionBar } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Page, cx } from "@/components/ui";
 import { MeasureBlock } from "@/components/measure";
@@ -828,10 +829,43 @@ export function ProxyTask({
         /* One muted line rather than the numbered list this replaced: the
            sequence is orientation, and a three-item list at the top of the
            screen competes with the decision the screen is actually for. */
+        /* THE REPRESENTATIVE ASKS, AND THE SCREEN ANSWERS. The two sections
+           below it — the term cards and the reason cards — are the two halves
+           of the question it puts here, which is the whole point of the merge:
+           deciding a position and deciding what may be said for it is ONE act.
+
+           WHAT THIS LINE MAY NOT DO. It may not say which reason works, or
+           which one it would prefer, or that saying more helps: disclosure is
+           the primary outcome and the ladder is never taught (§8.1). "Whatever
+           you leave out, I never say" is the only promise it makes about the
+           reasons, and it is symmetric — it describes the mechanism, not a
+           direction. */
         identity={
           <ProxyIdentity
             policy={policy}
-            footnote="You set the position and tick what it may say → it negotiates with the other side's proxy while you watch → you approve, ask for a change, or refuse."
+            scene="briefing"
+            status="Waiting for your instructions"
+            speech={
+              <>
+                <p>
+                  I&rsquo;ll be sitting down with the other participant&rsquo;s
+                  AI Proxy shortly, and I&rsquo;ll be speaking for you the whole
+                  time — you won&rsquo;t need to say anything while we talk.
+                </p>
+                <p className="mt-2">
+                  So tell me two things before I go in:{" "}
+                  <strong className="font-semibold">
+                    where to aim on each condition
+                  </strong>
+                  , and{" "}
+                  <strong className="font-semibold">
+                    which of your reasons I&rsquo;m allowed to say out loud
+                  </strong>
+                  . Whatever you leave out, I never say.
+                </p>
+              </>
+            }
+            footnote="After this: you can question me, then you watch the whole exchange, then you decide what happens to whatever we reach."
           />
         }
         reasonsComplete={true}
@@ -924,12 +958,46 @@ export function ProxyTask({
               current={STEP_OF.confirm}
             />
 
-            {/* THE INSTRUCTION SHEET YOU ARE SIGNING OFF. Same representative
-                as the mandate and the rehearsal, with what it is waiting for.
-                The three sections below are the sheet itself, in plain words:
-                the position, what may be said, what stays private. */}
+            {/* THE REPRESENTATIVE READS THE BRIEF BACK. Same figure as the
+                mandate and the rehearsal, now acknowledging what it was given.
+                The sheet below is the same acknowledgement itemised, so a
+                participant can check the summary against the detail.
+
+                WHAT THIS ACKNOWLEDGEMENT MAY CONTAIN. Only what was
+                AUTHORIZED — a count of the ticked reasons and the fact of the
+                position — and never the CONTENT of an unticked card, in quote
+                or in paraphrase. Reading a withheld card back to the
+                participant, even to promise silence about it, would put the
+                sentence on screen one more time at the moment they are
+                deciding, which is the disclosure decision being nudged.
+
+                The closing line is FIXED and identical in all four cells and
+                both policies. It is deliberately not tiered to how much was
+                ticked: "you've given me plenty" or "that's not much to work
+                with" would both be evaluations of the primary outcome, said by
+                the interface, right before it is recorded. */}
             <div className="mb-6">
-              <ProxyIdentity policy={policy} status="Waiting for your go-ahead" />
+              <ProxyIdentity
+                policy={policy}
+                status="Ready when you are"
+                speech={
+                  <>
+                    <p>
+                      Understood. I&rsquo;ll open where you told me to on both
+                      conditions, and{" "}
+                      {checked.length === 0
+                        ? "I'll give no reasons at all"
+                        : checked.length === 1
+                          ? "I may give the one reason you ticked"
+                          : `I may give the ${checked.length} reasons you ticked`}
+                      .
+                    </p>
+                    <p className="mt-2 font-semibold">
+                      Everything else you told me stays with me.
+                    </p>
+                  </>
+                }
+              />
             </div>
 
             {error ? (
@@ -953,7 +1021,13 @@ export function ProxyTask({
                 what a colour SAYS, not about which card a thing lives in, so
                 merging the cards must not merge the surfaces. */}
             <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+              <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+                <span
+                  aria-hidden
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 ring-1 ring-indigo-100"
+                >
+                  <ProxyFigure side="mine" size={20} />
+                </span>
                 <p className="text-[0.6875rem] font-extrabold uppercase tracking-wider text-[var(--ink-3)]">
                   Instructions to my AI Proxy · Task {taskIndex}
                 </p>
@@ -1166,6 +1240,43 @@ export function ProxyTask({
               }
             />
 
+            {/* AT THE TABLE. The same figure the participant briefed, now
+                opposite the other side's — so "my representative is speaking
+                for me right now" is a picture rather than an inference from a
+                transcript. Both figures are drawn identically apart from the
+                warm accent on the participant's own; the other side's proxy is
+                not a different KIND of agent, and §9.4 asks about both.
+
+                NO CUE RING (rule 9): this screen is not waiting for the
+                participant to do anything. The one live signal is the message
+                counter in the header, which counts rather than prompts. */}
+            <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs sm:p-5">
+              <div className="mb-3 flex items-center justify-center gap-8 sm:gap-14">
+                <div className="flex flex-col items-center text-center">
+                  <ProxyFigure side="mine" size={58} speaking />
+                  <span className="mt-1.5 text-xs font-extrabold text-[var(--ink-2)]">
+                    Your AI Proxy
+                  </span>
+                </div>
+                <div aria-hidden className="flex flex-col items-center gap-1 pb-6">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
+                  <span className="text-[0.625rem] font-bold uppercase tracking-wider text-[var(--ink-4)]">
+                    at the table
+                  </span>
+                </div>
+                <div className="flex flex-col items-center text-center">
+                  <ProxyFigure side="theirs" size={58} speaking />
+                  <span className="mt-1.5 text-xs font-extrabold text-[var(--ink-2)]">
+                    Their AI Proxy
+                  </span>
+                </div>
+              </div>
+              <p className="text-center text-xs leading-relaxed text-[var(--ink-3)] sm:text-sm">
+                Your proxy is speaking for you now. You cannot step in, but you
+                decide what happens to whatever they reach.
+              </p>
+            </div>
+
             <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
               <SpectatorBanner />
               <Transcript
@@ -1201,7 +1312,7 @@ export function ProxyTask({
                 {showStopped ? "Stopping proxy exchange…" : "Emergency: Stop proxy exchange"}
               </button>
               <p className="mt-1 text-2xs text-slate-400">
-                Only use if something goes wrong. You will proceed to direct handover.
+                Only use if something goes wrong. Your proxy steps back and you take over yourself.
               </p>
             </div>
           </TaskLayout>
@@ -1252,12 +1363,45 @@ export function ProxyTask({
       <TaskCover
         eyebrow="Your closing conversation"
         title={refused ? "Discuss a new package" : "Discuss your changes"}
+        /* THE SCENE IS THE DIRECT ONE, and that is the point: from here the
+           proxies are done and the two people talk. The representative gets
+           one closing line above it — it opened the delegation, so it closes
+           it rather than simply vanishing — but it is drawn small and beside
+           the text, not as the hero of a screen it is leaving. */
         scene="direct"
-        lead={<p className="text-base leading-relaxed text-slate-700">
-          {refused
-            ? "You refused the proposed package. Nothing is agreed. You will now discuss both conditions with the other participant yourself."
-            : "You asked to change the proposed package. Tell the other participant what you would like to change."}
-        </p>}
+        lead={
+          <>
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 sm:p-3.5">
+              <span
+                aria-hidden
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-indigo-100"
+              >
+                <ProxyFigure side="mine" size={26} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-indigo-700">
+                  Your AI Proxy
+                </p>
+                {/* Fixed wording in both branches apart from the clause naming
+                    what the participant chose, which is their own decision
+                    read back and not an evaluation of it. No thanks, no
+                    apology, no assessment of how it went: RATIFY's three
+                    options carry equal weight and the screen after it may not
+                    grade the one that was taken. */}
+                <p className="mt-0.5 text-sm leading-relaxed text-indigo-950">
+                  {refused
+                    ? "That is me done, then. I have stepped back and nothing is agreed. You take it from here — you are speaking for yourself now."
+                    : "That is me done, then. I have stepped back and left the package on the table. You take it from here — you are speaking for yourself now."}
+                </p>
+              </div>
+            </div>
+            <p className="text-base leading-relaxed text-slate-700">
+              {refused
+                ? "You refused the proposed package. Nothing is agreed. You will now discuss both conditions with the other participant yourself."
+                : "You asked to change the proposed package. Tell the other participant what you would like to change."}
+            </p>
+          </>
+        }
         steps={[
           { label: "Review the exchange", hint: "The AI Proxies' conversation stays available above your chat." },
           { label: "Make your proposal", hint: "Choose one option for each condition and write your message." },
@@ -1358,7 +1502,11 @@ export function ProxyTask({
       transcript={messages}
       proxyTranscript={proxyTranscript}
       isProxy
-      transcriptTitle="Your Direct Conversation"
+      /* "Your Direct Conversation" named the CONDITION. The heading only has
+         to distinguish this transcript from the proxies' one collapsed above
+         it, which "with the other participant" does without borrowing an arm
+         name. */
+      transcriptTitle="Your Conversation With the Other Participant"
       transcriptHint="What you and the other participant discussed after taking over from the AI Proxies."
       onDone={() => {
         logEvent("page_complete", undefined, {

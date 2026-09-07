@@ -64,6 +64,7 @@ import {
   TaskHeader,
   TaskLayout,
 } from "@/components/session";
+import { ProxyFigure } from "@/components/proxy-art";
 import { OptionChips, PackageValue, PointsKey, IssueValueTable } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
 import { ReadingProgress, PreviousReading } from "@/components/briefing-guide";
@@ -454,6 +455,36 @@ export function PreferenceForm({
             </Callout>
           </div>
 
+          {/* THE TWO SECTIONS ARE THE PROXY'S TWO QUESTIONS, ANSWERED. In the
+              Proxy arm the screen above it is a representative asking where to
+              aim and what it may say; without headings the participant answers
+              two questions that were asked as one. Direct passes no identity
+              and gets no heading — there is nobody asking, and a heading
+              reading "where I should aim" with no speaker would be nonsense.
+
+              THE HEADING IS ABOUT BOTH TERMS AT ONCE and names neither, which
+              is what §5 principle 1 requires: a per-issue heading would point
+              at the term the study is about. The two term cards under it stay
+              byte-for-byte identical, as they are in Direct. */}
+          {isProxy ? (
+            <div className="mb-3.5 flex items-baseline gap-2.5">
+              <span
+                aria-hidden
+                className="flex h-6 w-6 shrink-0 translate-y-0.5 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-800"
+              >
+                1
+              </span>
+              <p className="min-w-0">
+                <span className="text-base font-extrabold tracking-tight text-[var(--ink)]">
+                  Where I should aim
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-[var(--ink-3)] sm:text-sm">
+                  Pick the option you want me to open on, for each condition.
+                </span>
+              </p>
+            </div>
+          ) : null}
+
           <div className="space-y-4">
             {task.issues.map((issue) => (
               <Card key={issue.id} id={`q-pref-${issue.id}`} className="border-slate-200 bg-white">
@@ -498,7 +529,32 @@ export function PreferenceForm({
             </p>
           </div>
 
-          {reasons ? <div className="mt-6">{reasons}</div> : null}
+          {reasons ? (
+            <div className="mt-8">
+              {/* Second half of the same act, and the numbering says so. Still
+                  a section BELOW both term cards, never nested in one of them
+                  (§5 principle 4): nesting would make one term card visibly
+                  taller and carry a control the other does not, which names
+                  the study's term without a word. */}
+              <div className="mb-3.5 flex items-baseline gap-2.5">
+                <span
+                  aria-hidden
+                  className="flex h-6 w-6 shrink-0 translate-y-0.5 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-800"
+                >
+                  2
+                </span>
+                <p className="min-w-0">
+                  <span className="text-base font-extrabold tracking-tight text-[var(--ink)]">
+                    What I may say for you
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-[var(--ink-3)] sm:text-sm">
+                    Tick anything I&rsquo;m allowed to say out loud.
+                  </span>
+                </p>
+              </div>
+              {reasons}
+            </div>
+          ) : null}
         </TaskLayout>
       </Page>
 
@@ -1768,23 +1824,41 @@ export function RehearsalChat({
           />
 
           {/* The same representative as the mandate and the confirm sheet, so
-              the three screens read as one delegation rather than three forms.
-              The policy sentence inside it is the only thing that differs
-              between the two policies. */}
+              the four screens read as one delegation rather than four forms.
+              Here it speaks as the thing being QUESTIONED — it has the
+              instructions in hand and is offering to be checked. The policy
+              sentence inside it is the only thing that differs between the two
+              policies.
+
+              IT MAY NOT INVITE A CHANGE IN EITHER DIRECTION. "Ask me anything"
+              is neutral; "are you sure you want to hold that back?" would be a
+              nudge on the primary outcome, and so would its opposite. No scene
+              here either: the exchange has not started, and drawing the table
+              would say it had. */}
           <div className="mb-6">
             <ProxyIdentity
               policy={policy}
-              status="Ready to answer questions about your instructions"
+              status="I have your instructions"
+              speech={
+                <p>
+                  I have what you gave me. Before I go in, ask me anything you
+                  like — how I&rsquo;ll open, how I&rsquo;ll answer if they push
+                  back, or what I will and won&rsquo;t say. You can still change
+                  your instructions after.
+                </p>
+              }
             />
           </div>
 
           <div className="mb-6">
-            <Callout title="Ask it anything about your instructions" tone="neutral">
+            <Callout title="This chat is only between you and your proxy" tone="neutral">
               <p className="mb-1 text-sm leading-relaxed text-slate-800">
-                You can ask how it plans to open, where it will hold the line, or which reasons it will voice. The other participant cannot see this chat.
+                The other participant cannot see it, and nothing you say here is
+                proposed or agreed to anyone. Your proxy has not begun
+                negotiating.
               </p>
               <p className="text-xs text-slate-600">
-                This is optional — you can go straight on, or go back and change your instructions.
+                This step is optional — you can go straight on, or go back and change your instructions.
               </p>
             </Callout>
           </div>
@@ -1798,10 +1872,24 @@ export function RehearsalChat({
           ) : null}
 
           <Card padded={false} className="flex flex-col overflow-hidden border-slate-200">
-            <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
-              <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
-                🤖 Your AI Proxy
-              </p>
+            {/* The figure sits ON the chat, so the thing being questioned is
+                visibly the same one briefed on the screen before and watched
+                on the screen after. */}
+            <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/80 px-4 py-2.5 sm:px-5">
+              <span
+                aria-hidden
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 ring-1 ring-indigo-100"
+              >
+                <ProxyFigure side="mine" size={24} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs sm:text-sm font-bold text-[var(--ink)]">
+                  Your AI Proxy
+                </span>
+                <span className="block text-[0.6875rem] leading-tight text-[var(--ink-3)]">
+                  Answering your questions
+                </span>
+              </span>
             </div>
             <Transcript
               messages={messages}

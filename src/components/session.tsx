@@ -22,6 +22,7 @@ import {
   type ReactNode,
 } from "react";
 import { IssueValueTable } from "./issues";
+import { ProxyScene, ProxySpeech } from "./proxy-art";
 import { ActionBar } from "./study-chrome";
 import { Card, CardTitle, Page, PrivateTag, cx } from "./ui";
 import type { NegotiationTask, Role } from "@/lib/types";
@@ -97,19 +98,35 @@ export function TaskHeader({
 export type CoverScene = "direct" | "proxy" | "practice";
 
 function CoverArt({ scene }: { scene: CoverScene }) {
+  /* THE PROXY COVER IS DRAWN, not emoji. It is the first time a participant
+     meets the representative they are about to brief, and the four screens
+     after it (mandate, rehearsal, confirm, handover) all carry the same
+     figure — so the cover has to be the same figure too, or the character
+     starts one screen late. The other two scenes keep their emoji row: there
+     is no representative in them.
+
+     RULE 10 STILL HOLDS: this draws the INTERFACE. Both policies get this
+     picture, and `ProxyScene` takes no policy to branch on. */
+  if (scene === "proxy") {
+    return (
+      <div aria-hidden className="my-8 w-full">
+        <ProxyScene emphasis="briefing" />
+      </div>
+    );
+  }
+
   const figures =
-    scene === "proxy"
-      ? [
-          { emoji: "🧑‍💼", label: "You" },
-          { emoji: "🤖", label: "Your AI Proxy" },
-          { emoji: "🤝", label: "Exchange", joint: true },
-          { emoji: "🤖", label: "Their AI Proxy" },
-          { emoji: "👤", label: "Other Participant" },
-        ]
-      : scene === "direct"
+    scene === "direct"
         ? [
             { emoji: "🧑‍💼", label: "You" },
-            { emoji: "💬", label: "Direct Chat", joint: true },
+            /* NOT "Direct Chat". "Direct" is a CONDITION NAME
+               (`Condition = "direct" | ...`), and this scene is shown on the
+               Direct arm's own cover AND on the Proxy arm's handover — so the
+               label put one of the three arm names on screen, in the one place
+               a participant could compare it against the "AI Proxy" wording
+               next to it. Say what happens instead of what the arm is called;
+               everything else on these covers already does. */
+            { emoji: "💬", label: "You talk directly", joint: true },
             { emoji: "👤", label: "Other Participant" },
           ]
         : [
@@ -303,14 +320,27 @@ export const POLICY_DISCLOSURE: Record<
 };
 
 /**
- * One block, three screens: who this thing is and what it will do.
+ * One representative, four screens: who this thing is, in its own voice.
  *
- * The mandate, the rehearsal and the confirm sheet are the whole of the
- * delegation, and they read as three unrelated forms unless the same
- * representative is standing at the top of each one. The avatar and the label
- * are the ones the transcript uses for `participant_proxy` (see
- * `SPEAKER_CONFIG` in components/negotiation.tsx), so the proxy a participant
- * briefs here is visibly the proxy they later watch speak.
+ * The mandate, the rehearsal, the confirm sheet and the handover are the whole
+ * of the delegation, and they read as four unrelated forms unless the same
+ * representative is standing at the top of each one SAYING what it is about to
+ * do. It was an emoji and a third-person sentence ("It will negotiate…"),
+ * which describes a feature. The participant is delegating their voice, and
+ * §9.4 later asks them who was answerable for what got said — so the thing
+ * they briefed had better have spoken to them at least once.
+ *
+ * VOICE (Ver.2.19, applied to the participant's own side). The proxy says "I"
+ * about ITSELF and "you" about the participant. It never says "I" about the
+ * participant's circumstances, and it never claims their confession as its
+ * own — that rule is what keeps the delegation visible, and it is the rule the
+ * mockup's scripted proxy broke by pasting card text verbatim.
+ *
+ * IT MAY NOT COACH. `speech` is written at the call site and every line of it
+ * is checked against two things: it may not name which reason works (the
+ * ladder is never taught — Design §8.1), and it may not suggest what a
+ * sensible participant ticks. Disclosure is the primary outcome; a
+ * representative that leaned on it would be staging what the study measures.
  *
  * DECEPTION INTEGRITY: the two policies render an IDENTICAL block apart from
  * `POLICY_DISCLOSURE`. Nothing else here may branch on the policy, and the
@@ -320,6 +350,8 @@ export function ProxyIdentity({
   policy,
   status,
   footnote,
+  speech,
+  scene,
   className,
 }: {
   policy: "user_specified" | "ai_supplemented";
@@ -327,51 +359,38 @@ export function ProxyIdentity({
   /** One muted line under the policy sentence — the mandate screen uses it to
       say what happens after this screen. Never anything policy-specific. */
   footnote?: ReactNode;
+  /** What the representative says on this screen. Defaults to its standing
+      introduction; every screen in the delegation passes its own. */
+  speech?: ReactNode;
+  /** Draw the four-figure scene under the speech (mandate and handover). */
+  scene?: "briefing" | "table";
   className?: string;
 }) {
   return (
-    <div
-      className={cx(
-        "rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 sm:p-5 shadow-2xs",
-        className,
+    <ProxySpeech status={status} scene={scene} className={className}>
+      {speech ?? (
+        <p>
+          I&rsquo;ll be negotiating with the other participant&rsquo;s AI Proxy
+          on your behalf. I only say what you hand me here.
+        </p>
       )}
-    >
-      <div className="flex items-start gap-4">
-        {/* The avatar is deliberately larger than a list glyph. This is the
-            representative the participant is about to hand a mandate to, and
-            on three otherwise form-shaped screens it is the only thing that
-            says so before a word is read. Same glyph as the transcript's
-            `participant_proxy`, so it is visibly the same proxy throughout. */}
-        <span
-          aria-hidden
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[1.75rem] ring-4 ring-white/70 shadow-2xs"
-        >
-          🤖
-        </span>
-        <div className="min-w-0 flex-1 pt-0.5">
-          <p className="text-[0.6875rem] font-extrabold uppercase tracking-wider text-indigo-700">
-            Your AI Proxy
-          </p>
-          <p className="mt-1.5 text-sm leading-relaxed text-indigo-950 font-medium">
-            It will negotiate with the other participant&rsquo;s AI Proxy on
-            your behalf, saying only what you hand it here.
-          </p>
-          {status ? (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-2.5 py-0.5 text-[0.6875rem] font-bold text-indigo-900">
-              {status}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      <p className="mt-3.5 border-t border-indigo-200/70 pt-3.5 text-xs sm:text-sm leading-relaxed text-indigo-950/90">
+
+      {/* The §7 disclosure, verbatim and in the same place on every screen.
+          It is the ONE string that differs between the two policies, so it
+          keeps its own surface inside the speech rather than being folded into
+          a sentence the proxy speaks — a policy the proxy narrated would vary
+          in tone between arms, and its wording is fixed for exactly that
+          reason. */}
+      <p className="mt-3 rounded-lg bg-indigo-50/70 px-3 py-2 text-xs leading-relaxed text-indigo-950/90 sm:text-[0.8125rem]">
         {POLICY_DISCLOSURE[policy]}
       </p>
+
       {footnote ? (
         <p className="mt-2 text-xs leading-relaxed text-indigo-900/70">
           {footnote}
         </p>
       ) : null}
-    </div>
+    </ProxySpeech>
   );
 }
 
