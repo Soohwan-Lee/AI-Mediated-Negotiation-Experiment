@@ -123,9 +123,35 @@ Next image optimization at their full 3:2 aspect ratio. The result showed two
 issue rows whose private point values summed to the final total, retained the
 private sand treatment, and had no horizontal overflow.
 
+## Stage 8: role clarity and persistent chat timing
+
+- Use one clearly labelled person in each role illustration and keep the same
+  character design across roles, so age or gender does not imply hierarchy.
+- Name the two post-task paths separately: the Team Lead decides the Team
+  Member's study bonus, while the Team Member sends an upward evaluation of
+  the Team Lead to the project director. Working conditions still require both
+  people to agree.
+- Use `study bonus` consistently in participant-facing role, comprehension,
+  and reward copy. This is a terminology clarification only; amounts, item IDs,
+  correct answers, scoring, and payment logic are unchanged.
+- Keep the single countdown in a shared negotiation toolbar above the chat and
+  offer controls, so it remains visible while the document scrolls. Do not add
+  a second timer or a live announcement.
+- Append the stable `v=20260907b` revision to the four replaced illustration
+  sources and allow it through Next image optimization, while preserving the
+  unchanged workplace-story source without a query string.
+
+Browser verification on 2026-09-07 kept the negotiation toolbar at 64 px below
+the viewport top after scrolling to the page bottom at 1280×800, 1024×768, and
+768×800. The same bottom-scroll check passed for the Proxy closing conversation
+at 1280×800. At 768×800, the role art and explanation remained together in the
+first view with no horizontal overflow. Raw and optimized requests for the
+unchanged story and versioned role/task illustrations returned HTTP 200.
+
 ## Non-negotiable study boundaries
 
-- Apart from the explicitly authorized COMP2 clarification in Stage 6, do not
+- Apart from the explicitly authorized COMP2 clarification in Stage 6 and the
+  study-bonus terminology clarification in Stage 8, do not
   change questionnaire item text, IDs, or order.
 - Keep sensitive disclosure optional and its notice neutral.
 - Keep private and shared information visually distinct.

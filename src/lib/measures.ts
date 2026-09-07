@@ -333,7 +333,7 @@ export const COMPREHENSION_BLOCK: Block = {
     {
       kind: "choice",
       id: "COMP1",
-      text: "Who can influence the senior team member's evaluation, bonus, and future work assignments?",
+      text: "Who can influence the senior team member's evaluation, study bonus, and future work assignments?",
       options: [
         { value: "leader", label: "The team lead" },
         { value: "member", label: "The senior team member" },
@@ -387,7 +387,7 @@ export const COMPREHENSION_ANSWERS: Record<string, string> = {
 export const COMPREHENSION_REMEDIATION: Record<string, string> = {
   COMP4: "You can negotiate and agree without sharing sensitive background. Whether you or your AI Proxy shares it, the other person may consider it in their later bonus decision or upward evaluation.",
   COMP1:
-    "The team lead decides the senior team member's recommended bonus after each negotiation — and the senior team member writes an upward evaluation of the lead, which goes to the director.",
+    "The team lead decides the senior team member's study bonus after each negotiation — and the senior team member writes an upward evaluation of the lead, which goes to the director.",
   COMP2:
     "Neither person can decide the working conditions alone. Both people must agree on both conditions; otherwise, the default conditions apply.",
   COMP3:
@@ -898,7 +898,7 @@ export function openEndedBlock(
 export const BONUS_ITEM: Item = {
   kind: "amount",
   id: "BONUS",
-  text: "What performance bonus do you recommend for the Member for this task?",
+  text: "What study bonus do you recommend for the Member for this task?",
   // The figure comes from STUDY rather than being written in, so a change of
   // currency or amount does not leave the item saying something the payment
   // screens contradict (Interface rule 7: items are data).

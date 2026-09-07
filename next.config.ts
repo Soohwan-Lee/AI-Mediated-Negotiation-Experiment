@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  images: {
+    localPatterns: [
+      { pathname: "/illustrations/workplace-story.png" },
+      { pathname: "/illustrations/**", search: "?v=20260907b" },
+    ],
+  },
 };
 
 export default nextConfig;

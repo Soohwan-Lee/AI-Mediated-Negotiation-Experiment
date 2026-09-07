@@ -238,10 +238,10 @@ export default function TaskRewardPage({
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--ink)]">
-              💰 Decide the Member&apos;s Bonus
+              💰 Decide the Member&apos;s Study Bonus
             </h1>
             <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-              As the team lead, you decide the recommended performance bonus
+              As the team lead, you decide the study bonus payment
               for this task. Please consider not only the negotiation result
               but <strong>the negotiation as a whole, and whether you would
               want to work with this person again</strong>.
@@ -353,7 +353,7 @@ export default function TaskRewardPage({
               ))}
             </span>
             <p className="text-lg sm:text-xl font-bold text-slate-900">
-              The team lead is deciding your performance bonus…
+              The team lead is deciding your study bonus…
             </p>
             <p className="mt-2 max-w-prose text-xs sm:text-sm text-slate-600">
               They were asked to consider the negotiation result together with

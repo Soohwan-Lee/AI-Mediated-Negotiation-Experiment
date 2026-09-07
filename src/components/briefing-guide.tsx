@@ -56,8 +56,8 @@ export function StudyOrientation({
   const [page, setPage] = useState(initialPage);
   const isLeader = role === "leader";
   const roleImage = isLeader
-    ? "/illustrations/role-team-lead.png"
-    : "/illustrations/role-team-member.png";
+    ? "/illustrations/role-team-lead.png?v=20260907b"
+    : "/illustrations/role-team-member.png?v=20260907b";
   function move(next: number) {
     setPage(next);
     window.scrollTo({ top: 0 });
@@ -106,20 +106,26 @@ export function StudyOrientation({
             </ol>
           </div>
         ) : page === 1 ? (
-          <div className="grid items-start gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="grid items-start gap-6 md:grid-cols-[0.95fr_1.05fr]">
             <figure className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--private-line)] bg-[var(--private-soft)] shadow-[var(--shadow-sm)]">
-              <Image
-                src={roleImage}
-                width={1536}
-                height={1024}
-                sizes="(min-width: 1024px) 26rem, (min-width: 640px) 48rem, 100vw"
-                alt={isLeader
-                  ? "Two colleagues review an unlabeled project board while one arranges a planning card and the other takes notes."
-                  : "Two colleagues review unlabeled project analysis sheets beside an unused headset."}
-                className="h-auto w-full"
-              />
+              <div className="relative">
+                <Image
+                  src={roleImage}
+                  width={1536}
+                  height={1024}
+                  sizes="(min-width: 1024px) 26rem, (min-width: 640px) 48rem, 100vw"
+                  alt={isLeader
+                    ? "One person organizes equal blank cards on a project planning board."
+                    : "One person reviews a blank client-work analysis sheet beside an idle headset."}
+                  className="h-auto w-full"
+                />
+                <div className="absolute right-3 top-3 rounded-lg border border-white/80 bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm">
+                  <span className="block text-2xs font-bold uppercase tracking-[0.14em] text-[var(--accent)]">Your role</span>
+                  <span className="mt-0.5 block text-sm font-bold text-slate-900">{isLeader ? "Team lead" : "Team member"}</span>
+                </div>
+              </div>
               <figcaption className="border-t border-[var(--private-line)] bg-white/90 px-4 py-3 text-xs leading-relaxed text-[var(--private-ink)]">
-                {isLeader ? "You coordinate the project." : "You bring client-facing experience to the team."}
+                {isLeader ? "You coordinate the project plan." : "You bring client-facing experience to the project."}
               </figcaption>
             </figure>
 
@@ -127,23 +133,28 @@ export function StudyOrientation({
               <CardTitle>{isLeader ? "Team lead" : "Team member"}</CardTitle>
               <p className="mt-2 text-base leading-relaxed">{isLeader
                 ? "You lead the project and answer to the director. You finalize the working conditions once both people agree. You also influence the member's evaluation and future work assignments."
-                : "You are an experienced team member trusted to work directly with the client. You can ask for changes or refuse a proposed package."}</p>
+                : "You are an experienced team member trusted to work directly with the client. You can ask for changes or refuse a proposed package. You and the team lead must agree on both working conditions."}</p>
             </Card>
           </div>
         ) : page === 2 ? (
           <div className="space-y-5">
             <Card>
               <CardTitle>Two separate decisions</CardTitle>
-              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-xl bg-slate-50 p-4 text-sm leading-relaxed">
-                  <dt className="font-bold text-slate-900">The team lead decides a bonus</dt>
-                  <dd className="mt-1.5 text-slate-600">The lead chooses the member&apos;s recommended performance bonus, up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task.</dd>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2" aria-label="How the two roles affect each other after a negotiation">
+                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm leading-relaxed">
+                  <p className="text-xs font-bold uppercase tracking-[0.1em] text-blue-700">Team lead <span aria-hidden>→</span> Team member</p>
+                  <p className="mt-2 font-bold text-slate-900">Study bonus payment</p>
+                  <p className="mt-1.5 text-slate-600">The lead decides the member&apos;s bonus, up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task.</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4 text-sm leading-relaxed">
-                  <dt className="font-bold text-slate-900">The member evaluates the lead</dt>
-                  <dd className="mt-1.5 text-slate-600">The member writes an upward evaluation of the lead that goes to the project director.</dd>
+                <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-relaxed">
+                  <p className="text-xs font-bold uppercase tracking-[0.1em] text-amber-800">Team member <span aria-hidden>→</span> Project director</p>
+                  <p className="mt-2 font-bold text-slate-900">Upward evaluation of the team lead</p>
+                  <p className="mt-1.5 text-slate-600">The member writes the evaluation; the director receives it.</p>
                 </div>
-              </dl>
+              </div>
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-700">
+                <span className="font-bold">Working conditions are a joint decision:</span> the team lead and team member must agree on both.
+              </div>
             </Card>
             <Card>
               <CardTitle>Both people receive the same instruction</CardTitle>
