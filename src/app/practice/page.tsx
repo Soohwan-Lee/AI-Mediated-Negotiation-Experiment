@@ -43,13 +43,14 @@ import { useDevAutofill, useDevBypass } from "@/lib/dev-mode";
 import { PRACTICE_REASON_ANSWER, practiceReasonItem } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { STAGE_MINUTES, nextHref } from "@/lib/study-config";
-import { PRACTICE_TASK } from "@/lib/tasks";
+import { PRACTICE_TASK, requirementIssue } from "@/lib/tasks";
 
 export default function PracticePage() {
   usePageEnter("practice");
 
   const router = useRouter();
   const [phase, setPhase] = useState<"intro" | "practice">("intro");
+  const [tutorialStep, setTutorialStep] = useState<1 | 2 | 3 | 4>(1);
   const { assignment, logEvent, saveResponses } = useParticipant();
 
   // Direct practice states
@@ -74,6 +75,7 @@ export default function PracticePage() {
   const plan = assignment ? sessionPlan(assignment, 1) : null;
   const isProxy = plan ? isProxyCondition(plan.condition) : false;
   const task = PRACTICE_TASK;
+  const practiceReason = requirementIssue(task, role).rationale[role];
   const prac1 = practiceReasonItem(role);
   const reasonCorrect = reasonAnswer === PRACTICE_REASON_ANSWER;
 
@@ -99,7 +101,7 @@ export default function PracticePage() {
         ? "hi! the move week is the main thing for me — could we do next week?"
         : "hi! where the printer goes is the main thing for me — could we keep it beside my desk?",
     );
-    setProxyDraft("How will you argue for the week I picked?");
+    setProxyDraft("How will you argue for the options I picked?");
     setReasonAnswer(PRACTICE_REASON_ANSWER);
   }, `practice-${phase}`);
 
@@ -141,6 +143,7 @@ export default function PracticePage() {
   }
 
   async function sendProxyRehearsal(text: string) {
+    const includePracticeReason = proxyReasonChecked;
     setProxyChatMessages((m) => [
       ...m,
       { id: `pr-user-${m.length}`, speaker: "participant", text },
@@ -152,36 +155,41 @@ export default function PracticePage() {
       {
         id: `pr-ai-${m.length}`,
         speaker: "participant_proxy",
-        text: "I will open by asking for what you chose on both terms, and I will argue for it using only the reasons you authorized. Whatever the two proxies reach is tentative — you decide afterwards whether to approve it, change it, or refuse it.",
+        text: includePracticeReason
+          ? "In this practice example, I’ll start from the goals you selected. The practice workplace reason is included, so I can use it when it helps explain those goals. Any package the two proxies reach is tentative — you decide afterwards whether to approve it, change it, or refuse it."
+          : "In this practice example, I’ll start from the goals you selected. The practice workplace reason is not included, so I’ll work from those goals alone. Any package the two proxies reach is tentative — you decide afterwards whether to approve it, change it, or refuse it.",
       },
     ]);
     setProxyPending(false);
   }
 
-  // Active step calculation for interactive guidance
   const baselineOfferChosen = Object.keys(offer).length >= task.issues.length;
-  const baselineMessageSent = messages.length > 0;
+  const baselineExchangeDone = messages.some(
+    (message) => message.speaker === "counterpart",
+  );
   const proxyMandateChosen =
     Object.keys(proxyPreferred).length >= task.issues.length;
-  const proxyRehearsalDone = proxyChatMessages.length > 0;
-
-  const currentStep = isProxy
-    ? !proxyMandateChosen
-      ? 1
-      : !proxyRehearsalDone
-        ? 2
-        : !reasonCorrect
-          ? 3
-          : 4
-    : !baselineOfferChosen
-      ? 1
-      : !baselineMessageSent
-        ? 2
-        : !reasonCorrect
-          ? 3
-          : 4;
+  const proxyExchangeDone = proxyChatMessages.some(
+    (message) => message.speaker === "participant_proxy",
+  );
+  const choicesComplete = isProxy ? proxyMandateChosen : baselineOfferChosen;
+  const exchangeComplete = isProxy ? proxyExchangeDone : baselineExchangeDone;
 
   const canContinue = bypass || (reasonSubmitted && reasonCorrect);
+
+  function showTutorialStep(step: 1 | 2 | 3 | 4) {
+    setTutorialStep(step);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function goBack() {
+    if (tutorialStep === 1) {
+      setPhase("intro");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    showTutorialStep((tutorialStep - 1) as 1 | 2 | 3 | 4);
+  }
 
   if (phase === "intro") {
     return (
@@ -197,7 +205,7 @@ export default function PracticePage() {
             </p>
             <p className="text-slate-600 text-sm">
               {isProxy
-                ? "In your first task, an AI Proxy will negotiate from your instructions, and then the decision comes back to you. This practice shows you those controls: setting goals, writing instructions, and checking them."
+                ? "In your first task, an AI Proxy will negotiate from your instructions, and then the decision comes back to you. This practice shows you those controls: choosing goals, trying a private question, and checking your understanding."
                 : "In your first task you will chat with the other participant directly. This practice shows you those controls: building an offer package and sending messages."}
             </p>
           </>
@@ -205,31 +213,124 @@ export default function PracticePage() {
         steps={
           isProxy
             ? [
-                { label: "Step 1: Check your practice goals", hint: "Review the private situation in the sidebar" },
-                { label: "Step 2: Say what you want", hint: "Choose the option you would like on each of the two terms" },
-                { label: "Step 3: Consult your AI Proxy", hint: "Ask a test question to see how it will defend your position" },
-                { label: "Step 4: Quick 1-question check", hint: "Confirm that points and reasons are clear" },
+                { label: "Step 1: Read the situation", hint: "See the shared scenario and your private workplace context" },
+                { label: "Step 2: Set two practice goals", hint: "Choose what you would like on each term" },
+                { label: "Step 3: Consult your AI Proxy", hint: "Ask one practice question and see its reply" },
+                { label: "Step 4: Answer one quick check", hint: "Confirm that points and reasons are clear" },
               ]
             : [
-                { label: "Step 1: Check your practice goals", hint: "Review the private situation in the sidebar" },
-                { label: "Step 2: Build a proposal package", hint: "Select an option for each of the practice terms" },
-                { label: "Step 3: Send a test message", hint: "Type a message to see how the live conversation works" },
-                { label: "Step 4: Quick 1-question check", hint: "Confirm that points and reasons are clear" },
+                { label: "Step 1: Read the situation", hint: "See the shared scenario and your private workplace context" },
+                { label: "Step 2: Build a practice proposal", hint: "Select an option for each term" },
+                { label: "Step 3: Send one practice message", hint: "Try the chat and wait for a reply" },
+                { label: "Step 4: Answer one quick check", hint: "Confirm that points and reasons are clear" },
               ]
         }
         minutes={STAGE_MINUTES.practice}
         note={
           <Callout title="🛡️ Safe Sandbox" tone="neutral">
             <p>
-              Nothing in this practice round affects your payment or recorded outcomes. Take as much time as you need to get comfortable with the controls!
+              Nothing in this practice round affects your task outcome or
+              payment. Take as much time as you need to get comfortable with
+              the controls.
             </p>
           </Callout>
         }
         actionLabel="Start Interactive Practice →"
-        onStart={() => setPhase("practice")}
+        onStart={() => {
+          setPhase("practice");
+          showTutorialStep(1);
+        }}
         secondary={<BackButton from="practice" />}
       />
     );
+  }
+
+  const progressSteps = [
+    "Situation",
+    isProxy ? "Set goals" : "Build proposal",
+    isProxy ? "Ask Proxy" : "Try chat",
+    "Quick check",
+  ];
+
+  const coachCopy = [
+    {
+      title: "First, get oriented",
+      body: "Read the shared situation below, then glance at your private points and workplace context in the side panel.",
+    },
+    {
+      title: isProxy ? "Now set your practice goals" : "Now build a practice proposal",
+      body: isProxy
+        ? "Choose one option on each term. These choices tell your AI Proxy what you would like."
+        : "Choose one option on each term. Together, they make one proposal package.",
+    },
+    {
+      title: isProxy ? "Try one private Proxy question" : "Try one message",
+      body: isProxy
+        ? "Ask the AI Proxy a practice question and wait for the sample reply."
+        : "Send a short practice message and wait for the sample reply.",
+    },
+    {
+      title: "Last, answer one quick check",
+      body: "Use the practice briefing to connect the point values with the workplace reason.",
+    },
+  ][tutorialStep - 1];
+
+  const actionLabel =
+    tutorialStep === 1
+      ? "Continue to Practice Choices →"
+      : tutorialStep === 2
+        ? isProxy
+          ? "Continue to Proxy Question →"
+          : "Continue to Practice Chat →"
+        : tutorialStep === 3
+          ? "Continue to Quick Check →"
+          : canContinue
+            ? "Start Task 1 (Real Session) →"
+            : "Check My Answer";
+
+  const actionDisabled =
+    tutorialStep === 2
+      ? !bypass && !choicesComplete
+      : tutorialStep === 3
+        ? !bypass && (!exchangeComplete || pending || proxyPending)
+        : tutorialStep === 4
+          ? !canContinue && !reasonAnswer
+          : false;
+
+  const actionNote =
+    tutorialStep === 1
+      ? "This is a neutral practice situation. It does not affect your task outcome or payment."
+      : tutorialStep === 2
+        ? choicesComplete
+          ? "Both practice choices are set. You can continue or revise them first."
+          : "Choose one option for each of the two terms."
+        : tutorialStep === 3
+          ? pending || proxyPending
+            ? "Waiting for the practice reply…"
+            : exchangeComplete
+              ? "Practice reply received. You can continue or try another message."
+              : isProxy
+                ? "Ask one question and wait for the AI Proxy’s practice reply."
+                : "Send one message and wait for the practice reply."
+          : canContinue
+            ? "Practice complete. You are ready to begin Task 1."
+            : reasonSubmitted
+              ? "Please review your selected answer above."
+              : !reasonAnswer
+                ? "Select an answer, then check it."
+                : "";
+
+  function handleAction() {
+    if (actionDisabled) return;
+    if (tutorialStep < 4) {
+      showTutorialStep((tutorialStep + 1) as 1 | 2 | 3 | 4);
+      return;
+    }
+    if (canContinue) {
+      finish();
+      return;
+    }
+    setReasonSubmitted(true);
   }
 
   return (
@@ -238,381 +339,313 @@ export default function PracticePage() {
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <PageHeader
             eyebrow="Practice Sandbox"
-            title="Interactive Practice: Step-by-Step Guide"
-            subtitle="Follow the numbered steps below to try each control before the real task begins."
+            title="Let’s Try It Together"
           />
 
-          {/* Interactive Stepper Progress Bar */}
-          <div className="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50/50 to-white p-4 shadow-sm">
-            <p className="text-2xs font-extrabold uppercase tracking-widest text-blue-800 mb-2">
-              Practice Progress Tracker
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div className={cx(
-                "min-w-0 rounded-xl border p-2 text-center transition-all flex items-center justify-center",
-                currentStep > 1
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-900 font-bold"
-                  : currentStep === 1
-                    ? "border-blue-500 bg-white text-blue-900 font-extrabold ring-2 ring-blue-400/40 shadow-xs"
-                    : "border-slate-200 bg-white/70 text-slate-500",
-              )}>
-                <span className="text-xs leading-tight break-words">{currentStep > 1 ? "✓ 1. Set Terms" : "👉 1. Set Terms"}</span>
-              </div>
+          <ol
+            aria-label="Practice progress"
+            className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
+          >
+            {progressSteps.map((label, index) => {
+              const step = index + 1;
+              const complete = step < tutorialStep;
+              const current = step === tutorialStep;
+              return (
+                <li
+                  key={label}
+                  aria-current={current ? "step" : undefined}
+                  className={cx(
+                    "rounded-xl border px-3 py-1.5 text-sm font-bold",
+                    complete
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : current
+                        ? "border-blue-300 bg-blue-50 text-blue-900"
+                        : "border-slate-200 bg-white text-slate-400",
+                  )}
+                >
+                  {complete ? `✓ ${step}` : step}. {label}
+                </li>
+              );
+            })}
+          </ol>
 
-              <div className={cx(
-                "min-w-0 rounded-xl border p-2 text-center transition-all flex items-center justify-center",
-                currentStep > 2
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-900 font-bold"
-                  : currentStep === 2
-                    ? "border-blue-500 bg-white text-blue-900 font-extrabold ring-2 ring-blue-400/40 shadow-xs"
-                    : "border-slate-200 bg-white/70 text-slate-500",
-              )}>
-                <span className="text-xs leading-tight break-words">
-                  {currentStep > 2 ? "✓ 2. Test Exchange" : currentStep === 2 ? "👉 2. Test Exchange" : "2. Test Exchange"}
+          <section className="mb-4 flex gap-3 rounded-2xl border border-blue-200 bg-blue-50/70 p-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-700 text-sm font-black text-white">
+              {tutorialStep}
+            </div>
+            <div>
+              <p className="text-base font-extrabold text-blue-950">
+                {coachCopy.title}
+              </p>
+              <p className="mt-0.5 text-sm leading-relaxed text-blue-900">
+                {coachCopy.body}
+              </p>
+            </div>
+          </section>
+
+          {tutorialStep === 1 ? (
+            <Card className="mb-6 border-blue-300 bg-white p-4" padded={false}>
+              <CardTitle>
+                The Practice Situation: {task.title.replace(/^Practice — /, "")}
+              </CardTitle>
+              <p className="mt-3 text-sm leading-relaxed text-slate-700">
+                {task.publicBrief}
+              </p>
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
+                Your private points and workplace context are in the side panel.
+                You will use both in the next steps.
+              </div>
+            </Card>
+          ) : null}
+
+          {tutorialStep === 2 && isProxy ? (
+            <Card
+              tone="private"
+              className="mb-6 border-amber-300 p-4"
+              padded={false}
+            >
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Set Your Practice Goals</CardTitle>
+                <span className="rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-950">
+                  Private · only you and your Proxy
                 </span>
               </div>
-
-              <div className={cx(
-                "min-w-0 rounded-xl border p-2 text-center transition-all flex items-center justify-center",
-                currentStep > 3
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-900 font-bold"
-                  : currentStep === 3
-                    ? "border-blue-500 bg-white text-blue-900 font-extrabold ring-2 ring-blue-400/40 shadow-xs"
-                    : "border-slate-200 bg-white/70 text-slate-500",
-              )}>
-                <span className="text-xs leading-tight break-words">
-                  {currentStep > 3 ? "✓ 3. Quick Check" : currentStep === 3 ? "👉 3. Quick Check" : "3. Quick Check"}
-                </span>
-              </div>
-
-              <div className={cx(
-                "min-w-0 rounded-xl border p-2 text-center transition-all flex items-center justify-center",
-                canContinue
-                  ? "border-emerald-400 bg-emerald-100 text-emerald-950 font-black shadow-xs"
-                  : "border-slate-200 bg-white/70 text-slate-400",
-              )}>
-                <span className="text-xs leading-tight break-words">{canContinue ? "🎉 4. Start Task 1" : "4. Start Task 1"}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Scenario Context Card */}
-          <Card className="mb-6 border-slate-200 bg-white">
-            <CardTitle hint="Practice scenario — nothing here counts:">
-              📋 The Practice Scenario: {task.title.replace(/^Practice — /, "")}
-            </CardTitle>
-            <p className="text-xs sm:text-sm leading-relaxed text-slate-700 mt-2">
-              {task.publicBrief}
-            </p>
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-slate-50 p-2.5 text-xs text-slate-600 border border-slate-200">
-              <span>💡</span>
-              <span>Your private points and preferences are shown on the right sidebar. Check what pays you more!</span>
-            </div>
-          </Card>
-
-          {/* ========================================================================= */}
-          {/* BRANCH A: PROXY CONDITION PRACTICE                                      */}
-          {/* ========================================================================= */}
-          {isProxy ? (
-            <>
-              {/* Step 1 for Proxy: Set Mandate Bounds */}
-              <Card
-                className={cx(
-                  "mb-6 transition-all",
-                  currentStep === 1 ? "border-blue-500 ring-2 ring-blue-500/20 shadow-md" : "border-slate-200",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-2xs font-extrabold text-blue-900">
-                    Step 1 of 3 · AI Proxy Mandate Configuration
-                  </span>
-                  {proxyMandateChosen ? (
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      ✓ Set
-                    </span>
-                  ) : null}
-                </div>
-                <CardTitle hint="Choose the option you would like on each of the two practice terms:">
-                  🎯 Step 1: Tell Your AI Proxy What You Want
-                </CardTitle>
-
-                {/* THE PRACTICE MUST MIRROR THE REAL SCREEN. It used to teach a
-                    second control per term — a walkaway limit the proxy would
-                    never cross — which Ver.2.13 §2.6 removed. A practice round
-                    that rehearses a control the task does not have is worse
-                    than no practice: the participant arrives looking for it. */}
-                <div className="mt-2.5 mb-3.5 rounded-xl border border-blue-200 bg-blue-50/60 p-2.5 text-xs text-blue-950">
-                  <span className="font-bold flex items-center gap-1 text-emerald-800">
-                    <span>🏆</span> What you want
-                  </span>
-                  <p className="text-2xs text-slate-600 mt-0.5">
-                    The option you would like on each term. Your proxy opens by
-                    asking for it — and whatever it reaches, you decide
-                    afterwards whether to accept it.
-                  </p>
-                </div>
-
-                <div className="space-y-4 mt-3">
-                  {task.issues.map((issue) => (
-                    <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5">
-                      <div className="mb-2">
-                        <p className="text-xs sm:text-sm font-bold text-slate-900">{issue.label}</p>
-                        <p className="mt-0.5 text-xs text-slate-600 font-medium leading-relaxed">💡 {issue.rationale[role]}</p>
-                      </div>
-
+              <p className="text-sm leading-relaxed text-[var(--private-ink)]">
+                Your Proxy starts from these goals. Any package it reaches later
+                comes back to you for a decision.
+              </p>
+              <div className="mt-4 space-y-4">
+                {task.issues.map((issue) => (
+                  <div
+                    key={issue.id}
+                    className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5"
+                  >
+                    <p className="text-sm font-bold text-slate-900">{issue.label}</p>
+                    <p className="mt-1 text-sm font-medium leading-relaxed text-slate-600">
+                      {issue.rationale[role]}
+                    </p>
+                    <div className="mt-2">
                       <OptionChips
                         issue={issue}
                         role={role}
                         name={`practice-proxy-pref-${issue.id}`}
                         value={proxyPreferred[issue.id] ?? null}
-                        onChange={(v) => setProxyPreferred((p) => ({ ...p, [issue.id]: v }))}
+                        onChange={(value) =>
+                          setProxyPreferred((previous) => ({
+                            ...previous,
+                            [issue.id]: value,
+                          }))
+                        }
                       />
                     </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Step 2 for Proxy: Permitted Reason Authorization & Rehearsal Q&A */}
-              <Card
-                className={cx(
-                  "mb-6 flex flex-col overflow-hidden border-slate-200 transition-all",
-                  currentStep === 2 ? "border-blue-500 ring-2 ring-blue-500/20 shadow-md" : "",
-                )}
-                padded={false}
-              >
-                <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-2xs font-extrabold text-blue-900">
-                        Step 2 of 3 · AI Proxy Consultation (Rehearsal)
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm font-bold text-slate-900">
-                      🤖 Test Your AI Proxy with a Question
-                    </p>
                   </div>
-                  {proxyRehearsalDone ? (
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      ✓ Consultation Tested
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="p-4 border-b border-slate-200 bg-amber-50/40">
-                  <label className="flex cursor-pointer items-start gap-2.5 text-xs text-amber-950 font-medium">
-                    <input
-                      type="checkbox"
-                      checked={proxyReasonChecked}
-                      onChange={(e) => setProxyReasonChecked(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded text-blue-600"
-                    />
-                    <span>
-                      <strong>Authorized Workplace Reason:</strong> &ldquo;The quarterly review is right after that week.&rdquo; (The proxy will only say reasons you keep checked).
-                    </span>
-                  </label>
-                </div>
-
-                <Transcript
-                  messages={proxyChatMessages}
-                  pending={proxyPending}
-                  // THE PARTICIPANT'S OWN PROXY, and the default would be
-                  // wrong in the most damaging way here. `pendingSpeaker`
-                  // defaults to `counterpart`, so this showed "👤 Other
-                  // Participant · typing" while the participant waited for the
-                  // proxy they are being taught to distinguish — on the one
-                  // screen whose whole job is to establish who is who, and in
-                  // a conversation the design says is private to them.
-                  pendingSpeaker="participant_proxy"
-                  emptyHint="Ask your AI Proxy anything, e.g. &ldquo;What will you open with?&rdquo; or click the suggestion below."
+                ))}
+              </div>
+              <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-xl border border-amber-300 bg-white/70 p-3 text-sm font-medium text-amber-950">
+                <input
+                  type="checkbox"
+                  checked={proxyReasonChecked}
+                  onChange={(event) => setProxyReasonChecked(event.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded text-blue-600"
                 />
+                <span>
+                  <strong>Practice workplace reason:</strong> “{practiceReason}”
+                  Try the sharing control here; this example does not affect the
+                  real task.
+                </span>
+              </label>
+            </Card>
+          ) : null}
 
-                <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center gap-2">
-                  <span className="text-2xs font-bold text-slate-500">Quick Test Prompts:</span>
-                  <button
-                    type="button"
-                    onClick={() => void sendProxyRehearsal("How will you argue for the week I picked?")}
-                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs"
+          {tutorialStep === 2 && !isProxy ? (
+            <Card className="mb-6 border-blue-300 bg-white p-4" padded={false}>
+              <CardTitle>Build a Practice Proposal</CardTitle>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                These selections prepare a draft package. Nothing is sent from
+                this step.
+              </p>
+              <div className="mt-4 space-y-4">
+                {task.issues.map((issue) => (
+                  <div
+                    key={issue.id}
+                    className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5"
                   >
-                    &ldquo;How will you argue for the week I picked?&rdquo;
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void sendProxyRehearsal("Which reasons are you allowed to share?")}
-                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs"
-                  >
-                    &ldquo;Which reasons can you share?&rdquo;
-                  </button>
-                </div>
-
-                <MessageComposer
-                  value={proxyDraft}
-                  onChange={setProxyDraft}
-                  onSend={(text) => {
-                    setProxyDraft("");
-                    void sendProxyRehearsal(text);
-                  }}
-                  disabled={proxyPending}
-                  placeholder="Type a test question for your AI Proxy…"
-                  sendLabel="Ask Proxy"
-                />
-              </Card>
-            </>
-          ) : (
-            /* ========================================================================= */
-            /* BRANCH B: BASELINE DIRECT NEGOTIATION PRACTICE                            */
-            /* ========================================================================= */
-            <>
-              {/* Step 1 for Direct: Offer Builder */}
-              <Card
-                className={cx(
-                  "mb-6 transition-all",
-                  currentStep === 1 ? "border-blue-500 ring-2 ring-blue-500/20 shadow-md" : "border-slate-200",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-2xs font-extrabold text-blue-900">
-                    Step 1 of 3 · Offer Package Builder
-                  </span>
-                  {baselineOfferChosen ? (
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      ✓ Package Selected
-                    </span>
-                  ) : null}
-                </div>
-                <CardTitle hint="Selecting an option on each term builds your proposal package:">
-                  📦 Step 1: Select Your Proposed Terms
-                </CardTitle>
-
-                <div className="space-y-4 mt-3">
-                  {task.issues.map((issue) => (
-                    <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/70 p-3.5">
-                      <div className="mb-2">
-                        <p className="text-xs sm:text-sm font-bold text-slate-900">{issue.label}</p>
-                        <p className="mt-0.5 text-xs text-slate-600 font-medium leading-relaxed">💡 {issue.rationale[role]}</p>
-                      </div>
+                    <p className="text-sm font-bold text-slate-900">{issue.label}</p>
+                    <p className="mt-1 text-sm font-medium leading-relaxed text-slate-600">
+                      {issue.rationale[role]}
+                    </p>
+                    <div className="mt-2">
                       <OptionChips
                         issue={issue}
                         role={role}
                         name={`practice-${issue.id}`}
                         value={offer[issue.id] ?? null}
-                        onChange={(v) => setOffer((prev) => ({ ...prev, [issue.id]: v }))}
+                        onChange={(value) =>
+                          setOffer((previous) => ({
+                            ...previous,
+                            [issue.id]: value,
+                          }))
+                        }
                         allowNone
                         noneLabel="Not specified"
                       />
                     </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Step 2 for Direct: Live Chatbox */}
-              <Card
-                className={cx(
-                  "mb-6 flex flex-col overflow-hidden border-slate-200 transition-all",
-                  currentStep === 2 ? "border-blue-500 ring-2 ring-blue-500/20 shadow-md" : "",
-                )}
-                padded={false}
-              >
-                <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-2xs font-extrabold text-blue-900">
-                        Step 2 of 3 · Live Chatbox
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm font-bold text-slate-900">
-                      💬 Step 2: Send a Sample Message
-                    </p>
                   </div>
-                  {baselineMessageSent ? (
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      ✓ Message Exchanged
-                    </span>
-                  ) : null}
-                </div>
-                <Transcript
-                  messages={messages}
-                  pending={pending}
-                  emptyHint="Type a message below or click the pre-filled sample to test the chat response!"
-                />
-                <MessageComposer
-                  value={draft}
-                  onChange={setDraft}
-                  onSend={(text) => {
-                    setDraft("");
-                    void sendPractice(text);
-                  }}
-                  disabled={pending}
-                  placeholder="Type a sample message here…"
-                />
-              </Card>
-            </>
-          )}
-
-          {/* ========================================================================= */}
-          {/* Step 3: Quick Comprehension Question (Applies to both)                    */}
-          {/* ========================================================================= */}
-          <Card
-            id={`q-${prac1.id}`}
-            className={cx(
-              "mb-6 transition-all",
-              currentStep === 3 ? "border-blue-500 ring-2 ring-blue-500/20 shadow-md" : "border-slate-200",
-              reasonSubmitted && reasonCorrect ? "border-emerald-300 bg-emerald-50/20" : "",
-            )}
-          >
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-2xs font-extrabold text-blue-900">
-                Step 3 of 3 · Quick Comprehension Check
-              </span>
-              {reasonSubmitted && reasonCorrect ? (
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  ✓ Answer Verified
-                </span>
-              ) : null}
-            </div>
-            <CardTitle hint="One quick question to confirm that points and scenario reasons are understood:">
-              ✅ Step 3: Check Your Understanding
-            </CardTitle>
-            <p className="my-2 text-xs sm:text-sm font-bold text-slate-900">
-              {prac1.text}
-            </p>
-            {prac1.kind === "choice" ? (
-              <ChoiceList
-                name={prac1.id}
-                value={reasonAnswer}
-                onChange={(v) => {
-                  setReasonAnswer(v);
-                  setReasonSubmitted(false);
-                }}
-                options={prac1.options}
-              />
-            ) : null}
-            {reasonSubmitted && !reasonCorrect ? (
-              <div className="mt-3">
-                <Callout title="💡 Helpful Hint" tone="warning">
-                  <p className="text-xs sm:text-sm">
-                    Points reflect how valuable an option is for your scenario; the briefing explains the workplace reasons why.
-                  </p>
-                </Callout>
+                ))}
               </div>
-            ) : null}
-          </Card>
+            </Card>
+          ) : null}
+
+          {tutorialStep === 3 && isProxy ? (
+            <Card
+              tone="private"
+              className="mb-6 flex flex-col overflow-hidden border-amber-300"
+              padded={false}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2 border-b border-amber-200 bg-amber-50/70 px-4 py-3 sm:px-5">
+                <div>
+                  <p className="text-base font-bold text-[var(--private-ink)]">
+                    Ask Your AI Proxy a Practice Question
+                  </p>
+                  <p className="mt-0.5 text-sm text-[var(--private-ink)]">
+                    This practice uses a sample reply.
+                  </p>
+                </div>
+                <span className="rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-950">
+                  Private · only you and your Proxy
+                </span>
+              </div>
+              <Transcript
+                messages={proxyChatMessages}
+                pending={proxyPending}
+                pendingSpeaker="participant_proxy"
+                emptyHint="Choose a suggestion or type one question below."
+              />
+              <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 p-3">
+                <span className="text-sm font-bold text-slate-600">Suggestions:</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void sendProxyRehearsal(
+                      "How will you argue for the options I picked?",
+                    )
+                  }
+                  disabled={proxyPending}
+                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  “How will you argue for the options I picked?”
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void sendProxyRehearsal(
+                      "Which reasons are you allowed to share?",
+                    )
+                  }
+                  disabled={proxyPending}
+                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  “Which reasons can you share?”
+                </button>
+              </div>
+              <MessageComposer
+                value={proxyDraft}
+                onChange={setProxyDraft}
+                onSend={(text) => {
+                  setProxyDraft("");
+                  void sendProxyRehearsal(text);
+                }}
+                disabled={proxyPending}
+                placeholder="Type a practice question…"
+                sendLabel="Ask Proxy"
+              />
+            </Card>
+          ) : null}
+
+          {tutorialStep === 3 && !isProxy ? (
+            <Card
+              className="mb-6 flex flex-col overflow-hidden border-blue-300 bg-white"
+              padded={false}
+            >
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+                <p className="text-base font-bold text-slate-900">
+                  Send a Practice Message
+                </p>
+                <p className="mt-0.5 text-sm text-slate-600">
+                  This sandbox returns a fixed sample reply.
+                </p>
+              </div>
+              <Transcript
+                messages={messages}
+                pending={pending}
+                emptyHint="Type a short message below, then send it."
+              />
+              <MessageComposer
+                value={draft}
+                onChange={setDraft}
+                onSend={(text) => {
+                  setDraft("");
+                  void sendPractice(text);
+                }}
+                disabled={pending}
+                placeholder="Type a practice message…"
+              />
+            </Card>
+          ) : null}
+
+          {tutorialStep === 4 ? (
+            <Card
+              id={`q-${prac1.id}`}
+              className={cx(
+                "mb-6 border-blue-300 bg-white p-4",
+                reasonSubmitted && reasonCorrect
+                  ? "border-emerald-300 bg-emerald-50/20"
+                  : "",
+              )}
+              padded={false}
+            >
+              <CardTitle>Check Your Understanding</CardTitle>
+              <p className="my-3 text-sm font-bold text-slate-900">{prac1.text}</p>
+              {prac1.kind === "choice" ? (
+                <ChoiceList
+                  name={prac1.id}
+                  value={reasonAnswer}
+                  onChange={(value) => {
+                    setReasonAnswer(value);
+                    setReasonSubmitted(false);
+                  }}
+                  options={prac1.options}
+                />
+              ) : null}
+              {reasonSubmitted && !reasonCorrect ? (
+                <div className="mt-3">
+                  <Callout title="Helpful hint" tone="warning">
+                    <p className="text-xs sm:text-sm">
+                      Points show how valuable an option is in the scenario. The
+                      briefing explains the workplace reason behind that value.
+                    </p>
+                  </Callout>
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
         </TaskLayout>
       </Page>
 
       <ActionBar
-        label={canContinue ? "Start Task 1 (Real Session) →" : "Check My Answer"}
-        onClick={canContinue ? finish : () => setReasonSubmitted(true)}
-        disabled={!canContinue && !reasonAnswer}
-        note={
-          canContinue
-            ? "🎉 Excellent! Practice round complete. Ready to begin Task 1."
-            : reasonSubmitted
-              ? "⚠️ Please review your selected answer above."
-              : !reasonAnswer
-                ? "💡 Select an answer in Step 3 above to verify."
-                : ""
+        label={actionLabel}
+        onClick={handleAction}
+        disabled={actionDisabled}
+        note={actionNote}
+        secondary={
+          <button
+            type="button"
+            onClick={goBack}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          >
+            ← Back
+          </button>
         }
-        secondary={<BackButton from="practice" />}
       />
     </>
   );

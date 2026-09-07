@@ -47,10 +47,22 @@ the maximum reading load at one time fell by 56%.
 ## Stage 4: guided practice
 
 - Keep one practice round matched to the participant's first task interface.
-- Turn the practice into a friendly, explicit tutorial with numbered prompts,
-  a strong current-action cue, and immediate explanations after each action.
+- Divide the tutorial into four focused views: situation, choices, sample
+  exchange, and the existing PRAC1 check. Show one active control at a time,
+  return to the top on each transition, and preserve inputs when going Back.
+- Require both practice choices and a completed local sample exchange before
+  PRAC1. The sample exchange does not call the study model, and PRAC1's item,
+  answer, and saved response remain unchanged.
 - Keep both Proxy policies on the same practice interface and do not add a
   second practice round or a new study mechanic.
+
+Browser verification covered the Direct flow as a Team Lead, the
+User-Specified Proxy flow as a Senior Team Member, and the AI-Supplemented
+assignment opening the same Proxy tutorial as a Team Lead. The checks included
+disabled Continue states, role-appropriate practice reasons, sharing-control
+on/off replies, wrong and correct PRAC1 attempts, Back-state preservation, and
+top-of-step scrolling. No paid model request was made. TypeScript, lint, the
+production build, and all 178 unit tests passed.
 
 ## Non-negotiable study boundaries
 
