@@ -388,7 +388,9 @@ export default function PracticePage() {
             <div
               className={cx(
                 "rounded-2xl border border-transparent",
-                tutorialStep === 1 ? "cue-ring" : "",
+                // The rail is a private (sand) surface, so its ring is the private one
+                // (interface rule 1: the ring colour must not contradict the card).
+                tutorialStep === 1 ? "cue-ring-private" : "",
               )}
             >
               <BriefingPanel task={task} role={role} />
@@ -491,7 +493,7 @@ export default function PracticePage() {
                       // unanswered term, and moves to the second once that one
                       // is picked. It marks where the participant is, and says
                       // nothing about which chip inside it to press.
-                      firstUnpickedIssueIndex === index ? "cue-ring" : "",
+                      firstUnpickedIssueIndex === index ? "cue-ring-private" : "",
                     )}
                   >
                     <p className="text-sm font-bold text-slate-900">{issue.label}</p>

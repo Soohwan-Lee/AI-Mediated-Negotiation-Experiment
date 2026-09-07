@@ -74,6 +74,14 @@ import { nextHref } from "@/lib/study-config";
  */
 const TEXT_ITEMS_PER_PART = 3;
 
+/**
+ * How many items a block may have and still share a page with the last
+ * free-text slice before it. One page-turn for a single question (Direct's
+ * M1, which follows the open-ended block) is worse than one extra choice row
+ * under three text boxes.
+ */
+const TRAILING_JOIN_MAX = 2;
+
 /** A block whose items are ALL free text, e.g. `open_ended`. */
 function isTextBlock(block: Block): boolean {
   return (
@@ -140,7 +148,13 @@ function groupIntoParts(blocks: Block[], softMax: number): Block[][] {
   for (const block of blocks) {
     if (isTextBlock(block)) {
       flush();
-      for (const slice of sliceTextBlock(block)) parts.push([slice]);
+      const slices = sliceTextBlock(block);
+      for (const slice of slices.slice(0, -1)) parts.push([slice]);
+      // The LAST slice stays open, so a short block that follows — Direct's
+      // one-item M1 — can ride on it instead of turning a page for a single
+      // question. Anything longer than `TRAILING_JOIN_MAX` flushes as usual.
+      currentPart = [slices[slices.length - 1]];
+      count = softMax - TRAILING_JOIN_MAX;
       continue;
     }
     if (currentPart.length > 0 && count + block.items.length > softMax) flush();
