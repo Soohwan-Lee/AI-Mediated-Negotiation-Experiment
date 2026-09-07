@@ -28,6 +28,38 @@ import {
 
 export type Answers = SurveyResponses;
 
+/**
+ * Show each item's id above its question — `PERC-F1`, `OE-P4`, `SUS1`.
+ *
+ * FOR THE RESEARCHER READING THE SCREENS, NOT FOR THE PARTICIPANT. The ids are
+ * the column names in the export (Interface rule 7), so having them on screen
+ * is what makes a walk-through checkable against Design §9 without counting
+ * questions. Flip this one constant to hide every one of them.
+ *
+ * It is rendered as a SIBLING of the control and never reaches an answer: the
+ * `statement` and `label` strings passed down are exactly what `lib/measures`
+ * holds, so nothing an id could contaminate is saved or logged.
+ *
+ * OFF IN A RECRUITING BUILD, BY THE SAME SWITCH THAT DROPS THE DEV PANEL. Some
+ * of these ids are tells — `SUS1` on the suspicion probe names what that probe
+ * is for, and the `OWN-AI` / `OTHER-AI` prefixes label a whole block by its
+ * construct. Tying it to `NEXT_PUBLIC_DEV_TOOLS=off` means there is one thing
+ * to set before recruiting, not two, and a preview deployment keeps the tags.
+ */
+export const SHOW_ITEM_IDS = process.env.NEXT_PUBLIC_DEV_TOOLS !== "off";
+
+function ItemTag({ id }: { id: string }) {
+  if (!SHOW_ITEM_IDS) return null;
+  return (
+    <span
+      aria-hidden
+      className="mb-1 block font-mono text-[10px] uppercase tracking-wide text-[var(--ink-3)]"
+    >
+      {id}
+    </span>
+  );
+}
+
 export function MeasureBlock({
   block,
   answers,
@@ -131,17 +163,32 @@ function MeasureItem({
   const asNumber = typeof value === "number" ? value : null;
 
   if (item.kind === "scale") {
+    // The tag is a sibling rather than part of `statement`: `Scale` types the
+    // statement as a string and mirrors it into its own `<legend>`, so folding
+    // the id in would read the id out to a screen reader as part of the
+    // question. `Scale` keeps the `q-` anchor.
+    //
+    // THE SEPARATOR MOVES OUT WITH IT. `Scale`'s own rule is
+    // `border-b … last:border-b-0`, which counts siblings — wrap each scale in
+    // a div and every one becomes an only child, so `last:` matches them all
+    // and the whole block loses its rules. So the scale is asked for `compact`
+    // (no rule of its own) and the wrapper carries the rule instead, where it
+    // is still one per item and still dropped on the last.
     return (
-      <Scale
-        id={item.id}
-        statement={item.text}
-        value={asNumber}
-        onChange={(v) => onChange(item.id, v)}
-        lowAnchor={item.low}
-        highAnchor={item.high}
-        points={item.points}
-        flagged={flagged}
-      />
+      <div className="border-b border-[var(--line)] py-4 last:border-b-0">
+        <ItemTag id={item.id} />
+        <Scale
+          id={item.id}
+          statement={item.text}
+          value={asNumber}
+          onChange={(v) => onChange(item.id, v)}
+          lowAnchor={item.low}
+          highAnchor={item.high}
+          points={item.points}
+          flagged={flagged}
+          compact
+        />
+      </div>
     );
   }
 
@@ -151,6 +198,7 @@ function MeasureItem({
   if (item.kind === "amount") {
     return (
       <div id={`q-${item.id}`} className="scroll-mt-24">
+        <ItemTag id={item.id} />
         <Field label={item.text} required={!optional} flagged={flagged}>
           <AmountScale
             id={item.id}
@@ -166,6 +214,7 @@ function MeasureItem({
 
   return (
     <div id={`q-${item.id}`} className="scroll-mt-24">
+      <ItemTag id={item.id} />
       <Field label={item.text} required={!optional} flagged={flagged}>
         {item.kind === "choice" ? (
           <ChoiceList

@@ -25,6 +25,12 @@
  * boundaries, so the §9.4 order is untouched: a part is a run of whole blocks
  * in the same fixed sequence, never a reshuffle.
  *
+ * The one block that IS split is the free-text one, three questions to a page.
+ * A rating block is kept whole because it is one instrument with one response
+ * scale and one hint row; a written-answer block has neither, so nothing breaks
+ * when it is cut, and seven essay boxes on one page is precisely the screen the
+ * pagination exists to prevent. The order inside it is still untouched.
+ *
  * There is no way back between parts, and that is the same rule as the order
  * itself. The AI-Proxy blocks come last so that being asked about the other
  * side's proxy cannot colour the answers about the other side; letting someone
@@ -58,28 +64,90 @@ import { getTask } from "@/lib/tasks";
 import { nextHref } from "@/lib/study-config";
 
 /**
- * Cuts the blocks into parts of roughly `softMax` items, never splitting a
- * block.
+ * A written answer costs far more than a rating, so a block of them is capped
+ * far lower than a block of scales.
  *
- * The cap is soft on purpose: a block longer than it becomes a part of its own
- * rather than being broken up, because a block is one instrument with one
- * response scale and one hint row. Overshooting by a few items costs a little
- * scrolling; splitting a scale across a page break costs the scale.
+ * Three free-text boxes is about what fits on one screen without the last one
+ * being answered from below the fold. Seven of them — the AI-Supplemented set —
+ * on one page after a negotiation is where "two or three sentences" turns into
+ * "n/a".
+ */
+const TEXT_ITEMS_PER_PART = 3;
+
+/** A block whose items are ALL free text, e.g. `open_ended`. */
+function isTextBlock(block: Block): boolean {
+  return (
+    block.items.length > 0 && block.items.every((item) => item.kind === "text")
+  );
+}
+
+/**
+ * Cuts one all-text block into slices of at most `TEXT_ITEMS_PER_PART`, in
+ * order, each carrying the block's own title and hint.
+ *
+ * The id is suffixed so React keys stay unique across the slices; nothing reads
+ * a block id back, and the ITEM ids — which are the export's column names —
+ * are untouched.
+ */
+function sliceTextBlock(block: Block): Block[] {
+  const slices: Block[] = [];
+  for (let i = 0; i < block.items.length; i += TEXT_ITEMS_PER_PART) {
+    const items = block.items.slice(i, i + TEXT_ITEMS_PER_PART);
+    const ids = new Set(items.map((item) => item.id));
+    slices.push({
+      ...block,
+      id: `${block.id}__${slices.length + 1}`,
+      items,
+      // `optional` is an id list, so it has to be narrowed with the items or a
+      // slice would count a neighbour's optional item as still outstanding.
+      optional: block.optional?.filter((id) => ids.has(id)),
+    });
+  }
+  return slices;
+}
+
+/**
+ * Cuts the blocks into parts of roughly `softMax` items, never splitting a
+ * RATING block.
+ *
+ * The cap is soft on purpose: a rating block longer than it becomes a part of
+ * its own rather than being broken up, because a block is one instrument with
+ * one response scale and one hint row. Overshooting by a few items costs a
+ * little scrolling; splitting a scale across a page break costs the scale.
+ *
+ * AN ALL-TEXT BLOCK IS THE EXCEPTION and is split, at most
+ * `TEXT_ITEMS_PER_PART` to a page, each page repeating the title and hint. It
+ * has no shared response scale to break — every item is its own textarea with
+ * its own prompt — so the reason the rest are kept whole does not apply, while
+ * the reason for paginating at all applies to it hardest. It is also never
+ * merged with a neighbouring block: a page mixing seven-point rows with essay
+ * boxes reads as one is optional.
+ *
+ * Order is preserved exactly in both cases, so the fixed §9.4 sequence is
+ * untouched and the page is still forward-only.
  */
 function groupIntoParts(blocks: Block[], softMax: number): Block[][] {
   const parts: Block[][] = [];
   let currentPart: Block[] = [];
   let count = 0;
+
+  const flush = () => {
+    if (currentPart.length > 0) parts.push(currentPart);
+    currentPart = [];
+    count = 0;
+  };
+
   for (const block of blocks) {
-    if (currentPart.length > 0 && count + block.items.length > softMax) {
-      parts.push(currentPart);
-      currentPart = [];
-      count = 0;
+    if (isTextBlock(block)) {
+      flush();
+      for (const slice of sliceTextBlock(block)) parts.push([slice]);
+      continue;
     }
+    if (currentPart.length > 0 && count + block.items.length > softMax) flush();
     currentPart.push(block);
     count += block.items.length;
   }
-  if (currentPart.length > 0) parts.push(currentPart);
+  flush();
   return parts;
 }
 
