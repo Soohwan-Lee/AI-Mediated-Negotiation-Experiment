@@ -359,10 +359,10 @@ export interface ExchangeState {
 /**
  * The counterpart's next move (Ver.2.12 §6.1–6.3).
  *
- * `stage` is the counterpart's own position in ITS script. It advances one
- * step per reply — opening, its work reason plus the priority question, its
- * fixed SB disclosure, then the trade loop — so every participant meets the
- * same sequence however many messages they spend in between.
+ * `stage` is the counterpart's own position in ITS script. Proxy advances
+ * through the fixed opening, work reason, SB disclosure, and trade loop.
+ * Direct uses the same positions, but its disclosure policy may skip the SB
+ * move or combine it with acceptance.
  *
  * DISCLOSURE POLICY IS EXPLICIT. Proxy observation retains the fixed stage-4
  * SB disclosure. Direct uses reciprocity: its safe WR is in the opening, and

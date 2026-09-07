@@ -10,17 +10,17 @@
  * FREE CHAT ON A TEN-MINUTE CLOCK. The participant writes as much or as little
  * as they like and may finish early; Design §4 is explicit that their
  * behaviour is not forced ("참가자의 행동은 강제하지 않음"). What is fixed is
- * the COUNTERPART: it walks its five-stage script one move per reply, so every
- * participant meets the same opening, the same standardized challenge and the
- * same thresholds in the same order, however long they take.
+ * the COUNTERPART: it uses the same standardized thresholds, while Direct
+ * gates sensitive disclosure on participant disclosure and may settle before
+ * later script positions.
  *
  * The counterpart is presented as another participant. It is a controlled LLM
  * behind /api/counterpart whose moves are decided by the state machine, so
- * every participant meets the same behaviour.
+ * every participant meets the same deterministic policy.
  */
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OptionChips } from "@/components/issues";
 import {
   CountdownTimer,
@@ -46,6 +46,7 @@ import {
   LABEL_TIER,
   type ReasonTier,
 } from "@/lib/negotiation/machine";
+import { reciprocalAcceptanceText } from "@/lib/negotiation/counterpart-text";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
@@ -181,22 +182,17 @@ const PHASE_LABELS: Record<Phase, string> = {
 
 /** Entry preferences as a package (nulls dropped). */
 /**
- * SB-TIMING (Ver.2.13 §9.3) for the Direct arm, from the reply index the
- * participant's SB was tagged at.
- *
- * THE BOUNDARY IS A FIXED SCRIPT POSITION, not something the participant can
- * move. The counterpart discloses its own SB on its SECOND live reply, so a
- * tag at reply 0 or 1 is out before it and anything later is after. That also
- * makes `SB` — the primary outcome — the "before" category alone.
- *
- * Direct has no closing stage, so category "wrap_up" is unreachable here;
- * §9.8-5 flags that as a structural zero cell for the χ², not a coding gap.
+ * SB-TIMING for the Direct arm. Under reciprocal disclosure, every
+ * participant SB necessarily precedes the counterpart's SB; late disclosure
+ * remains distinguishable in the message/reply log, not by falsely coding it
+ * as post-counterpart. `SB` separately records whether the participant chose
+ * it during the first reason opportunity.
  */
 function sbTimingCode(
   sbVoicedAtReply: number | null,
 ): "none" | "before_counterpart" | "after_counterpart" {
   if (sbVoicedAtReply === null) return "none";
-  return sbVoicedAtReply <= 1 ? "before_counterpart" : "after_counterpart";
+  return "before_counterpart";
 }
 
 function toPackage(
@@ -260,9 +256,12 @@ export function BaselineTask({
   const [replies, setReplies] = useState(0);
   /** Set when the counterpart accepts or declares an impasse. */
   const [settled, setSettled] = useState<"agreed" | "impasse" | null>(null);
+  /** Synchronous settlement guard for timeout versus an in-flight reply. */
+  const settledRef = useRef(false);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
+  const [turnError, setTurnError] = useState<string | null>(null);
   const [offer, setOffer] = useState<Package>({});
   const [tentative, setTentative] = useState<Package | null>(null);
   const [prefs, setPrefs] = useState<Preferences | null>(null);
@@ -291,15 +290,18 @@ export function BaselineTask({
   const [tier, setTier] = useState<ReasonTier>("none");
   /** SCRIPT-ASKWHY / SCRIPT-NONUM / SCRIPT-CLOSE are each one-shot (§6.2). */
   const [askedWhy, setAskedWhy] = useState(false);
+  const [misreadOffered, setMisreadOffered] = useState(false);
   const [numbersReminded, setNumbersReminded] = useState(false);
   /** Any participant message so far mentioned score numbers (one-shot pool). */
   const [numbersEver, setNumbersEver] = useState(false);
   const [softCloseOffered, setSoftCloseOffered] = useState(false);
+  /** Direct counterpart SB is reciprocal and must be voiced at most once. */
+  const [counterpartSbDisclosed, setCounterpartSbDisclosed] = useState(false);
   /**
    * When the participant first tagged their SB, in counterpart replies.
-   * PRE-RECIP-SB (§9.3) is "was their SB out before the counterpart's stage-4
-   * disclosure" — and the disclosure is the counterpart's SECOND live reply,
-   * so the comparison is against that fixed position.
+   * The primary SB outcome is still the first reason opportunity. Later SB is
+   * kept in the turn log separately; under reciprocity it necessarily precedes
+   * the counterpart's own SB.
    */
   const [sbVoicedAtReply, setSbVoicedAtReply] = useState<number | null>(null);
 
@@ -397,6 +399,11 @@ export function BaselineTask({
       text,
     };
     const next = [...messages, own];
+    setTurnError(null);
+    // Lock the composer before classification starts. The classifier is part
+    // of this turn, and a second send while it is in flight would create two
+    // replies from the same state.
+    setPending(true);
     setMessages(next);
     setDraft("");
 
@@ -429,21 +436,33 @@ export function BaselineTask({
       } catch (error) {
         console.warn("[classify-reason] failed", error);
       }
-    } else if (script.messages.some((m) => m.speaker === "participant")) {
-      // Mockup mode walks the IDEAL trajectory, so the scripted participant
-      // messages are the ones that carry the SB. Classifying them live would
-      // spend a model call to re-derive what the script already fixes.
-      label = "SB";
+    } else {
+      // Only an exact scripted reason line gets its scripted card label.
+      // Treating every typed mock message as SB made a plain "yes" trigger
+      // sensitive reciprocity and hid the early-settlement path in previews.
+      const mockedReason = script.messages.find(
+        (message) =>
+          message.speaker === "participant" &&
+          message.text === text &&
+          message.reasonCardId,
+      );
+      if (mockedReason?.reasonCardId) {
+        label = cardOfLayer(task, role, "sensitive")?.id === mockedReason.reasonCardId
+          ? "SB"
+          : "WR";
+      }
     }
 
     const tierNow: ReasonTier = foldTier(tier, LABEL_TIER[label]);
     setTier(tierNow);
 
-    // SB (§9.3) is "was the participant's SB out before the counterpart's
-    // stage-4 disclosure" — so it is the first message the classifier reads
-    // as SB that fixes it, whatever they say afterwards.
-    if (label === "SB" && sbVoicedAtReply === null) {
-      setSbVoicedAtReply(replies);
+    // The first SB-labelled message fixes timing. Reciprocity guarantees it
+    // precedes counterpart SB; its reply index still says whether it was the
+    // participant's first disclosure opportunity.
+    const sbVoicedAtReplyNow =
+      sbVoicedAtReply ?? (label === "SB" ? replies : null);
+    if (sbVoicedAtReplyNow !== sbVoicedAtReply) {
+      setSbVoicedAtReply(sbVoicedAtReplyNow);
     }
 
     logEvent(
@@ -480,7 +499,6 @@ export function BaselineTask({
       });
     }
 
-    setPending(true);
     // The reply budget is counted from HERE, not from when the text came
     // back, so generation time is spent out of the delay rather than added to
     // it — and so mockup mode waits the same as a live run.
@@ -489,9 +507,9 @@ export function BaselineTask({
       let reply: string;
       let counterProposal: Package | null = null;
 
-      // Where the counterpart is in ITS OWN script: the seeded opening was
-      // stage 1, so its live replies walk 2 (its WR + the reason question),
-      // 4 (its fixed SB disclosure), then the trade loop.
+      // Where the counterpart is in ITS OWN script. Direct can skip the
+      // sensitive-disclosure position or combine disclosure with acceptance;
+      // the machine decides that from the explicit reciprocal policy.
       const stageNow = counterpartStageAfter(replies + SEEDED_OPENING_STAGES);
 
       const mentioned = numbersEver || mentionsScoreNumbers(text);
@@ -499,10 +517,13 @@ export function BaselineTask({
       const decision = counterpartStep(task, counterpartRole, stageNow, sentOffer, {
         tier: tierNow,
         askedWhy,
+        misreadOffered,
         numbersReminded,
         numbersMentionedNow: mentioned,
         secondsRemaining,
         softCloseOffered,
+        disclosurePolicy: "reciprocal",
+        counterpartSbDisclosed,
       });
       if (decision.action === "ask_why") setAskedWhy(true);
       if (decision.action === "nonum") setNumbersReminded(true);
@@ -510,17 +531,34 @@ export function BaselineTask({
       counterProposal = decision.proposal;
 
       if (mockAi) {
-        // The scripted line for the decision's stage; the accept line doubles
-        // as the close.
-        const scripted =
-          script.messages.find(
+        const disclosure = script.messages.find(
+          (m) => m.stage === 4 && m.speaker === "counterpart",
+        )?.text;
+        if (decision.action === "disclose_sb_and_accept") {
+          reply = decision.proposal
+            ? reciprocalAcceptanceText(task, counterpartRole, decision.proposal)
+            : disclosure ?? "";
+        } else if (decision.action === "disclose_sb") {
+          reply = disclosure ?? "";
+        } else if (decision.accepts) {
+          const levels = decision.proposal
+            ? task.issues
+                .map((issue) =>
+                  issue.options.find(
+                    (option) => option.id === decision.proposal?.[issue.id],
+                  )?.label,
+                )
+                .filter(Boolean)
+                .join(", ")
+            : "that package";
+          reply = `that works for me. || let's go with ${levels}.`;
+        } else {
+          const scripted = script.messages.find(
             (m) =>
               m.stage === decision.stage && m.speaker === "counterpart",
-          ) ??
-          script.messages.find(
-            (m) => m.stage === 6 && m.speaker === "counterpart",
           );
-        reply = scripted?.text ?? "";
+          reply = scripted?.text ?? "let's keep working through the terms.";
+        }
       } else {
         const res = await fetch("/api/counterpart", {
           method: "POST",
@@ -532,6 +570,7 @@ export function BaselineTask({
             incoming: sentOffer,
             tier: tierNow,
             askedWhy,
+            misreadOffered,
             numbersReminded,
             // Sent, not re-derived server-side: the client codes the outcome
             // from its own `counterpartStep`, so every input to that call has
@@ -540,6 +579,8 @@ export function BaselineTask({
             numbersMentionedNow: mentioned,
             secondsRemaining,
             softCloseOffered,
+            disclosurePolicy: "reciprocal",
+            counterpartSbDisclosed,
             history: next.map((m) => ({
               role: m.speaker === "participant" ? "user" : "assistant",
               content: m.text,
@@ -547,13 +588,18 @@ export function BaselineTask({
           }),
         });
 
+        if (!res.ok) {
+          throw new Error(`Counterpart request failed with ${res.status}`);
+        }
+
         const data = (await res.json()) as {
           message?: string;
           proposal?: Package | null;
         };
-        reply =
-          data.message ??
-          "sorry, lost my train of thought there — could you say that again?";
+        if (!data.message?.trim()) {
+          throw new Error("Counterpart returned no message");
+        }
+        reply = data.message;
         // THE LOCAL DECISION'S PACKAGE, not the server's echo of it. Both
         // are produced by the same deterministic machine from the same
         // inputs, so they agree — but only the local one is guaranteed to be
@@ -573,6 +619,17 @@ export function BaselineTask({
       // mode — the default off-production, and so the thing anyone walking a
       // preview actually sees — answering in 400ms.
       await awaitCounterpartDelay(reply.length, turnStartedAt);
+      // A timeout that won while this reply was in flight ends the exchange.
+      // Do not append or persist a late message after that terminal event.
+      if (settledRef.current) return;
+
+      if (
+        decision.action === "disclose_sb" ||
+        decision.action === "disclose_sb_and_accept"
+      ) {
+        setCounterpartSbDisclosed(true);
+      }
+      if (decision.action === "misread") setMisreadOffered(true);
 
       // The visible package card follows the counterproposal, so "accept the
       // package on the table" always names what the button actually sends.
@@ -610,7 +667,11 @@ export function BaselineTask({
       // An accepted package or an impasse ends the exchange. The participant
       // sees the counterpart's last message first, and a Continue button
       // appears.
-      if (decision.accepts || decision.impasse) {
+      if (
+        !settledRef.current &&
+        (decision.accepts || decision.impasse)
+      ) {
+        settledRef.current = true;
         setTentative(decision.accepts ? (decision.proposal ?? sentOffer) : null);
         setSettled(decision.accepts ? "agreed" : "impasse");
         logEvent(
@@ -621,12 +682,20 @@ export function BaselineTask({
             replies: replies + 1,
             secondsRemaining,
             tier: tierNow,
-            sb: sbVoicedAtReply !== null && sbVoicedAtReply <= 1,
-            sbTiming: sbTimingCode(sbVoicedAtReply),
+            sb: sbVoicedAtReplyNow !== null && sbVoicedAtReplyNow <= 1,
+            sbTiming: sbTimingCode(sbVoicedAtReplyNow),
           },
           { sessionIndex: taskIndex },
         );
       }
+    } catch (error) {
+      console.error("[counterpart] turn failed", error);
+      // Keep the participant's text available for a deliberate retry. No
+      // reply, disclosure flag, or settlement is recorded on a failed turn.
+      setDraft(text);
+      setTurnError(
+        "We couldn’t get a reply. Your message is still here. Please try sending it again.",
+      );
     } finally {
       setPending(false);
     }
@@ -799,30 +868,9 @@ export function BaselineTask({
             title={task.title}
             steps={STEP_LABELS}
             current={STEP_OF.negotiate}
-            aside={
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs">
-                <span aria-hidden>⏱</span>
-                <CountdownTimer
-                  seconds={NEGOTIATION_SECONDS}
-                  running={!settled}
-                  onTick={setSecondsRemaining}
-                  onExpire={() => {
-                    if (settled) return;
-                    setTentative(null);
-                    setSettled("impasse");
-                    logEvent(
-                      "negotiation_ended",
-                      { phase: "direct", reason: "timeout" },
-                      { sessionIndex: taskIndex },
-                    );
-                  }}
-                />
-              </span>
-            }
           />
 
-          <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
-            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
+          <div className="sticky top-[calc(var(--header-h)+0.25rem)] z-20 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/95 px-4 py-3 shadow-sm backdrop-blur-md sm:px-5">
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
                   💬 Live Direct Negotiation
@@ -835,18 +883,34 @@ export function BaselineTask({
                       : "Messages are sent directly to the other participant in real time."}
                 </p>
               </div>
-              {settled ? null : (
-                <div className="shrink-0">
-                  {pending ? (
-                    <Cue tone="quiet">Waiting for reply…</Cue>
-                  ) : yourTurn ? (
-                    <Cue>Your Turn</Cue>
-                  ) : (
-                    <Cue tone="quiet">Select terms first</Cue>
-                  )}
-                </div>
-              )}
-            </div>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <CountdownTimer
+                  seconds={NEGOTIATION_SECONDS}
+                  running={!settled}
+                  onTick={setSecondsRemaining}
+                  onExpire={() => {
+                    if (settledRef.current) return;
+                    settledRef.current = true;
+                    setTentative(null);
+                    setSettled("impasse");
+                    logEvent(
+                      "negotiation_ended",
+                      { phase: "direct", reason: "timeout" },
+                      { sessionIndex: taskIndex },
+                    );
+                  }}
+                />
+                {settled ? null : pending ? (
+                  <Cue tone="quiet">Waiting for reply…</Cue>
+                ) : yourTurn ? (
+                  <Cue>Your Turn</Cue>
+                ) : (
+                  <Cue tone="quiet">Select terms first</Cue>
+                )}
+              </div>
+          </div>
+
+          <Card className="mb-6 flex flex-col border-slate-200" padded={false}>
             <Transcript
               messages={messages}
               pending={pending}
@@ -868,6 +932,11 @@ export function BaselineTask({
                     : "Please choose an option for both terms below first."
               }
             />
+            {turnError ? (
+              <p className="px-4 pb-4 text-sm text-red-700" role="alert">
+                {turnError}
+              </p>
+            ) : null}
           </Card>
 
           {!settled && lastCounterpartPackage ? (

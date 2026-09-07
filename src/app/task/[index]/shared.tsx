@@ -198,8 +198,8 @@ export function TaskBrief({
   const { logEvent } = useParticipant();
   const brief = task.roleBriefs[role];
   const taskImage = task.id === "task_a"
-    ? "/illustrations/task-working-arrangements.png"
-    : "/illustrations/task-new-project.png";
+    ? "/illustrations/task-working-arrangements.png?v=20260907b"
+    : "/illustrations/task-new-project.png?v=20260907b";
   const labels = ["The task", "Your situation", "Your points", "Your reasons"];
   function move(next: number) {
     logEvent("page_complete", { briefingPage: page + 1 }, { sessionIndex: taskIndex });
@@ -227,12 +227,13 @@ export function TaskBrief({
                     height={1024}
                     sizes="(min-width: 1024px) 20rem, (min-width: 640px) 44rem, 100vw"
                     alt={task.id === "task_a"
-                      ? "Two colleagues consider a blank office schedule and prepare a presentation room."
-                      : "Two colleagues review a blank project board and an unused headset and desk phone."}
+                      ? "An office schedule beside a shared workstation, and a client presentation room with four blank meeting cards."
+                      : "A new-project allocation board, and an idle client-call phone and headset beside a blank rota."}
                     className="h-auto w-full"
                   />
-                  <figcaption className="border-t border-slate-200 bg-white/90 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
-                    Two conditions. One complete agreement.
+                  <figcaption className="grid grid-cols-2 border-t border-slate-200 bg-white/95 text-xs font-semibold leading-relaxed text-slate-700">
+                    <span className="border-r border-slate-200 px-3 py-2.5 text-center">{task.issues[0].label}</span>
+                    <span className="px-3 py-2.5 text-center">{task.issues[1].label}</span>
                   </figcaption>
                 </figure>
               </div>
@@ -1120,6 +1121,7 @@ export function DirectNegotiation({
       if (mentioned !== numbersEver) setNumbersEver(mentioned);
       const decision = counterpartStep(task, counterpartRole, stageNow, sentOffer, {
         tier: tierNow,
+        disclosurePolicy: "fixed",
         askedWhy,
         numbersReminded,
         numbersMentionedNow: mentioned,
@@ -1154,6 +1156,7 @@ export function DirectNegotiation({
             numbersMentionedNow: mentioned,
             secondsRemaining,
             softCloseOffered,
+            disclosurePolicy: "fixed",
             afterProxy: true,
             history: next.map((m) => ({
               role: m.speaker === "participant" ? "user" : "assistant",
@@ -1262,26 +1265,11 @@ export function DirectNegotiation({
             title={task.title}
             steps={steps}
             current={stepIndex}
-            aside={
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-2xs">
-                <span aria-hidden>⏱</span>
-                <CountdownTimer
-                  seconds={CLOSING_SECONDS}
-                  running={!settled}
-                  onTick={setSecondsRemaining}
-                  onExpire={() => {
-                    if (settled) return;
-                    settle("impasse", null, "timeout");
-                  }}
-                />
-              </span>
-            }
           />
 
           <ProxyTranscriptPanel transcript={proxyTranscript} />
 
-          <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
-            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 sm:px-5">
+          <div className="sticky top-[calc(var(--header-h)+0.25rem)] z-20 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/95 px-4 py-3 shadow-sm backdrop-blur-md sm:px-5">
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
                   💬 Close It Together
@@ -1306,18 +1294,27 @@ export function DirectNegotiation({
                           : "Your proxies did not settle on a package. Choose a level on each term below, then put it to the other participant."}
                 </p>
               </div>
-              {settled ? null : (
-                <div className="shrink-0">
-                  {pending ? (
-                    <Cue tone="quiet">Waiting for reply…</Cue>
-                  ) : yourTurn ? (
-                    <Cue>Your Turn</Cue>
-                  ) : (
-                    <Cue tone="quiet">Select terms first</Cue>
-                  )}
-                </div>
-              )}
-            </div>
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <CountdownTimer
+                  seconds={CLOSING_SECONDS}
+                  running={!settled}
+                  onTick={setSecondsRemaining}
+                  onExpire={() => {
+                    if (settled) return;
+                    settle("impasse", null, "timeout");
+                  }}
+                />
+                {settled ? null : pending ? (
+                  <Cue tone="quiet">Waiting for reply…</Cue>
+                ) : yourTurn ? (
+                  <Cue>Your Turn</Cue>
+                ) : (
+                  <Cue tone="quiet">Select terms first</Cue>
+                )}
+              </div>
+          </div>
+
+          <Card className="mb-6 flex flex-col border-slate-200" padded={false}>
             <Transcript
               messages={messages}
               pending={pending}
