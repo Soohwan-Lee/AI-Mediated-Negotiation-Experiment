@@ -665,18 +665,44 @@ export function ReasonBox({
 }) {
   if (!cards.length) return null;
   return (
+    /*
+     * COLOUR SAYS COSTLY, NOT FORBIDDEN (interface rules 1 and 6).
+     *
+     * The sensitive box was amber on amber: `IssueReasonGroups` renders it on
+     * a slate group card that itself sits on the sand private surface, so a
+     * light amber tint separated it from the WORK box by almost nothing and
+     * from the rail's own ground by less than that. Rule 6 wants these two
+     * boxes read as different KINDS of thing, because which box a participant
+     * draws from is the measure.
+     *
+     * Rose rather than a deeper amber, and rose rather than red. Amber is
+     * already spoken for — it is the private/sand family (rule 1), so any
+     * amount of it reads as "this is your side of the table" and not as "this
+     * one costs something to say". Rose is the nearest warm hue that is not
+     * that family and still sits inside it: a warm tint on a light ground,
+     * with the ink and the border carrying the weight rather than the fill.
+     * A saturated red-600 ground would read as a form validation error, which
+     * is a different claim — that the participant has done something wrong —
+     * and it would also read as an instruction not to tick, which the study
+     * may not give. Disclosure is the primary outcome; the colour may say the
+     * sentence is costly, which `brief.disclosureRisk` already says in words,
+     * and must not say what to do about it.
+     *
+     * No ring and no animation here: rule 9 reserves the cue for the one thing
+     * a screen is waiting for, and this box is not waiting for anything.
+     */
     <div
       className={cx(
         "mb-2.5 rounded-xl border p-3 last:mb-0 shadow-2xs transition-all",
         sensitive
-          ? "border-amber-300 bg-amber-50/90 text-amber-950"
+          ? "border-rose-300 bg-rose-50 text-rose-950"
           : "border-slate-200 bg-white text-slate-900",
       )}
     >
       <p
         className={cx(
           "mb-1 flex items-center gap-1 text-xs font-extrabold uppercase tracking-wide",
-          sensitive ? "text-amber-900" : "text-slate-700",
+          sensitive ? "text-rose-800" : "text-slate-700",
         )}
       >
         <span>{sensitive ? "🔒" : "💼"}</span>

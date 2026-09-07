@@ -1091,13 +1091,25 @@ compiles.
    most of the rail on its own — the panel's own `text-[0.8125rem]` was being
    silently overridden. Prose treatment at 13px means the leading and the
    measure, not the display face.
-6. **The two reason boxes stay visually separate.** Work and sensitive cards
+6. **The two reason boxes stay visually separate, and the sensitive one is
+   ROSE.** Work and sensitive cards
    get their own headings, borders and colours, on the briefing and on the
    mandate screen. The whole measure is which box a participant is willing to
    draw from; if the two read as one list, that decision stops being legible.
    It matters MORE now that the Direct arm has no picker: the briefing panel is
    the only place a Direct participant ever sees the two boxes, so it is the
    only place the distinction can be made visible to them at all.
+
+   The sensitive box was amber, which is the private/sand family itself
+   (rule 1), so it separated from the work box by almost nothing and from the
+   rail's own sand ground by less than that. It is ROSE: the nearest warm hue
+   outside that family, with the weight in the border and the ink rather than
+   the fill. The colour may say the sentence is COSTLY — which
+   `disclosureRisk` already says in words — and may NOT say what to do about
+   it. A saturated red would read as a form validation error, which claims the
+   participant did something wrong, and either reading would stage the primary
+   outcome. No cue ring here either (rule 9): the box is not waiting for
+   anything.
 7. **Items are data.** Every questionnaire item lives in `lib/measures.ts`;
    pages hold answers and never lay out a question. Item ids are the column
    names in the export and match Design §9 — renaming one renames a variable.
