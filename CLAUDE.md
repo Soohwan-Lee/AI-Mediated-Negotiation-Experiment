@@ -359,9 +359,10 @@ Five rules hold it in place, and each closes a specific way it could go wrong:
 - **The tier only ever RISES**, enforced by `foldTier` in all three places that
   need it (the Direct loop, the Proxy closing, the route's own log). Two
   hand-written ternaries would eventually disagree.
-- **A classifier failure returns `none`, never a guess.** A guessed SB would
-  hand out the maximum package on a network error, in one arm only, on the
-  primary outcome.
+- **A classifier failure is unresolved, never `none` or a guess.** The pending
+  turn is held for retry and the tier does not change until classification
+  succeeds. Normal ambiguity within a valid model response still goes to the
+  lower label; a network error is not evidence for any label.
 - **Every `{text, label, confidence}` is stored for post-hoc human re-coding**,
   reported as κ against the classifier with a sensitivity analysis excluding
   disagreements (§6.2). **Gate 19 requires κ ≥ .90**; below it the study
@@ -1267,28 +1268,25 @@ Three layers, and the order matters:
    set one closes the route rather than opening it. It never prints the key,
    not even masked — a mask still leaks length and tail.
 
-**Why the gate is not per-turn, which was the first design and is wrong.**
-Both facts were established by tracing the clients:
+**What the entry gate proves, and what it does not.** It checks before consent
+that a usable-looking key is present, so a known misconfiguration can be
+refused while participation is still free. It does not call the provider and
+is not proof that every later model request will succeed.
 
-- A 503 from `/api/classify-reason` is **swallowed**. Both callers read
-  `if (data.label) label = data.label` inside a try/catch, so a body with no
-  `label` silently leaves the tier at `none` — the very silence the guard
-  exists to break, one layer down.
-- **A mid-negotiation refusal is now visible, but as an ordinary network
-  failure.** Both arms throw on a non-200, restore the participant's draft and
-  show one retry prompt — the fetch used to fall through to "sorry, lost my
-  train of thought there", so a refusal read as a conversational turn. What the
-  retry prompt cannot say is that the study is misconfigured, so the
-  participant would keep retrying a 503 that will never clear. That is why the
-  guarantee stays at ENTRY: refusing there is free, and by here half the data
-  is already collected.
+Once a negotiation is under way, a non-200 classifier or counterpart response
+is treated as unknown and unresolved. The pending action is held, the
+participant sees a retry path, and the study does not assign `none` or advance
+from that failed request. A transient per-turn failure may clear on retry;
+normal ambiguity in a successful classifier response still follows the
+downward-label rule above.
 
 **`ModelNotConfiguredError` is a named class for one reason**: the classifier
 must tell it apart from an ordinary model failure. `{label:"none"}` is correct
-for a call that FAILED — recoverable, since the tier only rises and the
-participant can say it again — but the same answer for a study with no model
-at all would floor every message of every session in silence. Same shape,
-opposite meaning, so they cannot share a catch.
+only when the model successfully classifies the text as containing no covered
+reason. A failed call, whether caused by configuration, transport, or provider
+health, remains unresolved and must be retried rather than converted into a
+label. The named error still lets the server distinguish a deployment fault
+from an ordinary per-turn failure for diagnosis and entry refusal.
 
 **The scaffold is deliberately untouched where it belongs.** Dev-tools-on with
 no key still returns it at 200: walking the whole flow without credentials is

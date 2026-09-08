@@ -38,6 +38,7 @@ import {
 } from "react";
 import Image from "next/image";
 import { MeasureBlock, type Answers } from "@/components/measure";
+import { NavigationNotice } from "@/components/navigation-notice";
 import {
   CountdownTimer,
   MessageComposer,
@@ -54,6 +55,7 @@ import {
   mentionsScoreNumbers,
   type ReasonTier,
 } from "@/lib/negotiation/machine";
+import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
 import {
   BriefingPanel,
   ProxyIdentity,
@@ -970,6 +972,44 @@ export function DecisionButton({
 // Phase: the participant negotiates directly (Proxy condition)
 // ---------------------------------------------------------------------------
 
+type ClosingReasonLabel = "none" | "WR" | "PRI" | "SB";
+
+interface ClosingClassification {
+  label: ClosingReasonLabel;
+  confidence?: number;
+  stubbed?: boolean;
+}
+
+interface ClosingStagedTurn {
+  text: string;
+  sentOffer: Package;
+  sentPackage: Package | null;
+  ownId: string;
+  createdAt: string;
+  secondsAtSend: number;
+  classification?: ClosingClassification;
+}
+
+interface ClosingCounterpartResponse {
+  message: string;
+  proposal?: Package | null;
+}
+
+function isClosingClassification(value: unknown): value is ClosingClassification {
+  if (typeof value !== "object" || value === null || !("label" in value)) return false;
+  if (!["none", "WR", "PRI", "SB"].includes(String(value.label))) return false;
+  if ("confidence" in value && value.confidence !== undefined &&
+      (typeof value.confidence !== "number" || !Number.isFinite(value.confidence) ||
+       value.confidence < 0 || value.confidence > 1)) return false;
+  return true;
+}
+
+function isClosingCounterpartResponse(value: unknown): value is ClosingCounterpartResponse {
+  return typeof value === "object" && value !== null &&
+    "message" in value && typeof value.message === "string" &&
+    value.message.trim().length > 0;
+}
+
 export function DirectNegotiation({
   taskIndex,
   task,
@@ -1034,6 +1074,13 @@ export function DirectNegotiation({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [turnError, setTurnError] = useState<string | null>(null);
+  const [stagedTurn, setStagedTurn] = useState<ClosingStagedTurn | null>(null);
+  const [recovering, setRecovering] = useState(false);
+  const recoveryStartedAt = useRef<number | null>(null);
+  const activeRequest = useRef<AbortController | null>(null);
+  const turnGeneration = useRef(0);
+  const mounted = useRef(true);
+  const expiryPending = useRef(false);
   const [replies, setReplies] = useState(0);
   const [settled, setSettled] = useState<"agreed" | "impasse" | null>(null);
   const [finalPackage, setFinalPackage] = useState<Package | null>(
@@ -1095,6 +1142,15 @@ export function DirectNegotiation({
   const [proposalOpen, setProposalOpen] = useState(Boolean(openingPackage));
   const openedOnCounterProposal = useRef(Boolean(openingPackage));
 
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      turnGeneration.current += 1;
+      activeRequest.current?.abort();
+    };
+  }, []);
+
   // THE PACKAGE IS OPTIONAL IN BOTH ARMS, and it has to be: this screen and
   // the Direct arm's are the two places a participant speaks for themselves,
   // so an interface difference between them would land on
@@ -1151,6 +1207,12 @@ export function DirectNegotiation({
     kind: "agreed" | "impasse",
     pkg: Package | null,
     reason: string,
+    committed?: {
+      replies: number;
+      secondsRemaining: number;
+      tier: ReasonTier;
+      selfDisclosed: boolean;
+    },
   ) {
     // The ref, not the state, is what the guards read: `setSettled` does not
     // take effect until the next render, and both callers here can fire
@@ -1164,10 +1226,10 @@ export function DirectNegotiation({
       {
         phase: "direct",
         reason,
-        replies,
-        secondsRemaining,
-        tier,
-        selfDisclosed,
+        replies: committed?.replies ?? replies,
+        secondsRemaining: committed?.secondsRemaining ?? secondsRemaining,
+        tier: committed?.tier ?? tier,
+        selfDisclosed: committed?.selfDisclosed ?? selfDisclosed,
       },
       { sessionIndex: taskIndex },
     );
@@ -1188,155 +1250,103 @@ export function DirectNegotiation({
     onSettled(kind === "agreed" ? pkg : null, { selfDisclosed });
   }
 
-  async function send(text: string, sentOffer: Package = offer) {
-    /**
-     * NO PACKAGE IS `null`, NOT `{}`. Same normalization and same reason as
-     * the Direct arm: `counterpartStep` branches on
-     * `incoming ? "balance" : "propose_tier"` and `{}` is truthy, so a
-     * message carrying no package at all would be answered with
-     * SCRIPT-BALANCE — "that package is lopsided" about a package that does
-     * not exist. Done in both arms at once, because a difference here is a
-     * difference in how a turn is coded along the primary contrast.
-     */
-    const sentPackage: Package | null =
-      Object.keys(sentOffer).length > 0 ? sentOffer : null;
-    const own: DisplayMessage = {
-      id: `d-p${messages.length}`,
-      speaker: "participant",
-      text,
-    };
-    const next = [...messages, own];
-    setTurnError(null);
-    // Lock the composer before classification starts, exactly as the Direct
-    // arm does. The classifier is part of this turn, and a second Send while
-    // it is in flight would produce two participant messages and two
-    // counterpart turns from the same state.
-    setPending(true);
-    setMessages(next);
-    setDraft("");
+  function beginRecovery() {
+    if (recoveryStartedAt.current !== null) return;
+    recoveryStartedAt.current = Date.now();
+    setRecovering(true);
+  }
 
-    // The classifier reads this message (§6.2a); the rung it earns counts
-    // from THIS turn, because a confession should land the moment it is made.
-    type ReasonLabel = "none" | "WR" | "PRI" | "SB";
-    let label: ReasonLabel = "none";
-    let confidence: number | undefined;
-    /**
-     * Did the CANNED classifier answer this message?
-     *
-     * `{label:"none"}` is byte-identical whether the participant genuinely
-     * gave no reason, the call failed, or there is no model configured at
-     * all. The route already distinguishes the third case; nothing was
-     * reading it. Logged here so a scaffolded classifier is visible in the
-     * data rather than showing up as a whole arm that happened to say
-     * nothing — which is what gate 19's κ would otherwise be computed off.
-     */
-    let classifierStubbed = false;
-    if (!mockAi) {
-      try {
-        const res = await fetch("/api/classify-reason", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskId: task.id, role, message: text }),
-        });
-        const data = (await res.json()) as {
-          label?: ReasonLabel;
-          confidence?: number;
-          stubbed?: boolean;
-        };
-        if (data.label) label = data.label;
-        confidence = data.confidence;
-        classifierStubbed = data.stubbed === true;
-      } catch (error) {
-        console.warn("[classify-reason] failed", error);
-      }
-    }
-
-    const personalNow = foldTier(personalTier, LABEL_TIER[label]);
-    setPersonalTier(personalNow);
-    if (label === "SB") setSelfDisclosed(true);
-    const tierNow: ReasonTier = foldTier(proxyVoicedTier, personalNow);
-
+  function finishRecovery() {
+    const startedAt = recoveryStartedAt.current;
+    if (startedAt === null) return;
+    recoveryStartedAt.current = null;
+    setRecovering(false);
     logEvent(
-      "message_sent",
-      {
-        phase: "direct",
-        length: text.length,
-        secondsRemaining,
-        requirementOption: sentOffer[requirement.id] ?? null,
-        reasonLabel: label,
-        reasonConfidence: confidence,
-        classifierStubbed,
-        tier: tierNow,
-      },
+      "technical_pause",
+      { durationMs: Date.now() - startedAt },
       { sessionIndex: taskIndex },
     );
+  }
 
-    if (participantKey) {
-      void getStore().appendMessage(participantKey, {
-        id: own.id,
-        sessionIndex: taskIndex,
-        speaker: "participant",
-        text,
-        createdAt: new Date().toISOString(),
-        // THE PARTICIPANT'S OWN SLOT, ONE BEHIND THE COUNTERPART'S. They are
-        // replying TO the counterpart's current move, so their message belongs
-        // to the stage before it — which is exactly what the Direct arm
-        // records (`counterpartStageAfter(replies)` there, with its own
-        // seeded-opening offset already inside `replies`).
-        //
-        // Without the -1 this stored the COUNTERPART's stage, the same
-        // expression used below for the counterpart's own turn. The first
-        // participant message came out as stage 1 in Direct and stage 5 here:
-        // the same act, labelled differently, and differing BY ARM in the
-        // export. CLAUDE.md records this conflation as having "broke it twice
-        // before" — those were machine calls, where it changed behaviour; this
-        // one is the audit trail, where it quietly mislabels the data instead.
-        stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET - 1),
-        proposal: sentPackage ?? undefined,
-        // Same audit trail as the Direct arm: this is the other place a
-        // participant speaks for themselves, so it is the other place the
-        // classifier can be wrong (§6.2a, §6.9 #15-16).
-        reasonLabel: label,
-        reasonConfidence: confidence,
-      });
-    }
+  async function runStagedTurn(initialTurn: ClosingStagedTurn) {
+    const generation = turnGeneration.current + 1;
+    turnGeneration.current = generation;
+    const controller = new AbortController();
+    activeRequest.current?.abort();
+    activeRequest.current = controller;
+    setPending(true);
+    setTurnError(null);
+    let turn = initialTurn;
 
-    // Counted from here so generation time comes OUT of the reply budget
-    // rather than being added on top of it.
-    const turnStartedAt = Date.now();
+    const failedAttempt = () => {
+      if (mounted.current && generation === turnGeneration.current && !settledRef.current) {
+        beginRecovery();
+      }
+    };
+
     try {
+      let classification = turn.classification;
+      if (!classification) {
+        classification = mockAi
+          ? { label: "none" }
+          : await fetchJsonWithRetry<ClosingClassification>(
+              "/api/classify-reason",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ taskId: task.id, role, message: turn.text }),
+              },
+              {
+                signal: controller.signal,
+                onFailure: failedAttempt,
+                validate: isClosingClassification,
+              },
+            );
+        turn = { ...turn, classification };
+        if (mounted.current && generation === turnGeneration.current) {
+          setStagedTurn(turn);
+        }
+      }
+
+      const { label, confidence, stubbed: classifierStubbed = false } = classification;
+      const personalNow = foldTier(personalTier, LABEL_TIER[label]);
+      const selfDisclosedNow = selfDisclosed || label === "SB";
+      const tierNow: ReasonTier = foldTier(proxyVoicedTier, personalNow);
+      const own: DisplayMessage = {
+        id: turn.ownId,
+        speaker: "participant",
+        text: turn.text,
+      };
+      const next = [...messages, own];
+      const turnStartedAt = Date.now();
       const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
-      const mentioned = numbersEver || mentionsScoreNumbers(text);
-      if (mentioned !== numbersEver) setNumbersEver(mentioned);
-      const decision = counterpartStep(task, counterpartRole, stageNow, sentPackage, {
+      const mentioned = numbersEver || mentionsScoreNumbers(turn.text);
+      const decision = counterpartStep(task, counterpartRole, stageNow, turn.sentPackage, {
         tier: tierNow,
         disclosurePolicy: "fixed",
         askedWhy,
         misreadOffered,
         numbersReminded,
         numbersMentionedNow: mentioned,
-        secondsRemaining,
+        secondsRemaining: turn.secondsAtSend,
         softCloseOffered,
       });
-      if (decision.action === "ask_why") setAskedWhy(true);
-      if (decision.action === "nonum") setNumbersReminded(true);
-      if (decision.action === "soft_close") setSoftCloseOffered(true);
-      if (decision.action === "misread") setMisreadOffered(true);
-
       let reply: string;
       if (mockAi) {
         reply = decision.accepts
           ? DIRECT_MOCK_REPLIES[1]
           : DIRECT_MOCK_REPLIES[Math.min(replies, DIRECT_MOCK_REPLIES.length - 1)];
       } else {
-        const res = await fetch("/api/counterpart", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const data = await fetchJsonWithRetry<ClosingCounterpartResponse>(
+          "/api/counterpart",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
             taskId: task.id,
             participantRole: role,
             stage: stageNow,
-            incoming: sentPackage,
+            incoming: turn.sentPackage,
             tier: tierNow,
             askedWhy,
             misreadOffered,
@@ -1346,7 +1356,7 @@ export function DirectNegotiation({
             // to reach the route unchanged or the two can disagree about
             // whether the exchange was agreed.
             numbersMentionedNow: mentioned,
-            secondsRemaining,
+            secondsRemaining: turn.secondsAtSend,
             softCloseOffered,
             disclosurePolicy: "fixed",
             afterProxy: true,
@@ -1354,25 +1364,14 @@ export function DirectNegotiation({
               role: m.speaker === "participant" ? "user" : "assistant",
               content: m.text,
             })),
-          }),
-        });
-        // MIRRORS THE DIRECT ARM EXACTLY. This read a missing message as an
-        // apology from the counterpart, so a failed request became an ordinary
-        // conversational turn — a reply the participant answers, a turn
-        // counted, and no trace that the model never ran. Direct throws and
-        // offers a retry; a failure mode that differs by arm is a failure mode
-        // correlated with the primary contrast.
-        if (!res.ok) {
-          throw new Error(`Counterpart request failed with ${res.status}`);
-        }
-
-        const data = (await res.json()) as {
-          message?: string;
-          proposal?: Package | null;
-        };
-        if (!data.message?.trim()) {
-          throw new Error("Counterpart returned no message");
-        }
+            }),
+          },
+          {
+            signal: controller.signal,
+            onFailure: failedAttempt,
+            validate: isClosingCounterpartResponse,
+          },
+        );
         reply = data.message;
       }
 
@@ -1381,6 +1380,16 @@ export function DirectNegotiation({
       // apply only to the live branch, so mockup mode replied in 500ms, and it
       // was ADDED to the model's own latency rather than absorbing it.
       await awaitCounterpartDelay(reply.length, turnStartedAt);
+
+      if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
+
+      setPersonalTier(personalNow);
+      setSelfDisclosed(selfDisclosedNow);
+      setNumbersEver(mentioned);
+      if (decision.action === "ask_why") setAskedWhy(true);
+      if (decision.action === "nonum") setNumbersReminded(true);
+      if (decision.action === "soft_close") setSoftCloseOffered(true);
+      if (decision.action === "misread") setMisreadOffered(true);
 
       // THE VISIBLE CARD FOLLOWS THE COUNTERPROPOSAL, and this is not
       // cosmetic. `offer` is the "Current Negotiation Package" chip card;
@@ -1417,13 +1426,43 @@ export function DirectNegotiation({
       }
 
       const counter: DisplayMessage = {
-        id: `d-c${messages.length}`,
+        id: `d-c${next.length}`,
         speaker: "counterpart",
         text: reply,
       };
-      setMessages((m) => [...m, counter]);
+      setMessages([...next, counter]);
+      setReplies((n) => n + 1);
+      setStagedTurn(null);
+      setDraft("");
+      setTurnError(null);
+
+      logEvent(
+        "message_sent",
+        {
+          phase: "direct",
+          length: turn.text.length,
+          secondsRemaining: turn.secondsAtSend,
+          requirementOption: turn.sentOffer[requirement.id] ?? null,
+          reasonLabel: label,
+          reasonConfidence: confidence,
+          classifierStubbed,
+          tier: tierNow,
+        },
+        { sessionIndex: taskIndex },
+      );
 
       if (participantKey) {
+        void getStore().appendMessage(participantKey, {
+          id: own.id,
+          sessionIndex: taskIndex,
+          speaker: "participant",
+          text: turn.text,
+          createdAt: turn.createdAt,
+          stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET - 1),
+          proposal: turn.sentPackage ?? undefined,
+          reasonLabel: label,
+          reasonConfidence: confidence,
+        });
         void getStore().appendMessage(participantKey, {
           id: counter.id,
           sessionIndex: taskIndex,
@@ -1436,7 +1475,7 @@ export function DirectNegotiation({
         });
       }
 
-      setReplies((n) => n + 1);
+      finishRecovery();
       // FIRST SETTLEMENT WINS. `onExpire` guards on `settled` and this did
       // not, so a reply still in flight when the clock ran out overwrote the
       // recorded impasse with an agreement — two `negotiation_ended` events
@@ -1448,21 +1487,52 @@ export function DirectNegotiation({
       if (!settledRef.current && (decision.accepts || decision.impasse)) {
         settle(
           decision.accepts ? "agreed" : "impasse",
-          decision.accepts ? (decision.proposal ?? sentPackage) : null,
+          decision.accepts ? (decision.proposal ?? turn.sentPackage) : null,
           decision.accepts ? "agreed" : "impasse",
+          {
+            replies: replies + 1,
+            secondsRemaining,
+            tier: tierNow,
+            selfDisclosed: selfDisclosedNow,
+          },
         );
+      } else if (!settledRef.current && expiryPending.current) {
+        settle("impasse", null, "timeout", {
+          replies: replies + 1,
+          secondsRemaining: 0,
+          tier: tierNow,
+          selfDisclosed: selfDisclosedNow,
+        });
       }
     } catch (error) {
-      console.error("[counterpart] turn failed", error);
-      // Keep the participant's text available for a deliberate retry. No
-      // reply, disclosure flag, or settlement is recorded on a failed turn.
-      setDraft(text);
-      setTurnError(
-        "We couldn’t get a reply. Your message is still here. Please try sending it again.",
-      );
+      if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("[turn] recovery required", error);
+      beginRecovery();
+      setStagedTurn(turn);
+      setTurnError("Your message is still here. Select Retry.");
     } finally {
-      setPending(false);
+      if (mounted.current && generation === turnGeneration.current) {
+        setPending(false);
+        activeRequest.current = null;
+      }
     }
+  }
+
+  async function send(text: string, sentOffer: Package = offer) {
+    if (pending || stagedTurn || settledRef.current) return;
+    const immutableOffer = { ...sentOffer };
+    const turn: ClosingStagedTurn = {
+      text,
+      sentOffer: immutableOffer,
+      sentPackage: Object.keys(immutableOffer).length > 0 ? immutableOffer : null,
+      ownId: `d-p${messages.length}`,
+      createdAt: new Date().toISOString(),
+      secondsAtSend: secondsRemaining,
+    };
+    setStagedTurn(turn);
+    setDraft("");
+    await runStagedTurn(turn);
   }
 
   /**
@@ -1472,7 +1542,7 @@ export function DirectNegotiation({
    * identically across conditions.
    */
   function acceptStanding() {
-    if (!lastCounterpartPackage || pending || settled) return;
+    if (!lastCounterpartPackage || pending || stagedTurn || settled) return;
     setOffer(lastCounterpartPackage);
     void send(
       "that works for me — let's go with that.",
@@ -1493,6 +1563,8 @@ export function DirectNegotiation({
             steps={steps}
             current={stepIndex}
           />
+
+          <NavigationNotice className="mb-3" />
 
           <ProxyTranscriptPanel transcript={proxyTranscript} />
 
@@ -1532,19 +1604,42 @@ export function DirectNegotiation({
               <div className="ml-auto flex shrink-0 items-center gap-2">
                 <CountdownTimer
                   seconds={CLOSING_SECONDS}
-                  running={!settled}
+                  running={!settled && !recovering}
+                  paused={recovering}
                   onTick={setSecondsRemaining}
                   onExpire={() => {
-                    if (settled) return;
+                    if (settledRef.current) return;
+                    if (activeRequest.current || stagedTurn) {
+                      expiryPending.current = true;
+                      return;
+                    }
                     settle("impasse", null, "timeout");
                   }}
                 />
-                {settled ? null : pending ? (
+                {settled ? null : recovering && pending ? (
+                  <Cue tone="quiet">Reconnecting…</Cue>
+                ) : recovering ? null : pending ? (
                   <Cue tone="quiet">Waiting for reply…</Cue>
                 ) : yourTurn ? (
                   <Cue>Your Turn</Cue>
                 ) : null}
               </div>
+              {turnError ? (
+                <div
+                  className="flex basis-full flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2"
+                  role="alert"
+                >
+                  <p className="text-sm font-medium text-red-800">{turnError}</p>
+                  <button
+                    type="button"
+                    onClick={() => stagedTurn && void runStagedTurn(stagedTurn)}
+                    disabled={pending || !stagedTurn}
+                    className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-bold text-red-800 disabled:opacity-50"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : null}
           </div>
 
           <Card className="mb-6 flex flex-col border-slate-200" padded={false}>
@@ -1558,10 +1653,10 @@ export function DirectNegotiation({
               }
             />
             <MessageComposer
-              value={draft}
+              value={stagedTurn?.text ?? draft}
               onChange={setDraft}
               onSend={send}
-              disabled={pending || !canSend}
+              disabled={pending || Boolean(stagedTurn) || !canSend}
               cue={yourTurn}
               placeholder={
                 settled
@@ -1571,11 +1666,6 @@ export function DirectNegotiation({
                     : "Choose both terms below, or neither, before sending."
               }
             />
-            {turnError ? (
-              <p className="px-4 pb-4 text-sm text-red-700" role="alert">
-                {turnError}
-              </p>
-            ) : null}
           </Card>
 
           {/* NO PARTICIPANT-INITIATED IMPASSE. A closing conversation ends the
@@ -1591,7 +1681,7 @@ export function DirectNegotiation({
               <button
                 type="button"
                 onClick={acceptStanding}
-                disabled={pending}
+                disabled={pending || Boolean(stagedTurn)}
                 className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-2xs transition-colors hover:bg-emerald-100 disabled:opacity-50"
               >
                 ✓ Accept the package on the table
@@ -1627,7 +1717,10 @@ export function DirectNegotiation({
                 </span>
               </span>
             </summary>
-            <div className="space-y-4 px-5 pb-5 sm:px-7 sm:pb-7">
+            <fieldset
+              disabled={pending || Boolean(stagedTurn)}
+              className="space-y-4 px-5 pb-5 disabled:opacity-60 sm:px-7 sm:pb-7"
+            >
               {task.issues.map((issue) => (
                 <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
                   <p className="mb-2 text-xs sm:text-sm font-bold text-[var(--ink)]">
@@ -1649,7 +1742,7 @@ export function DirectNegotiation({
               {/* A half package is the one blocked state, said quietly in the
                   SUMMARY so it is visible with the drawer shut. No cue ring
                   and no pill (interface rule 9). */}
-            </div>
+            </fieldset>
           </details>
         </TaskLayout>
       </Page>

@@ -53,12 +53,10 @@ export function getApiKey(): string | null {
  * Thrown when a live study has no model configured.
  *
  * A NAMED CLASS BECAUSE THE ROUTES MUST TELL IT APART from an ordinary model
- * failure. `/api/classify-reason` answers a failed call with
- * `{label:"none"}` on purpose — the tier only rises, so a floor costs the
- * participant nothing they cannot recover by saying more. But that same
- * answer for a MISCONFIGURED STUDY would bury the one signal there is: every
- * message floored, silently, with the negotiation running on regardless.
- * Same shape, opposite meaning, so the two cannot share a catch.
+ * failure for diagnosis and entry refusal. Neither failure is a classification:
+ * the pending action stays unresolved and is retried instead of becoming
+ * `{label:"none"}`. That label is reserved for a successful model response
+ * that finds no covered reason; normal ambiguity still resolves downward.
  */
 export class ModelNotConfiguredError extends Error {
   readonly code = "model_not_configured";

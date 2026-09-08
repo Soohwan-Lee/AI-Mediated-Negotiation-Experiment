@@ -111,11 +111,9 @@ test("the readiness reason never contains the key itself", () => {
 });
 
 test("the config error is its own class, so routes can tell it apart", () => {
-  // `/api/classify-reason` answers an ordinary model failure with
-  // `{label:"none"}` on purpose — the tier only rises, so a floor is
-  // recoverable. The same answer for a study with NO MODEL AT ALL would floor
-  // every message of every session in silence. Same shape, opposite meaning,
-  // so they must not share a catch.
+  // `/api/classify-reason` keeps this class distinct so configuration failures
+  // can be diagnosed, while both this and transient failures remain non-2xx
+  // responses that preserve the staged participant turn.
   const err = new ModelNotConfiguredError("no model");
   assert.ok(err instanceof Error);
   assert.ok(err instanceof ModelNotConfiguredError);

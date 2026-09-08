@@ -99,12 +99,9 @@ export async function POST(request: Request) {
       stubbed: result.stubbed,
     });
   } catch (error) {
-    // A MISCONFIGURED STUDY IS NOT A FAILED CLASSIFICATION, and the two must
-    // not share an answer. `none` is right for a model call that failed —
-    // recoverable, because the tier only rises and the participant can say it
-    // again. Returning `none` because there is NO MODEL AT ALL would floor
-    // every message of every session in silence, which is precisely the
-    // invisible failure the guard exists to break. It surfaces as a 503.
+    // A misconfigured study and a transient model failure are both unavailable
+    // turns. Neither is evidence that the participant gave no reason, so both
+    // surface as non-2xx responses for the client's bounded recovery path.
     if (error instanceof ModelNotConfiguredError) {
       console.error("[classify-reason] model not configured", error);
       return NextResponse.json(
@@ -112,11 +109,13 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
-    // A FAILED CLASSIFICATION IS `none`, NEVER A GUESS. The tier only ever
-    // rises (§6.2), so a floor here costs the participant nothing they cannot
-    // recover by saying more — while a guessed SB would hand out the maximum
-    // package on a network error, in one arm only, on the primary outcome.
+    // A failed classification is not evidence for `none`. The client keeps
+    // the turn staged and retries this non-2xx response without advancing the
+    // ladder, transcript, or counterpart state.
     console.error("[classify-reason]", error);
-    return NextResponse.json({ label: "none", confidence: 0 });
+    return NextResponse.json(
+      { error: "Classification unavailable" },
+      { status: 503 },
+    );
   }
 }

@@ -556,6 +556,7 @@ export type EventType =
    */
   | "rehearsal_finished"
   | "message_sent"
+  | "technical_pause"
   | "negotiation_started"
   | "negotiation_ended"
   | "task_outcome_recorded"

@@ -14,6 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { NEGOTIATION, bubbleDelayMs } from "@/lib/study-config";
+import { nextCountdownValue } from "@/lib/negotiation/recoverable-request";
 import type { Speaker } from "@/lib/types";
 import { Button, cx } from "./ui";
 
@@ -26,11 +27,13 @@ export function CountdownTimer({
   onExpire,
   onTick,
   running = true,
+  paused = false,
 }: {
   seconds: number;
   onExpire?: () => void;
   onTick?: (remaining: number) => void;
   running?: boolean;
+  paused?: boolean;
 }) {
   const [remaining, setRemaining] = useState(seconds);
 
@@ -54,9 +57,9 @@ export function CountdownTimer({
   const remainingRef = useRef(seconds);
 
   useEffect(() => {
-    if (!running) return;
+    if (!running || paused) return;
     const id = window.setInterval(() => {
-      const next = Math.max(0, remainingRef.current - 1);
+      const next = nextCountdownValue(remainingRef.current, running, paused);
       remainingRef.current = next;
       setRemaining(next);
       onTickRef.current?.(next);
@@ -66,7 +69,7 @@ export function CountdownTimer({
       }
     }, 1000);
     return () => window.clearInterval(id);
-  }, [running]);
+  }, [paused, running]);
 
   const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
   const ss = String(remaining % 60).padStart(2, "0");
@@ -76,14 +79,17 @@ export function CountdownTimer({
     <span
       className={cx(
         "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs sm:text-sm font-mono font-bold tracking-tight shadow-2xs transition-all",
-        low
+        paused
+          ? "border-slate-300 bg-slate-100 text-slate-700"
+          : low
           ? "border-red-300 bg-red-50 text-red-600 animate-pulse"
           : "border-slate-200 bg-white text-[var(--ink-2)]",
       )}
       aria-live="off"
     >
-      <span aria-hidden>{low ? "⚠️" : "⏱️"}</span>
+      <span aria-hidden>{paused ? "⏸️" : low ? "⚠️" : "⏱️"}</span>
       <span>{mm}:{ss}</span>
+      {paused ? <span className="font-sans">Paused</span> : null}
     </span>
   );
 }

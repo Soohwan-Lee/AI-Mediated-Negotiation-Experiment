@@ -54,15 +54,12 @@ export async function GET(request: Request) {
    * without telling the participant anything about the machinery. It needs no
    * token for exactly that reason: there is nothing in the answer to protect.
    *
-   * IT IS AT ENTRY RATHER THAN PER-TURN because of what the clients do with a
-   * failure. A 503 from /api/classify-reason is SWALLOWED — both callers read
-   * `if (data.label) label = data.label` inside a try/catch, so a body with no
-   * label silently leaves the tier at `none`, which is the very silence this
-   * guard exists to break. And the Direct arm has no error state at all: its
-   * counterpart fetch has no catch and falls through to "sorry, lost my train
-   * of thought there", so a mid-negotiation refusal would have a participant
-   * watch the counterpart apologise forever, forty minutes in, with half their
-   * data already recorded. Refusing before consent costs them nothing.
+   * THIS IS A CONFIGURATION CHECK, NOT A PER-TURN HEALTH PROBE. Key presence
+   * lets the study refuse a known deployment fault before consent, when doing
+   * so is still free to the participant. It does not call the provider or
+   * guarantee that later requests will succeed. Mid-study classifier and
+   * counterpart failures stay unknown and unresolved: the pending action is
+   * held for retry rather than converted to `none` or allowed to advance.
    */
   if (url.searchParams.get("gate") === "1") {
     return NextResponse.json(

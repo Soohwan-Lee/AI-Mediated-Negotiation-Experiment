@@ -22,6 +22,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { OptionChips } from "@/components/issues";
+import { NavigationNotice } from "@/components/navigation-notice";
 import {
   CountdownTimer,
   MessageComposer,
@@ -47,6 +48,7 @@ import {
   type ReasonTier,
 } from "@/lib/negotiation/machine";
 import { reciprocalAcceptanceText } from "@/lib/negotiation/counterpart-text";
+import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
@@ -111,6 +113,44 @@ function openingLine(
  * its priority and challenged before the direct conversation starts.
  */
 const SEEDED_OPENING_STAGES = 1;
+
+type ReasonLabel = "none" | "WR" | "PRI" | "SB";
+
+interface StagedTurn {
+  text: string;
+  sentOffer: Package;
+  sentPackage: Package | null;
+  ownId: string;
+  createdAt: string;
+  secondsAtSend: number;
+  classification?: ClassificationResponse;
+}
+
+interface ClassificationResponse {
+  label: ReasonLabel;
+  confidence?: number;
+  stubbed?: boolean;
+}
+
+interface CounterpartResponse {
+  message: string;
+  proposal?: Package | null;
+}
+
+function isClassificationResponse(value: unknown): value is ClassificationResponse {
+  if (typeof value !== "object" || value === null || !("label" in value)) return false;
+  if (!["none", "WR", "PRI", "SB"].includes(String(value.label))) return false;
+  if ("confidence" in value && value.confidence !== undefined &&
+      (typeof value.confidence !== "number" || !Number.isFinite(value.confidence) ||
+       value.confidence < 0 || value.confidence > 1)) return false;
+  return true;
+}
+
+function isCounterpartResponse(value: unknown): value is CounterpartResponse {
+  return typeof value === "object" && value !== null &&
+    "message" in value && typeof value.message === "string" &&
+    value.message.trim().length > 0;
+}
 
 /**
  * RISK COMES BEFORE THE LEVELS SCREEN, in this arm and in the Proxy arm.
@@ -265,6 +305,13 @@ export function BaselineTask({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [turnError, setTurnError] = useState<string | null>(null);
+  const [stagedTurn, setStagedTurn] = useState<StagedTurn | null>(null);
+  const [recovering, setRecovering] = useState(false);
+  const recoveryStartedAt = useRef<number | null>(null);
+  const activeRequest = useRef<AbortController | null>(null);
+  const turnGeneration = useRef(0);
+  const mounted = useRef(true);
+  const expiryPending = useRef(false);
   const [offer, setOffer] = useState<Package>({});
   const [tentative, setTentative] = useState<Package | null>(null);
   const [prefs, setPrefs] = useState<Preferences | null>(null);
@@ -342,6 +389,15 @@ export function BaselineTask({
   const openedOnCounterProposal = useRef(false);
 
   const mockAi = useDevMockAi();
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      turnGeneration.current += 1;
+      activeRequest.current?.abort();
+    };
+  }, []);
 
   // THE PACKAGE IS OPTIONAL, AND THAT IS THE POINT OF THE DEMOTION. A message
   // may carry no package at all: the participant is talking, and talking is
@@ -456,151 +512,86 @@ export function BaselineTask({
     }
   }, `baseline-t${taskIndex}-${phase}-${replies}`);
 
-  async function send(text: string, sentOffer: Package = offer) {
-    /**
-     * NO PACKAGE IS `null`, NOT `{}` — and the difference is a whole move.
-     *
-     * `counterpartStep` branches on `incoming ? "balance" : "propose_tier"`,
-     * and `{}` is truthy, so a message carrying no package at all would be
-     * answered with SCRIPT-BALANCE: "that package is lopsided, here is the
-     * symmetric one". There is no package to call lopsided. Since Ver.2.20 a
-     * participant may simply talk — that is what the classifier reads and
-     * what the ladder is driven off — so an empty selector has to reach the
-     * machine as the absence it is, and be answered with the counterpart's
-     * own stage move (ask_why, misread, propose_tier) instead.
-     *
-     * Normalized HERE rather than inside the machine so the same value goes
-     * to the local decision, to the route, and to the stored transcript, and
-     * the client and the server cannot code the same turn differently.
-     */
-    const sentPackage: Package | null =
-      Object.keys(sentOffer).length > 0 ? sentOffer : null;
-    const own: DisplayMessage = {
-      id: `p${messages.length}`,
-      speaker: "participant",
-      text,
-    };
-    const next = [...messages, own];
-    setTurnError(null);
-    // Lock the composer before classification starts. The classifier is part
-    // of this turn, and a second send while it is in flight would create two
-    // replies from the same state.
-    setPending(true);
-    setMessages(next);
-    setDraft("");
+  function beginRecovery() {
+    if (recoveryStartedAt.current !== null) return;
+    recoveryStartedAt.current = Date.now();
+    setRecovering(true);
+  }
 
-    /**
-     * THE CLASSIFIER DECIDES THE RUNG, AND THE COUNTERPART'S OWN MODEL NEVER
-     * DOES (§6.2a, §6.7). This is a separate single-purpose call that writes
-     * nothing anyone sees; its one label becomes the tier, and `machine.ts`
-     * decides the package from it exactly as it did from a checkbox.
-     *
-     * A FAILURE FLOORS RATHER THAN GUESSES. The route answers `none` when the
-     * model errors, and the fold below means a floor costs the participant
-     * only this turn — they can say it again. A guess in the other direction
-     * would hand out the maximum package on a network error.
-     */
-    let label: "none" | "WR" | "PRI" | "SB" = "none";
-    let confidence: number | undefined;
-    /**
-     * Did the CANNED classifier answer this message?
-     *
-     * `{label:"none"}` is byte-identical whether the participant genuinely
-     * gave no reason, the call failed, or there is no model configured at
-     * all. The route already distinguishes the third case; nothing was
-     * reading it. Logged here so a scaffolded classifier is visible in the
-     * data rather than showing up as a whole arm that happened to say
-     * nothing — which is what gate 19's κ would otherwise be computed off.
-     */
-    let classifierStubbed = false;
-    if (!mockAi) {
-      try {
-        const res = await fetch("/api/classify-reason", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskId, role, message: text }),
-        });
-        const data = (await res.json()) as {
-          label?: typeof label;
-          confidence?: number;
-          stubbed?: boolean;
-        };
-        if (data.label) label = data.label;
-        confidence = data.confidence;
-        classifierStubbed = data.stubbed === true;
-      } catch (error) {
-        console.warn("[classify-reason] failed", error);
-      }
-    } else {
-      // Only an exact scripted reason line gets its scripted card label.
-      // Treating every typed mock message as SB made a plain "yes" trigger
-      // sensitive reciprocity and hid the early-settlement path in previews.
-      const mockedReason = script.messages.find(
-        (message) =>
-          message.speaker === "participant" &&
-          message.text === text &&
-          message.reasonCardId,
-      );
-      if (mockedReason?.reasonCardId) {
-        label = cardOfLayer(task, role, "sensitive")?.id === mockedReason.reasonCardId
-          ? "SB"
-          : "WR";
-      }
-    }
-
-    const tierNow: ReasonTier = foldTier(tier, LABEL_TIER[label]);
-    setTier(tierNow);
-
-    // The first SB-labelled message fixes timing. Reciprocity guarantees it
-    // precedes counterpart SB; its reply index still says whether it was the
-    // participant's first disclosure opportunity.
-    const sbVoicedAtReplyNow =
-      sbVoicedAtReply ?? (label === "SB" ? replies : null);
-    if (sbVoicedAtReplyNow !== sbVoicedAtReply) {
-      setSbVoicedAtReply(sbVoicedAtReplyNow);
-    }
-
+  function finishRecovery() {
+    const startedAt = recoveryStartedAt.current;
+    if (startedAt === null) return;
+    recoveryStartedAt.current = null;
+    setRecovering(false);
     logEvent(
-      "message_sent",
-      {
-        length: text.length,
-        stage: counterpartStageAfter(replies),
-        secondsRemaining,
-        requirementOption: sentOffer[requirement.id] ?? null,
-        // The classifier's verdict on THIS message, stored per message for
-        // the post-hoc human re-coding and the κ that gate 19 turns on
-        // (§6.2). Not shown to anyone.
-        reasonLabel: label,
-        reasonConfidence: confidence,
-        classifierStubbed,
-        tier: tierNow,
-      },
+      "technical_pause",
+      { durationMs: Date.now() - startedAt },
       { sessionIndex: taskIndex },
     );
+  }
 
-    if (participantKey) {
-      void getStore().appendMessage(participantKey, {
-        id: own.id,
-        sessionIndex: taskIndex,
-        speaker: "participant",
-        text,
-        createdAt: new Date().toISOString(),
-        stage: counterpartStageAfter(replies),
-        proposal: sentPackage ?? undefined,
-        // The classifier's verdict on THIS message, stored per message. It is
-        // the source of the post-hoc κ that gate 19 turns on (§6.2a) — and it
-        // is never rendered, because showing a participant which of their
-        // sentences "counted" tells them what the study rewards mid-study.
-        reasonLabel: label,
-        reasonConfidence: confidence,
-      });
-    }
+  async function runStagedTurn(initialTurn: StagedTurn) {
+    const generation = turnGeneration.current + 1;
+    turnGeneration.current = generation;
+    const controller = new AbortController();
+    activeRequest.current?.abort();
+    activeRequest.current = controller;
+    setPending(true);
+    setTurnError(null);
+    let turn = initialTurn;
 
-    // The reply budget is counted from HERE, not from when the text came
-    // back, so generation time is spent out of the delay rather than added to
-    // it — and so mockup mode waits the same as a live run.
-    const turnStartedAt = Date.now();
+    const failedAttempt = () => {
+      if (mounted.current && generation === turnGeneration.current && !settledRef.current) {
+        beginRecovery();
+      }
+    };
+
     try {
+      let classification = turn.classification;
+      if (!classification) {
+        if (mockAi) {
+          let label: ReasonLabel = "none";
+          const mockedReason = script.messages.find(
+            (message) => message.speaker === "participant" &&
+              message.text === turn.text && message.reasonCardId,
+          );
+          if (mockedReason?.reasonCardId) {
+            label = cardOfLayer(task, role, "sensitive")?.id === mockedReason.reasonCardId
+              ? "SB"
+              : "WR";
+          }
+          classification = { label };
+        } else {
+          classification = await fetchJsonWithRetry<ClassificationResponse>(
+            "/api/classify-reason",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ taskId, role, message: turn.text }),
+            },
+            {
+              signal: controller.signal,
+              onFailure: failedAttempt,
+              validate: isClassificationResponse,
+            },
+          );
+        }
+        turn = { ...turn, classification };
+        if (mounted.current && generation === turnGeneration.current) {
+          setStagedTurn(turn);
+        }
+      }
+
+      const { label, confidence, stubbed: classifierStubbed = false } = classification;
+      const tierNow: ReasonTier = foldTier(tier, LABEL_TIER[label]);
+      const sbVoicedAtReplyNow = sbVoicedAtReply ?? (label === "SB" ? replies : null);
+      const own: DisplayMessage = {
+        id: turn.ownId,
+        speaker: "participant",
+        text: turn.text,
+      };
+      const next = [...messages, own];
+      const turnStartedAt = Date.now();
       let reply: string;
       let counterProposal: Package | null = null;
 
@@ -609,22 +600,18 @@ export function BaselineTask({
       // the machine decides that from the explicit reciprocal policy.
       const stageNow = counterpartStageAfter(replies + SEEDED_OPENING_STAGES);
 
-      const mentioned = numbersEver || mentionsScoreNumbers(text);
-      if (mentioned !== numbersEver) setNumbersEver(mentioned);
-      const decision = counterpartStep(task, counterpartRole, stageNow, sentPackage, {
+      const mentioned = numbersEver || mentionsScoreNumbers(turn.text);
+      const decision = counterpartStep(task, counterpartRole, stageNow, turn.sentPackage, {
         tier: tierNow,
         askedWhy,
         misreadOffered,
         numbersReminded,
         numbersMentionedNow: mentioned,
-        secondsRemaining,
+        secondsRemaining: turn.secondsAtSend,
         softCloseOffered,
         disclosurePolicy: "reciprocal",
         counterpartSbDisclosed,
       });
-      if (decision.action === "ask_why") setAskedWhy(true);
-      if (decision.action === "nonum") setNumbersReminded(true);
-      if (decision.action === "soft_close") setSoftCloseOffered(true);
       counterProposal = decision.proposal;
 
       if (mockAi) {
@@ -657,14 +644,16 @@ export function BaselineTask({
           reply = scripted?.text ?? "let's keep working through the terms.";
         }
       } else {
-        const res = await fetch("/api/counterpart", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const data = await fetchJsonWithRetry<CounterpartResponse>(
+          "/api/counterpart",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
             taskId,
             participantRole: role,
             stage: stageNow,
-            incoming: sentPackage,
+            incoming: turn.sentPackage,
             tier: tierNow,
             askedWhy,
             misreadOffered,
@@ -674,7 +663,7 @@ export function BaselineTask({
             // to reach the route unchanged or the two can disagree about
             // whether the exchange was agreed.
             numbersMentionedNow: mentioned,
-            secondsRemaining,
+            secondsRemaining: turn.secondsAtSend,
             softCloseOffered,
             disclosurePolicy: "reciprocal",
             counterpartSbDisclosed,
@@ -682,20 +671,14 @@ export function BaselineTask({
               role: m.speaker === "participant" ? "user" : "assistant",
               content: m.text,
             })),
-          }),
-        });
-
-        if (!res.ok) {
-          throw new Error(`Counterpart request failed with ${res.status}`);
-        }
-
-        const data = (await res.json()) as {
-          message?: string;
-          proposal?: Package | null;
-        };
-        if (!data.message?.trim()) {
-          throw new Error("Counterpart returned no message");
-        }
+            }),
+          },
+          {
+            signal: controller.signal,
+            onFailure: failedAttempt,
+            validate: isCounterpartResponse,
+          },
+        );
         reply = data.message;
         // THE LOCAL DECISION'S PACKAGE, not the server's echo of it. Both
         // are produced by the same deterministic machine from the same
@@ -716,9 +699,17 @@ export function BaselineTask({
       // mode — the default off-production, and so the thing anyone walking a
       // preview actually sees — answering in 400ms.
       await awaitCounterpartDelay(reply.length, turnStartedAt);
-      // A timeout that won while this reply was in flight ends the exchange.
-      // Do not append or persist a late message after that terminal event.
-      if (settledRef.current) return;
+      if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
+
+      // Commit the staged turn only after both requests and the visible delay
+      // succeed. Until here, retrying cannot duplicate a message, disclosure,
+      // state-machine flag, event, or stored transcript row.
+      setTier(tierNow);
+      setSbVoicedAtReply(sbVoicedAtReplyNow);
+      setNumbersEver(mentioned);
+      if (decision.action === "ask_why") setAskedWhy(true);
+      if (decision.action === "nonum") setNumbersReminded(true);
+      if (decision.action === "soft_close") setSoftCloseOffered(true);
 
       if (
         decision.action === "disclose_sb" ||
@@ -751,39 +742,65 @@ export function BaselineTask({
         setStandingTier(tierNow);
       }
 
-      if (reply) {
-        const counter: DisplayMessage = {
-          id: `c${next.length}`,
+      const counter: DisplayMessage = {
+        id: `c${next.length}`,
+        speaker: "counterpart",
+        text: reply,
+      };
+      setMessages([...next, counter]);
+      setReplies((n) => n + 1);
+      setStagedTurn(null);
+      setDraft("");
+      setTurnError(null);
+
+      logEvent(
+        "message_sent",
+        {
+          length: turn.text.length,
+          stage: counterpartStageAfter(replies),
+          secondsRemaining: turn.secondsAtSend,
+          requirementOption: turn.sentOffer[requirement.id] ?? null,
+          reasonLabel: label,
+          reasonConfidence: confidence,
+          classifierStubbed,
+          tier: tierNow,
+        },
+        { sessionIndex: taskIndex },
+      );
+
+      if (participantKey) {
+        const createdAt = new Date().toISOString();
+        void getStore().appendMessage(participantKey, {
+          id: own.id,
+          sessionIndex: taskIndex,
+          speaker: "participant",
+          text: turn.text,
+          createdAt: turn.createdAt,
+          stage: counterpartStageAfter(replies),
+          proposal: turn.sentPackage ?? undefined,
+          reasonLabel: label,
+          reasonConfidence: confidence,
+        });
+        void getStore().appendMessage(participantKey, {
+          id: counter.id,
+          sessionIndex: taskIndex,
           speaker: "counterpart",
           text: reply,
-        };
-        setMessages((m) => [...m, counter]);
-
-        if (participantKey) {
-          void getStore().appendMessage(participantKey, {
-            id: counter.id,
-            sessionIndex: taskIndex,
-            speaker: "counterpart",
-            text: reply,
-            createdAt: new Date().toISOString(),
-            stage: decision.stage,
-            proposal: counterProposal ?? undefined,
-            decidedAction: decision.action,
-          });
-        }
+          createdAt,
+          stage: decision.stage,
+          proposal: counterProposal ?? undefined,
+          decidedAction: decision.action,
+        });
       }
 
-      setReplies((n) => n + 1);
+      finishRecovery();
 
       // An accepted package or an impasse ends the exchange. The participant
       // sees the counterpart's last message first, and a Continue button
       // appears.
-      if (
-        !settledRef.current &&
-        (decision.accepts || decision.impasse)
-      ) {
+      if (!settledRef.current && (decision.accepts || decision.impasse)) {
         settledRef.current = true;
-        setTentative(decision.accepts ? (decision.proposal ?? sentPackage) : null);
+        setTentative(decision.accepts ? (decision.proposal ?? turn.sentPackage) : null);
         setSettled(decision.accepts ? "agreed" : "impasse");
         logEvent(
           "negotiation_ended",
@@ -798,18 +815,45 @@ export function BaselineTask({
           },
           { sessionIndex: taskIndex },
         );
+      } else if (!settledRef.current && expiryPending.current) {
+        settledRef.current = true;
+        setTentative(null);
+        setSettled("impasse");
+        logEvent(
+          "negotiation_ended",
+          { phase: "direct", reason: "timeout" },
+          { sessionIndex: taskIndex },
+        );
       }
     } catch (error) {
-      console.error("[counterpart] turn failed", error);
-      // Keep the participant's text available for a deliberate retry. No
-      // reply, disclosure flag, or settlement is recorded on a failed turn.
-      setDraft(text);
-      setTurnError(
-        "We couldn’t get a reply. Your message is still here. Please try sending it again.",
-      );
+      if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("[turn] recovery required", error);
+      beginRecovery();
+      setStagedTurn(turn);
+      setTurnError("Your message is still here. Select Retry.");
     } finally {
-      setPending(false);
+      if (mounted.current && generation === turnGeneration.current) {
+        setPending(false);
+        activeRequest.current = null;
+      }
     }
+  }
+
+  async function send(text: string, sentOffer: Package = offer) {
+    if (pending || stagedTurn || settledRef.current) return;
+    const immutableOffer = { ...sentOffer };
+    const turn: StagedTurn = {
+      text,
+      sentOffer: immutableOffer,
+      sentPackage: Object.keys(immutableOffer).length > 0 ? immutableOffer : null,
+      ownId: `p${messages.length}`,
+      createdAt: new Date().toISOString(),
+      secondsAtSend: secondsRemaining,
+    };
+    setStagedTurn(turn);
+    setDraft("");
+    await runStagedTurn(turn);
   }
 
   /**
@@ -819,7 +863,7 @@ export function BaselineTask({
    * this button, or the clock.
    */
   function acceptStanding() {
-    if (!lastCounterpartPackage || pending || settled) return;
+    if (!lastCounterpartPackage || pending || stagedTurn || settled) return;
     setOffer(lastCounterpartPackage);
     void send(
       "that works for me — let's go with that.",
@@ -981,6 +1025,8 @@ export function BaselineTask({
             current={STEP_OF.negotiate}
           />
 
+          <NavigationNotice className="mb-3" />
+
           <div className="sticky top-[calc(var(--header-h)+0.25rem)] z-20 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/95 px-4 py-3 shadow-sm backdrop-blur-md sm:px-5">
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
@@ -1002,11 +1048,17 @@ export function BaselineTask({
               <div className="ml-auto flex shrink-0 items-center gap-2">
                 <CountdownTimer
                   seconds={NEGOTIATION_SECONDS}
-                  running={!settled}
+                  running={!settled && !recovering}
+                  paused={recovering}
                   onTick={setSecondsRemaining}
                   onExpire={() => {
                     if (settledRef.current) return;
+                    if (activeRequest.current || stagedTurn) {
+                      expiryPending.current = true;
+                      return;
+                    }
                     settledRef.current = true;
+                    turnGeneration.current += 1;
                     setTentative(null);
                     setSettled("impasse");
                     logEvent(
@@ -1016,12 +1068,30 @@ export function BaselineTask({
                     );
                   }}
                 />
-                {settled ? null : pending ? (
+                {settled ? null : recovering && pending ? (
+                  <Cue tone="quiet">Reconnecting…</Cue>
+                ) : recovering ? null : pending ? (
                   <Cue tone="quiet">Waiting for reply…</Cue>
                 ) : yourTurn ? (
                   <Cue>Your Turn</Cue>
                 ) : null}
               </div>
+              {turnError ? (
+                <div
+                  className="flex basis-full flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2"
+                  role="alert"
+                >
+                  <p className="text-sm font-medium text-red-800">{turnError}</p>
+                  <button
+                    type="button"
+                    onClick={() => stagedTurn && void runStagedTurn(stagedTurn)}
+                    disabled={pending || !stagedTurn}
+                    className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-bold text-red-800 disabled:opacity-50"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : null}
           </div>
 
           <Card className="mb-6 flex flex-col border-slate-200" padded={false}>
@@ -1032,10 +1102,10 @@ export function BaselineTask({
             />
 
             <MessageComposer
-              value={draft}
+              value={stagedTurn?.text ?? draft}
               onChange={setDraft}
               onSend={send}
-              disabled={pending || !canSend}
+              disabled={pending || Boolean(stagedTurn) || !canSend}
               cue={yourTurn}
               sendLabel="Send"
               placeholder={
@@ -1046,11 +1116,6 @@ export function BaselineTask({
                     : "Choose both terms below, or neither, before sending."
               }
             />
-            {turnError ? (
-              <p className="px-4 pb-4 text-sm text-red-700" role="alert">
-                {turnError}
-              </p>
-            ) : null}
           </Card>
 
           {!settled && lastCounterpartPackage ? (
@@ -1058,7 +1123,7 @@ export function BaselineTask({
               <button
                 type="button"
                 onClick={acceptStanding}
-                disabled={pending}
+                disabled={pending || Boolean(stagedTurn)}
                 className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-2xs transition-colors hover:bg-emerald-100 disabled:opacity-50"
               >
                 ✓ Accept their latest proposal as it stands
@@ -1104,7 +1169,10 @@ export function BaselineTask({
                 </span>
               </span>
             </summary>
-            <div className="space-y-4 px-5 pb-5 sm:px-7 sm:pb-7">
+            <fieldset
+              disabled={pending || Boolean(stagedTurn)}
+              className="space-y-4 px-5 pb-5 disabled:opacity-60 sm:px-7 sm:pb-7"
+            >
               {task.issues.map((issue) => (
                 <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
                   <div className="mb-2">
@@ -1132,7 +1200,7 @@ export function BaselineTask({
                   quiet. No cue ring and no pill: a cue names the thing the
                   screen is waiting for, and the screen is waiting for a
                   message, not for a second chip (interface rule 9). */}
-            </div>
+            </fieldset>
           </details>
         </TaskLayout>
       </Page>

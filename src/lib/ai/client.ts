@@ -297,10 +297,9 @@ export async function classifyReason(args: {
 }): Promise<ReasonClassification> {
   const apiKey = getApiKey();
   if (!apiKey) {
-    // NOT a silent `none` here. That contract is for a model call that FAILED
-    // mid-study — recoverable, because the participant can say it again and
-    // the tier only rises. A study running with no model at all is not that,
-    // and floored tiers would be the only trace it ever left.
+    // This `none` is a development-only scaffold. In a live study the guard
+    // throws, and transient provider failures also throw through the route so
+    // the participant's staged turn can be retried without changing its tier.
     assertNotLiveWithoutModel();
     return { label: "none", confidence: 0, stubbed: true };
   }
