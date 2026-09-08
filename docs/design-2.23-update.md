@@ -43,3 +43,8 @@ obsolete main-study RISK presentation, labels negotiation points as non-cash,
 and keeps disclosure guidance neutral. Before role assignment, the welcome
 page shows only the guaranteed £6 base rate (£9.00/hour); the debrief explains
 that bonus recommendations were scenario-only and everyone receives £7.
+
+Final review follow-up: the two Proxy interpretation questions will be split
+into separate one-response pages, and their staged navigation and reload
+recovery will be checked after that change lands. This note records the
+remaining implementation work; it does not claim those checks have passed.

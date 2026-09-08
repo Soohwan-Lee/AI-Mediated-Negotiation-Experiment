@@ -219,7 +219,7 @@ export function StudyOrientation({
             <Card>
               <CardTitle>Choose what to explain</CardTitle>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">You can explain what matters to you and ask about the other person&apos;s situation.</p>
-              <p className="mt-3 text-sm leading-relaxed text-slate-900">Sharing sensitive background is optional. You can negotiate and reach an agreement without it. If you or your AI Proxy shares it, the other person may consider it in their later bonus decision or upward evaluation.</p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-900">Sharing sensitive background is optional. You can negotiate and reach an agreement without it. If you or your AI Proxy shares it, the other person may consider it in their later bonus recommendation or upward evaluation.</p>
             </Card>
             <Card>
               <CardTitle>Two ways of taking part</CardTitle>

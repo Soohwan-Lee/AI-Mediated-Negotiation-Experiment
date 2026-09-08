@@ -45,6 +45,8 @@ test("payment briefing uses study constants and does not promise an amount revea
   assert.match(briefing, /Bonus amounts are not shown during the tasks/);
   assert.ok(!briefing.includes("You see the amounts after both tasks"));
   assert.ok(!briefing.includes("up to 10 minutes"));
+  assert.ok(!briefing.includes("bonus decision"));
+  assert.ok(!shared.includes("decide the bonus"));
 });
 
 test("background questions are shown and saved one section at a time", () => {

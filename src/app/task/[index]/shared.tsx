@@ -344,7 +344,8 @@ export function TaskBrief({
                 Sharing it can help the other person understand what
                 you&rsquo;re asking for. It can also shape their impression of
                 your judgement or actions, and what is shared may be weighed
-                when they decide the bonus or write the evaluation afterwards.{" "}
+                when they make a bonus recommendation or write the evaluation
+                afterwards.{" "}
                 <strong className="font-semibold">
                   Whether to share is your choice. You can negotiate and reach
                   an agreement without it.
