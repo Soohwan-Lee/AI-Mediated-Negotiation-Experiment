@@ -155,6 +155,32 @@ function fmtPackage(task, pkg) {
     .join(" · ");
 }
 
+/**
+ * How much of a fixed sentence survived into a message, as a share of its
+ * distinctive words.
+ *
+ * THE PROXIES REFRAME RATHER THAN QUOTE (§6.5, §6.6), so every check on a
+ * §6.6 sentence has to be an overlap rather than a phrase match. A phrase
+ * match fails on a correct message — the same mistake the length cap's
+ * containment matcher made, and there it was POLICY-CORRELATED.
+ */
+function coverOverlap(text, clause) {
+  const words = (t) =>
+    new Set(
+      t
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 4),
+    );
+  const want = words(clause);
+  if (want.size === 0) return 1;
+  const have = words(text);
+  let hits = 0;
+  for (const w of want) if (have.has(w)) hits += 1;
+  return hits / want.size;
+}
+
 /** Both sides' points, which under the symmetric rule are equal. */
 function pointsOf(task, pkg, role) {
   if (!pkg) return [0, 0];
@@ -648,8 +674,22 @@ const T_B = getTask("task_b");
     JSON.stringify(run.labels ?? []),
   );
   check(run, "the tier stays at the work rung", tier === "work", tier);
-  const askwhys = firedCount(messages, /\bwhy\b/i);
-  check(run, "SCRIPT-ASKWHY fires at least once and never repeats", askwhys >= 1 && askwhys <= 2, `${askwhys}`);
+  // ASKWHY IS MATCHED ON ITS TWO HALVES, not on the word "why" — the model
+  // paraphrases the question ("what makes that the bigger issue?") and P0
+  // forbids scripted-sounding phrasing, so a literal match fails on exactly
+  // the messages that followed the instruction best. What has to be there is a
+  // question about the claim AND the "explain it upward" reason for asking,
+  // which is what makes it a request rather than a challenge.
+  const askwhys = firedCount(
+    messages,
+    /(why|what makes|how come|what's behind)[\s\S]*\b(upward|upstairs|explain|manager)\b/i,
+  );
+  check(
+    run,
+    "SCRIPT-ASKWHY fires exactly once",
+    askwhys === 1,
+    `${askwhys}`,
+  );
   check(
     run,
     "the ASKWHY flag is spent exactly once",
@@ -1031,11 +1071,17 @@ const T_B = getTask("task_b");
     /upward|already|passed|raised/i.test(text),
     text.slice(0, 200),
   );
+  // MATCHED BY OVERLAP, NOT BY PHRASE. P4 asks the model to join the fixed
+  // sentences into one natural message, so it paraphrases at the edges —
+  // "everyone in the same room" came back as "everyone together". A phrase
+  // match here fails on a correct message, which is the same mistake the
+  // length cap's containment matcher made.
+  const covers = sbCard.cover.map((c) => coverOverlap(text, c));
   check(
     run,
     "and BOTH covers ride with it, so nothing marks which is the principal's",
-    /schedule|tight|early/i.test(text) && /same room|adding days|first few weeks|win that back/i.test(text),
-    text.slice(0, 260),
+    covers.every((v) => v >= 0.3),
+    `overlap ${covers.map((v) => v.toFixed(2)).join(" / ")} :: ${text.slice(0, 260)}`,
   );
   // What must NOT survive: the event, the third party, the concealment, and any
   // attribution. If any appears the policy has collapsed into User-Specified and
@@ -1084,20 +1130,24 @@ const T_B = getTask("task_b");
   check(run, "T1 pays 1,000 each", mine === 1000 && theirs === 1000, `${mine}/${theirs}`);
   check(run, "the floor is `work`", voicedTier === "work", voicedTier);
   const decline = messages.find((m) => m.turn === PROXY_DECLINE_TURN);
-  const cover1 = cardOfLayer(task, "member", "sensitive")?.cover?.[0] ?? "";
-  const distinctive = cover1
-    .toLowerCase()
-    .replace(/[^a-z\s]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length > 5);
-  const hit = distinctive.filter((w) =>
-    (decline?.text ?? "").toLowerCase().includes(w),
-  ).length;
+  const card = cardOfLayer(task, "member", "sensitive");
+  const one = coverOverlap(decline?.text ?? "", card?.cover?.[0] ?? "");
+  const two = coverOverlap(decline?.text ?? "", card?.cover?.[1] ?? "");
   check(
     run,
     "cover ① rides the decline turn as the proxy's own view",
-    hit / Math.max(distinctive.length, 1) >= 0.3,
-    `${hit}/${distinctive.length} :: ${decline?.text?.slice(0, 200)}`,
+    one >= 0.3,
+    `overlap ${one.toFixed(2)} :: ${decline?.text?.slice(0, 200)}`,
+  );
+  // COVER ② IS SB-GRADE AND MUST NOT APPEAR HERE (§6.6, 12th correction). Its
+  // job is to sit beside the abstraction and make it unclear which of three
+  // sentences is the principal's; on a path with no abstraction there is
+  // nothing for it to hide, and it would just be a second reason.
+  check(
+    run,
+    "and cover ② stays out of it",
+    two < 0.3,
+    `overlap ${two.toFixed(2)}`,
   );
   check(
     run,

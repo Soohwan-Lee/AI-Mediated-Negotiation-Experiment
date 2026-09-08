@@ -135,7 +135,7 @@ export const SCRIPT_LINES = {
 
   /** SCRIPT-CLOSE. Ninety seconds left. */
   soft_close: (ctx: ScriptLineContext) =>
-    `we're almost out of time — shall we settle on the last thing on the table? || ${ctx.levels ?? "that one"}.`,
+    `we're almost out of time. shall we settle on the last thing on the table? || ${ctx.levels ?? "that one"}.`,
 
   /** SCRIPT-FALLBACK. The clock ran out. Nothing is agreed and nobody scores. */
   impasse: () => `that's a shame, but ok — no deal then.`,
@@ -305,7 +305,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b2p",
         2,
         "participant",
-        `hi — honestly, ${mine.label.toLowerCase()} is the one I need. ${mySb ? lowerFirst(mySb.text) : "there's a bit of history behind it."}`,
+        `hi, honestly, ${mine.label.toLowerCase()} is the one I need. ${mySb ? lowerFirst(mySb.text) : "there's a bit of history behind it."}`,
         { reasonCardId: mySb?.id },
       ),
       // Reciprocal disclosure (§6.3): the counterpart's own SB comes out only
@@ -333,7 +333,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b6c",
         6,
         "counterpart",
-        `good — ${L(trade, theirs.id)} for me, ${L(trade, mine.id)} for you. || glad we sorted it.`,
+        `good. ${L(trade, theirs.id)} for me, ${L(trade, mine.id)} for you. || glad we sorted it.`,
         { proposal: trade },
       ),
     ],
@@ -407,7 +407,7 @@ function proxyScript(
         "p1c",
         1,
         "counterpart_proxy",
-        `Hello — I am the AI Proxy negotiating for ${otherPrincipal} I represent. ${theirWr?.relayed ?? ""} What is the situation on your side?`,
+        `Hello, I am the AI Proxy negotiating for ${otherPrincipal} I represent. ${theirWr?.relayed ?? ""} What is the situation on your side?`,
       ),
       // Turn 2 — the participant proxy's first reason opportunity. This is the
       // one turn the two policies say differently.
@@ -439,7 +439,7 @@ function proxyScript(
         "p5c",
         5,
         "counterpart_proxy",
-        `${otherPrincipal} I represent did not know that was the situation. Then let us do ${L(trade, mine.id)} on ${mine.label.toLowerCase()} — but they do need ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()} at their end.`,
+        `${otherPrincipal} I represent did not know that was the situation. Then let us do ${L(trade, mine.id)} on ${mine.label.toLowerCase()}, but they do need ${L(trade, theirs.id)} on ${theirs.label.toLowerCase()} at their end.`,
         { proposal: trade },
       ),
       // Turn 5 — the participant proxy accepts: the package is worth as much to

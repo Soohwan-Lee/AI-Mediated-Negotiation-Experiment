@@ -14,9 +14,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2)_
 
-> got it, both matter to you too.
-> fair thing is for each of us to move halfway.
-> could we settle on 2 office days and you presenting 3 of the 4 client meetings?
+> got it, sounds like both are a real load.
+> if both matter to you too, the fair move is halfway on each.
+> how about 2 office days a week and you present at 3 of the 4 client meetings?
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
@@ -26,8 +26,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 4)_
 
-> i get that presentations matter more to you. what makes that the bigger issue? I need to be able to explain it upward.
-> until then, I'd keep 2 office days and you presenting 3 of 4 on the table.
+> got it, I hear that presentations matter more.
+> what makes that the bigger issue for you? I need to be able to explain the reason upward.
+> until then, I'd keep 2 office days and 3 of 4 client meetings on the table.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
@@ -37,8 +38,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5)_
 
-> i hear you. since both terms are a burden, I'd rather keep this balanced.
-> 2 office days, and you present 3 of the 4 client meetings.
+> got it, you’d rather keep presenting down.
+> I’d rather keep this balanced, so let’s split the difference on both: 2 office days and 3 of 4 client meetings.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
@@ -51,7 +52,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 **counterpart** _(stage 5)_
 
 > works for me.
-> we'll go with 2 days in the office and you presenting 3 of 4 client meetings.
+> we'll do 2 days a week in the office and you'll present at 3 of the 4 client meetings.
 > nothing's final until we both confirm, and I confirm this package.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
@@ -59,14 +60,14 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 ## Classifier
 
 - `WR` (1, none) — my analysis scope is wide this quarter so the workload is heavy. both the office days and
-- `WR` +priority (0.99, none) — the presentations matter more to me than the office days, to be honest.
+- `WR` +priority (1, none) — the presentations matter more to me than the office days, to be honest.
 - `WR` +priority (0.99, none) — I'd just rather keep the presenting down. that's the one.
-- `WR` +priority (1, accept) — alright, I can live with that. let's settle there.
+- `WR` +priority (0.99, accept) — alright, I can live with that. let's settle there.
 
 ## Checks
 
-- ✓ the priority claim is flagged, not promoted to its own rung — [{"text":"my analysis scope is wide this quarter so the workload is heavy. both the office days and ","label":"WR","priority_claim":false,"confidence":1,"stance":"none"},{"text":"the presentations matter more to me than the office days, to be honest.","label":"WR","priority_claim":true,"confidence":0.99,"stance":"none"},{"text":"I'd just rather keep the presenting down. that's the one.","label":"WR","priority_claim":true,"confidence":0.99,"stance":"none"},{"text":"alright, I can live with that. let's settle there.","label":"WR","priority_claim":true,"confidence":1,"stance":"accept"}]
+- ✓ the priority claim is flagged, not promoted to its own rung — [{"text":"my analysis scope is wide this quarter so the workload is heavy. both the office days and ","label":"WR","priority_claim":false,"confidence":1,"stance":"none"},{"text":"the presentations matter more to me than the office days, to be honest.","label":"WR","priority_claim":true,"confidence":1,"stance":"none"},{"text":"I'd just rather keep the presenting down. that's the one.","label":"WR","priority_claim":true,"confidence":0.99,"stance":"none"},{"text":"alright, I can live with that. let's settle there.","label":"WR","priority_claim":true,"confidence":0.99,"stance":"accept"}]
 - ✓ the tier stays at the work rung — work
-- ✗ SCRIPT-ASKWHY fires at least once and never repeats — 0
+- ✓ SCRIPT-ASKWHY fires exactly once — 1
 - ✓ the ASKWHY flag is spent exactly once — [false,true,true,true]
 - ✓ T1 still lands, 1,000 each — agreed · 1000/1000

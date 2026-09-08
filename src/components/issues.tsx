@@ -37,15 +37,23 @@ function share(issue: Issue, points: number, role: Role): number {
  * read as "most of what this term can pay me" rather than as a raw token.
  *
  * The two anchors are the only ones a participant can act on: the most this
- * task could pay them, and the fallback they get if there is no agreement.
- * Both are already theirs — the fallback is stated in the briefing and the
+ * task could pay them, and what they get if there is no agreement. Both are
+ * already theirs — the no-agreement figure is stated in the briefing and the
  * maximum is the sum of their own best levels — so naming them adds no
  * information the design withholds.
  *
+ * THERE IS NO FALLBACK PLAN ANY MORE (§3.2, Ver.2.21). `reservationPoints` is
+ * 0, and "fallback" named a safety net that no longer exists — a participant
+ * who read it would think they came away with something. The wording says what
+ * is true instead: no agreement pays nothing, to BOTH sides. Saying "for both"
+ * is safe and not a leak of the other side's sheet — §8.1 already tells every
+ * participant that failing to agree scores zero for the pair, and it is what
+ * stops "0 pts" reading as a penalty aimed at them alone.
+ *
  * BOTH ARE DERIVED FROM THE TASK, never from the module constants. An earlier
  * version read `MAX_INDIVIDUAL_POINTS` and `RESERVATION_POINTS` directly, so
- * the practice round quoted the real task's maximum and fallback instead of
- * its own. The first payoff sheet anyone sees is the practice one, so that was
+ * the practice round quoted the real task's maximum and no-agreement figure
+ * instead of its own. The first payoff sheet anyone sees is the practice one, so that was
  * a wrong scale taught before the real task and then silently contradicted by
  * it. The practice task still keeps its own smaller numbers, so the hazard is
  * live even now that both tasks have the same shape.
@@ -109,7 +117,7 @@ export function PointsKey({
         </span>
         <span className="min-w-0 flex flex-col justify-between rounded-xl border border-slate-300 bg-white/90 px-3 py-2 font-semibold text-slate-800 shadow-2xs">
           <span className="block text-[0.6875rem] leading-tight opacity-90 font-medium break-words">
-            🚫 No Agreement
+            🚫 No Agreement (both score 0)
           </span>
           <strong className="tabular block text-sm font-black leading-tight mt-1 shrink-0">
             {reservationPoints.toLocaleString()} pts

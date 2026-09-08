@@ -10,7 +10,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 **counterpart** _(stage 5)_
 
 > I had no idea that was the situation. It changes what I think the right answer is.
-> Could we do 4 office days and 1 of 4 presentations? We both get what we most need, and I do need the office days at my end.
+> How about 4 office days and you present at 1 of 4 meetings? We both get what we most need.
+> I do need the 4 office days at my end.
 >
 > _package: Days a week in the office: 4 days · Client meetings the Member presents at: 1 of 4_
 
@@ -22,8 +23,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5)_
 
-> glad that works. We’re aligned on 4 days in the office and you presenting at 1 of 4 client meetings.
-> That’s the package, once we both confirm it.
+> glad that works.
+> Confirming 4 office days and you presenting at 1 of 4 client meetings.
 >
 > _package: Days a week in the office: 4 days · Client meetings the Member presents at: 1 of 4_
 

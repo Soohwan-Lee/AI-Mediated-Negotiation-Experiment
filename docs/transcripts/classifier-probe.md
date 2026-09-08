@@ -24,7 +24,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **classifier**
 
-> none (0.99, none) <- there is a bit of a complicated situation I would rather not get into.
+> none (0.98, none) <- there is a bit of a complicated situation I would rather not get into.
 
 **classifier**
 
@@ -32,7 +32,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **classifier**
 
-> WR (0.98, accept) <- ok, let's do that then.
+> WR (0.99, accept) <- ok, let's do that then.
 
 **classifier**
 
@@ -45,7 +45,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 - ✓ a priority claim is WR with the flag set, never its own rung — {"label":"WR","priority_claim":true,"confidence":0.99,"stance":"none","stubbed":false}
 - ✓ the confession is SB, in the participant's own words — {"label":"SB","priority_claim":false,"confidence":0.99,"stance":"none","stubbed":false}
 - ✓ a denial is not a disclosure — {"label":"none","priority_claim":false,"confidence":0.99,"stance":"none","stubbed":false}
-- ✓ a vague hint falls to the lower label, with low confidence — {"label":"none","priority_claim":false,"confidence":0.99,"stance":"none","stubbed":false}
+- ✓ a vague hint falls to the lower label, with low confidence — {"label":"none","priority_claim":false,"confidence":0.98,"stance":"none","stubbed":false}
 - ✓ the judgement is CUMULATIVE across three messages — {"label":"SB","priority_claim":false,"confidence":0.99,"stance":"none","stubbed":false}
-- ✓ an agreement is a stance, not a label — {"label":"WR","priority_claim":false,"confidence":0.98,"stance":"accept","stubbed":false}
+- ✓ an agreement is a stance, not a label — {"label":"WR","priority_claim":false,"confidence":0.99,"stance":"accept","stubbed":false}
 - ✓ a counter resolves to real option ids, or to nothing — {"label":"WR","priority_claim":false,"confidence":0.99,"stance":"counter","counter_terms":{"office_days":"od1","client_presentations":"cp1"},"stubbed":false}

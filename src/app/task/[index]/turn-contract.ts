@@ -53,17 +53,32 @@ export interface ClassificationResponse {
   stubbed?: boolean;
 }
 
+/**
+ * The counterpart route's answer.
+ *
+ * THE DECIDED ACTION IS NOT IN IT, AND THAT IS THE POINT. `propose_tier`,
+ * `ask_why`, `disclose_sb` and the rest are the names of a SCRIPT, and a
+ * participant who opens their network tab and sees one has learned that the
+ * other party is machinery — the first thing on CLAUDE.md's "must never learn"
+ * list, and the one this arm cannot survive. So the wire carries what the
+ * client actually needs and nothing that names the move:
+ *
+ *   message   the bubbles, already joined with " || " and capped
+ *   proposal  the package the counterpart put up or accepted
+ *   state     the FULL advanced state, one-shot flags already folded in
+ *   settled   how the exchange ended, or null if it has not
+ *
+ * `settled: "agreed"` also arrives on the combined disclose-and-accept turn,
+ * which is why the client must not look for an acceptance action to know the
+ * task is over.
+ */
 export interface CounterpartResponse {
   message: string;
   proposal?: Package | null;
-  /** The exchange state the route advanced. Replace yours with it. */
-  state?: Partial<ExchangeState>;
-  decision?: {
-    action?: string;
-    stage?: number;
-    accepts?: boolean;
-    impasse?: boolean;
-  };
+  /** The exchange state the route advanced. REPLACE what you hold with it. */
+  state?: ExchangeState;
+  /** How the exchange ended, or null while it continues. */
+  settled?: "agreed" | "impasse" | null;
 }
 
 export function isClassificationResponse(
@@ -104,13 +119,24 @@ export function isClassificationResponse(
 export function isCounterpartResponse(
   value: unknown,
 ): value is CounterpartResponse {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "message" in value &&
-    typeof (value as { message: unknown }).message === "string" &&
-    (value as { message: string }).message.trim().length > 0
-  );
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.message !== "string" || v.message.trim().length === 0) {
+    return false;
+  }
+  // `settled` stops the clock and codes the outcome, so a value outside the
+  // union is refused rather than read as "still going": a typo would silently
+  // run a finished exchange to the timer and record an impasse the counterpart
+  // never declared.
+  if (
+    v.settled !== undefined &&
+    v.settled !== null &&
+    v.settled !== "agreed" &&
+    v.settled !== "impasse"
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -143,19 +169,6 @@ interface Issueish {
   options: ReadonlyArray<{ id: string }>;
 }
 
-/**
- * How long a message stays inside the SAME turn (§6.1 stage 3).
- *
- * "The turn boundary is the moment the counterpart's reply renders." So a
- * second message sent while the reply delay is still running belongs to the
- * turn already in flight: the pending reply is cancelled, the whole message
- * list is re-classified, and the counterpart answers the new state once. That
- * is what stops a participant who splits a confession across three quick
- * messages from being answered three times — and, more importantly, it is
- * what makes the LOCK land on everything they said in that turn rather than
- * on whichever fragment arrived first.
- */
-export const TURN_FOLD_WINDOW = true;
 
 /**
  * The exchange flags a client holds between turns.
@@ -189,15 +202,48 @@ export const INITIAL_EXCHANGE_STATE: HeldExchangeState = {
 };
 
 /**
- * Fold the route's returned state into what the client holds.
+ * Take the route's advanced state as the client's new state.
  *
- * ONE-SHOT FLAGS ONLY EVER LATCH ON. The route and the client both run the
- * same machine over the same inputs, so they agree — but a dropped response, a
- * retry or a cancelled turn can leave the client a beat ahead, and a naive
- * assignment would then UNSPEND a script the participant has already seen.
- * `reasonlessTurns` and `clarifyUsedForTier` are counters rather than latches
- * and take the route's value, because both legitimately move in both
- * directions.
+ * THE ROUTE OWNS THE FOLD (Ver.2.21 contract). It runs the machine, it knows
+ * which move it made, and it folds every one-shot flag before answering — so
+ * the client replaces what it holds rather than merging. Merging would be the
+ * client re-deriving a decision the route deliberately does not tell it, and
+ * that is exactly the shape of the `voicedTier` failure: two ends computing
+ * one value, agreeing in the tests, disagreeing in production.
+ *
+ * The `previous` argument is the fallback for a response that omits the block
+ * entirely. Keeping the old state is the safe direction: every field in it is
+ * either a latch that has already fired or a counter, so carrying it forward
+ * can only make the counterpart repeat itself less, never more. Inventing a
+ * fresh one would unspend every script at once.
+ */
+export function takeExchangeState(
+  returned: ExchangeState | undefined,
+  previous: HeldExchangeState,
+): HeldExchangeState {
+  if (!returned) return previous;
+  return {
+    askedWhy: Boolean(returned.askedWhy),
+    askSitUsed: Boolean(returned.askSitUsed),
+    nudgeUsed: Boolean(returned.nudgeUsed),
+    numbersReminded: Boolean(returned.numbersReminded),
+    softCloseOffered: Boolean(returned.softCloseOffered),
+    counterpartSbDisclosed: Boolean(returned.counterpartSbDisclosed),
+    reasonlessTurns: returned.reasonlessTurns ?? 0,
+    clarifyUsedForTier: returned.clarifyUsedForTier ?? null,
+  };
+}
+
+/**
+ * The same fold, for MOCKUP MODE ONLY.
+ *
+ * A mockup never calls the route, so nothing advances the state for it. The
+ * flags are folded here from the local decision instead — which is legitimate
+ * there and only there, because the whole point of a mockup is to show the
+ * screens a live run would produce, and `tests/reason-rules.test.mjs` pins the
+ * script and the machine to each other in every cell.
+ *
+ * Never reachable from a live turn: the live path calls `takeExchangeState`.
  */
 export function foldExchangeState(
   held: HeldExchangeState,

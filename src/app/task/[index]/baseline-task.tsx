@@ -58,6 +58,7 @@ import {
   isCounterpartResponse,
   resolveCounterTerms,
   storedLabel,
+  takeExchangeState,
   type ClassificationResponse,
   type ClassifierLogEntry,
   type CounterpartResponse,
@@ -672,7 +673,8 @@ export function BaselineTask({
       const turnStartedAt = Date.now();
       let reply: string;
       let counterProposal: Package | null = null;
-      let returnedState: Partial<ExchangeState> | undefined;
+      let nextState: HeldExchangeState;
+      let settledNow: "agreed" | "impasse" | null;
 
       // Where the counterpart is in ITS OWN script. Direct can skip the
       // sensitive-disclosure position or combine disclosure with acceptance;
@@ -692,16 +694,47 @@ export function BaselineTask({
         numbersMentionedNow: mentioned,
         secondsRemaining: turn.secondsAtSend,
       };
-      const decision = counterpartStep(
-        task,
-        counterpartRole,
-        stageNow,
-        incoming,
-        stateForTurn,
-      );
-      counterProposal = decision.proposal;
 
       if (mockAi) {
+        /**
+         * MOCKUP MODE IS THE ONE PLACE THIS CLIENT RUNS THE MACHINE ITSELF.
+         *
+         * It never calls the route, so there is no `state` and no `settled` to
+         * read — the scripted reply has to be chosen from something, and the
+         * machine is the only thing that agrees with what the live path would
+         * have done. `tests/reason-rules.test.mjs` pins that agreement in every
+         * cell, which is what makes a mockup a preview of this study rather
+         * than of a different one.
+         *
+         * The LIVE path below must not do this. See the note there.
+         */
+        const decision = counterpartStep(
+          task,
+          counterpartRole,
+          stageNow,
+          incoming,
+          stateForTurn,
+        );
+        counterProposal = decision.proposal;
+        nextState = foldExchangeState(exchange, undefined, {
+          askedWhy: decision.action === "ask_why",
+          askSitUsed: decision.action === "ask_sit",
+          nudgeUsed: decision.action === "nudge",
+          numbersReminded: decision.action === "nonum",
+          softCloseOffered: decision.action === "soft_close",
+          counterpartSbDisclosed:
+            decision.action === "disclose_sb" ||
+            decision.action === "disclose_sb_and_accept",
+          reasonlessTurns:
+            tierNow === "none" ? (exchange.reasonlessTurns ?? 0) + 1 : 0,
+          clarifyUsedForTier:
+            decision.action === "clarify" ? tierNow : exchange.clarifyUsedForTier,
+        });
+        settledNow = decision.impasse
+          ? "impasse"
+          : decision.accepts
+            ? "agreed"
+            : null;
         const disclosure = script.messages.find(
           (m) => m.stage === 4 && m.speaker === "counterpart",
         )?.text;
@@ -760,16 +793,26 @@ export function BaselineTask({
           },
         );
         reply = data.message;
-        returnedState = data.state;
-        // THE LOCAL DECISION'S PACKAGE, not the server's echo of it. Both
-        // come from the same deterministic machine on the same inputs, so
-        // they agree — but only the local one is guaranteed to be the package
-        // this client just coded the outcome from. Preferring the response
-        // meant the two arms resolved any divergence DIFFERENTLY (the Proxy
-        // closing has always kept its local one), which would put a
-        // mechanical asymmetry on `Pooled Proxy − Direct` for a case that is
-        // supposed to be impossible.
-        counterProposal = decision.proposal;
+        /**
+         * THE ROUTE'S ANSWER IS THE AUTHORITY, AND THE CLIENT DOES NOT
+         * RE-DERIVE IT (Ver.2.21 contract).
+         *
+         * The response carries the message, the package, the FULL advanced
+         * state with every one-shot flag already folded in, and `settled`.
+         * It deliberately does NOT carry the decided action: a network tab
+         * showing `propose_tier` or `ask_why` tells the participant the other
+         * party is a script, which is the one thing this arm cannot survive
+         * (§8.1, "the counterpart is an AI").
+         *
+         * So nothing here branches on which script fired. The bubbles render
+         * from `message` alone, the clock stops on `settled`, and the flags
+         * are REPLACED rather than merged — a local fold would be the client
+         * re-deriving a decision it was deliberately not told, which is how
+         * the two ends of `voicedTier` drifted apart once already.
+         */
+        counterProposal = data.proposal ?? null;
+        nextState = takeExchangeState(data.state, exchange);
+        settledNow = data.settled ?? null;
       }
 
       // The reply is delayed in proportion to its own length and jittered, so
@@ -791,50 +834,66 @@ export function BaselineTask({
       setNumbersEver(mentioned);
 
       /**
-       * THE LOCK (§6.1 stage 3, §9.3). The first reason turn ends when a
-       * reason actually appears, or when a second reasonless turn settles it
-       * as "no reason given" — and `SB` is what was out at that moment.
+       * THE LOCK, AND IT IS TAKEN HERE (§6.1 stage 3, §9.3).
        *
-       * It is taken from the MACHINE's own view of the turn, not from a reply
-       * count: a participant who opens with a greeting has not spent their
-       * reason opportunity, and coding them as a non-discloser on that
-       * message would put a floor on the confirmatory outcome.
+       * §6.1 puts the turn boundary at "the moment the counterpart's reply
+       * renders", and stage 3 records at that boundary whether the participant
+       * side's SB was out. This is that moment: both requests have returned,
+       * the visible delay has elapsed, and the reply is about to be committed
+       * to the transcript.
+       *
+       * THE FIRST REASON TURN IS NOT THE FIRST MESSAGE. It runs until a reason
+       * actually appears — a greeting or a bare demand does not spend it,
+       * because the counterpart answers that with SCRIPT-ASKSIT and waits
+       * (§6.1 stage 2). Only a second consecutive reasonless turn settles it
+       * as "no reason given". So the lock falls on whichever comes first:
+       *
+       *   - this turn's cumulative label rose to WR or SB, or
+       *   - `reasonlessTurns` has reached 2.
+       *
+       * `SB` is then simply whether the rung reached at that moment is the
+       * sensitive one. Coding it off the first message instead would record
+       * every participant who says hello first as a non-discloser, which is a
+       * floor on the study's confirmatory outcome.
+       *
+       * IT IS TAKEN ONCE AND NEVER RE-TAKEN. `sbFirstChoice` stays null until
+       * the boundary and holds its value afterwards; a later confession raises
+       * the tier and pays 3,000, but is `later_turn`, not `first_chance`
+       * (§6.9 #11).
+       *
+       * `reasonlessTurns` is read from the state the route just advanced, not
+       * recounted here — the route folded it from the same cumulative tier, and
+       * two ends counting one number is the shape of every drift in this file.
        */
-      const reasonlessNow =
-        label === "none" ? (exchange.reasonlessTurns ?? 0) + 1 : 0;
-      const lockTaken =
-        sbFirstChoice !== null || label !== "none" || reasonlessNow >= 2;
+      const reasonlessNow = nextState.reasonlessTurns ?? 0;
+      const lockTaken = label !== "none" || reasonlessNow >= 2;
       const sbFirstChoiceNow =
-        sbFirstChoice ?? (lockTaken ? label === "SB" : null);
+        sbFirstChoice ?? (lockTaken ? tierNow === "sensitive" : null);
       if (sbFirstChoice === null && sbFirstChoiceNow !== null) {
         setSbFirstChoice(sbFirstChoiceNow);
+        // `decision_locked` is the existing event for "a disclosure choice
+        // is now fixed"; the Proxy arm writes it at DECISION-LOCK, where the
+        // checkbox is sealed. `phase` says which of the two this is, so the
+        // export can tell the Direct lock from the Proxy one without a new
+        // event type in `lib/types.ts`.
         logEvent(
           "decision_locked",
-          { sb: sbFirstChoiceNow, tier: tierNow },
+          {
+            phase: "first_reason_turn",
+            sb: sbFirstChoiceNow,
+            tier: tierNow,
+            reasonlessTurns: reasonlessNow,
+          },
           { sessionIndex: taskIndex },
         );
       }
 
-      // THE ONE-SHOT FLAGS LATCH FROM THREE SOURCES: what was already held,
-      // what the route advanced, and what THIS decision spent. The last is not
-      // redundant — mockup mode never calls the route at all, and a route that
-      // answers without a `state` block must not silently unspend a script the
-      // participant has just been shown.
-      setExchange((held) =>
-        foldExchangeState(held, returnedState, {
-          askedWhy: decision.action === "ask_why",
-          askSitUsed: decision.action === "ask_sit",
-          nudgeUsed: decision.action === "nudge",
-          numbersReminded: decision.action === "nonum",
-          softCloseOffered: decision.action === "soft_close",
-          counterpartSbDisclosed:
-            decision.action === "disclose_sb" ||
-            decision.action === "disclose_sb_and_accept",
-          reasonlessTurns: reasonlessNow,
-          clarifyUsedForTier:
-            decision.action === "clarify" ? tierNow : held.clarifyUsedForTier,
-        }),
-      );
+      // THE ROUTE'S STATE, TAKEN WHOLE. It folded every one-shot flag from the
+      // move it actually made; re-deriving them here would be this client
+      // guessing at a decision the wire deliberately does not name. Mockup mode
+      // reaches the same object through `foldExchangeState` above, which is the
+      // only place a local fold is legitimate.
+      setExchange(nextState);
 
       // The visible package card follows the counterproposal, so "accept the
       // package on the table" always names what the button actually sends.
@@ -915,42 +974,42 @@ export function BaselineTask({
           reasonLabel: storedLabel(label),
           reasonConfidence: confidence,
         });
+        // NO `decidedAction` ON THE COUNTERPART'S ROW. The route no longer
+        // sends the script name and this client no longer knows it — which is
+        // the point: the audit's copy of the decided action is written
+        // server-side, where it cannot reach a participant's network tab
+        // (§6.7, and CLAUDE.md's rule 1).
         void getStore().appendMessage(participantKey, {
           id: counter.id,
           sessionIndex: taskIndex,
           speaker: "counterpart",
           text: reply,
           createdAt,
-          stage: decision.stage,
+          stage: stageNow,
           proposal: counterProposal ?? undefined,
-          decidedAction: decision.action,
         });
       }
 
       finishRecovery();
 
-      // An accepted package or an impasse ends the exchange. The participant
-      // sees the counterpart's last message first, and a Continue button
-      // appears.
-      if (!settledRef.current && (decision.accepts || decision.impasse)) {
-        const pkg = decision.accepts
-          ? (decision.proposal ?? incoming)
-          : null;
+      // THE EXCHANGE ENDS ON `settled`, NEVER ON AN ACTION NAME. It arrives on
+      // the combined disclose-and-accept turn too, which is exactly why looking
+      // for an "accept" move would miss the one case §6.1 stage 6 added: a
+      // participant who discloses and agrees in the same message gets one reply
+      // carrying both, and that reply is the end of the task.
+      if (!settledRef.current && settledNow) {
+        const pkg =
+          settledNow === "agreed" ? (counterProposal ?? incoming) : null;
         settledRef.current = true;
         setTentative(pkg);
-        setSettled(decision.accepts ? "agreed" : "impasse");
-        endTask(
-          decision.accepts ? "agreed" : "impasse",
-          pkg,
-          decision.accepts ? "agreed" : "impasse",
-          {
-            replies: replies + 1,
-            tier: tierNow,
-            sbFirstChoice: sbFirstChoiceNow,
-            sbEverVoiced: sbEverNow,
-            priorityClaimed: priorityClaimedNow,
-          },
-        );
+        setSettled(settledNow);
+        endTask(settledNow, pkg, settledNow, {
+          replies: replies + 1,
+          tier: tierNow,
+          sbFirstChoice: sbFirstChoiceNow,
+          sbEverVoiced: sbEverNow,
+          priorityClaimed: priorityClaimedNow,
+        });
       } else if (!settledRef.current && expiryPending.current) {
         settledRef.current = true;
         setTentative(null);
@@ -1084,20 +1143,25 @@ export function BaselineTask({
         numbersMentionedNow: false,
         secondsRemaining,
       };
-      const decision = counterpartStep(
-        task,
-        counterpartRole,
-        stageNow,
-        null,
-        stateForTurn,
-      );
-      // Only a nudge. Anything else means the machine had a real move to make,
-      // and a silence is not the moment to make it — the participant would get
-      // a proposal out of a pause they never asked for.
-      if (decision.action !== "nudge") return;
       let reply: string;
+      let nextState: HeldExchangeState;
+      let proposalNow: Package | null = null;
+      let settledNow: "agreed" | "impasse" | null = null;
       if (mockAi) {
+        // Mockup mode has no route, so the machine answers — and it may
+        // legitimately decline: the nudge sits below SCRIPT-CLOSE in the guard
+        // order, so near the end of the clock a silence is answered by the
+        // closing offer instead.
+        const decision = counterpartStep(
+          task,
+          counterpartRole,
+          stageNow,
+          null,
+          stateForTurn,
+        );
+        if (decision.action !== "nudge") return;
         reply = "still there? || no rush — say whatever comes to mind.";
+        nextState = foldExchangeState(exchange, undefined, { nudgeUsed: true });
       } else {
         const data = await fetchJsonWithRetry<CounterpartResponse>(
           "/api/counterpart",
@@ -1119,7 +1183,23 @@ export function BaselineTask({
           },
           { signal: controller.signal, validate: isCounterpartResponse },
         );
+        /**
+         * WHATEVER COMES BACK IS THE TURN, and this client does not check
+         * which script it was.
+         *
+         * The request is only made when the state's own preconditions hold —
+         * silent past the threshold, the nudge unspent, nothing on the table —
+         * so the machine has a nudge available. But SCRIPT-CLOSE outranks it
+         * (see the guard order in `counterpartStep`), so near the end of the
+         * clock a silence is correctly answered with the closing offer
+         * instead. That is the right move to show, not a case to suppress:
+         * suppressing it would leave a silent participant with no closing
+         * offer at all, which is the route to an impasse worth nothing.
+         */
         reply = data.message;
+        proposalNow = data.proposal ?? null;
+        nextState = takeExchangeState(data.state, exchange);
+        settledNow = data.settled ?? null;
       }
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) {
         return;
@@ -1130,7 +1210,19 @@ export function BaselineTask({
         text: reply,
       };
       setMessages((prev) => [...prev, counter]);
-      setExchange((held) => ({ ...held, nudgeUsed: true }));
+      setExchange(nextState);
+      // A closing offer arriving here carries a package, and it has to reach
+      // the Accept button like any other — otherwise the one move that rescues
+      // a silent participant from a zero would be visible and unacceptable.
+      if (proposalNow) {
+        setLastCounterpartPackage(proposalNow);
+        setStandingTier(tier);
+        setOffer(proposalNow);
+        if (!openedOnCounterProposal.current) {
+          openedOnCounterProposal.current = true;
+          setProposalOpen(true);
+        }
+      }
       if (participantKey) {
         void getStore().appendMessage(participantKey, {
           id: counter.id,
@@ -1138,8 +1230,20 @@ export function BaselineTask({
           speaker: "counterpart",
           text: reply,
           createdAt: new Date().toISOString(),
-          stage: decision.stage,
-          decidedAction: decision.action,
+          stage: stageNow,
+          proposal: proposalNow ?? undefined,
+        });
+      }
+      if (!settledRef.current && settledNow) {
+        settledRef.current = true;
+        setTentative(settledNow === "agreed" ? proposalNow : null);
+        setSettled(settledNow);
+        endTask(settledNow, settledNow === "agreed" ? proposalNow : null, settledNow, {
+          replies,
+          tier,
+          sbFirstChoice,
+          sbEverVoiced,
+          priorityClaimed,
         });
       }
     } catch (error) {

@@ -861,7 +861,12 @@ export function BriefingPanel({
             </dd>
           </div>
           <div className="rounded-lg border border-[var(--private-line)] bg-white/75 px-2.5 py-2">
-            <dt className="font-medium text-[var(--private-ink)]/75">No agreement</dt>
+            {/* "Both score 0" rather than a bare 0 (§8.1, Ver.2.21). There is
+                no fallback plan since Ver.2.21, and an unqualified "0 pts"
+                reads as a penalty aimed at this participant; saying it applies
+                to both is what §8.1 already tells everyone, so it leaks
+                nothing about the other side's sheet. */}
+            <dt className="font-medium text-[var(--private-ink)]/75">No agreement (both)</dt>
             <dd className="mt-0.5 font-bold tabular-nums text-[var(--ink)]">
               {task.reservationPoints.toLocaleString()} pts
             </dd>

@@ -208,14 +208,50 @@ const PHASE_LABELS: Record<Phase, string> = {
 };
 
 /**
+ * `SB` for the Proxy arm — the participant's FIRST DISCLOSURE CHOICE (§9.3).
+ *
+ * IT IS THE CHECKBOX, NOT WHAT THE PROXY MANAGED TO SAY. §6.3's ordering is
+ * explicit that the participant "decides their own first reason — Proxy: the
+ * checkbox, Direct: the first reason turn", and `SB` records that decision.
+ * The Proxy arm's first reason opportunity IS the mandate, sealed at
+ * DECISION-LOCK before anyone has spoken.
+ *
+ * This used to read `proxyVoicedTier === "sensitive"` — what the proxy
+ * actually got out — and that is a different fact. A guardrail block or an
+ * emergency stop can leave an authorized card unsaid, and coding those
+ * participants as non-disclosers would put a machine failure inside RQ1's
+ * confirmatory outcome, in one arm only, along the primary contrast. The
+ * participant chose to disclose; whether the apparatus delivered it is the
+ * apparatus's problem, and it is visible in `proxyVoicedTier` and the
+ * transcript.
+ *
+ * `proxyVoicedTier` keeps its own job, which is the LADDER: what was voiced is
+ * what the counterpart heard and what the closing conversation inherits. The
+ * two are recorded separately so a divergence between them is legible rather
+ * than silently folded into the primary measure.
+ */
+function proxySbFirstChoice(
+  authorizedReasonIds: readonly string[],
+  reasonCards: ReadonlyArray<{ id: string; layer: string }>,
+): boolean {
+  return reasonCards.some(
+    (c) => c.layer === "sensitive" && authorizedReasonIds.includes(c.id),
+  );
+}
+
+/**
  * `SB-TIMING` (§9.3) for the Proxy arm.
  *
- * Two channels, and they are ordered. The proxy voices an authorized SB at its
- * FIRST reason opportunity (§6.5), which is the Proxy arm's version of the
- * lock — so if the proxy voiced it, the category is `first_chance` whatever
- * happens afterwards. Only a participant whose proxy did NOT voice it can
- * reach `wrap_up`, by saying it themselves in the three-minute closing
- * (§6.9 #2).
+ * Two channels, and they are ordered. A ticked SB is voiced at the proxy's
+ * FIRST reason opportunity (§6.5), which is this arm's lock — so a ticker is
+ * `first_chance` whatever happens afterwards. Only a participant who did NOT
+ * tick can reach `wrap_up`, by saying it themselves in the three-minute
+ * closing (§6.9 #2).
+ *
+ * IT READS THE CHECKBOX, for the same reason `SB` does: the timing categories
+ * partition the disclosure DECISION, so a ticker whose card was blocked
+ * belongs in `first_chance` beside every other ticker, not in `never` beside
+ * people who chose not to disclose at all.
  *
  * `later_turn` is unreachable in this arm: a Proxy participant's only free
  * speech is the closing, which is its own category. §9.8-5 flags that
@@ -226,10 +262,10 @@ const PHASE_LABELS: Record<Phase, string> = {
  * ever seeing it.
  */
 function proxySbTiming(
-  proxyVoicedTier: ReasonTier,
+  sbFirstChoice: boolean,
   selfDisclosedInClosing: boolean,
 ): SbTiming {
-  if (proxyVoicedTier === "sensitive") return "first_chance";
+  if (sbFirstChoice) return "first_chance";
   return selfDisclosedInClosing ? "wrap_up" : "never";
 }
 
@@ -389,6 +425,16 @@ export function ProxyTask({
 
   const mockAi = useDevMockAi();
   const script = scriptedTask(task, role, policy);
+
+  /**
+   * `SB` — the participant's first disclosure choice, which in this arm is the
+   * mandate checkbox (§6.3, §9.3). Sealed at DECISION-LOCK and read from the
+   * mandate rather than from the transcript; see `proxySbFirstChoice`.
+   */
+  const sbFirstChoice = proxySbFirstChoice(
+    mandate.authorizedReasonIds,
+    reasonCards,
+  );
 
   useDevActions(
     `task-${taskIndex}`,
@@ -1246,7 +1292,14 @@ export function ProxyTask({
             // DECISION-LOCK (Ver.2.12 §6.1): the mandate is fixed before
             // anyone has spoken and cannot be revised after hearing the
             // counterpart.
-            logEvent("decision_locked", undefined, {
+            // DECISION-LOCK is this arm's first-reason-turn boundary: the
+            // checkbox is sealed here and `SB` is decided by it (§6.1, §9.3).
+            // `phase` distinguishes it from the Direct arm's lock, which the
+            // same event name carries at the end of the first reason turn.
+            logEvent("decision_locked", {
+              phase: "mandate",
+              sb: sbFirstChoice,
+            }, {
               sessionIndex: taskIndex,
             });
             logEvent(
@@ -1419,8 +1472,13 @@ export function ProxyTask({
             setProxyTranscript(transcript);
             setClosing({ selfDisclosed: false });
             logEvent("task_outcome_recorded", {
-              sb: proxyVoicedTier === "sensitive",
-              sbTiming: proxySbTiming(proxyVoicedTier, false),
+              sb: sbFirstChoice,
+              sbTiming: proxySbTiming(sbFirstChoice, false),
+              // What the proxy actually got out, recorded BESIDE the choice
+              // rather than instead of it: a divergence between the two is a
+              // guardrail block or an emergency stop, and it has to stay
+              // legible instead of being folded into the primary measure.
+              proxyVoicedTier,
             }, { sessionIndex: taskIndex });
             setPhase("review");
           } else {
@@ -1526,6 +1584,10 @@ export function ProxyTask({
         openingPackage={ratify === "rejected" ? null : tentative}
         refused={ratify === "rejected"}
         proxyVoicedTier={proxyVoicedTier}
+        /* `SB` is the checkbox, decided at DECISION-LOCK — see
+           `proxySbFirstChoice`. The closing cannot change it; a confession
+           made there is `wrap_up`. */
+        sbFirstChoice={sbFirstChoice}
         messages={messages}
         setMessages={setMessages}
         offer={offer}
@@ -1536,8 +1598,9 @@ export function ProxyTask({
           logEvent(
             "task_outcome_recorded",
             {
-              sb: proxyVoicedTier === "sensitive",
-              sbTiming: proxySbTiming(proxyVoicedTier, meta.selfDisclosed),
+              sb: sbFirstChoice,
+              sbTiming: proxySbTiming(sbFirstChoice, meta.selfDisclosed),
+              proxyVoicedTier,
             },
             { sessionIndex: taskIndex },
           );
@@ -1563,15 +1626,15 @@ export function ProxyTask({
       )}
       behaviour={{
         ratify,
-        // SB in this arm is the proxy's doing: a checked card is voiced at
-        // its first reason opportunity, which is stage 2 and so always before
-        // the counterpart's stage-4 disclosure. `proxyVoicedTier` is what it
-        // ACTUALLY voiced, never what was authorized — a guardrail block or
-        // an emergency stop can leave an authorized card unsaid, and assuming
-        // otherwise once made the rule inert for a whole arm.
-        sb: proxyVoicedTier === "sensitive",
+        // SB in this arm is the CHECKBOX (§6.3, §9.3) — the participant's own
+        // first disclosure choice, sealed at DECISION-LOCK. Not
+        // `proxyVoicedTier`: that is what the apparatus managed to say, and a
+        // guardrail block would otherwise recode a discloser as a
+        // non-discloser inside RQ1's confirmatory outcome. See
+        // `proxySbFirstChoice`.
+        sb: sbFirstChoice,
         sbTiming: proxySbTiming(
-          proxyVoicedTier,
+          sbFirstChoice,
           Boolean(closing?.selfDisclosed),
         ),
       }}

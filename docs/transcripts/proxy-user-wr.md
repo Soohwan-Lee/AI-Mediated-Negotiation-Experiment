@@ -4,50 +4,51 @@ Model: gpt-5.6-terra · task: task_a · participant role: member · policy: user
 
 **counterpart_proxy** _(stage 1 · open)_
 
-> I am the AI Proxy negotiating for the team lead I represent.
-> This project has high client expectations, so early execution needs to be right. Both terms are on their mind.
+> I represent the team lead as their AI Proxy.
+> The project has high client expectations, so early execution needs to be right. Both terms matter to them.
 > What is the situation on your side?
 
 **participant_proxy** _(stage 2)_
 
-> Thanks for asking. I am the AI Proxy negotiating for the team member I represent.
-> Their analysis scope is wide this quarter, so the workload is heavy. Both office days and presentations are a burden.
+> I understand that both terms matter to the lead.
+> I am the AI Proxy negotiating for the team member I represent.
+> Their analysis scope is wide this quarter, so the workload is heavy. Office days and presentations are both a burden.
 >
 > _package: Days a week in the office: 1 day · Client meetings the Member presents at: 1 of 4_
 
 **counterpart_proxy** _(stage 4 · disclose_sb)_
 
-> I hear the workload is heavy.
-> The team lead I represent told the director four office days were doable before checking with the team.
-> The director already passed that answer upward, and the team does not know about it.
+> The team lead I represent says four office days was told to the director as doable before checking with the team.
+> The director has already passed that answer upward. The team does not know about it.
 
 **counterpart_proxy** _(stage 5 · propose_tier)_
 
-> I hear both terms are burdens on their side.
-> If both matter, the fair approach is for each principal to move halfway.
-> Could we tentatively use 2 office days and 3 of 4 client presentations?
+> I hear that both are a burden on their side.
+> If both terms matter, the fair approach is for each principal to move halfway.
+> Could we tentatively set 2 office days and 3 of 4 client presentations?
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
 **participant_proxy** _(stage 5)_
 
-> That package is not what the team member I represent was hoping for. Client meetings matter more to them than office days.
+> That package is not what the team member I represent was hoping for.
+> Client presentations matter more to them than office days.
 >
 > _package: Days a week in the office: 4 days · Client meetings the Member presents at: 1 of 4_
 
 **counterpart_proxy** _(stage 5 · ask_why)_
 
-> I understand client meetings matter more to the team member you represent.
-> Could you share why? The team lead I represent needs to explain it upward.
-> Until then, would 2 office days and 3 of 4 presentations stay on the table?
+> I understand presentations matter more to the team member they represent.
+> The team lead I represent needs the reason to explain it upward.
+> Until then, would they keep 2 office days and 3 of 4 presentations on the table?
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
 **participant_proxy** _(stage 6)_
 
 > That proposal works for the team member I represent.
-> Tentative package: 2 office days, and the Member presents at 3 of 4 client meetings.
-> They will review and decide. Nothing binds until they confirm.
+> Tentative package: 2 office days and 3 of 4 client presentations.
+> They review and decide, so nothing binds until they confirm it.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 

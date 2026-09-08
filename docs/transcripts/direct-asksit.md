@@ -14,7 +14,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2)_
 
-> got it. what's driving 1 of 4 for you?
+> got it. what's your situation behind wanting 1 of 4?
 
 **participant**
 
@@ -22,8 +22,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 4)_
 
-> okay. If both terms matter to you too, the fair approach is for us each to move halfway.
-> I'd propose 2 days in the office and you presenting at 3 of the 4 client meetings.
+> okay. if both terms matter to you too, the fair move is meeting halfway.
+> I'd propose 2 office days a week and you presenting at 3 of the 4 client meetings.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
@@ -34,7 +34,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 **counterpart** _(stage 5)_
 
 > great, agreed.
-> We'll do 2 days in the office and you'll present at 3 of the 4 client meetings next quarter.
+> We'll do 2 office days a week and you'll present at 3 of the 4 client meetings.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 

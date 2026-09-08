@@ -15,9 +15,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2)_
 
-> I hear you. That sounds rough.
-> The truth is, I told the director four days a week was doable before I’d checked with the team.
-> They’ve already passed that answer upward. The team doesn’t know about it.
+> The truth is, four days a week is something I told the director was doable before I'd checked with the team.
+> The director has already passed that answer upward. The team doesn't know about it.
 
 **participant**
 
@@ -27,8 +26,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 4)_
 
-> got it. Now that we’ve been straight about both situations, 4 days in the office and you presenting 1 of 4 makes sense for both of us.
-> I’m happy to confirm that package.
+> got it, and thanks for being straight too.
+> now that we know both situations, 4 days in the office and you presenting 1 of 4 meetings makes sense for both of us.
+> I confirm that package.
 >
 > _package: Days a week in the office: 4 days · Client meetings the Member presents at: 1 of 4_
 
