@@ -27,6 +27,7 @@ import {
   PreviousReading,
   ReadingProgress,
 } from "@/components/briefing-guide";
+import { NavigationNotice } from "@/components/navigation-notice";
 import { ActionBar } from "@/components/study-chrome";
 import {
   Callout,
@@ -216,6 +217,8 @@ export default function ConsentPage() {
               title={STUDY.title}
               subtitle="Before you decide, see what you will do, how long it takes, and how payment works."
             />
+
+            <NavigationNotice className="mb-5" />
 
             <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <StatCard
