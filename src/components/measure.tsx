@@ -28,34 +28,6 @@ import {
 
 export type Answers = SurveyResponses;
 
-/**
- * Prefixes each item's wording with its id — `(PERC-F1) Explaining my reasons…`,
- * `(OE-P4) …`, `(SUS1) …` — in muted monospace, on every screen.
- *
- * FOR THE RESEARCHER READING THE SCREENS, NOT FOR THE PARTICIPANT. The ids are
- * the column names in the export (Interface rule 7), so having them on screen
- * is what makes a walk-through checkable against Design §9 without counting
- * questions. A participant has no way to know what `PERC-F1` means, so it reads
- * as an item number rather than as a hint about what the item is for.
- *
- * IT IS A RENDER-TIME PREFIX AND NEVER ENTERS AN ANSWER. The node is built here
- * and handed to the control as a `ReactNode`; `item.text` in `lib/measures` is
- * untouched, so nothing saved, logged or exported can carry an id inside a
- * value. It is also `aria-hidden` where a control mirrors its wording for a
- * screen reader — `Scale` takes the plain string as `srStatement` — so the id
- * is visual only.
- */
-function withId(id: string, text: string) {
-  return (
-    <>
-      <span aria-hidden className="font-mono text-[0.9em] text-[var(--ink-3)]">
-        ({id}){" "}
-      </span>
-      {text}
-    </>
-  );
-}
-
 export function MeasureBlock({
   block,
   answers,
@@ -168,7 +140,7 @@ function MeasureItem({
     return (
       <Scale
         id={item.id}
-        statement={withId(item.id, item.text)}
+        statement={item.text}
         srStatement={item.text}
         value={asNumber}
         onChange={(v) => onChange(item.id, v)}
@@ -186,8 +158,8 @@ function MeasureItem({
   if (item.kind === "amount") {
     return (
       <div id={`q-${item.id}`} className="scroll-mt-24">
-        <Field
-          label={withId(item.id, item.text)}
+      <Field
+          label={item.text}
           required={!optional}
           flagged={flagged}
         >
@@ -206,13 +178,14 @@ function MeasureItem({
   return (
     <div id={`q-${item.id}`} className="scroll-mt-24">
       <Field
-        label={withId(item.id, item.text)}
+        label={item.text}
         required={!optional}
         flagged={flagged}
       >
         {item.kind === "choice" ? (
           <ChoiceList
             name={item.id}
+            ariaLabel={item.text}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             options={item.options}
@@ -220,6 +193,7 @@ function MeasureItem({
           />
         ) : item.kind === "select" ? (
           <Select
+            ariaLabel={item.text}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             options={item.options}
@@ -228,18 +202,21 @@ function MeasureItem({
           <TextInput
             type="number"
             inputMode="numeric"
+            ariaLabel={item.text}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             placeholder={item.placeholder}
           />
         ) : item.kind === "line" ? (
           <TextInput
+            ariaLabel={item.text}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             placeholder={item.placeholder}
           />
         ) : (
           <TextArea
+            ariaLabel={item.text}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             rows={item.rows ?? 3}
@@ -247,6 +224,11 @@ function MeasureItem({
           />
         )}
       </Field>
+      {item.hint ? (
+        <p className="mt-2 text-xs leading-relaxed text-[var(--ink-3)]">
+          {item.hint}
+        </p>
+      ) : null}
     </div>
   );
 }

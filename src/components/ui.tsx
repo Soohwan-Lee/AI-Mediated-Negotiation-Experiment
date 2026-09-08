@@ -387,12 +387,14 @@ export function TextInput({
   placeholder,
   type = "text",
   inputMode,
+  ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   type?: "text" | "number";
   inputMode?: "numeric";
+  ariaLabel?: string;
 }) {
   return (
     <input
@@ -400,6 +402,7 @@ export function TextInput({
       inputMode={inputMode}
       value={value}
       placeholder={placeholder}
+      aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value)}
       className={INPUT_CLASS}
     />
@@ -411,17 +414,20 @@ export function TextArea({
   onChange,
   placeholder,
   rows = 3,
+  ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   rows?: number;
+  ariaLabel?: string;
 }) {
   return (
     <textarea
       value={value}
       rows={rows}
       placeholder={placeholder}
+      aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value)}
       className={cx(INPUT_CLASS, "resize-y leading-relaxed")}
     />
@@ -433,15 +439,18 @@ export function Select({
   onChange,
   options,
   placeholder = "Choose…",
+  ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: Array<{ value: string; label: string }>;
   placeholder?: string;
+  ariaLabel?: string;
 }) {
   return (
     <select
       value={value}
+      aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value)}
       className={cx(INPUT_CLASS, "cursor-pointer font-medium")}
     >
@@ -462,15 +471,21 @@ export function ChoiceList({
   onChange,
   options,
   columns = 1,
+  ariaLabel,
 }: {
   name: string;
   value: string;
   onChange: (v: string) => void;
   options: Array<{ value: string; label: string; hint?: string }>;
   columns?: 1 | 2;
+  ariaLabel?: string;
 }) {
   return (
-    <div className={cx("grid gap-2.5", columns === 2 && "sm:grid-cols-2")}>
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      className={cx("grid gap-2.5", columns === 2 && "sm:grid-cols-2")}
+    >
       {options.map((o) => {
         const selected = value === o.value;
         return (

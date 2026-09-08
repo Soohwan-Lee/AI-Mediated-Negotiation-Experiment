@@ -1,50 +1,18 @@
 "use client";
 
 /**
- * The reward decision after one task (Experimental Design Ver.2.4 §8, §9.4.8).
- *
- * THE ONLY SCREEN THAT DIFFERS BY ROLE, and the asymmetry is the manipulation:
- * a Leader decides the Member's bonus for this task, and a Member receives one.
- * That is what makes the Leader's reward power real rather than asserted, and
- * POWER1 at the end of the study is the check that it landed.
- *
- * FOR THE LEADER this is a behavioural outcome (`BONUS`), not a survey item.
- * The instruction is fixed wording from §8 and names both the negotiation
- * result AND how the other person came across, because a bonus decided on
- * points alone would measure nothing about the interaction — which is the part
- * this study is about.
- *
- * FOR THE MEMBER THERE IS NO NUMBER. They see that a decision is being made,
- * and then the study moves on.
- *
- * This replaces a fixed 70/100 presented as the Leader's judgement, and it is
- * a better design in three separate ways.
- *
- *  - It removes a deception rather than managing one. A constant dressed as a
- *    judgement had to be disclosed at `/debriefing`; there is now nothing to
- *    disclose except that the counterpart was not a person, which is disclosed
- *    anyway. (Members are still told explicitly that no bonus decision was
- *    made about them, because the waiting screen implies one was.)
- *  - It removes a tell. The same 70 arriving after two visibly different
- *    negotiations says the number is fixed, and a participant who notices that
- *    has noticed the study is not what it claims.
- *  - It removes a contaminant. A payout seen after Task 1 is a response the
- *    Task 2 measures would pick up; the whole reason the number had to be
- *    constant was to stop it varying, and not showing one stops it entirely.
- *
- * WHAT THE WAIT IS STILL DOING. POWER2 asks whether outcomes that mattered
- * depended on the other person's decisions, and it is the Member-side half of
- * gate 2's manipulation check. Waiting while someone else decides your bonus
- * IS that experience — the number was never what made the power real, the
- * dependence was. The Leader's actual choice is still recorded as `BONUS`; it
- * simply never travels to the Member.
+ * Ver.2.23 post-task sequence: the Leader recommends £0–£0.50, or the Member
+ * submits one upward-evaluation rating; then REMARK, ATTR, and the condition-
+ * specific interpretation question follow. Recommendations are observed
+ * scenario decisions. Actual participant payment is fixed and disclosed at
+ * debriefing.
  */
 
 import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
+import { TranscriptReview } from "@/components/transcript-review";
 import {
-  AmountScale,
   Callout,
   Card,
   CardTitle,
@@ -58,13 +26,14 @@ import {
   RECV_EVAL_BLOCK,
   blockForTask,
   dummyAnswer,
+  postCommentOpenBlock,
   requiredIds,
 } from "@/lib/measures";
 import { RemarkPhase } from "../remark";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { getTask } from "@/lib/tasks";
-import { NEGOTIATION, STUDY, nextHref, pauseMs } from "@/lib/study-config";
+import { STUDY, nextHref } from "@/lib/study-config";
 
 export default function TaskRewardPage({
   params,
@@ -79,16 +48,21 @@ export default function TaskRewardPage({
   const router = useRouter();
   const { assignment, participantKey, logEvent } = useParticipant();
   const [amount, setAmount] = useState<number | null>(null);
+  const [amountConfirmed, setAmountConfirmed] = useState(false);
   /** Member: the upward evaluation, then the wait. */
   const [evalAnswers, setEvalAnswers] = useState<Answers>({});
   const [evalSubmitted, setEvalSubmitted] = useState(false);
-  const [revealed, setRevealed] = useState(false);
   /**
    * REMARK comes LAST on this screen (§6.8 rule 4): every confirmatory measure
    * — PERC, PCR, PNPQ, PNOQ, OWN/OTHER-AI, and the decision above — is already
    * recorded, so a mildly negative comment cannot contaminate any of them.
    */
   const [showRemark, setShowRemark] = useState(false);
+  const [showOpenAnswer, setShowOpenAnswer] = useState(false);
+  const [openAnswers, setOpenAnswers] = useState<Answers>({});
+  const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
+  const [restored, setRestored] = useState(false);
   /**
    * Did this task reach a package? REMARK's opener differs — "glad we got
    * that sorted" would be false after an impasse — and nothing else about the
@@ -113,20 +87,41 @@ export default function TaskRewardPage({
     };
   }, [participantKey, taskIndex]);
 
+  useEffect(() => {
+    if (!participantKey) return;
+    let active = true;
+    void Promise.all([
+      getStore().loadResponses(participantKey, `reward_t${taskIndex}`),
+      getStore().loadResponses(participantKey, `recv_eval_t${taskIndex}`),
+      getStore().loadResponses(participantKey, `attr_t${taskIndex}`),
+      getStore().loadResponses(participantKey, `post_comment_open_t${taskIndex}`),
+    ]).then(([reward, evaluation, attr, open]) => {
+      if (!active) return;
+      if (open) {
+        router.replace(nextHref(flowKey));
+        return;
+      }
+      if (attr) {
+        setShowOpenAnswer(true);
+      } else if (reward || evaluation) {
+        if (reward && typeof reward[`BONUS_t${taskIndex}`] === "number") {
+          setAmount(reward[`BONUS_t${taskIndex}`] as number);
+          setAmountConfirmed(true);
+        }
+        if (evaluation) {
+          setEvalAnswers(evaluation);
+          setEvalSubmitted(true);
+        }
+        setShowRemark(true);
+      }
+      setRestored(true);
+    });
+    return () => { active = false; };
+  }, [flowKey, participantKey, router, taskIndex]);
+
   const isLeader = assignment?.role === "leader";
   const plan = assignment ? sessionPlan(assignment, taskIndex) : null;
   const task = plan ? getTask(plan.taskId) : null;
-
-  // The Member's wait starts only after their evaluation is in — the §7
-  // order is RECV-EVAL first, then "the Leader is deciding…".
-  useEffect(() => {
-    if (isLeader || !assignment || !evalSubmitted) return;
-    const id = window.setTimeout(
-      () => setRevealed(true),
-      pauseMs(NEGOTIATION.matchmakingMs),
-    );
-    return () => window.clearTimeout(id);
-  }, [isLeader, assignment, evalSubmitted]);
 
   const evalBlock = blockForTask(RECV_EVAL_BLOCK, taskIndex);
   const evalRequired = requiredIds(evalBlock);
@@ -139,31 +134,40 @@ export default function TaskRewardPage({
     setEvalAnswers((prev) => ({ ...prev, ...filled }));
   }, `reward-${taskIndex}`);
 
-  const canContinue = useDevGate(isLeader ? amount !== null : revealed);
+  const canContinue = useDevGate(isLeader ? amount !== null && amountConfirmed : evalSubmitted);
   const canSubmitEval = useDevGate(evalMissing.length === 0);
 
   async function submitEval() {
-    if (!canSubmitEval) return;
-    if (participantKey) {
-      await getStore().saveResponses(
-        participantKey,
-        `recv_eval_t${taskIndex}`,
-        evalAnswers,
-      );
+    if (!canSubmitEval || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      if (participantKey) {
+        await getStore().saveResponses(participantKey, `recv_eval_t${taskIndex}`, evalAnswers);
+      }
+      logEvent("reward_decision", { kind: "recv_eval" }, { sessionIndex: taskIndex });
+      setEvalSubmitted(true);
+      setShowRemark(true);
+      window.scrollTo({ top: 0 });
+    } finally {
+      submitting.current = false;
+      setBusy(false);
     }
-    logEvent("reward_decision", { kind: "recv_eval" }, {
-      sessionIndex: taskIndex,
-    });
-    setEvalSubmitted(true);
-    window.scrollTo({ top: 0 });
   }
 
   /** The decision is recorded first, then REMARK is shown (§6.8 rule 4). */
   async function save() {
-    if (!canContinue) return;
-    await persistDecision();
-    setShowRemark(true);
-    window.scrollTo({ top: 0 });
+    if (!canContinue || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      await persistDecision();
+      setShowRemark(true);
+      window.scrollTo({ top: 0 });
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
   }
 
   async function persistDecision() {
@@ -191,14 +195,48 @@ export default function TaskRewardPage({
         answers,
       );
     }
-    router.push(nextHref(flowKey));
+    setShowOpenAnswer(true);
+    window.scrollTo({ top: 0 });
   }
 
-  if (!assignment) {
+  const isProxy = plan?.condition !== "direct";
+  const openBlock = blockForTask(postCommentOpenBlock(isProxy), taskIndex);
+  const openMissing = requiredIds(openBlock).filter((id) => openAnswers[id] === undefined || openAnswers[id] === "");
+  const canSubmitOpen = useDevGate(openMissing.length === 0);
+
+  useDevAutofill(() => {
+    if (!showOpenAnswer) return;
+    setOpenAnswers(Object.fromEntries(openBlock.items.map((item) => [item.id, dummyAnswer(item)])));
+  }, `reward-open-${taskIndex}-${showOpenAnswer}`);
+
+  async function finishOpenAnswer() {
+    if (!canSubmitOpen || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      if (participantKey) {
+        await getStore().saveResponses(participantKey, `post_comment_open_t${taskIndex}`, openAnswers);
+      }
+      router.push(nextHref(flowKey));
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
+  if (!assignment || !restored) {
+    return <Page><p className="text-sm text-[var(--ink-2)]">Loading…</p></Page>;
+  }
+
+  if (showOpenAnswer) {
     return (
-      <Page>
-        <p className="text-sm text-[var(--ink-2)]">Loading…</p>
-      </Page>
+      <>
+        <Page>
+          <TranscriptReview participantKey={participantKey} taskIndex={taskIndex} />
+          <MeasureBlock block={openBlock} answers={openAnswers} onChange={(id, value) => setOpenAnswers((previous) => ({ ...previous, [id]: value }))} />
+        </Page>
+        <ActionBar label="Submit & Continue" onClick={finishOpenAnswer} busy={busy} disabled={!canSubmitOpen} remaining={openMissing.length} firstUnansweredId={openMissing[0] ?? null} />
+      </>
     );
   }
 
@@ -206,7 +244,7 @@ export default function TaskRewardPage({
     return (
       <RemarkPhase
         taskIndex={taskIndex}
-        isProxy={plan?.condition !== "direct"}
+        isProxy={isProxy}
         agreed={agreed}
         onDone={finishRemark}
       />
@@ -234,14 +272,14 @@ export default function TaskRewardPage({
                 👑 Team Lead Decision · Task {taskIndex}
               </span>
               <span className="text-xs font-bold text-slate-500">
-                Bonus Allocation
+                Bonus Recommendation
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--ink)]">
-              💰 Decide the Member&apos;s Study Bonus
+              💰 Recommend the Member&apos;s Bonus
             </h1>
             <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-              As the team lead, you decide the study bonus payment
+              As the team lead, you recommend a bonus
               for this task. Please consider not only the negotiation result
               but <strong>the negotiation as a whole, and whether you would
               want to work with this person again</strong>.
@@ -250,18 +288,42 @@ export default function TaskRewardPage({
 
           <Card className="mb-6 border-slate-200" id={`q-${BONUS_ITEM.id}`}>
             <CardTitle hint={bonusUnit}>{BONUS_ITEM.text}</CardTitle>
-            <div className="mt-3">
-              <AmountScale
+            <div className="mt-5">
+              <label htmlFor={`BONUS_t${taskIndex}`} className="sr-only">
+                Bonus percentage from 0 to 100
+              </label>
+              <input
                 id={`BONUS_t${taskIndex}`}
-                value={amount}
-                onChange={setAmount}
-                step={5}
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={amount ?? 0}
+                onChange={(event) => {
+                  setAmount(Number(event.target.value));
+                  setAmountConfirmed(false);
+                }}
+                className="w-full accent-[var(--accent)]"
+                aria-valuetext={amount === null ? "No value selected" : `${STUDY.currencySymbol}${awarded}`}
               />
+              <div className="mt-2 flex justify-between text-xs font-semibold text-[var(--ink-3)]">
+                <span>{STUDY.currencySymbol}0.00</span>
+                <span>{STUDY.currencySymbol}{STUDY.bonusPerTask}</span>
+              </div>
+              {amount === null ? (
+                <button
+                  type="button"
+                  onClick={() => setAmount(0)}
+                  className="mt-4 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-[var(--accent)]"
+                >
+                  Choose {STUDY.currencySymbol}0.00
+                </button>
+              ) : null}
             </div>
             {awarded !== null ? (
               <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-center">
                 <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                  Allocated Bonus Amount
+                  Recommended Bonus Amount
                 </p>
                 <p className="text-2xl sm:text-3xl font-black text-emerald-950 font-mono my-1">
                   {STUDY.currencySymbol}{awarded}
@@ -273,20 +335,34 @@ export default function TaskRewardPage({
             ) : null}
           </Card>
 
-          <Callout title="ℹ️ Independent Allocation" tone="neutral">
+          <label className="mb-6 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-700">
+            <input
+              type="checkbox"
+              checked={amountConfirmed}
+              disabled={amount === null}
+              onChange={(event) => setAmountConfirmed(event.target.checked)}
+              className="mt-0.5 h-5 w-5 accent-[var(--accent)]"
+            />
+            <span>
+              I intend to recommend {amount === null ? "the amount shown above" : `${STUDY.currencySymbol}${awarded}`} for this task.
+            </span>
+          </label>
+
+          <Callout title="ℹ️ Independent Recommendation" tone="neutral">
             <p>
-              This is your independent decision as Leader. Awarded bonuses are added directly to the participant&apos;s Prolific compensation.
+              This recommendation does not reduce your own payment.
             </p>
           </Callout>
         </Page>
 
         <ActionBar
-          label="Confirm Bonus Allocation"
+          label="Confirm Bonus Recommendation"
           onClick={save}
+          busy={busy}
           disabled={!canContinue}
-          remaining={amount === null ? 1 : 0}
+          remaining={amount === null || !amountConfirmed ? 1 : 0}
           firstUnansweredId={amount === null ? `BONUS_t${taskIndex}` : null}
-          note={amount === null ? "⚠️ Please select a bonus percentage." : "✓ Ready to confirm"}
+          note={amount === null ? "Choose a value, even if it is £0.00." : !amountConfirmed ? "Confirm the exact amount before continuing." : "Ready to confirm"}
         />
       </>
     );
@@ -307,7 +383,7 @@ export default function TaskRewardPage({
               Evaluate the Team Lead
             </h1>
             <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-              Please write your evaluation of the team lead, considering not
+              Please provide your evaluation of the team lead, considering not
               only the negotiation result but <strong>the negotiation as a
               whole, and whether you would want to work with them
               again</strong>. It will be passed to the director.
@@ -326,6 +402,7 @@ export default function TaskRewardPage({
         <ActionBar
           label="Submit Evaluation"
           onClick={submitEval}
+          busy={busy}
           disabled={!canSubmitEval}
           remaining={evalMissing.length}
           firstUnansweredId={evalMissing[0] ?? null}
@@ -335,64 +412,5 @@ export default function TaskRewardPage({
     );
   }
 
-  return (
-    <>
-      <Page>
-        {!revealed ? (
-          <div className="flex min-h-[45vh] flex-col items-center justify-center text-center">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200 text-2xl shadow-sm">
-              ⏳
-            </div>
-            <span aria-hidden className="mb-4 inline-flex gap-2">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="h-2.5 w-2.5 animate-bounce rounded-full bg-[var(--accent)]"
-                  style={{ animationDelay: `${i * 0.15}s` }}
-                />
-              ))}
-            </span>
-            {/* A HEADING, NOT A PARAGRAPH. This is the page's own title and
-                the two sibling screens in this file (the Leader's decision and
-                the Member's evaluation) both title themselves with an `h1`, so
-                a bold `<p>` here left the Member's wait as the one screen in
-                the flow with no heading in its outline — invisible to a screen
-                reader moving by headings, on the screen that carries the power
-                manipulation. `h1` rather than `h2` to match those siblings:
-                each of these is the whole page. */}
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-              The team lead is deciding your study bonus…
-            </h1>
-            <p className="mt-2 max-w-prose text-xs sm:text-sm text-slate-600">
-              They were asked to consider the negotiation result together with
-              what they learned during the negotiation.
-            </p>
-          </div>
-        ) : (
-          <Card className="mb-6 border-slate-200 bg-white">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-900">
-                ✓ Recorded
-              </span>
-            </div>
-            <CardTitle hint={`Task ${taskIndex} of 2`}>
-              Decision Submitted
-            </CardTitle>
-            <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-              The team lead has submitted their bonus decision for Task {taskIndex}.
-              Any awarded bonus is added to your Prolific payment once the whole
-              study concludes.
-            </p>
-          </Card>
-        )}
-      </Page>
-
-      <ActionBar
-        label="Continue to Next Step"
-        onClick={save}
-        disabled={!canContinue}
-        note={revealed ? "✓ Ready to proceed" : "Waiting for the decision…"}
-      />
-    </>
-  );
+  return <Page><p className="text-sm text-[var(--ink-2)]">Saving your evaluation…</p></Page>;
 }

@@ -18,6 +18,6 @@ test("COMP2 plainly checks that both people must agree", () => {
   assert.equal(COMPREHENSION_ANSWERS.COMP2, "no");
   assert.equal(
     COMPREHENSION_REMEDIATION.COMP2,
-    "Neither person can decide the working conditions alone. Both people must agree on both conditions; otherwise, the default conditions apply.",
+    "Neither side can decide both terms alone. Both sides must agree.",
   );
 });

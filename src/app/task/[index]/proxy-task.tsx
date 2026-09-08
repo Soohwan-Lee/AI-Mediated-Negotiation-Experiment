@@ -3,18 +3,12 @@
 /**
  * Proxy task (Experimental Design Ver.2.20 §7–8).
  *
- * Flow: cover → brief → RISK → mandate (levels + reasons) → confirm →
+ * Flow: cover → brief → mandate (levels + reasons) → confirm →
  *       matchmaking → WATCH the two AI Proxies negotiate → ratify → review.
- *       Modification/refusal instead leads through a three-minute closing.
+ *       Modification/refusal instead leads through a two-minute closing.
  *
- * Four things in that line are recent and easy to write back the old way:
+ * Three things in that line are recent and easy to write back the old way:
  *
- *  - RISK comes before the mandate, not after. It asks what the participant
- *    EXPECTS raising their requirement to cost, so asking it after the mandate
- *    would have them answer having already decided which sensitive cards to
- *    hand over and read the policy disclosure — a pre-task measure turned
- *    partly post-treatment, in one arm only. It is now asked straight after
- *    the briefing, which is where Direct asks it too.
  *  - The mandate is ONE screen. Levels on both terms and the reason cards
  *    used to be two screens in sequence; deciding a position and deciding what
  *    may be said for it is one act, and that the second half was never asked
@@ -61,8 +55,6 @@ import {
 import { ProxyFigure } from "@/components/proxy-art";
 import { ActionBar } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Page, cx } from "@/components/ui";
-import { MeasureBlock } from "@/components/measure";
-import { m1Item } from "@/lib/measures";
 import {
   useDevActions,
   useDevAutofill,
@@ -101,34 +93,15 @@ import {
   Matchmaking,
   PreferenceForm,
   RehearsalChat,
-  RiskForm,
   TaskBrief,
   TaskIntro,
   type Preferences,
 } from "./shared";
 
-/**
- * RISK COMES BEFORE THE MANDATE, and that ordering is not cosmetic.
- *
- * An earlier version of this file asked it after the mandate — so a Proxy
- * participant answered "raising this could make them think worse of me" having
- * ALREADY decided which sensitive cards to hand over, read the two-box framing
- * and been told the policy. That makes a pre-task measure partly
- * post-treatment in one arm only, and RISK is §10 gate 4's task-equivalence
- * instrument, so it cannot carry a condition effect.
- *
- * Merging the levels and the reason cards onto one screen made the old
- * placement unsafe even where it had been fine: after that screen is after the
- * mandate. Both arms now ask it in the same place, cold, straight after the
- * briefing:
- *
- *   Direct: brief → RISK → levels → negotiate
- *   Proxy:    brief → RISK → levels + reasons → confirm → watch → negotiate
- */
+/** Ver.2.23 removes the pre-task RISK battery. */
 type Phase =
   | "intro"
   | "brief"
-  | "risk"
   | "mandate"
   | "rehearsal"
   | "confirm"
@@ -142,7 +115,6 @@ type Phase =
 const PHASES: Phase[] = [
   "intro",
   "brief",
-  "risk",
   "mandate",
   "rehearsal",
   "confirm",
@@ -170,7 +142,6 @@ const PHASES: Phase[] = [
  */
 const STEP_LABELS = [
   "Your briefing",
-  "Before you start",
   "Your instructions",
   "Check with it",
   "Check and start",
@@ -186,16 +157,15 @@ const STEP_LABELS = [
  * that gap costs something.
  */
 const COVER_STEPS = [
-  { label: "Prepare", hint: "Read your briefing, answer two questions, then set your goals and sharing choices." },
+  { label: "Prepare", hint: "Read your briefing, then set your goals and sharing choices." },
   { label: "Watch your AI Proxy", hint: "You can ask it questions before it speaks to the other Proxy." },
-  { label: "Decide", hint: "Approve the proposed agreement, or request changes/refuse and talk directly for up to 3 minutes." },
+  { label: "Decide", hint: "Approve the proposed agreement, or request changes/refuse and talk directly for up to 2 minutes." },
 ];
 
 /** Readable names for the dev panel's phase jumps. */
 const PHASE_LABELS: Record<Phase, string> = {
   intro: "Start screen",
   brief: "Your briefing",
-  risk: "Before you start",
   mandate: "Your instructions",
   rehearsal: "Check with it",
   confirm: "Check and start",
@@ -245,7 +215,7 @@ function proxySbFirstChoice(
  * Two channels, and they are ordered. A ticked SB is voiced at the proxy's
  * FIRST reason opportunity (§6.5), which is this arm's lock — so a ticker is
  * `first_chance` whatever happens afterwards. Only a participant who did NOT
- * tick can reach `wrap_up`, by saying it themselves in the three-minute
+ * tick can reach `wrap_up`, by saying it themselves in the two-minute
  * closing (§6.9 #2).
  *
  * IT READS THE CHECKBOX, for the same reason `SB` does: the timing categories
@@ -273,16 +243,15 @@ const STEP_OF: Record<Phase, number> = {
   /* The cover is not a counted step — see the note on STEP_LABELS. */
   intro: 0,
   brief: 0,
-  risk: 1,
-  mandate: 2,
-  rehearsal: 3,
-  confirm: 4,
-  matchmaking: 5,
-  watching: 5,
-  ratify: 6,
-  handover: 6,
-  negotiate: 6,
-  review: 7,
+  mandate: 1,
+  rehearsal: 2,
+  confirm: 3,
+  matchmaking: 4,
+  watching: 4,
+  ratify: 5,
+  handover: 5,
+  negotiate: 5,
+  review: 6,
 };
 
 /**
@@ -409,8 +378,6 @@ export function ProxyTask({
    */
   const stopped = useRef(false);
   const [showStopped, setShowStopped] = useState(false);
-  /** M1 (§9.3): asked right after the mandate, of non-disclosers only. */
-  const [m1Answer, setM1Answer] = useState<string | null>(null);
   /**
    * RATIFY (§9.3) — recorded on the decision screen, not inferred afterwards.
    * A participant who asked for a change and then agreed the very same package
@@ -833,7 +800,7 @@ export function ProxyTask({
         steps={COVER_STEPS}
         scene="proxy"
         /* The longer arm: two conversations where Direct has one. */
-        minutes={15}
+        minutes={5}
         onStart={() => setPhase("brief")}
       />
     );
@@ -847,19 +814,6 @@ export function ProxyTask({
         role={role}
         steps={STEP_LABELS}
         onBack={() => setPhase("intro")}
-        onContinue={() => setPhase("risk")}
-      />
-    );
-  }
-
-  if (phase === "risk") {
-    return (
-      <RiskForm
-        taskIndex={taskIndex}
-        task={task}
-        role={role}
-        steps={STEP_LABELS}
-        stepIndex={STEP_OF.risk}
         onContinue={() => setPhase("mandate")}
       />
     );
@@ -1011,13 +965,7 @@ export function ProxyTask({
       (c) =>
         c.layer === "sensitive" && mandate.authorizedReasonIds.includes(c.id),
     );
-    const m1Block = {
-      id: "m1",
-      title: "One quick question",
-      items: [{ ...m1Item("proxy"), id: `M1_t${taskIndex}` }],
-    };
-    const needsM1 = !sbChecked && m1Answer === null;
-    const confirmReady = !needsM1;
+    const confirmReady = true;
 
     return (
       <>
@@ -1260,19 +1208,6 @@ export function ProxyTask({
               </ol>
             </div>
 
-            {!sbChecked ? (
-              <div className="mb-6">
-                <MeasureBlock
-                  block={m1Block}
-                  answers={
-                    m1Answer === null
-                      ? {}
-                      : { [`M1_t${taskIndex}`]: m1Answer }
-                  }
-                  onChange={(_, value) => setM1Answer(String(value))}
-                />
-              </div>
-            ) : null}
           </TaskLayout>
         </Page>
 
@@ -1283,11 +1218,6 @@ export function ProxyTask({
             if (!confirmReady) return;
             if (participantKey) {
               await getStore().saveMandate(participantKey, mandate);
-              if (m1Answer !== null) {
-                await getStore().saveResponses(participantKey, `m1_t${taskIndex}`, {
-                  [`M1_t${taskIndex}`]: m1Answer,
-                });
-              }
             }
             // DECISION-LOCK (Ver.2.12 §6.1): the mandate is fixed before
             // anyone has spoken and cannot be revised after hearing the
@@ -1541,7 +1471,7 @@ export function ProxyTask({
           { label: "Make your proposal", hint: "Choose one option for each condition and write your message." },
           { label: "Agree on both conditions", hint: "If time runs out without agreement, nothing is settled and you both score 0 for this task." },
         ]}
-        minutes={3}
+        minutes={2}
         actionLabel="Start the closing conversation"
         onStart={() => {
           setProxyTranscript(transcript);

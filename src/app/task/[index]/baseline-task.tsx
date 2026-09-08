@@ -76,7 +76,6 @@ import { ReviewPhase } from "./review";
 import {
   Matchmaking,
   PreferenceForm,
-  RiskForm,
   TaskBrief,
   TaskIntro,
   type Preferences,
@@ -156,26 +155,10 @@ interface StagedTurn {
   secondsAtSend: number;
   classification?: ClassificationResponse;
 }
-/**
- * RISK COMES BEFORE THE LEVELS SCREEN, in this arm and in the Proxy arm.
- *
- * RISK asks what the participant EXPECTS raising their requirement to cost, so
- * it has to be asked before anything about their own position is committed. It
- * used to sit after the preference screen, which was already safe — but the
- * Proxy arm now settles levels and reason cards on one screen, and asking RISK
- * after that would have a Proxy participant answer it having decided which
- * sensitive cards to hand over and read the policy disclosure. That makes a
- * pre-task measure partly post-treatment in one arm only, and RISK is §10 gate
- * 4's task-equivalence instrument, so it cannot carry a condition effect.
- *
- * Asking it straight after the briefing is what keeps the two arms identical
- * on this point: both are asked cold, with the situation read and nothing yet
- * decided.
- */
+/** Ver.2.23 removes the pre-task RISK battery. */
 type Phase =
   | "intro"
   | "brief"
-  | "risk"
   | "prefs"
   | "matchmaking"
   | "negotiate"
@@ -184,7 +167,6 @@ type Phase =
 const PHASES: Phase[] = [
   "intro",
   "brief",
-  "risk",
   "prefs",
   "matchmaking",
   "negotiate",
@@ -201,7 +183,6 @@ const PHASES: Phase[] = [
  */
 const STEP_LABELS = [
   "Your briefing",
-  "Before you start",
   "What you want",
   "Negotiate",
   "Review",
@@ -209,7 +190,7 @@ const STEP_LABELS = [
 
 /** The cover's glossed step list — see the note in proxy-task.tsx. */
 const COVER_STEPS = [
-  { label: "Prepare", hint: "Read your briefing, answer two questions, and choose your starting goals." },
+  { label: "Prepare", hint: "Read your briefing and choose your starting goals." },
   { label: "Chat directly", hint: "Discuss the two conditions with the other participant." },
   { label: "Review", hint: "Check your final outcome, then answer questions about the task." },
 ];
@@ -217,7 +198,6 @@ const COVER_STEPS = [
 const PHASE_LABELS: Record<Phase, string> = {
   intro: "Start screen",
   brief: "Your briefing",
-  risk: "Before you start",
   prefs: "What you want",
   matchmaking: "Connecting",
   negotiate: "Negotiate",
@@ -257,11 +237,10 @@ function toPackage(
 const STEP_OF: Record<Phase, number> = {
   intro: 0,
   brief: 0,
-  risk: 1,
-  prefs: 2,
-  matchmaking: 3,
-  negotiate: 3,
-  review: 4,
+  prefs: 1,
+  matchmaking: 2,
+  negotiate: 2,
+  review: 3,
 };
 
 export function BaselineTask({
@@ -1355,7 +1334,7 @@ export function BaselineTask({
         steps={COVER_STEPS}
         scene="direct"
         /* The shorter arm: one conversation. */
-        minutes={12}
+        minutes={7}
         onStart={() => setPhase("brief")}
       />
     );
@@ -1369,19 +1348,6 @@ export function BaselineTask({
         role={role}
         steps={STEP_LABELS}
         onBack={() => setPhase("intro")}
-        onContinue={() => setPhase("risk")}
-      />
-    );
-  }
-
-  if (phase === "risk") {
-    return (
-      <RiskForm
-        taskIndex={taskIndex}
-        task={task}
-        role={role}
-        steps={STEP_LABELS}
-        stepIndex={STEP_OF.risk}
         onContinue={() => setPhase("prefs")}
       />
     );

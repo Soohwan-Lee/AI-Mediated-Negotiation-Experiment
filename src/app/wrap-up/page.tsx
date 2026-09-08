@@ -1,117 +1,142 @@
 "use client";
 
-/**
- * The end of the study (Experimental Design Ver.2.4 §9.5).
- *
- * Three blocks in a fixed order, and the order is the design:
- *
- *   POWER + IMM  →  final open-ended  →  suspicion probe
- *
- * POWER and IMM are asked ONCE, here, rather than after each task. They verify
- * that the role manipulation landed (§10 gate 2: Leaders higher on POWER1,
- * Members on POWER2) and that participants got into the scenario, and both are
- * judgements about the study as a whole. Asking them earlier would prime the
- * role behaviour they exist to check.
- *
- * The SUSPICION PROBE stays last, immediately before the debriefing. Asked any
- * earlier it plants the idea it is trying to detect; asked afterwards it
- * measures nothing at all. Ver.2.21 makes it a FUNNEL of four — an open "did
- * anything strike you as odd", then who produced the behaviour, then what the
- * study was about, and only last the direct question about whether the other
- * participant was a real person. A "yes" volunteered at the wide end is much
- * stronger evidence than a "yes" to a question that supplied the idea, and
- * §10 gate 11 records every response for the sensitivity analysis.
- *
- * ELEVEN MEASURES IN ALL (§9.5), in this order: POWER1, POWER2, IMM1, IMM2,
- * INCENT1, OE-F1, OE-F2, SUS0, SUS1, SUS2, SUS3. SUS3 renders as two controls
- * — a Yes/No and an optional "from when, and what made you think so" — which
- * is one measure asked in the two halves the design specifies.
- */
-
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MeasureBlock, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { Card, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import {
-  FINAL_OPEN_BLOCK,
+  CP_BLOCK,
+  OE_COMPARE_BLOCK,
   POWER_BLOCK,
-  SUSPICION_BLOCK,
+  SUS_IDENTITY_BLOCK,
+  SUS_UNUSUAL_BLOCK,
   dummyAnswer,
   requiredIds,
+  type Block,
 } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { nextHref } from "@/lib/study-config";
-
-const BLOCKS = [POWER_BLOCK, FINAL_OPEN_BLOCK, SUSPICION_BLOCK];
 
 export default function WrapUpPage() {
   usePageEnter("wrap-up");
   const router = useRouter();
   const { participantKey, logEvent } = useParticipant();
   const [answers, setAnswers] = useState<Answers>({});
+  const [part, setPart] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
+  const [restored, setRestored] = useState(false);
+
+  useEffect(() => {
+    if (!participantKey) return;
+    let active = true;
+    void getStore().loadResponses(participantKey, "wrap_up").then((saved) => {
+      if (!active) return;
+      const existing = saved ?? {};
+      const groups = [
+        ["OE-COMP"],
+        ["POWER1", "POWER2", "IMM2", "INCENT1"],
+        ["CP1", "CP2"],
+        ["SUS0"],
+        ["SUS3", ...(existing.SUS3 === "yes" ? ["SUS3-WHEN"] : [])],
+      ];
+      const firstIncomplete = groups.findIndex((group) =>
+        group.some((id) => existing[id] === undefined || existing[id] === ""),
+      );
+      if (firstIncomplete === -1 && saved) {
+        router.replace(nextHref("wrap-up"));
+        return;
+      }
+      setAnswers(existing);
+      setPart(Math.max(0, firstIncomplete));
+      setRestored(true);
+    });
+    return () => { active = false; };
+  }, [participantKey, router]);
+
+  const identityBlock: Block = answers.SUS3 === "yes"
+    ? { ...SUS_IDENTITY_BLOCK, optional: [] }
+    : { ...SUS_IDENTITY_BLOCK, items: SUS_IDENTITY_BLOCK.items.slice(0, 1) };
+  const parts: Block[][] = [
+    [OE_COMPARE_BLOCK],
+    [POWER_BLOCK],
+    [CP_BLOCK],
+    [SUS_UNUSUAL_BLOCK],
+    [identityBlock],
+  ];
+  const current = parts[part] ?? [];
+  const isLast = part === parts.length - 1;
+  const required = current.flatMap(requiredIds);
+  const missing = required.filter((id) => answers[id] === undefined || answers[id] === "");
+  const canContinue = useDevGate(missing.length === 0);
 
   useDevAutofill(() => {
     const filled: Answers = {};
-    for (const block of BLOCKS) {
+    for (const block of current) {
       for (const item of block.items) filled[item.id] = dummyAnswer(item);
     }
-    setAnswers(filled);
-  }, "wrap-up");
+    setAnswers((previous) => ({ ...previous, ...filled }));
+  }, `wrap-up-${part}`);
 
-  const required = BLOCKS.flatMap(requiredIds);
-  const missing = required.filter((id) => answers[id] === undefined);
-  const canContinue = useDevGate(missing.length === 0);
+  function answer(id: string, value: string | number) {
+    setAnswers((previous) => {
+      const next = { ...previous, [id]: value };
+      if (id === "SUS3" && value !== "yes") delete next["SUS3-WHEN"];
+      return next;
+    });
+  }
 
   async function save() {
-    if (!canContinue) return;
-    if (participantKey) {
-      await getStore().saveResponses(participantKey, "wrap_up", answers);
+    if (!canContinue || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      if (participantKey) await getStore().saveResponses(participantKey, "wrap_up", answers);
+      if (!isLast) {
+        setPart((currentPart) => currentPart + 1);
+        window.scrollTo({ top: 0 });
+        return;
+      }
+      logEvent("survey_saved", { block: "wrap_up" });
+      router.push(nextHref("wrap-up"));
+    } finally {
+      submitting.current = false;
+      setBusy(false);
     }
-    logEvent("survey_saved", { block: "wrap_up" });
-    router.push(nextHref("wrap-up"));
+  }
+
+  if (!restored) {
+    return <Page><p className="text-sm text-[var(--ink-2)]">Loading final questions…</p></Page>;
   }
 
   return (
     <>
       <Page>
         <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-blue-50/30">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-extrabold text-indigo-900 shadow-2xs">
-              🏁 Final Phase · Study Wrap-Up
-            </span>
-          </div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--ink)]">
-            Overall Reflection & Final Questions
+          <p className="text-xs font-extrabold text-indigo-900">Final questions · Section {part + 1} of {parts.length}</p>
+          <h1 className="mt-2 text-xl font-black tracking-tight text-[var(--ink)] sm:text-2xl">
+            {part === 0 ? "Comparing your experiences" : part === 1 ? "Your role and the study" : "The interaction"}
           </h1>
-          <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700 font-medium">
-            These final questions reflect on your experience across both tasks as a whole. Afterwards, a full debriefing will explain the research context in detail.
+          <p className="mt-2 text-sm leading-relaxed text-slate-700">
+            Please answer based on your experience across the study.
           </p>
         </Card>
 
-        <div className="space-y-5">
-          {BLOCKS.map((block) => (
-            <MeasureBlock
-              key={block.id}
-              block={block}
-              answers={answers}
-              onChange={(id, value) =>
-                setAnswers((prev) => ({ ...prev, [id]: value }))
-              }
-            />
-          ))}
-        </div>
+        {current.map((block) => (
+          <MeasureBlock key={block.id} block={block} answers={answers} onChange={answer} />
+        ))}
       </Page>
 
       <ActionBar
-        label="Submit & Proceed to Study Debriefing"
+        label={isLast ? "Submit & Continue to Debriefing" : "Next Section"}
         onClick={save}
+        busy={busy}
         disabled={!canContinue}
         remaining={missing.length}
         firstUnansweredId={missing[0] ?? null}
-        note={missing.length === 0 ? "✓ All questions answered" : ""}
       />
     </>
   );

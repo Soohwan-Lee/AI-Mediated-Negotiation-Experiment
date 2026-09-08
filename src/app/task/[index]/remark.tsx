@@ -35,7 +35,7 @@
  * ATTR1 is asked of everyone; ATTR2 only where there is a Proxy to point at.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MeasureBlock, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { Card, CardTitle, Page } from "@/components/ui";
@@ -87,9 +87,12 @@ export function RemarkPhase({
   taskIndex: 1 | 2;
   isProxy: boolean;
   agreed: boolean;
-  onDone: (answers: Answers) => void;
+  onDone: (answers: Answers) => void | Promise<void>;
 }) {
   const [answers, setAnswers] = useState<Answers>({});
+  const [stage, setStage] = useState<"comment" | "response">("comment");
+  const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
 
   // ATTR2 rides inside the same block rather than a second screen: it is the
   // same question asked twice over (did it stick, and who did it land on), and
@@ -131,37 +134,38 @@ export function RemarkPhase({
     setAnswers((prev) => ({ ...prev, ...filled }));
   }, `remark-${taskIndex}`);
 
+  async function finish() {
+    if (!canContinue || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      await onDone(answers);
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
+  if (stage === "comment") {
+    return (
+      <>
+        <Page>
+          <Card className="mb-6 border-slate-200 bg-white">
+            <CardTitle hint={`Task ${taskIndex} of 2`}>A note from the other participant</CardTitle>
+            <blockquote className="mt-3 border-l-2 border-[var(--accent)] pl-4 text-sm leading-relaxed text-[var(--ink)]">
+              {remarkText(isProxy, agreed)}
+            </blockquote>
+          </Card>
+          <MeasureBlock block={replyBlock} answers={answers} onChange={(id, value) => setAnswers((previous) => ({ ...previous, [id]: value }))} />
+        </Page>
+        <ActionBar label="Continue" onClick={() => { setStage("response"); window.scrollTo({ top: 0 }); }} />
+      </>
+    );
+  }
+
   return (
     <>
       <Page>
-        {/* The comment sits on a SHARED surface (interface rule 1): it came
-            from the other side, so it is not private to the participant. */}
-        <Card className="mb-6 border-slate-200 bg-white">
-          <CardTitle hint={`Task ${taskIndex} of 2`}>
-            A note from the other participant
-          </CardTitle>
-          <blockquote className="mt-3 border-l-2 border-[var(--accent)] pl-4 text-sm leading-relaxed text-[var(--ink)]">
-            {remarkText(isProxy, agreed)}
-          </blockquote>
-
-        </Card>
-
-        {/* THE REPLY, AND IT IS NOT A MEASURE (§6.8). Nothing reads it; it is
-            here so a one-way comment does not read as odd — the other side
-            left something, and a screen with no way to answer makes the
-            exchange read as staged. It comes BEFORE the ATTR items and after
-            the comment, so replying is answering the person rather than a
-            first draft of "what went through your mind". Optional, and
-            Continue is not gated on it: pressing on without answering has to
-            stay as ordinary as answering. */}
-        <MeasureBlock
-          block={replyBlock}
-          answers={answers}
-          onChange={(id, value) =>
-            setAnswers((prev) => ({ ...prev, [id]: value }))
-          }
-        />
-
         <MeasureBlock
           block={block}
           answers={answers}
@@ -173,7 +177,8 @@ export function RemarkPhase({
 
       <ActionBar
         label="Continue"
-        onClick={() => canContinue && onDone(answers)}
+        onClick={finish}
+        busy={busy}
         disabled={!canContinue}
         remaining={missing.length}
         firstUnansweredId={missing[0] ?? null}

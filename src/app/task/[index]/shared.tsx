@@ -4,20 +4,11 @@
  * Phases shared by the Direct and Proxy tasks (Experimental Design Ver.2.4
  * §8).
  *
- * The order of the first three matters and is not arbitrary:
+ * The opening order matters and is not arbitrary:
  *
- *   brief → RISK → levels (+ reason cards, in Proxy) → negotiate
+ *   brief → levels (+ reason cards, in Proxy) → negotiate
  *
- * RISK IS FIRST, straight after the briefing and before anything about the
- * participant's own position is committed. It asks what they EXPECT raising
- * their requirement to cost — an expectation, which stops being one the moment
- * a decision has been taken. Asking it here is also what keeps the two arms
- * identical on this point, now that the Proxy arm settles levels and reason
- * cards on a single screen: "after the levels screen" would mean "after the
- * mandate" in one arm and not the other, and RISK is §10 gate 4's
- * task-equivalence instrument.
- *
- * THE LEVELS come next. They are the first point on the trajectory the study
+ * THE LEVELS follow the briefing. They are the first point on the trajectory the study
  * measures — what you wanted, then what you entrusted, then what you opened
  * with, then what survived the challenge, then what reached the final
  * package — and taking them after the condition were visible would contaminate
@@ -37,7 +28,6 @@ import {
   type SetStateAction,
 } from "react";
 import Image from "next/image";
-import { MeasureBlock, type Answers } from "@/components/measure";
 import { NavigationNotice } from "@/components/navigation-notice";
 import {
   CountdownTimer,
@@ -89,7 +79,6 @@ import { ActionBar } from "@/components/study-chrome";
 import { ReadingProgress, PreviousReading } from "@/components/briefing-guide";
 import { Callout, Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
-import { dummyAnswer, riskBlock } from "@/lib/measures";
 import { comparePointsToFallback } from "@/lib/points-display";
 import { useParticipant } from "@/lib/participant-context";
 import {
@@ -210,7 +199,7 @@ export function TaskIntro({
 // Phase: scenario brief
 // ---------------------------------------------------------------------------
 
-/** All pages are read in both modes before RISK or any mandate decision. */
+/** All pages are read in both modes before any preference or mandate decision. */
 export function TaskBrief({
   taskIndex, task, role, steps, onBack, onContinue,
 }: {
@@ -315,6 +304,11 @@ export function TaskBrief({
             <ul className="mb-5 list-disc space-y-2 pl-5 text-sm leading-relaxed">
               {brief.objectives.map(objective => <li key={objective}>{objective}</li>)}
             </ul>
+            <p className="mb-4 rounded-xl border border-slate-200 bg-white/70 px-3.5 py-3 text-sm leading-relaxed text-[var(--private-ink)]">
+              <strong>Task points are not money.</strong> They show how well the
+              agreed working conditions fit your goals and do not directly
+              determine your study payment.
+            </p>
             <IssueValueTable issues={task.issues} role={role} reservationPoints={task.reservationPoints} />
             <p className="mt-5 text-sm leading-relaxed">{brief.batnaSummary}</p>
             <p className="mt-3 text-sm font-semibold">The other person cannot see these values. Do not share point numbers in the conversation.</p>
@@ -362,7 +356,7 @@ export function TaskBrief({
         )}
       </Page>
       <ActionBar
-        label={page === 3 ? "Continue to two short questions" : `Next: ${labels[page + 1].toLowerCase()}`}
+        label={page === 3 ? "Continue to task setup" : `Next: ${labels[page + 1].toLowerCase()}`}
         onClick={() => {
           if (page < 3) move(page + 1);
           else {
@@ -694,90 +688,6 @@ export function PreferenceForm({
 }
 
 // ---------------------------------------------------------------------------
-// Phase: RISK, straight after the briefing
-// ---------------------------------------------------------------------------
-
-export function RiskForm({
-  taskIndex,
-  task,
-  role,
-  steps,
-  stepIndex,
-  onContinue,
-}: {
-  taskIndex: 1 | 2;
-  task: NegotiationTask;
-  role: Role;
-  steps: string[];
-  stepIndex: number;
-  onContinue: () => void;
-}) {
-  const { participantKey, logEvent } = useParticipant();
-  const block = riskBlock(task, role);
-  const [answers, setAnswers] = useState<Answers>({});
-
-  useDevAutofill(
-    () =>
-      setAnswers(
-        Object.fromEntries(block.items.map((i) => [i.id, dummyAnswer(i)])),
-      ),
-    `risk-t${taskIndex}`,
-  );
-
-  const missing = block.items
-    .filter((i) => answers[i.id] === undefined)
-    .map((i) => i.id);
-  const canContinue = useDevGate(missing.length === 0);
-
-  async function save() {
-    if (!canContinue) return;
-    if (participantKey) {
-      await getStore().saveResponses(participantKey, `risk_t${taskIndex}`, {
-        taskId: task.id,
-        role,
-        ...answers,
-      });
-    }
-    logEvent("survey_saved", { block: `risk_t${taskIndex}` }, {
-      sessionIndex: taskIndex,
-    });
-    onContinue();
-  }
-
-  return (
-    <>
-      <Page width="wide">
-        <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
-          <TaskHeader
-            taskIndex={taskIndex}
-            title="Two Quick Questions Before You Begin"
-            steps={steps}
-            current={stepIndex}
-          />
-
-          <MeasureBlock
-            block={block}
-            answers={answers}
-            onChange={(id, value) =>
-              setAnswers((prev) => ({ ...prev, [id]: value }))
-            }
-          />
-        </TaskLayout>
-      </Page>
-
-      <ActionBar
-        label="Continue"
-        onClick={save}
-        disabled={!canContinue}
-        remaining={missing.length}
-        firstUnansweredId={missing[0] ?? null}
-        note={missing.length === 0 ? "✓ Ready" : ""}
-      />
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Phase: waiting for the other participant
 // ---------------------------------------------------------------------------
 
@@ -1095,9 +1005,9 @@ export function DecisionButton({
 // ---------------------------------------------------------------------------
 
 /**
- * The participant's own conversation — the Proxy arm's three-minute closing,
+ * The participant's own conversation — the Proxy arm's two-minute closing,
  * and (through `baseline-task.tsx`, which passes the same props) the Direct
- * arm's ten minutes.
+ * arm's five minutes.
  *
  * THESE TWO MUST STAY BEHAVIOURALLY IDENTICAL. They are the only two places a
  * participant speaks for themselves, so a difference between them lands on
@@ -2014,7 +1924,7 @@ export function DirectNegotiation({
          * WHATEVER COMES BACK IS THE TURN, and this client does not check
          * which script it was. The request is made only when the state's own
          * preconditions hold, so a nudge is available — but SCRIPT-CLOSE
-         * outranks it, and near the end of a three-minute clock that is the
+         * outranks it, and near the end of a two-minute clock that is the
          * right move to show. Suppressing it would leave a silent participant
          * with no closing offer at all, which is the route to a zero.
          */
