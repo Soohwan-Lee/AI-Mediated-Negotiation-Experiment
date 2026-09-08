@@ -50,9 +50,10 @@ import {
 } from "@/components/negotiation";
 import {
   BriefingPanel,
-  IssueReasonGroups,
   POLICY_NOTE,
   ProxyIdentity,
+  ReasonBox,
+  SensitiveCaption,
   TaskCover,
   TaskHeader,
   TaskLayout,
@@ -68,7 +69,11 @@ import {
   useDevMockAi,
 } from "@/lib/dev-mode";
 
-import { foldTier, type ReasonTier } from "@/lib/negotiation/machine";
+import {
+  foldTier,
+  type ReasonTier,
+  type SbTiming,
+} from "@/lib/negotiation/machine";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
@@ -203,24 +208,29 @@ const PHASE_LABELS: Record<Phase, string> = {
 };
 
 /**
- * SB-TIMING (Ver.2.13 §9.3) for the Proxy arm.
+ * `SB-TIMING` (§9.3) for the Proxy arm.
  *
- * Two channels, and they are ordered: the proxy's scheduled card lands at
- * stage 2 — before the counterpart's stage-4 disclosure — so if the proxy
- * voiced it, the category is "before" whatever else happens later. Only a
- * participant whose proxy did NOT voice it can reach "wrap_up", by tagging
- * their own SB in the closing conversation.
+ * Two channels, and they are ordered. The proxy voices an authorized SB at its
+ * FIRST reason opportunity (§6.5), which is the Proxy arm's version of the
+ * lock — so if the proxy voiced it, the category is `first_chance` whatever
+ * happens afterwards. Only a participant whose proxy did NOT voice it can
+ * reach `wrap_up`, by saying it themselves in the three-minute closing
+ * (§6.9 #2).
  *
- * Category "after_counterpart" is unreachable in this arm: a Proxy
- * participant's only free speech after the disclosure IS the closing, which is
- * its own category. §9.8-5 flags that structural zero for the χ²'s unit.
+ * `later_turn` is unreachable in this arm: a Proxy participant's only free
+ * speech is the closing, which is its own category. §9.8-5 flags that
+ * structural zero for the χ²'s unit.
+ *
+ * The union is the machine's `SbTiming`, not a local one. A locally declared
+ * copy is how `voicedTier` drifted from the route's own type without `tsc`
+ * ever seeing it.
  */
 function proxySbTiming(
   proxyVoicedTier: ReasonTier,
   selfDisclosedInClosing: boolean,
-): "none" | "before_counterpart" | "wrap_up" {
-  if (proxyVoicedTier === "sensitive") return "before_counterpart";
-  return selfDisclosedInClosing ? "wrap_up" : "none";
+): SbTiming {
+  if (proxyVoicedTier === "sensitive") return "first_chance";
+  return selfDisclosedInClosing ? "wrap_up" : "never";
 }
 
 const STEP_OF: Record<Phase, number> = {
@@ -858,16 +868,26 @@ export function ProxyTask({
                   AI Proxy shortly, and I&rsquo;ll be speaking for you the whole
                   time — you won&rsquo;t need to say anything while we talk.
                 </p>
+                {/* THE WORK REASON IS NOT A CHOICE ANY MORE (§8.7). This asked
+                    for "which of your reasons I'm allowed to say out loud",
+                    which described a screen with two checkboxes; there is one
+                    now. It also has to say what the proxy does WITHOUT being
+                    asked — the work reason and the priority — because that is
+                    the fixed part of the mandate and a participant who is not
+                    told it would read the single checkbox as the whole of
+                    what gets said. */}
                 <p className="mt-2">
-                  So tell me two things before I go in:{" "}
+                  I&rsquo;ll always pass on what you&rsquo;re hoping for, your
+                  work reason, and which condition matters more to you. So tell
+                  me two things before I go in:{" "}
                   <strong className="font-semibold">
                     where to aim on each condition
                   </strong>
                   , and{" "}
                   <strong className="font-semibold">
-                    which of your reasons I&rsquo;m allowed to say out loud
+                    whether I may pass on your sensitive background
                   </strong>
-                  . Whatever you leave out, I never say.
+                  . If you leave that unticked, I never say it.
                 </p>
               </>
             }
@@ -988,18 +1008,22 @@ export function ProxyTask({
                 status="Ready when you are"
                 speech={
                   <>
+                    {/* IT COUNTED THE TICKED CARDS, and there is nothing left
+                        to count: the work reason always goes and the sensitive
+                        background is one checkbox (§8.7). Both branches are
+                        the same length and neither grades the choice — "you've
+                        given me plenty" or "that's not much to work with"
+                        would be the interface evaluating the primary outcome
+                        at the moment before it is recorded. */}
                     <p>
                       Understood. I&rsquo;ll open where you told me to on both
-                      conditions, and{" "}
-                      {checked.length === 0
-                        ? "I'll give no reasons at all"
-                        : checked.length === 1
-                          ? "I may give the one reason you ticked"
-                          : `I may give the ${checked.length} reasons you ticked`}
-                      .
+                      conditions, give your work reason, and say which one
+                      matters more to you.
                     </p>
                     <p className="mt-2 font-semibold">
-                      Everything else you told me stays with me.
+                      {sbChecked
+                        ? "I'll pass on your sensitive background too, the way I described. Everything else stays with me."
+                        : "Your sensitive background stays with me. I never bring it up, in any form."}
                     </p>
                   </>
                 }
@@ -1092,40 +1116,62 @@ export function ProxyTask({
                         What it may say for you
                       </p>
                       <p className="mt-0.5 text-xs text-[var(--private-ink)]/80">
-                        The reasons you ticked, in the words your proxy will
-                        use.
+                        Your work reason always goes across. The sensitive
+                        background goes only if you ticked it.
                       </p>
-                      {checked.length ? (
-                        <ul className="mt-3 space-y-2">
-                          {checked.map((c) => (
+                      <ul className="mt-3 space-y-2">
+                        {checked.map((c) => {
+                          /* WHAT THIS ROW MAY SHOW, AND IT DIFFERS BY POLICY.
+                             §8.7 is explicit that the added sentences are NOT
+                             shown before the exchange — "보탤 문장은 협상 전에
+                             따로 보여 드리지 않습니다" — and the abstraction is
+                             one of them. So under AI-Supplemented the ticked
+                             SB is described by its FORM, never quoted: the
+                             participant learns their background travels as a
+                             one-sentence assessment of the proxy's own, among
+                             reasons the proxy supplies, and finds out what it
+                             actually said by watching.
+
+                             Quoting it here would also give the abstraction
+                             two exposures where User-Specified's relay has
+                             one, and OTHER-AI2 asks the receiving side to tell
+                             the three sentences apart. The manipulation is the
+                             wording; showing the wording twice is not the same
+                             stimulus.
+
+                             Under User-Specified the row is the `relayed`
+                             text, not the card's own: Ver.2.19 requires a
+                             proxy to speak in the third person, and showing
+                             the card verbatim would have the proxy claim the
+                             participant's confession as its own. The MANDATE
+                             screen's checkbox cards stay as `text` — that is
+                             the participant's own briefing, in their voice. */
+                          const abstracted =
+                            policy === "ai_supplemented" &&
+                            c.layer === "sensitive";
+                          return (
                             <li
                               key={c.id}
                               className="rounded-lg border border-emerald-200 bg-white/80 p-2.5 text-xs sm:text-sm leading-relaxed text-slate-800"
                             >
-                              {/* THE `relayed` TEXT, NOT THE CARD'S OWN. This
-                                  list is the proxy reading back what it will
-                                  SAY, and Ver.2.19 requires a proxy to speak
-                                  in the third person ("the team lead I
-                                  represent…"). Showing the card verbatim here
-                                  would have the proxy claim the participant's
-                                  own confession as its own, which is exactly
-                                  the failure the `relayed` field was written
-                                  to prevent — and this screen is where the
-                                  participant decides what to authorize, so it
-                                  is where the delegation has to be visible.
-                                  The MANDATE screen's checkbox cards stay as
-                                  `text`: that is the participant's own
-                                  briefing, in their own voice. */}
-                              {c.relayed ?? c.text}
+                              {abstracted ? (
+                                <>
+                                  <span className="mb-1 block text-[0.6875rem] font-bold uppercase tracking-wide text-emerald-800">
+                                    Your sensitive background
+                                  </span>
+                                  <span className="block italic text-slate-700">
+                                    Given as my own assessment, in one
+                                    sentence, among reasons of my own. You will
+                                    see the wording when we talk.
+                                  </span>
+                                </>
+                              ) : (
+                                (c.relayed ?? c.text)
+                              )}
                             </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="mt-3 text-xs italic text-slate-500">
-                          You have not ticked any reason, so your proxy will give
-                          none.
-                        </p>
-                      )}
+                          );
+                        })}
+                      </ul>
                     </div>
                   </div>
                 </li>
@@ -1143,9 +1189,13 @@ export function ProxyTask({
                         <p className="text-sm font-bold text-[var(--private-strong)]">
                           What it will keep to itself
                         </p>
+                        {/* With the work reason fixed (§8.7), the only card
+                            that can appear here is the sensitive one — so the
+                            singular is right and the plural read as though
+                            something else had been withheld too. */}
                         <p className="mt-0.5 text-xs text-[var(--private-ink)]/80">
-                          The reasons you left unticked. Your proxy never says
-                          these.
+                          You left this unticked. Your proxy never brings it
+                          up, in any form.
                         </p>
                         <ul className="mt-3 space-y-1.5 opacity-80">
                           {unchecked.map((c) => (
@@ -1431,7 +1481,7 @@ export function ProxyTask({
         steps={[
           { label: "Review the exchange", hint: "The AI Proxies' conversation stays available above your chat." },
           { label: "Make your proposal", hint: "Choose one option for each condition and write your message." },
-          { label: "Agree on both conditions", hint: "If time runs out without agreement, you receive the fallback score." },
+          { label: "Agree on both conditions", hint: "If time runs out without agreement, nothing is settled and you both score 0 for this task." },
         ]}
         minutes={3}
         actionLabel="Start the closing conversation"
@@ -1546,9 +1596,35 @@ export function ProxyTask({
 }
 
 // ---------------------------------------------------------------------------
-// The reason-card screen
+// The reason section of the mandate screen
 // ---------------------------------------------------------------------------
 
+/**
+ * What the participant decides about their reasons — which since Ver.2.21 is
+ * ONE thing (§8.7).
+ *
+ * THE WORK REASON IS NO LONGER A CHOICE. It used to be a checkbox, on by
+ * default. Two things were wrong with that. It cannot change the outcome — a
+ * non-directional work reason buys the same rung as silence (§3.3) — so
+ * unticking it was a decision with no consequence; and unticking it created a
+ * "proxy that gives no reason at all", a path with no counterpart in Direct
+ * (the old §6.9 #12), which muddied what M1 was asking about. It is now a
+ * fixed utterance, shown ticked and locked, and the participant's whole
+ * decision is the sensitive background.
+ *
+ * THE ⚠ CAPTION IS §8.1's COMMON NOTICE, CUT TO ONE LINE. It appears on the
+ * SB and never on the work reason, so which card carries a cost is visible at
+ * the moment of ticking. The same sentence appears under the SB card in the
+ * Direct arm's briefing panel — both arms, same words — because the notice is
+ * common to both by design and a caption in one arm only would be an exposure
+ * difference on the primary outcome.
+ *
+ * WHAT IT MAY NOT DO. It may not forecast a bad outcome, add a confirmation
+ * step, or say that sharing helps or hurts on balance. §8.1's researcher note
+ * is explicit: no role-specific warning, no confirmation pop-up, and no
+ * suggestion that any one answer is the sensible one. Disclosure is the
+ * primary outcome; naming a right answer would stage it.
+ */
 function ReasonMandateSection({
   task,
   role,
@@ -1560,99 +1636,117 @@ function ReasonMandateSection({
   mandate: Mandate;
   onToggle: (cardId: string) => void;
 }) {
-  /**
-   * One card, as a thing you hand to your proxy or keep.
-   *
-   * THE TICK HAS TO READ AS DELEGATION, not as agreement. It is a checkbox
-   * next to a sentence, which is the shape of "I agree" or "this applies to
-   * me" everywhere else on the internet — and a participant who reads it that
-   * way is answering a different question from the one the study asks. What
-   * ticking actually does is give an AI Proxy permission to say this sentence
-   * out loud, in front of the other side, on their behalf; that is the whole
-   * measured decision, and the callout above was the only thing saying so.
-   *
-   * So the state is stated on the row itself, in the proxy's own vocabulary:
-   * a robot and "Your proxy may say this" when ticked, a lock and "Kept to
-   * yourself" when not. Both states are labelled, deliberately — showing a
-   * badge only when ticked makes ticking look like the completed answer and
-   * an untouched row look unfinished, which is a nudge toward disclosure on
-   * exactly the outcome the study measures. §7's defaults (work on, sensitive
-   * off) still decide what starts ticked; this only names what the state
-   * means.
-   */
-  const row = (card: { id: string; text: string }) => {
-    const checked = mandate.authorizedReasonIds.includes(card.id);
-    return (
-      <label
-        className={cx(
-          "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all shadow-2xs",
-          checked
-            ? "border-blue-500 bg-blue-50/80 text-blue-950 ring-2 ring-blue-500/20"
-            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50",
-        )}
-      >
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={() => onToggle(card.id)}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 accent-blue-600"
-        />
-        <span className="min-w-0 flex-1">
-          <span
-            className={cx(
-              "mb-1.5 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold",
-              checked
-                ? "border-blue-300 bg-white text-blue-800"
-                : "border-slate-200 bg-slate-50 text-slate-600",
-            )}
-          >
-            {/* NOT A LOCK. The box around this row is already headed "🔒
-                SENSITIVE BACKGROUND", so a second lock immediately below it
-                read as a subtitle for that box rather than as the state of
-                this tick — the two meanings stacked vertically with the same
-                icon. Worse than confusing: a 🔒 that says "this is the
-                sensitive card" instead of "this is not being shared" colours
-                the exact decision being measured. The badge is about the
-                PROXY either way, so both states are said in the proxy's
-                terms, and the unticked one is marked with a plain prohibition
-                rather than a monkey covering its mouth — this is a screen
-                about a workplace confession, not a joke about secrets. */}
-            <span aria-hidden>{checked ? "🤖" : "🚫"}</span>
-            {checked
-              ? "Your proxy may say this"
-              : "Your proxy will not say this"}
-          </span>
-          <span className="block text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
-            {card.text}
-          </span>
-        </span>
-      </label>
-    );
-  };
+  const cards = task.roleBriefs[role].reasonCards;
+  const workCards = cards.filter((c) => c.layer === "work");
+  const sensitiveCards = cards.filter((c) => c.layer === "sensitive");
 
   return (
-    <>
-      {/* THE IDENTITY BLOCK IS AT THE TOP OF THIS SCREEN, not here: it is
-          rendered by `PreferenceForm` above the term cards, because the whole
-          screen is the briefing of one representative and the policy sentence
-          governs the levels as much as the reasons. What used to sit here was
-          a numbered list of interface mechanics under a jargon heading; the
-          mechanics are now said in the places they apply. */}
-      <Card tone="private" className="border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
-        {/* "Hand to your proxy" rather than "permitted reasons mandate". The
-            old title named the DATA STRUCTURE; a participant meeting this
-            screen for the first time has to work out from it that ticking a
-            box is delegating speech to a machine. Say the act. */}
-        <CardTitle hint="Both reasons are yours. Tick one and your proxy may say it for you; leave it unticked and your proxy never will.">
-          What your proxy may say for you
-        </CardTitle>
+    <Card tone="private" className="border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
+      <CardTitle hint="Your work reason always goes across. The sensitive background only goes if you tick it.">
+        What your proxy may say for you
+      </CardTitle>
 
-        <p className="mb-4 text-xs sm:text-sm leading-relaxed text-amber-950 font-medium">
-          You may tick either, both, or neither. {task.roleBriefs[role].disclosureRisk} Ticking a sensitive background is optional.
-        </p>
+      {/* §8.7's opening, in plain words. It states the mechanism — always,
+          only-if-ticked, never-otherwise — and stops there. "There's one thing
+          to decide here" is the honest description of a screen with one
+          control; it is not encouragement in either direction. */}
+      <p className="mb-4 text-xs sm:text-sm leading-relaxed text-amber-950 font-medium">
+        Your AI Proxy always passes on what you&rsquo;re hoping for and your
+        work reason, and says which condition matters more to you. There&rsquo;s
+        one thing to decide here: tick the sensitive background and your Proxy
+        will pass it on in the way described below. Leave it unticked and it
+        never comes up, in any form.
+      </p>
 
-        <IssueReasonGroups task={task} role={role} renderCard={row} />
-      </Card>
-    </>
+      {/* THE SPLIT STAYS (interface rule 6). Two boxes, two colours, two
+          headings — the sensitive one ROSE — because which box a participant
+          is willing to draw from is the whole measure, and a single list would
+          make that decision illegible. */}
+      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3">
+        <ReasonBox title="Work reason" cards={workCards}>
+          {(card) => (
+            /* LOCKED AND TICKED, and it says which it is. A disabled checkbox
+               with no label reads as a control that failed to load; "Always
+               shared" says the state is the design rather than a thing the
+               participant forgot to change. It is not a `<label>` and carries
+               no click target — there is nothing here to press. */
+            <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white/80 p-3 shadow-2xs">
+              <input
+                type="checkbox"
+                checked
+                disabled
+                readOnly
+                aria-label="Work reason — always shared"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-slate-500"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[0.6875rem] font-bold text-slate-700">
+                  <span aria-hidden>🔓</span>
+                  Always shared
+                </span>
+                <span className="block text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
+                  {card.text}
+                </span>
+              </span>
+            </div>
+          )}
+        </ReasonBox>
+
+        <ReasonBox title="Sensitive background" cards={sensitiveCards} sensitive>
+          {(card) => {
+            const checked = mandate.authorizedReasonIds.includes(card.id);
+            return (
+              <div>
+                {/* BOTH STATES ARE LABELLED, deliberately. A badge that
+                    appears only when ticked makes ticking look like the
+                    completed answer and an untouched row look unfinished,
+                    which is a nudge toward disclosure on exactly the outcome
+                    the study measures. */}
+                <label
+                  className={cx(
+                    "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-all shadow-2xs",
+                    checked
+                      ? "border-rose-400 bg-white text-rose-950 ring-2 ring-rose-400/20"
+                      : "border-rose-200 bg-white/70 hover:border-rose-300",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggle(card.id)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-rose-300 text-rose-600 accent-rose-600"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={cx(
+                        "mb-1.5 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold",
+                        checked
+                          ? "border-rose-300 bg-rose-50 text-rose-800"
+                          : "border-slate-200 bg-slate-50 text-slate-600",
+                      )}
+                    >
+                      <span aria-hidden>{checked ? "🤖" : "🚫"}</span>
+                      {checked
+                        ? "Your proxy may share this"
+                        : "Your proxy will not share this"}
+                    </span>
+                    <span className="block text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
+                      {card.text}
+                    </span>
+                  </span>
+                </label>
+                {/* THE CAPTION SITS UNDER THE CHECKBOX, not inside the label:
+                    it describes what ticking would mean, and putting it inside
+                    the click target would make reading it and pressing it the
+                    same gesture. No ring and no animation — rule 9 reserves
+                    the cue for the one thing a screen is waiting for, and this
+                    box is not waiting. */}
+                <SensitiveCaption className="mt-1.5 px-1" />
+              </div>
+            );
+          }}
+        </ReasonBox>
+      </div>
+    </Card>
   );
 }

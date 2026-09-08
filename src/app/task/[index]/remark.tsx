@@ -57,9 +57,25 @@ import type { Block } from "@/lib/measures";
  * sentence, because "glad we sorted it" would be false.
  */
 export function remarkText(isProxy: boolean, agreed: boolean): string {
-  const opener = agreed ? "Glad we got that sorted." : "Shame we couldn't get there.";
-  const subject = isProxy ? "the demands your Proxy put forward" : "your demands";
-  return `${opener} Honestly, I felt ${subject} were a bit strong.`;
+  // "That's a shame" for the impasse: §6.8's rule is that only the FIRST
+  // sentence changes, because "glad we sorted it" would be false.
+  const opener = agreed ? "Glad we sorted it." : "That's a shame.";
+  /**
+   * THE ONLY THING THAT VARIES IS WHO IT POINTS AT, and that difference IS
+   * the Mode (§6.8 rule 1).
+   *
+   * "PASSED ON", NOT "PUT FORWARD". §6.8 targets the participant's own DEMAND
+   * LEVEL in both arms — under Proxy it is "그쪽 Proxy가 전한 요구", the ask the
+   * Proxy RELAYED. "Put forward" reads as the Proxy having chosen the ask
+   * itself, which points the comment at something the system decided rather
+   * than at something the participant did; that is the exact confound rule 3
+   * excludes, and it would make ATTR2's Mode contrast a measurement error
+   * instead of a finding.
+   */
+  const subject = isProxy
+    ? "the ask your Proxy passed on"
+    : "your ask";
+  return `${opener} Honestly, I felt ${subject} was a bit strong.`;
 }
 
 export function RemarkPhase({

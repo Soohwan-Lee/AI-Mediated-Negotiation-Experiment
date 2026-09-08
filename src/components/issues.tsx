@@ -109,7 +109,7 @@ export function PointsKey({
         </span>
         <span className="min-w-0 flex flex-col justify-between rounded-xl border border-slate-300 bg-white/90 px-3 py-2 font-semibold text-slate-800 shadow-2xs">
           <span className="block text-[0.6875rem] leading-tight opacity-90 font-medium break-words">
-            🛡️ Fallback (No Deal)
+            🚫 No Agreement
           </span>
           <strong className="tabular block text-sm font-black leading-tight mt-1 shrink-0">
             {reservationPoints.toLocaleString()} pts
@@ -156,11 +156,15 @@ export function PackageValue({
       </div>
 
       <div className="rounded-lg border border-[var(--private-line)] bg-white/75 px-3 py-2 text-xs font-semibold text-[var(--private-strong)]">
+        {/* NO AGREEMENT IS WORTH NOTHING since Ver.2.21 (§3.2), so "above
+            fallback" named a safety net that no longer exists. The comparison
+            is kept — it is what makes a bare point total mean anything — and
+            said against the real figure instead. */}
         {comparison === "above"
-          ? `Above fallback (${reservationPoints.toLocaleString()} pts)`
+          ? `Above no agreement (${reservationPoints.toLocaleString()} pts)`
           : comparison === "below"
-            ? `Below fallback (${reservationPoints.toLocaleString()} pts)`
-            : `Equal to fallback (${reservationPoints.toLocaleString()} pts)`}
+            ? `Below no agreement (${reservationPoints.toLocaleString()} pts)`
+            : `Same as no agreement (${reservationPoints.toLocaleString()} pts)`}
       </div>
     </div>
   );

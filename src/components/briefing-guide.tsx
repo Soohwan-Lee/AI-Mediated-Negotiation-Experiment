@@ -168,7 +168,7 @@ export function StudyOrientation({
           <div className="space-y-4">
             <Card>
               <CardTitle>Agree on both conditions</CardTitle>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">Each condition has four options. Your aim is a package worth more points to you. If you do not agree on both, you each receive the fallback score. Direct negotiation lasts up to 10 minutes; you can finish sooner when you agree.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">Each condition has four options. Your aim is a package worth more points to you. If you don&apos;t agree on both, you each get 0 points for that task. Direct negotiation lasts up to 10 minutes; you can finish sooner when you agree.</p>
             </Card>
             <Card tone="private">
               <CardTitle>Keep point values private</CardTitle>

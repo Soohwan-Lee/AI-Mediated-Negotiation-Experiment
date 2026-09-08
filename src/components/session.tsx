@@ -4,7 +4,7 @@
  * Task shell: where you are in the task, and your briefing, always.
  *
  * The briefing is the whole problem with this study's interface. Three terms
- * with four levels each, private point values, a fallback score, a role story
+ * with four levels each, private point values, a role story
  * and six reason cards for the one term that is hard to raise — shown once on
  * an intro screen and then taken away, which is what an ordinary flow does.
  * Nobody holds that. So the briefing is pinned beside the work on a wide
@@ -893,9 +893,15 @@ export function BriefingPanel({
           <p className="mb-2.5 rounded-lg border border-[var(--private-line)] bg-amber-100/60 p-2.5 text-xs font-medium leading-relaxed">
             {brief.requirementNote}
           </p>
+          {/* THE RISK SENTENCE MOVED OUT OF THIS LINE. `disclosureRisk` is
+              role-specific and forecasts a particular bad impression, which
+              §8.1's researcher note rules out ("부정적 결과를 예고하는 역할별
+              경고… 추가하지 않음"). What the notice may say is the ⚠ caption
+              under the sensitive box — the same sentence in both arms, naming
+              both sides of the decision. */}
           <p className="mb-2.5 text-xs leading-relaxed text-[var(--private-ink)]/85">
             You hold a <strong>work reason</strong> that is not awkward to say
-            and <strong>sensitive background</strong> that is yours to keep. {brief.disclosureRisk}
+            and <strong>sensitive background</strong> that is yours to keep.
           </p>
           <IssueReasonGroups task={task} role={role} />
         </section>
@@ -904,17 +910,60 @@ export function BriefingPanel({
   );
 }
 
+/**
+ * §8.1's common pre-disclosure notice, cut to one line.
+ *
+ * IT APPEARS IN BOTH ARMS AND NOWHERE ELSE: under the SB card in the briefing
+ * panel (which is the only place a Direct participant ever sees the two boxes,
+ * there being no picker in the composer since Ver.2.20), and under the SB
+ * checkbox on the Proxy arm's mandate. §8.7 requires the same sentence in both
+ * — a caption in one arm only would be an exposure difference on the primary
+ * outcome, along the primary contrast.
+ *
+ * WHAT IT SAYS AND WHAT IT MUST NOT. It names both sides of the decision: it
+ * may help them understand the ask, and it may shape how they see you and be
+ * weighed afterwards. It never forecasts a bad outcome, never says AI
+ * protects, never says disclosure gets a better result, and it is never
+ * followed by a confirmation step. §8.1's researcher note is explicit that no
+ * answer here may be presented as the sensible one, because which answer
+ * people give IS the primary outcome.
+ *
+ * It is exported from ONE place so the two arms cannot drift a word apart.
+ */
+export const SB_CAPTION =
+  "Sharing this can help the other side understand what you're asking for. It can also shape how they see you, and it may be weighed in the bonus or evaluation afterwards.";
+
+/** The caption as it renders — one ⚠ line, no ring, no animation (rule 9). */
+export function SensitiveCaption({ className }: { className?: string }) {
+  return (
+    <p
+      className={cx(
+        "flex items-start gap-1.5 text-[0.6875rem] leading-relaxed text-rose-900/90 sm:text-xs",
+        className,
+      )}
+    >
+      <span aria-hidden className="shrink-0">
+        ⚠
+      </span>
+      <span>{SB_CAPTION}</span>
+    </p>
+  );
+}
+
 export function ReasonBox({
   title,
   note,
   cards,
   sensitive,
+  caption,
   children,
 }: {
   title: string;
   note?: string;
   cards: Array<{ id: string; text: string }>;
   sensitive?: boolean;
+  /** Rendered under the cards — §8.7's ⚠ line on the sensitive box. */
+  caption?: ReactNode;
   children?: (card: { id: string; text: string }) => ReactNode;
 }) {
   if (!cards.length) return null;
@@ -980,6 +1029,7 @@ export function ReasonBox({
           </li>
         ))}
       </ul>
+      {caption}
     </div>
   );
 }
@@ -1004,10 +1054,23 @@ export function IssueReasonGroups({
   task,
   role,
   renderCard,
+  caption = true,
 }: {
   task: NegotiationTask;
   role: Role;
   renderCard?: (card: { id: string; text: string }) => ReactNode;
+  /**
+   * Show §8.7's ⚠ line under the sensitive box. On by default, because the
+   * briefing panel is where a Direct participant sees these two boxes for the
+   * whole negotiation and the caption has to be there.
+   *
+   * The brief phase turns it OFF: that screen carries §8.1's notice in full,
+   * directly below, and the caption is a one-line repeat of that same notice.
+   * Two versions of one sentence, stacked, reads as the interface pressing the
+   * point — which on the primary outcome is exactly what §8.1's researcher
+   * note forbids.
+   */
+  caption?: boolean;
 }) {
   const cards = task.roleBriefs[role].reasonCards;
   if (!cards.length) return null;
@@ -1023,6 +1086,12 @@ export function IssueReasonGroups({
         title="Sensitive background"
         cards={cards.filter((c) => c.layer === "sensitive")}
         sensitive
+        /* §8.7: the same one-line notice in both arms. The mandate screen
+           passes its own copy under the checkbox, because there the caption
+           belongs to a control rather than to the box; everywhere else — the
+           briefing panel, the brief phase — it belongs to the box, which is
+           what this renders. */
+        caption={caption ? <SensitiveCaption className="mt-2.5" /> : null}
       >
         {renderCard}
       </ReasonBox>

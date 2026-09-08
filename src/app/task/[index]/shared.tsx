@@ -48,14 +48,30 @@ import {
 import {
   CLOSING_SECONDS,
   DIRECT_STAGE_OFFSET,
+  NUDGE_AFTER_SILENT_SECONDS,
+  codeOutcome,
   counterpartStageAfter,
   counterpartStep,
   foldTier,
   LABEL_TIER,
   mentionsScoreNumbers,
+  type ExchangeState,
   type ReasonTier,
+  type SbTiming,
 } from "@/lib/negotiation/machine";
 import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
+import {
+  INITIAL_EXCHANGE_STATE,
+  foldExchangeState,
+  isClassificationResponse,
+  isCounterpartResponse,
+  resolveCounterTerms,
+  storedLabel,
+  type ClassificationResponse,
+  type ClassifierLogEntry,
+  type CounterpartResponse,
+  type HeldExchangeState,
+} from "./turn-contract";
 import {
   BriefingPanel,
   ProxyIdentity,
@@ -87,7 +103,13 @@ import {
   preservesRequirement,
   requirementIssue,
 } from "@/lib/tasks";
-import type { Mandate, NegotiationTask, Package, Role } from "@/lib/types";
+import type {
+  Issue,
+  Mandate,
+  NegotiationTask,
+  Package,
+  Role,
+} from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Phase: the cover
@@ -302,9 +324,39 @@ export function TaskBrief({
               <CardTitle>What you can explain</CardTitle><PrivateTag />
             </div>
             <p className="mb-4 text-sm leading-relaxed">{brief.requirementNote}</p>
-            <IssueReasonGroups task={task} role={role} />
-            <p className="mt-4 text-sm leading-relaxed">{brief.disclosureRisk}</p>
-            <p className="mt-4 text-sm leading-relaxed">You choose what to share. Sensitive background is optional: you can negotiate and agree without sharing it. These are the facts of your role; you do not need to use the exact wording.</p>
+            {/* No ⚠ caption here — §8.1's notice below IS that sentence, in
+                full. See `IssueReasonGroups`. */}
+            <IssueReasonGroups task={task} role={role} caption={false} />
+            {/* §8.1's COMMON PRE-DISCLOSURE NOTICE, in full, once. It is shown
+                after the cards and before anything is decided, in both arms
+                and both roles, in identical words — which is what §8.1
+                requires ("두 방식·두 역할에 같은 문구를 사용함").
+
+                IT REPLACED `disclosureRisk`, which is role-specific and
+                forecasts a particular bad impression ("could make you look
+                like a lead who answers for their team"). §8.1's researcher
+                note rules that out by name: no role-specific warning of a
+                negative consequence, and no confirmation pop-up. The notice
+                names BOTH sides of the decision and then says the choice is
+                theirs — because which way they choose is the primary
+                outcome, and a screen that recommends an answer measures the
+                recommendation. */}
+            <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50/70 p-4">
+              <p className="text-sm font-bold text-rose-900">
+                Before you decide about the sensitive background
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-rose-950">
+                Sharing it can help the other person understand what
+                you&rsquo;re asking for. It can also shape their impression of
+                your judgement or actions, and what is shared may be weighed
+                when they decide the bonus or write the evaluation afterwards.{" "}
+                <strong className="font-semibold">
+                  Whether to share is your choice. You can negotiate and reach
+                  an agreement without it.
+                </strong>
+              </p>
+            </div>
+            <p className="mt-4 text-sm leading-relaxed">These are the facts of your role; you do not need to use the exact wording.</p>
           </Card>
         )}
       </Page>
@@ -352,6 +404,28 @@ export interface Preferences {
   preferred: Record<string, string | null>;
 }
 
+/**
+ * The participant's own best option on a term.
+ *
+ * NOT `options[0]`. Option order is role-relative — each issue lists its
+ * options best-first for whichever role the term favours — so on the other
+ * side's priority term `options[0]` is worth nothing to this participant.
+ */
+function bestOptionId(issue: Issue, role: Role): string {
+  return [...issue.options].sort((a, b) => b.points[role] - a.points[role])[0]
+    .id;
+}
+
+/** The wish package, both terms at the participant's own best (§8.6). */
+export function bestWish(
+  task: NegotiationTask,
+  role: Role,
+): Record<string, string> {
+  return Object.fromEntries(
+    task.issues.map((issue) => [issue.id, bestOptionId(issue, role)]),
+  );
+}
+
 export function PreferenceForm({
   taskIndex,
   task,
@@ -381,27 +455,43 @@ export function PreferenceForm({
   onContinue: (prefs: Preferences) => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
+  /**
+   * THE ONE DELIBERATE EXCEPTION TO INTERFACE RULE 2 (§8.6, Ver.2.21).
+   *
+   * Nothing else on this study starts answered, because a pre-selected control
+   * is submitted by everyone who does not engage and cannot be told apart from
+   * a considered answer. Here the default is specified: both terms at the
+   * participant's OWN BEST option.
+   *
+   * TWO THINGS DEPEND ON IT. The wish is the proxy's acceptance line as well
+   * as its target — a proxy holding a wish no package can match pushes to the
+   * ceiling its reasons allow and brings back what it reached, so a blank or
+   * a modest wish would change how far the proxy goes for reasons that have
+   * nothing to do with disclosure. And REMARK's fixed line ("your demands were
+   * a bit strong") presupposes the participant asked for their best; a modest
+   * wish would make that comment factually wrong for them.
+   *
+   * Departure from it is therefore the thing worth recording, not the
+   * selection: `WISH-DEV` is an audit flag, and §13-25 switches REMARK to
+   * demand-free wording if it clears 20% at pilot.
+   */
+  const defaults = bestWish(task, role);
   const [preferred, setPreferred] = useState<Record<string, string | null>>(
-    () =>
-      initial?.preferred ??
-      Object.fromEntries(task.issues.map((i) => [i.id, null])),
+    () => initial?.preferred ?? { ...defaults },
   );
   useDevAutofill(() => {
-    const best = (issueId: string) => {
-      const issue = task.issues.find((i) => i.id === issueId)!;
-      return [...issue.options].sort(
-        (a, b) => b.points[role] - a.points[role],
-      )[0].id;
-    };
-    setPreferred(
-      Object.fromEntries(task.issues.map((i) => [i.id, best(i.id)])),
-    );
+    setPreferred({ ...defaults });
   }, `prefs-t${taskIndex}`);
 
   const missing = task.issues
     .filter((i) => !preferred[i.id])
     .map((i) => `pref-${i.id}`);
   const canContinue = useDevGate(missing.length === 0 && reasonsComplete);
+
+  /** Did they move off the pre-selected best-on-both (§8.6, `WISH-DEV`)? */
+  const wishDeviated = task.issues.some(
+    (issue) => preferred[issue.id] !== defaults[issue.id],
+  );
 
   async function save() {
     if (!canContinue) return;
@@ -410,12 +500,21 @@ export function PreferenceForm({
       await getStore().saveResponses(
         participantKey,
         `preferences_t${taskIndex}`,
-        { taskId: task.id, role, preferred },
+        {
+          taskId: task.id,
+          role,
+          preferred,
+          [`WISH-DEV_t${taskIndex}`]: wishDeviated,
+        },
       );
     }
-    logEvent("initial_preference_saved", { taskId: task.id }, {
-      sessionIndex: taskIndex,
-    });
+    logEvent(
+      "initial_preference_saved",
+      { taskId: task.id, wishDeviated },
+      {
+        sessionIndex: taskIndex,
+      },
+    );
     onContinue(prefs);
   }
 
@@ -441,11 +540,19 @@ export function PreferenceForm({
                   : "🔒 Private to You · Set Your Goals"
               }
             >
+              {/* §8.6, in the participant's words. Three facts and no advice:
+                  pick what you would like, the other side never sees it, and
+                  it comes back beside the real outcome. It may not say that a
+                  bolder or a softer wish does better — where the negotiation
+                  lands turns on the reasons voiced, and teaching that would
+                  stage the primary outcome. */}
               <p className="text-xs sm:text-sm leading-relaxed">
-                Select the option you would like to aim for on each condition. This form is private.{" "}
+                Before you go in, pick the option you&rsquo;d like on each
+                condition. The other side never sees this. Afterwards
+                we&rsquo;ll show it next to what was actually agreed.{" "}
                 {isProxy
-                  ? "These are the instructions your AI Proxy will follow: it aims for the options you pick here and says only the reasons you tick below."
-                  : "Afterwards, you will see your original goals beside the final agreed package."}
+                  ? "Your AI Proxy aims for what you pick here."
+                  : ""}
               </p>
 
               <PointsKey
@@ -549,8 +656,15 @@ export function PreferenceForm({
                   <span className="text-base font-extrabold tracking-tight text-[var(--ink)]">
                     What I may say for you
                   </span>
+                  {/* THE WORK REASON IS NO LONGER A CHOICE (§8.7, Ver.2.21),
+                      so this line may not invite one. It used to read "tick
+                      anything I'm allowed to say out loud", which described a
+                      screen with two checkboxes; there is one now, and a
+                      heading that promises a set of choices in front of a
+                      single decision reads as a control that failed to
+                      render. */}
                   <span className="mt-0.5 block text-xs leading-relaxed text-[var(--ink-3)] sm:text-sm">
-                    Tick anything I&rsquo;m allowed to say out loud.
+                    One thing to decide here.
                   </span>
                 </p>
               </div>
@@ -823,7 +937,13 @@ export function TermsList({
 }
 
 /**
- * What the package is worth to you, and whether it clears your fallback.
+ * What the package is worth to you.
+ *
+ * THERE IS NO FALLBACK PLAN ANY MORE (§3.2, Ver.2.21). No agreement means
+ * nothing is settled and both sides score zero — so "your fallback total
+ * applies" described a safety net that no longer exists, and a participant who
+ * read it would be told they had come away with something. Every screen here
+ * says the same three words instead: nothing is settled.
  *
  * Private, so it lives on a sand card: your own score is exactly the kind of
  * value the other side must not be assumed to see (globals.css, "colour
@@ -888,14 +1008,14 @@ export function OutcomeValue({
         </dl>
       ) : (
         <p className="rounded-xl border border-amber-200/80 bg-white/80 p-3 text-sm leading-relaxed">
-          There are no agreed terms to break down. Your fallback total applies.
+          Nothing was settled, so there are no agreed terms to break down.
         </p>
       )}
 
       <div className="mt-3 border-t border-amber-200 pt-3">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-sm font-bold text-[var(--ink)]">
-            {terms ? "Final total" : "Fallback total"}
+            {terms ? "Final total" : "Your total"}
           </span>
           <span className="shrink-0 text-xl font-black tabular-nums text-amber-950">
             {mine.toLocaleString()} pts
@@ -904,14 +1024,15 @@ export function OutcomeValue({
         {terms ? (
           <p className="mt-1 text-xs leading-relaxed text-[var(--private-ink)]/80">
             {comparison === "above"
-              ? `${(mine - task.reservationPoints).toLocaleString()} points above your fallback.`
+              ? `${(mine - task.reservationPoints).toLocaleString()} points more than you would have had with no agreement.`
               : comparison === "below"
-                ? `${(task.reservationPoints - mine).toLocaleString()} points below your fallback.`
-                : "Equal to your fallback."}
+                ? `${(task.reservationPoints - mine).toLocaleString()} points below what no agreement would have paid.`
+                : "The same as no agreement would have paid."}
           </p>
         ) : (
           <p className="mt-1 text-xs leading-relaxed text-[var(--private-ink)]/80">
-            No agreement reached, so the fallback score applies.
+            Nothing was settled on either condition, so this task pays
+            nothing.
           </p>
         )}
       </div>
@@ -972,42 +1093,28 @@ export function DecisionButton({
 // Phase: the participant negotiates directly (Proxy condition)
 // ---------------------------------------------------------------------------
 
-type ClosingReasonLabel = "none" | "WR" | "PRI" | "SB";
-
-interface ClosingClassification {
-  label: ClosingReasonLabel;
-  confidence?: number;
-  stubbed?: boolean;
-}
-
-interface ClosingStagedTurn {
+/**
+ * The participant's own conversation — the Proxy arm's three-minute closing,
+ * and (through `baseline-task.tsx`, which passes the same props) the Direct
+ * arm's ten minutes.
+ *
+ * THESE TWO MUST STAY BEHAVIOURALLY IDENTICAL. They are the only two places a
+ * participant speaks for themselves, so a difference between them lands on
+ * `Pooled Proxy − Direct` itself. Everything below that could differ is a
+ * prop: the clock, the seeded stage offset, the disclosure policy, the tier
+ * the conversation starts from.
+ */
+interface StagedTurn {
+  /** Every participant message in this task, in order — the classifier reads all of them. */
+  texts: string[];
+  /** The new message only, for the transcript row and the store. */
   text: string;
   sentOffer: Package;
   sentPackage: Package | null;
   ownId: string;
   createdAt: string;
   secondsAtSend: number;
-  classification?: ClosingClassification;
-}
-
-interface ClosingCounterpartResponse {
-  message: string;
-  proposal?: Package | null;
-}
-
-function isClosingClassification(value: unknown): value is ClosingClassification {
-  if (typeof value !== "object" || value === null || !("label" in value)) return false;
-  if (!["none", "WR", "PRI", "SB"].includes(String(value.label))) return false;
-  if ("confidence" in value && value.confidence !== undefined &&
-      (typeof value.confidence !== "number" || !Number.isFinite(value.confidence) ||
-       value.confidence < 0 || value.confidence > 1)) return false;
-  return true;
-}
-
-function isClosingCounterpartResponse(value: unknown): value is ClosingCounterpartResponse {
-  return typeof value === "object" && value !== null &&
-    "message" in value && typeof value.message === "string" &&
-    value.message.trim().length > 0;
+  classification?: ClassificationResponse;
 }
 
 export function DirectNegotiation({
@@ -1043,11 +1150,14 @@ export function DirectNegotiation({
    */
   refused?: boolean;
   /**
-   * The credibility tier the participant's OWN proxy earned in the AI-AI
-   * exchange (Ver.2.12 §6.2) — what was actually VOICED, not what was
-   * authorized: an emergency stop or a guardrail block can leave an
-   * authorized card unsaid, and assuming it was said made the rule inert for
-   * every Proxy participant once before.
+   * The rung the participant's OWN proxy earned in the AI-AI exchange — what
+   * was actually VOICED, not what was authorized: an emergency stop or a
+   * guardrail block can leave an authorized card unsaid, and assuming it was
+   * said made the rule inert for every Proxy participant once before.
+   *
+   * Since Ver.2.21 the proxy's floor is `work`, the same as a Direct
+   * participant's, because the priority rung that used to sit above it is
+   * gone (§6.5, §6.9 #12).
    */
   proxyVoicedTier: ReasonTier;
   messages: DisplayMessage[];
@@ -1058,8 +1168,8 @@ export function DirectNegotiation({
     finalPackage: Package | null,
     meta: {
       /**
-       * Did the participant tag their own SB in this closing conversation?
-       * Feeds SB-TIMING's "wrap_up" category (§9.3) — the only route to it,
+       * Did the participant voice their own SB in this conversation?
+       * Feeds `SB-TIMING = wrap_up` (§9.3, §6.9 #2) — the only route to it,
        * and available only to someone whose proxy did not already voice it.
        */
       selfDisclosed: boolean;
@@ -1074,7 +1184,7 @@ export function DirectNegotiation({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [turnError, setTurnError] = useState<string | null>(null);
-  const [stagedTurn, setStagedTurn] = useState<ClosingStagedTurn | null>(null);
+  const [stagedTurn, setStagedTurn] = useState<StagedTurn | null>(null);
   const [recovering, setRecovering] = useState(false);
   const recoveryStartedAt = useRef<number | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
@@ -1094,20 +1204,34 @@ export function DirectNegotiation({
    */
   const [personalTier, setPersonalTier] = useState<ReasonTier>("none");
   const [selfDisclosed, setSelfDisclosed] = useState(false);
-  /** SCRIPT-ASKWHY / SCRIPT-NONUM / SCRIPT-CLOSE are each one-shot. */
-  const [askedWhy, setAskedWhy] = useState(false);
-  const [numbersReminded, setNumbersReminded] = useState(false);
+  /**
+   * The classifier's `priority_claim` flag (§6.2). It buys no rung — Ver.2.21
+   * deleted the one it used to — and its whole effect is one SCRIPT-ASKWHY,
+   * which is where the participant HEARS that a claim without a reason moves
+   * nothing.
+   */
+  const [priorityClaimed, setPriorityClaimed] = useState(false);
+  /** Confidence in the CURRENT label, for SCRIPT-CLARIFY (§6.2). */
+  const [labelConfidence, setLabelConfidence] = useState<number | undefined>(
+    undefined,
+  );
+  /**
+   * The one-shot script flags, held as ONE object.
+   *
+   * The counterpart route now returns the state it advanced and the client
+   * replaces what it holds; splitting these into eight `useState` calls is
+   * what made a field get dropped on the merge last time, which turns a
+   * one-shot script into a no-shot or an every-turn one.
+   */
+  const [exchange, setExchange] = useState<HeldExchangeState>(() => ({
+    ...INITIAL_EXCHANGE_STATE,
+    // The counterpart disclosed through its own proxy while the participant
+    // watched (§6.3). Repeating it in person would give the Proxy arm two
+    // disclosures where Direct has one.
+    counterpartSbDisclosed: true,
+  }));
   /** Any participant message so far mentioned score numbers (one-shot pool). */
   const [numbersEver, setNumbersEver] = useState(false);
-  const [softCloseOffered, setSoftCloseOffered] = useState(false);
-  /**
-   * SCRIPT-MISREAD is once per task, and the flag has to travel — identical
-   * to the Direct arm's. Untracked it did two things at once: the counterpart
-   * could re-offer the misread on every work-rung turn, and
-   * `acceptablePackage` would refuse its own good-faith offer when the
-   * participant took it (§6.2 keeps the misread acceptable once made).
-   */
-  const [misreadOffered, setMisreadOffered] = useState(false);
   const [lastCounterpartPackage, setLastCounterpartPackage] =
     useState<Package | null>(openingPackage);
   /**
@@ -1122,11 +1246,7 @@ export function DirectNegotiation({
    *
    * The rule is deliberately narrow — clear it only when a counterpart turn
    * brings no replacement package AND the tier has moved past the rung this
-   * one was offered at. A turn that carries a proposal replaces it anyway,
-   * and a tier that has not moved leaves it acceptable, so neither case may
-   * take a live Accept button away from the participant.
-   *
-   * The proxies' opening package is seeded at the tier the proxies earned.
+   * one was offered at.
    */
   const [standingTier, setStandingTier] = useState<ReasonTier>(proxyVoicedTier);
   /** Synchronous mirror of `settled`, so two callers in one tick cannot both win. */
@@ -1136,11 +1256,25 @@ export function DirectNegotiation({
    * puts a package on the table — identical to the Direct arm's rule and for
    * the same reason. It is seeded open when the participant arrives carrying
    * the proxies' package, because that package IS what this conversation is
-   * about: the screen tells them to confirm or adjust it, so the
-   * thing being confirmed cannot start hidden.
+   * about.
    */
   const [proposalOpen, setProposalOpen] = useState(Boolean(openingPackage));
   const openedOnCounterProposal = useRef(Boolean(openingPackage));
+
+  /**
+   * Every participant message in this task, in order, for the CUMULATIVE
+   * classifier (§6.2a). A ref rather than derived from `messages` because a
+   * turn that is folded into the one in flight has to append to it
+   * synchronously, before any render.
+   */
+  const participantTexts = useRef<string[]>([]);
+  /** The stored `{text, label, confidence, stance}` log, for gate 19's κ. */
+  const classifierLog = useRef<ClassifierLogEntry[]>([]);
+  /** When the participant last sent anything, for the client-timed nudge. */
+  const lastParticipantAt = useRef<number>(Date.now());
+  const nudgeRequested = useRef(false);
+  /** A message that arrived while a turn was in flight, waiting to be folded. */
+  const queuedText = useRef<string | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -1160,13 +1294,6 @@ export function DirectNegotiation({
   const chosen = task.issues.filter((i) => offer[i.id]).length;
   const complete = chosen === task.issues.length;
   const partial = chosen > 0 && !complete;
-  /**
-   * What will travel with the next message, said on the closed drawer —
-   * identical to the Direct arm's, and load-bearing for the same reason: the
-   * package is pre-filled here too (from the proxies' own settlement), so a
-   * collapsed drawer without this would have the participant send a package
-   * they never saw attached.
-   */
   const attachedSummary = partial
     ? "Choose both terms, or neither."
     : complete
@@ -1178,6 +1305,11 @@ export function DirectNegotiation({
           .filter(Boolean)
           .join(" · ")}`
       : "No proposal attached — you are just talking.";
+  // THE COMPOSER STAYS OPEN WHILE THE REPLY IS COMING (§6.1 stage 3). The
+  // turn boundary is the moment the counterpart's reply RENDERS, so anything
+  // sent before then belongs to the same turn — and a locked composer would
+  // make that impossible to do. What arrives during the delay cancels the
+  // pending reply and is folded in.
   const canSend = useDevGate(!partial) && !settled;
   // One cue on the screen, and it is the composer's (interface rule 9). The
   // package card is not waiting for anything now that a message may be sent
@@ -1188,9 +1320,9 @@ export function DirectNegotiation({
    * The ladder carries over from the AI-AI exchange and only ever RISES: what
    * the proxy earned, raised by whatever the participant says here in person.
    *
-   * This is the one place `SB-TIMING = wrap_up` can happen — a participant who
-   * authorized nothing, watched the proxies settle at the priority rung, and
-   * then said the thing themselves.
+   * This is the one place `SB-TIMING = wrap_up` can happen — a participant
+   * whose proxy voiced only the work reason, who then says the thing
+   * themselves.
    */
   const tier: ReasonTier = foldTier(proxyVoicedTier, personalTier);
 
@@ -1221,6 +1353,13 @@ export function DirectNegotiation({
     settledRef.current = true;
     setFinalPackage(pkg);
     setSettled(kind);
+    const committedTier = committed?.tier ?? tier;
+    const committedSelf = committed?.selfDisclosed ?? selfDisclosed;
+    // THE OUTCOME IS CODED BY THE MACHINE, not by this screen. `codeOutcome`
+    // owns "no agreement is worth nothing" (§3.2) and the requirement
+    // trajectory the review screen reads; recomputing either here is how the
+    // two came to disagree about what an impasse pays.
+    const outcome = codeOutcome(task, role, pkg, kind === "agreed");
     logEvent(
       "negotiation_ended",
       {
@@ -1228,25 +1367,73 @@ export function DirectNegotiation({
         reason,
         replies: committed?.replies ?? replies,
         secondsRemaining: committed?.secondsRemaining ?? secondsRemaining,
-        tier: committed?.tier ?? tier,
-        selfDisclosed: committed?.selfDisclosed ?? selfDisclosed,
+        tier: committedTier,
+        selfDisclosed: committedSelf,
+        priorityClaimed,
+        outcome,
       },
       { sessionIndex: taskIndex },
+    );
+    void persistTaskRecord(committedTier, committedSelf, outcome);
+  }
+
+  /**
+   * Everything §9.3 and §6.2 need from this conversation, written once when it
+   * ends.
+   *
+   * IT IS ONE WRITE, NOT ONE PER FIELD, and the classifier log travels with
+   * it: gate 19's κ is computed off `{text, label, confidence}` for every
+   * participant message, and a per-message write would put a request on the
+   * wire on every turn, which is a timing tell as well as a stall.
+   */
+  async function persistTaskRecord(
+    finalTier: ReasonTier,
+    disclosedHere: boolean,
+    outcome: ReturnType<typeof codeOutcome>,
+  ) {
+    if (!participantKey) return;
+    // `SB` is the FIRST-CHANCE decision (§6.3): whether the participant side's
+    // SB was out at their first reason opportunity. A confession made here, in
+    // the closing, is not that — it is `wrap_up`.
+    const sbFirstChoice = proxyVoicedTier === "sensitive";
+    const sbTiming: SbTiming = sbFirstChoice
+      ? "first_chance"
+      : disclosedHere
+        ? "wrap_up"
+        : "never";
+    await getStore().saveResponses(
+      participantKey,
+      `negotiation_t${taskIndex}`,
+      {
+        taskId: task.id,
+        role,
+        phase: "closing",
+        tier: finalTier,
+        [`SB_t${taskIndex}`]: sbFirstChoice,
+        [`SB-TIMING_t${taskIndex}`]: sbTiming,
+        sbFirstChoice,
+        sbTiming,
+        priorityClaimed,
+        // JSON, NOT NESTED OBJECTS. `ResponseValue` is deliberately flat —
+        // one row per item id is what makes the export a table — so the two
+        // structured records travel as text and are parsed by the analysis
+        // rather than reshaping a type the whole questionnaire depends on.
+        classifierLog: JSON.stringify(classifierLog.current),
+        outcome: JSON.stringify(outcome),
+        participantPoints: outcome.participantPoints,
+        jointPoints: outcome.jointPoints,
+      },
     );
   }
 
   /**
-   * RATIFY IS NOT INFERRED HERE ANY MORE (Ver.2.13 §9.3). It is recorded on
-   * the decision screen, where the participant actually takes it. Reading it
-   * back off the final package — as this used to — coded a participant who
-   * asked for a change and then agreed the very same package as an approver,
-   * which is a different behaviour on a confirmatory outcome.
+   * RATIFY IS NOT INFERRED HERE (§9.3). It is recorded on the decision screen,
+   * where the participant actually takes it. Reading it back off the final
+   * package coded a participant who asked for a change and then agreed the
+   * very same package as an approver, which is a different behaviour on a
+   * confirmatory outcome.
    */
   function finish(kind: "agreed" | "impasse", pkg: Package | null) {
-    // How it ended is already on the `negotiation_ended` event that `settle()`
-    // writes, which is where an audit looks for it. Only "timeout" and
-    // "agreed" reach it now: the participant-initiated "declined" route was
-    // removed so both arms end the same three ways (see the composer below).
     onSettled(kind === "agreed" ? pkg : null, { selfDisclosed });
   }
 
@@ -1268,7 +1455,7 @@ export function DirectNegotiation({
     );
   }
 
-  async function runStagedTurn(initialTurn: ClosingStagedTurn) {
+  async function runStagedTurn(initialTurn: StagedTurn) {
     const generation = turnGeneration.current + 1;
     turnGeneration.current = generation;
     const controller = new AbortController();
@@ -1288,18 +1475,27 @@ export function DirectNegotiation({
       let classification = turn.classification;
       if (!classification) {
         classification = mockAi
-          ? { label: "none" }
-          : await fetchJsonWithRetry<ClosingClassification>(
+          ? { label: "none", stance: "none" }
+          : await fetchJsonWithRetry<ClassificationResponse>(
               "/api/classify-reason",
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ taskId: task.id, role, message: turn.text }),
+                // THE WHOLE LIST, EVERY TIME (§6.2a). A confession arrives in
+                // two or three messages; judged one at a time under the
+                // "ambiguous goes lower" rule, it would systematically fail to
+                // register, and that floor would then read as the Proxy arm's
+                // protective effect.
+                body: JSON.stringify({
+                  taskId: task.id,
+                  role,
+                  messages: turn.texts,
+                }),
               },
               {
                 signal: controller.signal,
                 onFailure: failedAttempt,
-                validate: isClosingClassification,
+                validate: isClassificationResponse,
               },
             );
         turn = { ...turn, classification };
@@ -1308,10 +1504,40 @@ export function DirectNegotiation({
         }
       }
 
-      const { label, confidence, stubbed: classifierStubbed = false } = classification;
+      const {
+        label,
+        confidence,
+        stubbed: classifierStubbed = false,
+        stance = "none",
+        priority_claim: priorityNow = false,
+      } = classification;
       const personalNow = foldTier(personalTier, LABEL_TIER[label]);
       const selfDisclosedNow = selfDisclosed || label === "SB";
       const tierNow: ReasonTier = foldTier(proxyVoicedTier, personalNow);
+      const priorityClaimedNow = priorityClaimed || priorityNow;
+
+      /**
+       * STANCE, RESOLVED BEFORE THE MACHINE SEES IT (§6.2, §6.9 #18).
+       *
+       * `accept` means the participant agreed in words to what is on the
+       * table, so the standing package travels as their offer — the same
+       * thing the Accept button does, by the same deterministic route.
+       * `counter` means they named terms in prose, which is then treated
+       * exactly like a package from the drawer. Neither hands the model a
+       * decision: the classifier reports what was said, and `machine.ts`
+       * still decides whether it is acceptable.
+       */
+      const counterPackage = resolveCounterTerms(
+        task.issues,
+        classification.counter_terms,
+      );
+      const incoming: Package | null =
+        stance === "accept" && lastCounterpartPackage
+          ? lastCounterpartPackage
+          : stance === "counter" && counterPackage
+            ? counterPackage
+            : turn.sentPackage;
+
       const own: DisplayMessage = {
         id: turn.ownId,
         speaker: "participant",
@@ -1321,106 +1547,120 @@ export function DirectNegotiation({
       const turnStartedAt = Date.now();
       const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
       const mentioned = numbersEver || mentionsScoreNumbers(turn.text);
-      const decision = counterpartStep(task, counterpartRole, stageNow, turn.sentPackage, {
+      // A turn that carries a message is never a silent one, whatever the
+      // nudge timer thought a moment ago.
+      const silentNow = false;
+      const stateForTurn: ExchangeState = {
+        ...exchange,
         tier: tierNow,
         disclosurePolicy: "fixed",
-        askedWhy,
-        misreadOffered,
-        numbersReminded,
+        priorityClaimed: priorityClaimedNow,
+        labelConfidence: confidence,
+        participantSilent: silentNow,
         numbersMentionedNow: mentioned,
         secondsRemaining: turn.secondsAtSend,
-        softCloseOffered,
-      });
+      };
+      const decision = counterpartStep(
+        task,
+        counterpartRole,
+        stageNow,
+        incoming,
+        stateForTurn,
+      );
       let reply: string;
+      let returnedState: Partial<ExchangeState> | undefined;
       if (mockAi) {
         reply = decision.accepts
           ? DIRECT_MOCK_REPLIES[1]
           : DIRECT_MOCK_REPLIES[Math.min(replies, DIRECT_MOCK_REPLIES.length - 1)];
       } else {
-        const data = await fetchJsonWithRetry<ClosingCounterpartResponse>(
+        const data = await fetchJsonWithRetry<CounterpartResponse>(
           "/api/counterpart",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-            taskId: task.id,
-            participantRole: role,
-            stage: stageNow,
-            incoming: turn.sentPackage,
-            tier: tierNow,
-            askedWhy,
-            misreadOffered,
-            numbersReminded,
-            // Sent, not re-derived server-side: the client codes the outcome
-            // from its own `counterpartStep`, so every input to that call has
-            // to reach the route unchanged or the two can disagree about
-            // whether the exchange was agreed.
-            numbersMentionedNow: mentioned,
-            secondsRemaining: turn.secondsAtSend,
-            softCloseOffered,
-            disclosurePolicy: "fixed",
-            afterProxy: true,
-            history: next.map((m) => ({
-              role: m.speaker === "participant" ? "user" : "assistant",
-              content: m.text,
-            })),
+              taskId: task.id,
+              participantRole: role,
+              stage: stageNow,
+              incoming,
+              afterProxy: true,
+              history: next.map((m) => ({
+                role: m.speaker === "participant" ? "user" : "assistant",
+                content: m.text,
+              })),
+              // THE WHOLE EXCHANGE STATE, sent and replaced. Every input the
+              // client coded its own outcome from has to reach the route
+              // unchanged, or the two can disagree about whether the exchange
+              // was agreed.
+              ...stateForTurn,
             }),
           },
           {
             signal: controller.signal,
             onFailure: failedAttempt,
-            validate: isClosingCounterpartResponse,
+            validate: isCounterpartResponse,
           },
         );
         reply = data.message;
+        returnedState = data.state;
       }
 
       // One delay for both branches, counting the generation time already
-      // spent. Same fix and same reason as the Direct arm: the budget used to
-      // apply only to the live branch, so mockup mode replied in 500ms, and it
-      // was ADDED to the model's own latency rather than absorbing it.
+      // spent. The budget used to apply only to the live branch, so mockup
+      // mode replied in 500ms, and it was ADDED to the model's own latency
+      // rather than absorbing it.
       await awaitCounterpartDelay(reply.length, turnStartedAt);
 
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
 
       setPersonalTier(personalNow);
       setSelfDisclosed(selfDisclosedNow);
+      setPriorityClaimed(priorityClaimedNow);
+      setLabelConfidence(confidence);
       setNumbersEver(mentioned);
-      if (decision.action === "ask_why") setAskedWhy(true);
-      if (decision.action === "nonum") setNumbersReminded(true);
-      if (decision.action === "soft_close") setSoftCloseOffered(true);
-      if (decision.action === "misread") setMisreadOffered(true);
+
+      // THE ONE-SHOT FLAGS LATCH FROM THREE SOURCES: what was already held,
+      // what the route advanced, and what THIS decision spent. The last is not
+      // redundant — mockup mode never calls the route at all, and a route that
+      // answers without a `state` block must not silently unspend a script the
+      // participant has just been shown.
+      setExchange((held) =>
+        foldExchangeState(held, returnedState, {
+          askedWhy: decision.action === "ask_why",
+          askSitUsed: decision.action === "ask_sit",
+          nudgeUsed: decision.action === "nudge",
+          numbersReminded: decision.action === "nonum",
+          softCloseOffered: decision.action === "soft_close",
+          counterpartSbDisclosed:
+            decision.action === "disclose_sb" ||
+            decision.action === "disclose_sb_and_accept",
+          // Two reasonless turns in a row settle it as "no reason given" and
+          // the trade loop takes over (§6.1 stage 2).
+          reasonlessTurns:
+            label === "none" ? (held.reasonlessTurns ?? 0) + 1 : 0,
+          clarifyUsedForTier:
+            decision.action === "clarify" ? tierNow : held.clarifyUsedForTier,
+        }),
+      );
 
       // THE VISIBLE CARD FOLLOWS THE COUNTERPROPOSAL, and this is not
-      // cosmetic. `offer` is the "Current Negotiation Package" chip card;
-      // `lastCounterpartPackage` is what "✓ Accept the package on the table"
-      // actually sends. They were separate, and nothing synced them.
-      //
-      // A participant at the work rung who edits the chips to their own best
-      // level and sends it gets `balance` back — the machine holds them one
-      // option down. That counterpackage silently became the accept target
-      // while the card still showed what they had asked for, so the button's
-      // own label pointed at the wrong package and one click committed them
-      // to 2,300 where the card said 3,000.
-      //
-      // `acceptStanding` does call `setOffer` first, but React batches it with
-      // the `send()` on the next line, so the correction painted only after
-      // the commitment it was meant to inform.
+      // cosmetic. `offer` is the drawer's chip selection; `lastCounterpartPackage`
+      // is what "✓ Accept the package on the table" actually sends. They were
+      // separate, and nothing synced them — so one click could commit a
+      // participant to a package the card was not showing.
       if (decision.proposal) {
         setLastCounterpartPackage(decision.proposal);
         setStandingTier(tierNow);
         setOffer(decision.proposal);
-        // The drawer opens itself the FIRST time a package arrives, so
-        // countering it is one click away. Once only, and identical to the
-        // Direct arm's rule.
         if (!openedOnCounterProposal.current) {
           openedOnCounterProposal.current = true;
           setProposalOpen(true);
         }
       } else if (tierNow !== standingTier) {
-        // See `standingTier`: nothing came back to replace it and the rung has
-        // moved, so the package on screen can no longer be accepted. Take the
-        // button away rather than leave one that silently does nothing.
+        // Nothing came back to replace it and the rung has moved, so the
+        // package on screen can no longer be accepted. Take the button away
+        // rather than leave one that silently does nothing.
         setLastCounterpartPackage(null);
         setStandingTier(tierNow);
       }
@@ -1435,6 +1675,21 @@ export function DirectNegotiation({
       setStagedTurn(null);
       setDraft("");
       setTurnError(null);
+      nudgeRequested.current = false;
+
+      classifierLog.current = [
+        ...classifierLog.current,
+        {
+          text: turn.text,
+          label,
+          confidence: confidence ?? null,
+          stance,
+          priorityClaim: priorityNow,
+          tier: tierNow,
+          messageIndex: turn.texts.length - 1,
+          createdAt: turn.createdAt,
+        },
+      ];
 
       logEvent(
         "message_sent",
@@ -1445,6 +1700,8 @@ export function DirectNegotiation({
           requirementOption: turn.sentOffer[requirement.id] ?? null,
           reasonLabel: label,
           reasonConfidence: confidence,
+          reasonStance: stance,
+          priorityClaim: priorityNow,
           classifierStubbed,
           tier: tierNow,
         },
@@ -1460,7 +1717,7 @@ export function DirectNegotiation({
           createdAt: turn.createdAt,
           stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET - 1),
           proposal: turn.sentPackage ?? undefined,
-          reasonLabel: label,
+          reasonLabel: storedLabel(label),
           reasonConfidence: confidence,
         });
         void getStore().appendMessage(participantKey, {
@@ -1479,15 +1736,11 @@ export function DirectNegotiation({
       // FIRST SETTLEMENT WINS. `onExpire` guards on `settled` and this did
       // not, so a reply still in flight when the clock ran out overwrote the
       // recorded impasse with an agreement — two `negotiation_ended` events
-      // for one exchange, and which one survived decided by network timing.
-      // The reply delay is 8-25s on a 180s closing clock, so a message sent
-      // near the end is genuinely likely to land after zero. Direct has the
-      // same shape on a 600s clock, which made this an asymmetry on the
-      // primary contrast as well as a bug.
+      // for one exchange, decided by network timing.
       if (!settledRef.current && (decision.accepts || decision.impasse)) {
         settle(
           decision.accepts ? "agreed" : "impasse",
-          decision.accepts ? (decision.proposal ?? turn.sentPackage) : null,
+          decision.accepts ? (decision.proposal ?? incoming) : null,
           decision.accepts ? "agreed" : "impasse",
           {
             replies: replies + 1,
@@ -1503,6 +1756,14 @@ export function DirectNegotiation({
           tier: tierNow,
           selfDisclosed: selfDisclosedNow,
         });
+      } else if (queuedText.current !== null) {
+        // A message arrived while this reply was still on the wire and could
+        // not be folded into it. Send it now rather than dropping it — the
+        // participant pressed send and watched their words disappear
+        // otherwise.
+        const queued = queuedText.current;
+        queuedText.current = null;
+        void send(queued);
       }
     } catch (error) {
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
@@ -1519,10 +1780,71 @@ export function DirectNegotiation({
     }
   }
 
+  /**
+   * Send a participant message.
+   *
+   * THE TURN BOUNDARY IS THE MOMENT THE REPLY RENDERS (§6.1 stage 3), so a
+   * message sent while the counterpart's delay is still running is FOLDED
+   * INTO THE SAME TURN: the pending reply is cancelled, the whole message list
+   * is re-classified, and the counterpart answers the new state once.
+   *
+   * That is what makes the LOCK land on everything the participant said in
+   * their first reason turn rather than on whichever fragment arrived first —
+   * and `SB` (the confirmatory outcome) is exactly that lock. Without it,
+   * someone who writes a confession as "actually, there's something" then
+   * "the client asked for the lead" is recorded as a non-discloser on the
+   * strength of the first half.
+   *
+   * A message that arrives after the reply has already rendered is a new turn.
+   * One in-flight request at a time, always: a second is queued, never
+   * dropped.
+   */
   async function send(text: string, sentOffer: Package = offer) {
-    if (pending || stagedTurn || settledRef.current) return;
+    if (settledRef.current) return;
+    lastParticipantAt.current = Date.now();
+    nudgeRequested.current = false;
+
+    if (pending || stagedTurn) {
+      const inFlight = stagedTurn;
+      // The reply has not rendered yet, so this belongs to the turn in
+      // flight. Cancel it and re-run with both messages classified together.
+      if (inFlight) {
+        turnGeneration.current += 1;
+        activeRequest.current?.abort();
+        activeRequest.current = null;
+        participantTexts.current = [...participantTexts.current, text];
+        // The two messages become two transcript rows; only the new one is
+        // appended here, because the first was already committed to the list
+        // when its own turn began.
+        const merged: StagedTurn = {
+          texts: [...participantTexts.current],
+          text,
+          sentOffer: { ...sentOffer },
+          sentPackage:
+            Object.keys(sentOffer).length > 0 ? { ...sentOffer } : null,
+          ownId: `d-p${messages.length + 1}`,
+          createdAt: new Date().toISOString(),
+          secondsAtSend: secondsRemaining,
+        };
+        setMessages((prev) => [
+          ...prev,
+          { id: inFlight.ownId, speaker: "participant", text: inFlight.text },
+        ]);
+        setStagedTurn(merged);
+        setDraft("");
+        await runStagedTurn(merged);
+        return;
+      }
+      // No staged turn to fold into (a retry is running, say). Queue it.
+      queuedText.current = text;
+      setDraft("");
+      return;
+    }
+
+    participantTexts.current = [...participantTexts.current, text];
     const immutableOffer = { ...sentOffer };
-    const turn: ClosingStagedTurn = {
+    const turn: StagedTurn = {
+      texts: [...participantTexts.current],
       text,
       sentOffer: immutableOffer,
       sentPackage: Object.keys(immutableOffer).length > 0 ? immutableOffer : null,
@@ -1533,6 +1855,114 @@ export function DirectNegotiation({
     setStagedTurn(turn);
     setDraft("");
     await runStagedTurn(turn);
+  }
+
+  /**
+   * SCRIPT-NUDGE, timed on the CLIENT (§6.2, §6.9 #17).
+   *
+   * The counterpart has nothing to answer — no package arrived, no reason was
+   * given — so there is no turn to hang the nudge on. The client watches the
+   * silence instead, asks the route for exactly one nudge turn, and then the
+   * counterpart simply waits, which is what §6.9 #17 describes.
+   *
+   * It runs through the same `counterpartStep` as everything else, so the
+   * machine still owns whether the nudge is available: `nudgeUsed` latches on
+   * this turn and every later silence produces nothing.
+   */
+  async function runNudge() {
+    if (settledRef.current || pending || stagedTurn) return;
+    if (exchange.nudgeUsed || nudgeRequested.current) return;
+    nudgeRequested.current = true;
+    const generation = turnGeneration.current + 1;
+    turnGeneration.current = generation;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setPending(true);
+    try {
+      const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
+      const stateForTurn: ExchangeState = {
+        ...exchange,
+        tier,
+        disclosurePolicy: "fixed",
+        priorityClaimed,
+        labelConfidence,
+        participantSilent: true,
+        numbersMentionedNow: false,
+        secondsRemaining,
+      };
+      const decision = counterpartStep(
+        task,
+        counterpartRole,
+        stageNow,
+        null,
+        stateForTurn,
+      );
+      // Only a nudge. Anything else means the machine had a real move to make,
+      // and a silence is not the moment to make it — the participant would get
+      // a proposal they never asked for out of a pause.
+      if (decision.action !== "nudge") return;
+      let reply: string;
+      if (mockAi) {
+        reply = "still there? || no rush — say whatever comes to mind.";
+      } else {
+        const data = await fetchJsonWithRetry<CounterpartResponse>(
+          "/api/counterpart",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              taskId: task.id,
+              participantRole: role,
+              stage: stageNow,
+              incoming: null,
+              afterProxy: true,
+              history: messages.map((m) => ({
+                role: m.speaker === "participant" ? "user" : "assistant",
+                content: m.text,
+              })),
+              ...stateForTurn,
+            }),
+          },
+          {
+            signal: controller.signal,
+            validate: isCounterpartResponse,
+          },
+        );
+        reply = data.message;
+      }
+      if (!mounted.current || generation !== turnGeneration.current || settledRef.current) {
+        return;
+      }
+      const counter: DisplayMessage = {
+        id: `d-nudge${messages.length}`,
+        speaker: "counterpart",
+        text: reply,
+      };
+      setMessages((prev) => [...prev, counter]);
+      setExchange((held) => ({ ...held, nudgeUsed: true }));
+      if (participantKey) {
+        void getStore().appendMessage(participantKey, {
+          id: counter.id,
+          sessionIndex: taskIndex,
+          speaker: "counterpart",
+          text: reply,
+          createdAt: new Date().toISOString(),
+          stage: decision.stage,
+          decidedAction: decision.action,
+        });
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      // A failed nudge is not worth a recovery banner: nothing the participant
+      // did is waiting on it, and the retry path is for their own messages.
+      console.error("[nudge]", error);
+      nudgeRequested.current = false;
+    } finally {
+      if (mounted.current && generation === turnGeneration.current) {
+        setPending(false);
+        activeRequest.current = null;
+      }
+    }
   }
 
   /**
@@ -1577,25 +2007,15 @@ export function DirectNegotiation({
                   {settled === "agreed"
                     ? "✓ You have reached a mutual agreement!"
                     : settled === "impasse"
-                      ? "⚠️ The negotiation ended without an agreement."
+                      ? "⚠️ Time ran out. Nothing is settled, so you both score 0 for this task."
                       : openingPackage
                         ? "You are talking directly with the other participant. Confirm or adjust what the proxies reached."
                         : // NO STANDING PACKAGE, and two different things
                           // bring a participant here: they refused what their
                           // proxies reached, or the exchange never produced
                           // one. Either way there is nothing to confirm or
-                          // adjust — saying otherwise sent them looking for
-                          // an Accept button that is correctly not rendered —
-                          // but telling a refuser their proxies "did not
-                          // settle" contradicts the screen they just left.
-                          //
-                          // NEITHER LINE TELLS THEM TO PICK LEVELS FIRST any
-                          // more. A message may be sent with no package at
-                          // all, so an instruction to choose levels before
-                          // speaking would describe a gate that no longer
-                          // exists — and would put the selector back at the
-                          // centre of a screen whose subject is the
-                          // conversation.
+                          // adjust — but telling a refuser their proxies "did
+                          // not settle" contradicts the screen they just left.
                           refused
                           ? "You refused what the proxies reached, so nothing is on the table. Talk it through with the other participant, and attach a proposal below when you want to put one up."
                           : "Your proxies did not settle on a package. Talk it through with the other participant, and attach a proposal below when you want to put one up."}
@@ -1606,7 +2026,23 @@ export function DirectNegotiation({
                   seconds={CLOSING_SECONDS}
                   running={!settled && !recovering}
                   paused={recovering}
-                  onTick={setSecondsRemaining}
+                  onTick={(remaining) => {
+                    setSecondsRemaining(remaining);
+                    // SCRIPT-NUDGE is client-timed because a silence produces
+                    // no turn to hang it on. Requested once; the machine's
+                    // `nudgeUsed` decides whether it is still available.
+                    if (
+                      !settledRef.current &&
+                      !pending &&
+                      !stagedTurn &&
+                      !exchange.nudgeUsed &&
+                      !nudgeRequested.current &&
+                      Date.now() - lastParticipantAt.current >=
+                        NUDGE_AFTER_SILENT_SECONDS * 1000
+                    ) {
+                      void runNudge();
+                    }
+                  }}
                   onExpire={() => {
                     if (settledRef.current) return;
                     if (activeRequest.current || stagedTurn) {
@@ -1653,10 +2089,16 @@ export function DirectNegotiation({
               }
             />
             <MessageComposer
-              value={stagedTurn?.text ?? draft}
+              value={stagedTurn && pending ? draft : (stagedTurn?.text ?? draft)}
               onChange={setDraft}
               onSend={send}
-              disabled={pending || Boolean(stagedTurn) || !canSend}
+              /* THE COMPOSER STAYS OPEN WHILE THE REPLY IS COMING (§6.1
+                 stage 3). What arrives before the reply renders is folded into
+                 the same turn; a locked composer would make the turn boundary
+                 the moment of SENDING rather than the moment of ANSWERING,
+                 and the LOCK — `SB`, the confirmatory outcome — is taken at
+                 the end of the turn. */
+              disabled={!canSend}
               cue={yourTurn}
               placeholder={
                 settled
@@ -1672,8 +2114,8 @@ export function DirectNegotiation({
               same three ways as the Direct arm's: a package the counterpart
               accepts by the ladder, this explicit Accept, or the clock. The
               "End without agreement" control was only ever here, so it gave
-              the Proxy arm a route to the 600 fallback that Direct has no
-              counterpart for — on the primary contrast, taken by the
+              the Proxy arm a route to the no-agreement outcome that Direct has
+              no counterpart for — on the primary contrast, taken by the
               participant rather than by the machine. Restore it only in BOTH
               arms at once, if at all. */}
           {!settled && lastCounterpartPackage ? (
@@ -1756,7 +2198,7 @@ export function DirectNegotiation({
           note={
             settled === "agreed"
               ? "✓ Agreement reached! Proceed to review."
-              : "⚠️ No agreement. Proceed to review."
+              : "⚠️ No agreement — 0 points for this task. Proceed to review."
           }
         />
       ) : (

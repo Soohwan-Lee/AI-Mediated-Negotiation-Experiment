@@ -40,13 +40,29 @@ import {
 } from "@/lib/dev-mode";
 import {
   NEGOTIATION_SECONDS,
+  NUDGE_AFTER_SILENT_SECONDS,
+  codeOutcome,
   counterpartStageAfter,
   counterpartStep,
   mentionsScoreNumbers,
   foldTier,
   LABEL_TIER,
+  type ExchangeState,
   type ReasonTier,
+  type SbTiming,
 } from "@/lib/negotiation/machine";
+import {
+  INITIAL_EXCHANGE_STATE,
+  foldExchangeState,
+  isClassificationResponse,
+  isCounterpartResponse,
+  resolveCounterTerms,
+  storedLabel,
+  type ClassificationResponse,
+  type ClassifierLogEntry,
+  type CounterpartResponse,
+  type HeldExchangeState,
+} from "./turn-contract";
 import { reciprocalAcceptanceText } from "@/lib/negotiation/counterpart-text";
 import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
 import { scriptedTask } from "@/lib/negotiation/script";
@@ -77,18 +93,20 @@ function openingLine(
   task: NegotiationTask,
   counterpartRole: Role,
 ): string {
-  // SCRIPT-OPEN (Ver.2.16 §6.1, §6.4): the counterpart's own DECOY work
-  // reason and the question that invites the participant's. NO PACKAGE, and
-  // NO STATEMENT OF ITS OWN PRIORITY.
+  // SCRIPT-OPEN (§6.1, §6.4): the counterpart's own work reason — which since
+  // Ver.2.21 is NON-DIRECTIONAL, "both of these are on my mind" — and the
+  // question that invites the participant's situation. NO PACKAGE, and NO
+  // STATEMENT OF ITS OWN PRIORITY.
   //
-  // The second omission is Ver.2.16's, and it puts the participant on the
-  // RECEIVING end of the same decoy: hearing only a safe general reason, they
-  // read the counterpart's priority as the obvious remedy for it, and the
-  // counterpart's stage-4 SB is what corrects them. Gate 16 checks that
-  // PCR1-2 rise across that disclosure. Asking "what matters most on your
-  // side" here instead of "what's the situation" also invites a bare priority
-  // claim as the first move, which is tier 2 — so the misread, the whole
-  // point of the WR, would rarely fire at all.
+  // THE DECOY AND ITS MISREAD ARE GONE (Ver.2.21). The work reason no longer
+  // points at the wrong term, so there is no wrong-term package to offer and
+  // SCRIPT-MISREAD was deleted with it; a work reason now simply buys the same
+  // rung as silence (§3.3). What survives from that design is the two
+  // omissions above. Withholding its own priority is what leaves the
+  // participant to start without knowing which term the other side needs, and
+  // asking "what's the situation" rather than "what matters most on your side"
+  // is what stops the screen inviting a bare priority claim as the opening
+  // move — a claim that buys nothing and earns one SCRIPT-ASKWHY.
   //
   // IT USED TO OPEN ON ITS OWN BEST PACKAGE, and Ver.2.13 §2.6 removed that
   // deliberately: an opening of "my best, your worst" is a face threat in its
@@ -114,9 +132,21 @@ function openingLine(
  */
 const SEEDED_OPENING_STAGES = 1;
 
-type ReasonLabel = "none" | "WR" | "PRI" | "SB";
-
+/**
+ * The staged turn.
+ *
+ * `texts` carries EVERY participant message in this task, in order, because
+ * the classifier reads them cumulatively (§6.2a): people say a confession
+ * across two or three messages, and judging each alone under the
+ * "ambiguous goes lower" rule would put a systematic floor on Direct
+ * disclosure — which would then read as the Proxy arm's protective effect.
+ *
+ * The wire shapes and their validators live in `./turn-contract`, imported by
+ * this arm and by the Proxy arm's closing alike, because a difference between
+ * the two lands on `Pooled Proxy − Direct` itself.
+ */
 interface StagedTurn {
+  texts: string[];
   text: string;
   sentOffer: Package;
   sentPackage: Package | null;
@@ -125,33 +155,6 @@ interface StagedTurn {
   secondsAtSend: number;
   classification?: ClassificationResponse;
 }
-
-interface ClassificationResponse {
-  label: ReasonLabel;
-  confidence?: number;
-  stubbed?: boolean;
-}
-
-interface CounterpartResponse {
-  message: string;
-  proposal?: Package | null;
-}
-
-function isClassificationResponse(value: unknown): value is ClassificationResponse {
-  if (typeof value !== "object" || value === null || !("label" in value)) return false;
-  if (!["none", "WR", "PRI", "SB"].includes(String(value.label))) return false;
-  if ("confidence" in value && value.confidence !== undefined &&
-      (typeof value.confidence !== "number" || !Number.isFinite(value.confidence) ||
-       value.confidence < 0 || value.confidence > 1)) return false;
-  return true;
-}
-
-function isCounterpartResponse(value: unknown): value is CounterpartResponse {
-  return typeof value === "object" && value !== null &&
-    "message" in value && typeof value.message === "string" &&
-    value.message.trim().length > 0;
-}
-
 /**
  * RISK COMES BEFORE THE LEVELS SCREEN, in this arm and in the Proxy arm.
  *
@@ -220,19 +223,26 @@ const PHASE_LABELS: Record<Phase, string> = {
   review: "Review",
 };
 
-/** Entry preferences as a package (nulls dropped). */
 /**
- * SB-TIMING for the Direct arm. Under reciprocal disclosure, every
- * participant SB necessarily precedes the counterpart's SB; late disclosure
- * remains distinguishable in the message/reply log, not by falsely coding it
- * as post-counterpart. `SB` separately records whether the participant chose
- * it during the first reason opportunity.
+ * `SB-TIMING` for the Direct arm (§9.3, §6.9 #10-#11).
+ *
+ * THE LOCK IS THE FIRST REASON TURN, not the first message (§6.1 stage 2-3).
+ * A participant whose opening is a greeting or a bare demand has not spent
+ * their reason opportunity: the counterpart asks once with SCRIPT-ASKSIT and
+ * waits, and only a second reasonless turn settles it as "no reason". So
+ * `sbFirstChoice` — which is `SB`, the confirmatory outcome — is whether the
+ * SB was out when that turn ended, and it is the machine's answer, not a
+ * reply count.
+ *
+ * A confession made after the lock still raises the tier and still pays
+ * 3,000; it is recorded as `later_turn` and `SB` stays 0 (§6.9 #11).
  */
 function sbTimingCode(
-  sbVoicedAtReply: number | null,
-): "none" | "before_counterpart" | "after_counterpart" {
-  if (sbVoicedAtReply === null) return "none";
-  return "before_counterpart";
+  sbFirstChoice: boolean,
+  sbEverVoiced: boolean,
+): SbTiming {
+  if (sbFirstChoice) return "first_chance";
+  return sbEverVoiced ? "later_turn" : "never";
 }
 
 function toPackage(
@@ -338,22 +348,54 @@ export function BaselineTask({
    * who discloses and then changes the subject keeps the rung they paid for.
    */
   const [tier, setTier] = useState<ReasonTier>("none");
-  /** SCRIPT-ASKWHY / SCRIPT-NONUM / SCRIPT-CLOSE are each one-shot (§6.2). */
-  const [askedWhy, setAskedWhy] = useState(false);
-  const [misreadOffered, setMisreadOffered] = useState(false);
-  const [numbersReminded, setNumbersReminded] = useState(false);
+  /**
+   * The classifier's `priority_claim` flag (§6.2). It buys no rung — Ver.2.21
+   * deleted the one it used to — and its whole effect is one SCRIPT-ASKWHY,
+   * which is where the participant HEARS that a claim without a reason moves
+   * nothing.
+   */
+  const [priorityClaimed, setPriorityClaimed] = useState(false);
+  /** Confidence in the CURRENT label, for SCRIPT-CLARIFY (§6.2). */
+  const [labelConfidence, setLabelConfidence] = useState<number | undefined>(
+    undefined,
+  );
+  /**
+   * The one-shot script flags, held as ONE object.
+   *
+   * The counterpart route returns the state it advanced and the client
+   * replaces what it holds; eight separate `useState` calls are what made a
+   * field get dropped on the merge last time, which turns a one-shot script
+   * into a no-shot or an every-turn one. Identical to the Proxy arm's closing
+   * (`shared.tsx`), which is the point.
+   */
+  const [exchange, setExchange] = useState<HeldExchangeState>(
+    INITIAL_EXCHANGE_STATE,
+  );
   /** Any participant message so far mentioned score numbers (one-shot pool). */
   const [numbersEver, setNumbersEver] = useState(false);
-  const [softCloseOffered, setSoftCloseOffered] = useState(false);
-  /** Direct counterpart SB is reciprocal and must be voiced at most once. */
-  const [counterpartSbDisclosed, setCounterpartSbDisclosed] = useState(false);
   /**
-   * When the participant first tagged their SB, in counterpart replies.
-   * The primary SB outcome is still the first reason opportunity. Later SB is
-   * kept in the turn log separately; under reciprocity it necessarily precedes
-   * the counterpart's own SB.
+   * `SB` — was the participant's sensitive background out when their FIRST
+   * REASON TURN ended (§6.1 stage 3, §9.3)?
+   *
+   * NOT "was it in the first message". The first reason turn runs until a
+   * reason actually appears: a greeting or a bare demand gets SCRIPT-ASKSIT
+   * and the turn continues. So the lock is taken on the turn where the label
+   * first rises above `none`, or on the second reasonless turn, whichever
+   * comes first — and `machine.ts` decides which of those happened through
+   * `reasonlessTurns` and the ask-sit action.
    */
-  const [sbVoicedAtReply, setSbVoicedAtReply] = useState<number | null>(null);
+  const [sbFirstChoice, setSbFirstChoice] = useState<boolean | null>(null);
+  /** Did the participant ever voice it, at any point? Feeds `later_turn`. */
+  const [sbEverVoiced, setSbEverVoiced] = useState(false);
+  /** Every participant message, in order, for the CUMULATIVE classifier. */
+  const participantTexts = useRef<string[]>([]);
+  /** The stored `{text, label, confidence, stance}` log, for gate 19's κ. */
+  const classifierLog = useRef<ClassifierLogEntry[]>([]);
+  /** When the participant last sent anything, for the client-timed nudge. */
+  const lastParticipantAt = useRef<number>(Date.now());
+  const nudgeRequested = useRef(false);
+  /** A message that arrived while a turn was in flight, waiting to be folded. */
+  const queuedText = useRef<string | null>(null);
 
 
   const [lastCounterpartPackage, setLastCounterpartPackage] =
@@ -499,16 +541,22 @@ export function BaselineTask({
   // `replies`. Past the clamp the stage-5 close is used, for the same reason
   // the counterpart's lookup does it.
   useDevAutofill(() => {
-    // The participant's script slots run 1 (answer the opening), 2 (their
-    // first reason — the SB in the ideal path), 5 (the trade), then the
-    // stage-6 close for anything after.
-    const slot = ([1, 2, 5][replies] ?? 6) as number;
-    const own = script.messages.find(
-      (m) => m.stage === slot && m.speaker === "participant",
-    );
-    if (own) {
-      setDraft(own.text);
-      if (own.proposal) setOffer(own.proposal);
+    /**
+     * THE PARTICIPANT'S OWN SCRIPTED MESSAGES, IN ORDER, not by stage index.
+     *
+     * It used to look each one up by a hard-coded stage — `[1, 2, 5][replies]`
+     * — which broke silently the moment Ver.2.21 rewrote the Direct script:
+     * the participant's first turn is stage 2 there (their first REASON
+     * opportunity, §6.1), so slot 1 found nothing and the composer arrived
+     * empty on the one screen the mockup exists to show. Reading the script's
+     * own participant turns in order cannot drift with the stage numbering
+     * again.
+     */
+    const own = script.messages.filter((m) => m.speaker === "participant");
+    const next = own[replies] ?? own[own.length - 1];
+    if (next) {
+      setDraft(next.text);
+      if (next.proposal) setOffer(next.proposal);
     }
   }, `baseline-t${taskIndex}-${phase}-${replies}`);
 
@@ -550,7 +598,7 @@ export function BaselineTask({
       let classification = turn.classification;
       if (!classification) {
         if (mockAi) {
-          let label: ReasonLabel = "none";
+          let label: ClassificationResponse["label"] = "none";
           const mockedReason = script.messages.find(
             (message) => message.speaker === "participant" &&
               message.text === turn.text && message.reasonCardId,
@@ -560,14 +608,15 @@ export function BaselineTask({
               ? "SB"
               : "WR";
           }
-          classification = { label };
+          classification = { label, stance: "none" };
         } else {
           classification = await fetchJsonWithRetry<ClassificationResponse>(
             "/api/classify-reason",
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ taskId, role, message: turn.text }),
+              // THE WHOLE LIST, EVERY TIME (§6.2a). See `StagedTurn.texts`.
+              body: JSON.stringify({ taskId, role, messages: turn.texts }),
             },
             {
               signal: controller.signal,
@@ -582,9 +631,38 @@ export function BaselineTask({
         }
       }
 
-      const { label, confidence, stubbed: classifierStubbed = false } = classification;
+      const {
+        label,
+        confidence,
+        stubbed: classifierStubbed = false,
+        stance = "none",
+        priority_claim: priorityNow = false,
+      } = classification;
       const tierNow: ReasonTier = foldTier(tier, LABEL_TIER[label]);
-      const sbVoicedAtReplyNow = sbVoicedAtReply ?? (label === "SB" ? replies : null);
+      const priorityClaimedNow = priorityClaimed || priorityNow;
+      const sbEverNow = sbEverVoiced || label === "SB";
+
+      /**
+       * STANCE, RESOLVED BEFORE THE MACHINE SEES IT (§6.2, §6.9 #18).
+       *
+       * `accept` means the participant agreed in words to what is on the
+       * table, so the standing package travels as their offer — the same
+       * thing the Accept button does, by the same deterministic route.
+       * `counter` means they named terms in prose, treated exactly like a
+       * package from the drawer. Neither hands the model a decision: the
+       * classifier reports what was said, `machine.ts` decides what it buys.
+       */
+      const counterPackage = resolveCounterTerms(
+        task.issues,
+        classification.counter_terms,
+      );
+      const incoming: Package | null =
+        stance === "accept" && lastCounterpartPackage
+          ? lastCounterpartPackage
+          : stance === "counter" && counterPackage
+            ? counterPackage
+            : turn.sentPackage;
+
       const own: DisplayMessage = {
         id: turn.ownId,
         speaker: "participant",
@@ -594,6 +672,7 @@ export function BaselineTask({
       const turnStartedAt = Date.now();
       let reply: string;
       let counterProposal: Package | null = null;
+      let returnedState: Partial<ExchangeState> | undefined;
 
       // Where the counterpart is in ITS OWN script. Direct can skip the
       // sensitive-disclosure position or combine disclosure with acceptance;
@@ -601,17 +680,25 @@ export function BaselineTask({
       const stageNow = counterpartStageAfter(replies + SEEDED_OPENING_STAGES);
 
       const mentioned = numbersEver || mentionsScoreNumbers(turn.text);
-      const decision = counterpartStep(task, counterpartRole, stageNow, turn.sentPackage, {
+      const stateForTurn: ExchangeState = {
+        ...exchange,
         tier: tierNow,
-        askedWhy,
-        misreadOffered,
-        numbersReminded,
+        disclosurePolicy: "reciprocal",
+        priorityClaimed: priorityClaimedNow,
+        labelConfidence: confidence,
+        // A turn carrying a message is not a silent one, whatever the nudge
+        // timer thought a moment ago.
+        participantSilent: false,
         numbersMentionedNow: mentioned,
         secondsRemaining: turn.secondsAtSend,
-        softCloseOffered,
-        disclosurePolicy: "reciprocal",
-        counterpartSbDisclosed,
-      });
+      };
+      const decision = counterpartStep(
+        task,
+        counterpartRole,
+        stageNow,
+        incoming,
+        stateForTurn,
+      );
       counterProposal = decision.proposal;
 
       if (mockAi) {
@@ -650,27 +737,20 @@ export function BaselineTask({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-            taskId,
-            participantRole: role,
-            stage: stageNow,
-            incoming: turn.sentPackage,
-            tier: tierNow,
-            askedWhy,
-            misreadOffered,
-            numbersReminded,
-            // Sent, not re-derived server-side: the client codes the outcome
-            // from its own `counterpartStep`, so every input to that call has
-            // to reach the route unchanged or the two can disagree about
-            // whether the exchange was agreed.
-            numbersMentionedNow: mentioned,
-            secondsRemaining: turn.secondsAtSend,
-            softCloseOffered,
-            disclosurePolicy: "reciprocal",
-            counterpartSbDisclosed,
-            history: next.map((m) => ({
-              role: m.speaker === "participant" ? "user" : "assistant",
-              content: m.text,
-            })),
+              taskId,
+              participantRole: role,
+              stage: stageNow,
+              incoming,
+              afterProxy: false,
+              history: next.map((m) => ({
+                role: m.speaker === "participant" ? "user" : "assistant",
+                content: m.text,
+              })),
+              // THE WHOLE EXCHANGE STATE, sent and replaced. Every input the
+              // client coded its own outcome from has to reach the route
+              // unchanged, or the two can disagree about whether the exchange
+              // was agreed.
+              ...stateForTurn,
             }),
           },
           {
@@ -680,16 +760,16 @@ export function BaselineTask({
           },
         );
         reply = data.message;
+        returnedState = data.state;
         // THE LOCAL DECISION'S PACKAGE, not the server's echo of it. Both
-        // are produced by the same deterministic machine from the same
-        // inputs, so they agree — but only the local one is guaranteed to be
-        // the package this client just coded the outcome from. Preferring
-        // the response meant the two arms resolved any divergence
-        // DIFFERENTLY (the Proxy closing has always kept its local one),
-        // which would put a mechanical asymmetry on `Pooled Proxy −
-        // Direct` for a case that is supposed to be impossible.
+        // come from the same deterministic machine on the same inputs, so
+        // they agree — but only the local one is guaranteed to be the package
+        // this client just coded the outcome from. Preferring the response
+        // meant the two arms resolved any divergence DIFFERENTLY (the Proxy
+        // closing has always kept its local one), which would put a
+        // mechanical asymmetry on `Pooled Proxy − Direct` for a case that is
+        // supposed to be impossible.
         counterProposal = decision.proposal;
-
       }
 
       // The reply is delayed in proportion to its own length and jittered, so
@@ -705,19 +785,56 @@ export function BaselineTask({
       // succeed. Until here, retrying cannot duplicate a message, disclosure,
       // state-machine flag, event, or stored transcript row.
       setTier(tierNow);
-      setSbVoicedAtReply(sbVoicedAtReplyNow);
+      setPriorityClaimed(priorityClaimedNow);
+      setLabelConfidence(confidence);
+      setSbEverVoiced(sbEverNow);
       setNumbersEver(mentioned);
-      if (decision.action === "ask_why") setAskedWhy(true);
-      if (decision.action === "nonum") setNumbersReminded(true);
-      if (decision.action === "soft_close") setSoftCloseOffered(true);
 
-      if (
-        decision.action === "disclose_sb" ||
-        decision.action === "disclose_sb_and_accept"
-      ) {
-        setCounterpartSbDisclosed(true);
+      /**
+       * THE LOCK (§6.1 stage 3, §9.3). The first reason turn ends when a
+       * reason actually appears, or when a second reasonless turn settles it
+       * as "no reason given" — and `SB` is what was out at that moment.
+       *
+       * It is taken from the MACHINE's own view of the turn, not from a reply
+       * count: a participant who opens with a greeting has not spent their
+       * reason opportunity, and coding them as a non-discloser on that
+       * message would put a floor on the confirmatory outcome.
+       */
+      const reasonlessNow =
+        label === "none" ? (exchange.reasonlessTurns ?? 0) + 1 : 0;
+      const lockTaken =
+        sbFirstChoice !== null || label !== "none" || reasonlessNow >= 2;
+      const sbFirstChoiceNow =
+        sbFirstChoice ?? (lockTaken ? label === "SB" : null);
+      if (sbFirstChoice === null && sbFirstChoiceNow !== null) {
+        setSbFirstChoice(sbFirstChoiceNow);
+        logEvent(
+          "decision_locked",
+          { sb: sbFirstChoiceNow, tier: tierNow },
+          { sessionIndex: taskIndex },
+        );
       }
-      if (decision.action === "misread") setMisreadOffered(true);
+
+      // THE ONE-SHOT FLAGS LATCH FROM THREE SOURCES: what was already held,
+      // what the route advanced, and what THIS decision spent. The last is not
+      // redundant — mockup mode never calls the route at all, and a route that
+      // answers without a `state` block must not silently unspend a script the
+      // participant has just been shown.
+      setExchange((held) =>
+        foldExchangeState(held, returnedState, {
+          askedWhy: decision.action === "ask_why",
+          askSitUsed: decision.action === "ask_sit",
+          nudgeUsed: decision.action === "nudge",
+          numbersReminded: decision.action === "nonum",
+          softCloseOffered: decision.action === "soft_close",
+          counterpartSbDisclosed:
+            decision.action === "disclose_sb" ||
+            decision.action === "disclose_sb_and_accept",
+          reasonlessTurns: reasonlessNow,
+          clarifyUsedForTier:
+            decision.action === "clarify" ? tierNow : held.clarifyUsedForTier,
+        }),
+      );
 
       // The visible package card follows the counterproposal, so "accept the
       // package on the table" always names what the button actually sends.
@@ -752,6 +869,21 @@ export function BaselineTask({
       setStagedTurn(null);
       setDraft("");
       setTurnError(null);
+      nudgeRequested.current = false;
+
+      classifierLog.current = [
+        ...classifierLog.current,
+        {
+          text: turn.text,
+          label,
+          confidence: confidence ?? null,
+          stance,
+          priorityClaim: priorityNow,
+          tier: tierNow,
+          messageIndex: turn.texts.length - 1,
+          createdAt: turn.createdAt,
+        },
+      ];
 
       logEvent(
         "message_sent",
@@ -762,6 +894,8 @@ export function BaselineTask({
           requirementOption: turn.sentOffer[requirement.id] ?? null,
           reasonLabel: label,
           reasonConfidence: confidence,
+          reasonStance: stance,
+          priorityClaim: priorityNow,
           classifierStubbed,
           tier: tierNow,
         },
@@ -778,7 +912,7 @@ export function BaselineTask({
           createdAt: turn.createdAt,
           stage: counterpartStageAfter(replies),
           proposal: turn.sentPackage ?? undefined,
-          reasonLabel: label,
+          reasonLabel: storedLabel(label),
           reasonConfidence: confidence,
         });
         void getStore().appendMessage(participantKey, {
@@ -799,31 +933,43 @@ export function BaselineTask({
       // sees the counterpart's last message first, and a Continue button
       // appears.
       if (!settledRef.current && (decision.accepts || decision.impasse)) {
+        const pkg = decision.accepts
+          ? (decision.proposal ?? incoming)
+          : null;
         settledRef.current = true;
-        setTentative(decision.accepts ? (decision.proposal ?? turn.sentPackage) : null);
+        setTentative(pkg);
         setSettled(decision.accepts ? "agreed" : "impasse");
-        logEvent(
-          "negotiation_ended",
+        endTask(
+          decision.accepts ? "agreed" : "impasse",
+          pkg,
+          decision.accepts ? "agreed" : "impasse",
           {
-            phase: "direct",
-            reason: decision.accepts ? "agreed" : "impasse",
             replies: replies + 1,
-            secondsRemaining,
             tier: tierNow,
-            sb: sbVoicedAtReplyNow !== null && sbVoicedAtReplyNow <= 1,
-            sbTiming: sbTimingCode(sbVoicedAtReplyNow),
+            sbFirstChoice: sbFirstChoiceNow,
+            sbEverVoiced: sbEverNow,
+            priorityClaimed: priorityClaimedNow,
           },
-          { sessionIndex: taskIndex },
         );
       } else if (!settledRef.current && expiryPending.current) {
         settledRef.current = true;
         setTentative(null);
         setSettled("impasse");
-        logEvent(
-          "negotiation_ended",
-          { phase: "direct", reason: "timeout" },
-          { sessionIndex: taskIndex },
-        );
+        endTask("impasse", null, "timeout", {
+          replies: replies + 1,
+          tier: tierNow,
+          sbFirstChoice: sbFirstChoiceNow,
+          sbEverVoiced: sbEverNow,
+          priorityClaimed: priorityClaimedNow,
+        });
+      } else if (queuedText.current !== null) {
+        // A message arrived while this reply was still on the wire and could
+        // not be folded into it. Send it now rather than dropping it — the
+        // participant pressed send and watched their words disappear
+        // otherwise.
+        const queued = queuedText.current;
+        queuedText.current = null;
+        void send(queued);
       }
     } catch (error) {
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
@@ -840,10 +986,235 @@ export function BaselineTask({
     }
   }
 
+  /**
+   * Everything §9.3 and §6.2 need from this task, written once when the
+   * exchange ends.
+   *
+   * ONE WRITE, NOT ONE PER FIELD, and the classifier log travels with it: gate
+   * 19's κ is computed off `{text, label, confidence}` for every participant
+   * message, and a per-message write would put a request on the wire on every
+   * turn — a timing tell as well as a stall.
+   */
+  function endTask(
+    kind: "agreed" | "impasse",
+    pkg: Package | null,
+    reason: string,
+    committed: {
+      replies: number;
+      tier: ReasonTier;
+      sbFirstChoice: boolean | null;
+      sbEverVoiced: boolean;
+      priorityClaimed: boolean;
+    },
+  ) {
+    // THE OUTCOME IS CODED BY THE MACHINE, not by this screen. `codeOutcome`
+    // owns "no agreement is worth nothing" (§3.2) and the requirement
+    // trajectory the review screen reads.
+    const outcome = codeOutcome(task, role, pkg, kind === "agreed");
+    const sb = Boolean(committed.sbFirstChoice);
+    const sbTiming = sbTimingCode(sb, committed.sbEverVoiced);
+    logEvent(
+      "negotiation_ended",
+      {
+        phase: "direct",
+        reason,
+        replies: committed.replies,
+        secondsRemaining,
+        tier: committed.tier,
+        priorityClaimed: committed.priorityClaimed,
+        sb,
+        sbTiming,
+        outcome,
+      },
+      { sessionIndex: taskIndex },
+    );
+    if (!participantKey) return;
+    void getStore().saveResponses(
+      participantKey,
+      `negotiation_t${taskIndex}`,
+      {
+        taskId,
+        role,
+        phase: "direct",
+        tier: committed.tier,
+        [`SB_t${taskIndex}`]: sb,
+        [`SB-TIMING_t${taskIndex}`]: sbTiming,
+        sbFirstChoice: sb,
+        sbTiming,
+        priorityClaimed: committed.priorityClaimed,
+        // JSON, NOT NESTED OBJECTS. `ResponseValue` is deliberately flat —
+        // one row per item id is what makes the export a table — so the two
+        // structured records travel as text and are parsed by the analysis.
+        classifierLog: JSON.stringify(classifierLog.current),
+        outcome: JSON.stringify(outcome),
+        participantPoints: outcome.participantPoints,
+        jointPoints: outcome.jointPoints,
+      },
+    );
+  }
+
+  /**
+   * SCRIPT-NUDGE, timed on the CLIENT (§6.2, §6.9 #17).
+   *
+   * The counterpart has nothing to answer — no package arrived, no reason was
+   * given — so there is no turn to hang the nudge on. The client watches the
+   * silence instead, asks for exactly one nudge turn, and then the counterpart
+   * simply waits, which is what §6.9 #17 describes. It runs through the same
+   * `counterpartStep` as everything else, so the machine still owns whether
+   * the nudge is available.
+   */
+  async function runNudge() {
+    if (settledRef.current || pending || stagedTurn) return;
+    if (exchange.nudgeUsed || nudgeRequested.current) return;
+    nudgeRequested.current = true;
+    const generation = turnGeneration.current + 1;
+    turnGeneration.current = generation;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setPending(true);
+    try {
+      const stageNow = counterpartStageAfter(replies + SEEDED_OPENING_STAGES);
+      const stateForTurn: ExchangeState = {
+        ...exchange,
+        tier,
+        disclosurePolicy: "reciprocal",
+        priorityClaimed,
+        labelConfidence,
+        participantSilent: true,
+        numbersMentionedNow: false,
+        secondsRemaining,
+      };
+      const decision = counterpartStep(
+        task,
+        counterpartRole,
+        stageNow,
+        null,
+        stateForTurn,
+      );
+      // Only a nudge. Anything else means the machine had a real move to make,
+      // and a silence is not the moment to make it — the participant would get
+      // a proposal out of a pause they never asked for.
+      if (decision.action !== "nudge") return;
+      let reply: string;
+      if (mockAi) {
+        reply = "still there? || no rush — say whatever comes to mind.";
+      } else {
+        const data = await fetchJsonWithRetry<CounterpartResponse>(
+          "/api/counterpart",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              taskId,
+              participantRole: role,
+              stage: stageNow,
+              incoming: null,
+              afterProxy: false,
+              history: messages.map((m) => ({
+                role: m.speaker === "participant" ? "user" : "assistant",
+                content: m.text,
+              })),
+              ...stateForTurn,
+            }),
+          },
+          { signal: controller.signal, validate: isCounterpartResponse },
+        );
+        reply = data.message;
+      }
+      if (!mounted.current || generation !== turnGeneration.current || settledRef.current) {
+        return;
+      }
+      const counter: DisplayMessage = {
+        id: `c-nudge${messages.length}`,
+        speaker: "counterpart",
+        text: reply,
+      };
+      setMessages((prev) => [...prev, counter]);
+      setExchange((held) => ({ ...held, nudgeUsed: true }));
+      if (participantKey) {
+        void getStore().appendMessage(participantKey, {
+          id: counter.id,
+          sessionIndex: taskIndex,
+          speaker: "counterpart",
+          text: reply,
+          createdAt: new Date().toISOString(),
+          stage: decision.stage,
+          decidedAction: decision.action,
+        });
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      // A failed nudge is not worth a recovery banner: nothing the participant
+      // did is waiting on it, and the retry path is for their own messages.
+      console.error("[nudge]", error);
+      nudgeRequested.current = false;
+    } finally {
+      if (mounted.current && generation === turnGeneration.current) {
+        setPending(false);
+        activeRequest.current = null;
+      }
+    }
+  }
+
+  /**
+   * Send a participant message.
+   *
+   * THE TURN BOUNDARY IS THE MOMENT THE REPLY RENDERS (§6.1 stage 3), so a
+   * message sent while the counterpart's delay is still running is FOLDED
+   * INTO THE SAME TURN: the pending reply is cancelled, the whole message list
+   * is re-classified, and the counterpart answers the new state once.
+   *
+   * That is what makes the LOCK land on everything the participant said in
+   * their first reason turn rather than on whichever fragment arrived first —
+   * and `SB` is exactly that lock. Without it, someone who writes a confession
+   * as "actually, there's something" then "the client asked for the lead" is
+   * recorded as a non-discloser on the strength of the first half.
+   *
+   * One in-flight request at a time, always: a second is queued, never
+   * dropped. Identical to the Proxy arm's closing.
+   */
   async function send(text: string, sentOffer: Package = offer) {
-    if (pending || stagedTurn || settledRef.current) return;
+    if (settledRef.current) return;
+    lastParticipantAt.current = Date.now();
+    nudgeRequested.current = false;
+
+    if (pending || stagedTurn) {
+      const inFlight = stagedTurn;
+      if (inFlight) {
+        turnGeneration.current += 1;
+        activeRequest.current?.abort();
+        activeRequest.current = null;
+        participantTexts.current = [...participantTexts.current, text];
+        const merged: StagedTurn = {
+          texts: [...participantTexts.current],
+          text,
+          sentOffer: { ...sentOffer },
+          sentPackage:
+            Object.keys(sentOffer).length > 0 ? { ...sentOffer } : null,
+          ownId: `p${messages.length + 1}`,
+          createdAt: new Date().toISOString(),
+          secondsAtSend: secondsRemaining,
+        };
+        // The first message's bubble goes up now; it was never committed,
+        // because its own turn had not finished.
+        setMessages((prev) => [
+          ...prev,
+          { id: inFlight.ownId, speaker: "participant", text: inFlight.text },
+        ]);
+        setStagedTurn(merged);
+        setDraft("");
+        await runStagedTurn(merged);
+        return;
+      }
+      queuedText.current = text;
+      setDraft("");
+      return;
+    }
+
+    participantTexts.current = [...participantTexts.current, text];
     const immutableOffer = { ...sentOffer };
     const turn: StagedTurn = {
+      texts: [...participantTexts.current],
       text,
       sentOffer: immutableOffer,
       sentPackage: Object.keys(immutableOffer).length > 0 ? immutableOffer : null,
@@ -991,8 +1362,8 @@ export function BaselineTask({
         behaviour={{
           // No proxy ran, so there is nothing to ratify.
           ratify: null,
-          sb: sbVoicedAtReply !== null && sbVoicedAtReply <= 1,
-          sbTiming: sbTimingCode(sbVoicedAtReply),
+          sb: Boolean(sbFirstChoice),
+          sbTiming: sbTimingCode(Boolean(sbFirstChoice), sbEverVoiced),
         }}
         transcript={messages}
         isProxy={false}
@@ -1041,7 +1412,7 @@ export function BaselineTask({
                   {settled === "agreed"
                     ? "✓ Both parties agreed on a complete package!"
                     : settled === "impasse"
-                      ? "⚠️ The negotiation ended without an agreement."
+                      ? "⚠️ Time ran out. Nothing is settled, so you both score 0 for this task."
                       : "Messages are sent directly to the other participant in real time."}
                 </p>
               </div>
@@ -1050,7 +1421,24 @@ export function BaselineTask({
                   seconds={NEGOTIATION_SECONDS}
                   running={!settled && !recovering}
                   paused={recovering}
-                  onTick={setSecondsRemaining}
+                  onTick={(remaining) => {
+                    setSecondsRemaining(remaining);
+                    // SCRIPT-NUDGE is client-timed because a silence produces
+                    // no turn to hang it on (§6.9 #17). Requested once; the
+                    // machine's `nudgeUsed` decides whether it is still
+                    // available. Identical to the Proxy arm's closing.
+                    if (
+                      !settledRef.current &&
+                      !pending &&
+                      !stagedTurn &&
+                      !exchange.nudgeUsed &&
+                      !nudgeRequested.current &&
+                      Date.now() - lastParticipantAt.current >=
+                        NUDGE_AFTER_SILENT_SECONDS * 1000
+                    ) {
+                      void runNudge();
+                    }
+                  }}
                   onExpire={() => {
                     if (settledRef.current) return;
                     if (activeRequest.current || stagedTurn) {
@@ -1102,10 +1490,16 @@ export function BaselineTask({
             />
 
             <MessageComposer
-              value={stagedTurn?.text ?? draft}
+              value={stagedTurn && pending ? draft : (stagedTurn?.text ?? draft)}
               onChange={setDraft}
               onSend={send}
-              disabled={pending || Boolean(stagedTurn) || !canSend}
+              /* THE COMPOSER STAYS OPEN WHILE THE REPLY IS COMING (§6.1
+                 stage 3). What arrives before the reply renders is folded into
+                 the same turn; a locked composer would make the turn boundary
+                 the moment of SENDING rather than the moment of ANSWERING,
+                 and the LOCK — `SB`, the confirmatory outcome — is taken at
+                 the end of the turn. Same in the Proxy arm's closing. */
+              disabled={!canSend}
               cue={yourTurn}
               sendLabel="Send"
               placeholder={
@@ -1218,7 +1612,7 @@ export function BaselineTask({
           note={
             settled === "agreed"
               ? "✓ Agreement reached! Proceed to review."
-              : "⚠️ Negotiation concluded. Proceed to review."
+              : "⚠️ No agreement — 0 points for this task. Proceed to review."
           }
         />
       ) : (

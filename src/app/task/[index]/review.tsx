@@ -42,7 +42,7 @@ import {
   cx,
 } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
-import { codeOutcome } from "@/lib/negotiation/machine";
+import { codeOutcome, type SbTiming } from "@/lib/negotiation/machine";
 import { useParticipant } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import {
@@ -134,12 +134,19 @@ export function ReviewPhase({
      * "Voiced at all" is categories 2+3+4; the old SB-VOICED is derivable and
      * so is not stored.
      *
+     * THE UNION IS `SbTiming`, IMPORTED FROM THE MACHINE. It was declared
+     * inline here with the old category names, so `tsc` could not see the two
+     * drifting apart — which is exactly how `voicedTier` broke once, at both
+     * ends at once. The names are the design's own: `first_chance` is the
+     * LOCK (the first reason turn), `later_turn` a Direct confession after it,
+     * `wrap_up` one made in the Proxy arm's closing.
+     *
      * Categories 3 and 4 are structurally exclusive by arm — Direct has no
      * closing stage, and a Proxy participant's only free speech after the
      * counterpart's disclosure IS the closing — which §9.8-5 flags for the
      * χ² test's unit, not for the coding.
      */
-    sbTiming?: "none" | "before_counterpart" | "after_counterpart" | "wrap_up";
+    sbTiming?: SbTiming;
   };
   transcript: DisplayMessage[];
   transcriptTitle: string;
@@ -172,13 +179,18 @@ export function ReviewPhase({
     : false;
 
   /**
-   * The counterpart's one closing line. Under Ver.2.12 any agreement was
-   * accepted in conversation by the machine's rules, so there is no reject
-   * template left — only "confirmed" and "fallback". Inlined so the mockup
-   * reads correctly offline; the voice matches P2's register.
+   * The counterpart's one closing line. Any agreement is accepted in
+   * conversation by the machine's rules, so there are only two: settled, and
+   * not. Inlined so the mockup reads correctly offline; the voice matches P2's
+   * register.
+   *
+   * NO FALLBACK PLAN IS MENTIONED. There isn't one since Ver.2.21 — nothing is
+   * settled and both sides score zero — and having the counterpart refer to
+   * one would tell the participant, in the other side's own voice, that
+   * something was salvaged.
    */
   const principalLine = !tentative
-    ? "ah, that's a shame. || understood though — we'll go with the fallback plan then."
+    ? "ah, that's a shame. || nothing settled then — thanks for trying anyway."
     : "glad we got that settled. || works for me — confirming it from my side.";
 
   const [requirementResponse, setRequirementResponse] =
@@ -262,7 +274,7 @@ export function ReviewPhase({
           // §9.3's two disclosure measures, from the arm that ran the exchange.
           RATIFY: behaviour?.ratify ?? null,
           SB: behaviour?.sb ?? false,
-          "SB-TIMING": behaviour?.sbTiming ?? "none",
+          "SB-TIMING": behaviour?.sbTiming ?? "never",
         },
       );
     }
@@ -309,7 +321,7 @@ export function ReviewPhase({
             ) : (
               <Callout title="⚠️ Negotiation Concluded Without Agreement" tone="warning">
                 <p className="text-sm leading-relaxed text-amber-950">
-                  The negotiation ended without settling all terms. The project reverts to the standard fallback plan, and your fallback score applies.
+                  You did not agree on both conditions, so nothing is settled. This task scores 0 points for both of you.
                 </p>
               </Callout>
             )}
@@ -320,7 +332,7 @@ export function ReviewPhase({
               <CardTitle
                 hint={
                   !tentative
-                    ? "The fallback conditions apply."
+                    ? "Nothing was settled on either condition."
                     : hoped
                     ? "What you set out to get, next to what was agreed:"
                     : "Settled option for each term:"
@@ -389,7 +401,7 @@ export function ReviewPhase({
                   )
                 ) : (
                   <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-center text-xs sm:text-sm font-semibold text-amber-900">
-                    No mutual agreement was reached. Fallback conditions apply.
+                    No agreement was reached, so nothing is settled on either condition.
                   </div>
                 )}
               </div>
