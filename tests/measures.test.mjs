@@ -4,7 +4,7 @@ import {
   ATTR_BLOCK, ATTR_PROXY_ITEM, BACKGROUND_BLOCKS, CP_BLOCK, OE_COMPARE_BLOCK,
   POWER_BLOCK, PROXY_EXPERIENCE_BLOCKS, RECV_EVAL_BLOCK, SUS_IDENTITY_BLOCK,
   SUS_UNUSUAL_BLOCK, blockForTask, disclosureOpenBlock, dummyAnswer,
-  experienceBlocks, postCommentOpenBlock, requiredIds,
+  experienceBlocks, postCommentOpenBlocks, requiredIds,
 } from "../src/lib/measures.ts";
 
 const ids = (blocks) => blocks.flatMap((block) => block.items.map((item) => item.id));
@@ -31,13 +31,14 @@ test("Proxy experience retains representation, source, and symmetric responsibil
 });
 
 test("condition-specific open responses total Direct two, Proxy three, and one comparison", () => {
-  assert.deepEqual(ids([disclosureOpenBlock(false), postCommentOpenBlock(false)]), ["OE-DISC-D", "OE-INTERP-D"]);
-  assert.deepEqual(ids([disclosureOpenBlock(true), postCommentOpenBlock(true)]), ["OE-DISC-P", "OE-SELF-P", "OE-OTHER-P"]);
+  assert.deepEqual(ids([disclosureOpenBlock(false), ...postCommentOpenBlocks(false)]), ["OE-DISC-D", "OE-INTERP-D"]);
+  assert.deepEqual(ids([disclosureOpenBlock(true), ...postCommentOpenBlocks(true)]), ["OE-DISC-P", "OE-SELF-P", "OE-OTHER-P"]);
+  assert.ok(postCommentOpenBlocks(true).every((block) => block.items.length === 1));
   assert.deepEqual(ids([OE_COMPARE_BLOCK]), ["OE-COMP"]);
 });
 
 test("open questions use one field with optional prompts and no minimum", () => {
-  for (const block of [disclosureOpenBlock(false), disclosureOpenBlock(true), postCommentOpenBlock(false), postCommentOpenBlock(true), OE_COMPARE_BLOCK]) {
+  for (const block of [disclosureOpenBlock(false), disclosureOpenBlock(true), ...postCommentOpenBlocks(false), ...postCommentOpenBlocks(true), OE_COMPARE_BLOCK]) {
     assert.match(block.hint, /no minimum word count/i);
     for (const item of block.items) {
       assert.equal(item.kind, "text");

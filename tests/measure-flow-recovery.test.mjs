@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { blockForTask, postCommentOpenBlocks, requiredIds } from "../src/lib/measures.ts";
+import { restoredSurveyPart, surveyComplete } from "../src/lib/survey-progress.ts";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const reward = read("../src/app/task/[index]/reward/page.tsx");
@@ -14,8 +16,24 @@ test("a saved post-task decision resumes after the decision rather than overwrit
 });
 
 test("completed post-comment answers advance without showing the decision again", () => {
-  assert.match(reward, /if \(open\) \{[\s\S]*router\.replace\(nextHref\(flowKey\)\)/);
+  assert.match(reward, /if \(complete\) \{[\s\S]*router\.replace\(nextHref\(flowKey\)\)/);
   assert.match(reward, /if \(!assignment \|\| !restored\)/);
+});
+
+test("partial Proxy interpretation answers resume at the first missing one", () => {
+  const pages = postCommentOpenBlocks(true)
+    .map((block) => blockForTask(block, 1))
+    .map(requiredIds);
+  assert.equal(restoredSurveyPart(pages, {}), 0);
+  assert.equal(restoredSurveyPart(pages, { "OE-SELF-P_t1": "Saved first response" }), 1);
+});
+
+test("complete interpretation answers are recognized for both policies", () => {
+  const direct = postCommentOpenBlocks(false).map((block) => requiredIds(block));
+  const proxy = postCommentOpenBlocks(true).map((block) => requiredIds(block));
+  assert.ok(surveyComplete(direct, { "OE-INTERP-D": "Done" }));
+  assert.ok(surveyComplete(proxy, { "OE-SELF-P": "Done", "OE-OTHER-P": "Done" }));
+  assert.equal(surveyComplete(proxy, { "OE-SELF-P": "Done" }), false);
 });
 
 test("the bonus control has an intentional zero path and explicit confirmation", () => {

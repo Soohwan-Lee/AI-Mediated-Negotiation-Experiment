@@ -11,3 +11,10 @@ export function restoredSurveyPart(
   );
   return firstIncomplete === -1 ? pageIds.length - 1 : firstIncomplete;
 }
+
+export function surveyComplete(
+  pageIds: string[][],
+  saved: SurveyResponses,
+): boolean {
+  return pageIds.flat().every((id) => saved[id] !== undefined && saved[id] !== "");
+}

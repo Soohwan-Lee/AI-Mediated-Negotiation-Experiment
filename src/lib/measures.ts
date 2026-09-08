@@ -191,16 +191,19 @@ export function disclosureOpenBlock(isProxy: boolean): Block {
       : [{ kind: "text", id: "OE-DISC-D", text: "How did you decide what to share or keep to yourself in this negotiation, and why?", hint: "Optional prompt: Did your decision change during the conversation? What led to that change?", placeholder: "A brief answer is fine.", rows: 4 }],
   };
 }
-export function postCommentOpenBlock(isProxy: boolean): Block {
-  return {
-    id: "interpretation_open", title: "Looking back", hint: OPEN_HINT,
-    items: isProxy
-      ? [
-          { kind: "text", id: "OE-SELF-P", text: "What did you initially expect from your Proxy, and why? How did you feel about it as the negotiation unfolded, and what led you to feel that way?", hint: "Optional prompt: Consider a message that matched or changed how you wanted your position to be presented. Why did that matter to you?", placeholder: "A brief answer is fine.", rows: 4 },
-          { kind: "text", id: "OE-OTHER-P", text: "How did you interpret the counterpart's Proxy and the person it represented? Which parts of its messages led you to that interpretation?", hint: "Optional prompt: Were there any reasons you associated with the person or with the AI? What made you think so? You may also discuss the final comment.", placeholder: "A brief answer is fine.", rows: 4 },
-        ]
-      : [{ kind: "text", id: "OE-INTERP-D", text: "How did you feel about the counterpart, and what did they say or do that led you to feel that way?", hint: "Optional prompt: You may refer to the negotiation or the final comment. A specific example would help.", placeholder: "A brief answer is fine.", rows: 4 }],
-  };
+export function postCommentOpenBlocks(isProxy: boolean): Block[] {
+  const items: Item[] = isProxy
+    ? [
+        { kind: "text", id: "OE-SELF-P", text: "What did you initially expect from your Proxy, and why? How did you feel about it as the negotiation unfolded, and what led you to feel that way?", hint: "Optional prompt: Consider a message that matched or changed how you wanted your position to be presented. Why did that matter to you?", placeholder: "A brief answer is fine.", rows: 4 },
+        { kind: "text", id: "OE-OTHER-P", text: "How did you interpret the counterpart's Proxy and the person it represented? Which parts of its messages led you to that interpretation?", hint: "Optional prompt: Were there any reasons you associated with the person or with the AI? What made you think so? You may also discuss the final comment.", placeholder: "A brief answer is fine.", rows: 4 },
+      ]
+    : [{ kind: "text", id: "OE-INTERP-D", text: "How did you feel about the counterpart, and what did they say or do that led you to feel that way?", hint: "Optional prompt: You may refer to the negotiation or the final comment. A specific example would help.", placeholder: "A brief answer is fine.", rows: 4 }];
+  return items.map((item, index) => ({
+    id: `interpretation_open_${index + 1}`,
+    title: "Looking back",
+    hint: OPEN_HINT,
+    items: [item],
+  }));
 }
 
 export const BONUS_ITEM: Item = {

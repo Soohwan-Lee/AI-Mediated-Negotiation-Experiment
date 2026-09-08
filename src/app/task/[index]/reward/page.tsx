@@ -9,7 +9,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
 import { TranscriptReview } from "@/components/transcript-review";
 import {
@@ -26,7 +26,7 @@ import {
   RECV_EVAL_BLOCK,
   blockForTask,
   dummyAnswer,
-  postCommentOpenBlock,
+  postCommentOpenBlocks,
   requiredIds,
 } from "@/lib/measures";
 import { RemarkPhase } from "../remark";
@@ -34,6 +34,7 @@ import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { getTask } from "@/lib/tasks";
 import { STUDY, nextHref } from "@/lib/study-config";
+import { restoredSurveyPart, surveyComplete } from "@/lib/survey-progress";
 
 export default function TaskRewardPage({
   params,
@@ -60,6 +61,8 @@ export default function TaskRewardPage({
   const [showRemark, setShowRemark] = useState(false);
   const [showOpenAnswer, setShowOpenAnswer] = useState(false);
   const [openAnswers, setOpenAnswers] = useState<Answers>({});
+  const [restoredOpenAnswers, setRestoredOpenAnswers] = useState<Answers>({});
+  const [openPart, setOpenPart] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const [restored, setRestored] = useState(false);
@@ -73,6 +76,15 @@ export default function TaskRewardPage({
    * negotiation state is long gone by the time it renders.
    */
   const [agreed, setAgreed] = useState(true);
+
+  const isLeader = assignment?.role === "leader";
+  const plan = assignment ? sessionPlan(assignment, taskIndex) : null;
+  const task = plan ? getTask(plan.taskId) : null;
+  const isProxy = plan ? plan.condition !== "direct" : false;
+  const openBlocks = useMemo(
+    () => postCommentOpenBlocks(isProxy).map((block) => blockForTask(block, taskIndex)),
+    [isProxy, taskIndex],
+  );
 
   useEffect(() => {
     if (!participantKey) return;
@@ -88,7 +100,7 @@ export default function TaskRewardPage({
   }, [participantKey, taskIndex]);
 
   useEffect(() => {
-    if (!participantKey) return;
+    if (!participantKey || !plan) return;
     let active = true;
     void Promise.all([
       getStore().loadResponses(participantKey, `reward_t${taskIndex}`),
@@ -98,10 +110,15 @@ export default function TaskRewardPage({
     ]).then(([reward, evaluation, attr, open]) => {
       if (!active) return;
       if (open) {
-        router.replace(nextHref(flowKey));
-        return;
-      }
-      if (attr) {
+        setOpenAnswers(open);
+        setRestoredOpenAnswers(open);
+        const complete = surveyComplete(openBlocks.map(requiredIds), open);
+        if (complete) {
+          router.replace(nextHref(flowKey));
+          return;
+        }
+        setShowOpenAnswer(true);
+      } else if (attr) {
         setShowOpenAnswer(true);
       } else if (reward || evaluation) {
         if (reward && typeof reward[`BONUS_t${taskIndex}`] === "number") {
@@ -117,11 +134,7 @@ export default function TaskRewardPage({
       setRestored(true);
     });
     return () => { active = false; };
-  }, [flowKey, participantKey, router, taskIndex]);
-
-  const isLeader = assignment?.role === "leader";
-  const plan = assignment ? sessionPlan(assignment, taskIndex) : null;
-  const task = plan ? getTask(plan.taskId) : null;
+  }, [flowKey, openBlocks, participantKey, plan, router, taskIndex]);
 
   const evalBlock = blockForTask(RECV_EVAL_BLOCK, taskIndex);
   const evalRequired = requiredIds(evalBlock);
@@ -195,19 +208,27 @@ export default function TaskRewardPage({
         answers,
       );
     }
+    setOpenPart(0);
     setShowOpenAnswer(true);
     window.scrollTo({ top: 0 });
   }
 
-  const isProxy = plan?.condition !== "direct";
-  const openBlock = blockForTask(postCommentOpenBlock(isProxy), taskIndex);
+  const restoredOpenPart = restoredSurveyPart(
+    openBlocks.map((block) => requiredIds(block)),
+    restoredOpenAnswers,
+  );
+  const activeOpenPart = openPart ?? restoredOpenPart;
+  const openBlock = openBlocks[activeOpenPart] ?? openBlocks[0];
   const openMissing = requiredIds(openBlock).filter((id) => openAnswers[id] === undefined || openAnswers[id] === "");
   const canSubmitOpen = useDevGate(openMissing.length === 0);
 
   useDevAutofill(() => {
     if (!showOpenAnswer) return;
-    setOpenAnswers(Object.fromEntries(openBlock.items.map((item) => [item.id, dummyAnswer(item)])));
-  }, `reward-open-${taskIndex}-${showOpenAnswer}`);
+    setOpenAnswers((previous) => ({
+      ...previous,
+      ...Object.fromEntries(openBlock.items.map((item) => [item.id, dummyAnswer(item)])),
+    }));
+  }, `reward-open-${taskIndex}-${showOpenAnswer}-${activeOpenPart}`);
 
   async function finishOpenAnswer() {
     if (!canSubmitOpen || submitting.current) return;
@@ -216,6 +237,11 @@ export default function TaskRewardPage({
     try {
       if (participantKey) {
         await getStore().saveResponses(participantKey, `post_comment_open_t${taskIndex}`, openAnswers);
+      }
+      if (activeOpenPart < openBlocks.length - 1) {
+        setOpenPart(activeOpenPart + 1);
+        window.scrollTo({ top: 0 });
+        return;
       }
       router.push(nextHref(flowKey));
     } finally {
@@ -235,7 +261,7 @@ export default function TaskRewardPage({
           <TranscriptReview participantKey={participantKey} taskIndex={taskIndex} />
           <MeasureBlock block={openBlock} answers={openAnswers} onChange={(id, value) => setOpenAnswers((previous) => ({ ...previous, [id]: value }))} />
         </Page>
-        <ActionBar label="Submit & Continue" onClick={finishOpenAnswer} busy={busy} disabled={!canSubmitOpen} remaining={openMissing.length} firstUnansweredId={openMissing[0] ?? null} />
+        <ActionBar label={activeOpenPart < openBlocks.length - 1 ? "Next" : "Submit & Continue"} onClick={finishOpenAnswer} busy={busy} disabled={!canSubmitOpen} remaining={openMissing.length} firstUnansweredId={openMissing[0] ?? null} />
       </>
     );
   }
