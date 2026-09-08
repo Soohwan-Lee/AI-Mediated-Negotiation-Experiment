@@ -1,5 +1,5 @@
 /**
- * The Ver.2.21 justification ladder, tested against the shipped state machine
+ * The Ver.2.23 justification ladder, tested against the shipped state machine
  * and validator (imported directly via tests/ts-register.mjs).
  *
  * WHAT IS LOAD-BEARING HERE (Design §3.3, §6.2, §6.4, §6.9):
@@ -82,6 +82,8 @@ const {
   LABEL_TIER,
   CLARIFY_CONFIDENCE_FLOOR,
   SOFT_CLOSE_SECONDS,
+  NEGOTIATION_SECONDS,
+  CLOSING_SECONDS,
 } = await import("../src/lib/negotiation/machine.ts");
 const { validateAction } = await import("../src/lib/ai/validator.ts");
 const { scriptedTask, SCRIPT_LINES } = await import(
@@ -537,6 +539,11 @@ test("the clock's soft close fires at 90 seconds, not 60", () => {
   assert.equal(expired.impasse, true);
 });
 
+test("Ver.2.23 uses a five-minute Direct clock and two-minute Proxy closing", () => {
+  assert.equal(NEGOTIATION_SECONDS, 5 * 60);
+  assert.equal(CLOSING_SECONDS, 2 * 60);
+});
+
 // ---------------------------------------------------------------------------
 // 2b. Reciprocal disclosure in Direct (§6.3)
 // ---------------------------------------------------------------------------
@@ -615,6 +622,36 @@ for (const taskId of TASKS) {
     });
   }
 }
+
+test("the four Ver.2.23 WR cards retain their full work context", () => {
+  const expected = {
+    "task_a/leader": [/coordination faster/i, /early impression/i],
+    "task_a/member": [/commuting and meetings/i, /several days/i],
+    "task_b/leader": [/early work moving/i, /builds trust/i],
+    "task_b/member": [/delay my existing work/i, /separate time to prepare/i],
+  };
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const wr = cardOfLayer(getTask(taskId), role, "work");
+      for (const phrase of expected[`${taskId}/${role}`]) {
+        assert.match(wr.text, phrase, `${taskId}/${role} lost canonical WR detail`);
+      }
+    }
+  }
+});
+
+test("role briefings use the same neutral disclosure notice and £0.50 decision", () => {
+  const notices = new Set();
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const brief = getTask(taskId).roleBriefs[role];
+      notices.add(brief.disclosureRisk);
+      assert.match(brief.organizationalPosition, /up to £0\.50/);
+      assert.doesNotMatch(brief.roleStory, /can read as|could make you look/i);
+    }
+  }
+  assert.equal(notices.size, 1, "the notice must not vary by role or task");
+});
 
 test("Proxy observation keeps its fixed stage-4 disclosure schedule", () => {
   // The counterpart proxy always discloses while the participant watches, at

@@ -6,7 +6,7 @@
  * After watching their AI Proxy negotiate, the participant decides what
  * happens to the package it reached: approve it as it stands, ask for a
  * change, or refuse it. Approving ends the task; the other two open a
- * three-minute closing conversation with the other participant.
+ * two-minute closing conversation with the other participant.
  *
  * WHY THIS SCREEN IS BACK. Ver.2.12 deleted a ratification screen, and its
  * reasoning was right about the shape it had: when BOTH arms ended with the

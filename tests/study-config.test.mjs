@@ -13,6 +13,7 @@ import {
   STAGE_MINUTES,
   TOTAL_MINUTES,
   timingIsHonest,
+  backStep,
 } from "../src/lib/study-config.ts";
 import { capMessageLength } from "../src/lib/ai/validator.ts";
 import { NEGOTIATION } from "../src/lib/study-config.ts";
@@ -49,21 +50,13 @@ test("STAGE_MINUTES sums to TOTAL_MINUTES", () => {
 });
 
 test("every flow step the participant sits through carries minutes", () => {
-  // The debriefing was a FLOW step with no entry in STAGE_MINUTES until
-  // Ver.2.21, so the budget understated the study by two minutes and the
-  // advertised figure inherited the error. It is read, not skipped: whether a
-  // participant may keep their data is decided on it.
+  // Debriefing is read, not skipped: participants confirm data use there.
   assert.ok(STAGE_MINUTES.debrief > 0);
 });
 
-test("the budget sits inside Design Ver.2.21 §7's own estimate", () => {
-  // §7 gives 49-53 minutes. The code's own sum may exceed the doc's upper
-  // bound slightly - it counts screens that exist - but a large gap means one
-  // of the two is describing a different study.
-  assert.ok(
-    TOTAL_MINUTES >= 49 && TOTAL_MINUTES <= 56,
-    `${TOTAL_MINUTES} min is outside the §7 estimate's neighbourhood`,
-  );
+test("the budget matches Design Ver.2.23 §7's recruitment estimate", () => {
+  assert.equal(TOTAL_MINUTES, 40);
+  assert.equal(STUDY.estimatedMinutes, 40);
 });
 
 test("base + bonus equals the advertised total", () => {
@@ -91,6 +84,18 @@ test("the base alone still clears Prolific's hard floor", () => {
   // not fall under £6.00/hr.
   const perHour = (money(STUDY.compensation) / STUDY.estimatedMinutes) * 60;
   assert.ok(perHour >= 6.0, `base is £${perHour.toFixed(2)}/hr`);
+});
+
+test("Ver.2.23 pacing uses a two-minute practice and no artificial Proxy delay", () => {
+  assert.equal(NEGOTIATION.practiceSeconds, 2 * 60);
+  assert.deepEqual(NEGOTIATION.proxyMessageGap, { minMs: 0, maxMs: 0 });
+});
+
+test("post-task questionnaires cannot be revisited after the decision stimulus", () => {
+  assert.equal(backStep("reward-1"), null);
+  assert.equal(backStep("reward-2"), null);
+  assert.equal(backStep("instruction")?.key, "background");
+  assert.equal(backStep("practice")?.key, "instruction");
 });
 
 // --- the exposure cap -------------------------------------------------------

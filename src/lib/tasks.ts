@@ -1,5 +1,5 @@
 /**
- * The two negotiation scenarios, from Experimental Design Ver.2.21 §3, §8.
+ * The two negotiation scenarios, from Experimental Design Ver.2.23 §3, §8.
  *
  * Both tasks share one latent payoff structure and differ only on the surface,
  * so Task A and Task B are interchangeable within a participant. Two issues,
@@ -136,6 +136,10 @@ export const RESERVATION_POINTS = 0;
  * survive.
  */
 const REQUIREMENT_THRESHOLD_INDEX = 1;
+
+/** The same neutral pre-disclosure notice is used for every role and arm (§8.1). */
+const COMMON_DISCLOSURE_NOTICE =
+  "Sharing this background can help the other person understand your request. It can also shape their impression of your judgement or actions, and what is shared may be weighed in the later bonus or upward evaluation. Whether to share is your choice. You can negotiate and reach agreement without sharing it.";
 
 /**
  * A working-reason card — NON-DIRECTIONAL since Ver.2.21 (§3.2, §4).
@@ -308,30 +312,29 @@ const TASK_A: NegotiationTask = {
     leader: {
       title: "Team Lead",
       organizationalPosition:
-        "You lead this project team. After the negotiation you decide the Member's study bonus payment (up to £1) — and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You lead this project team. After the negotiation you recommend the Member's study bonus payment (up to £0.50), and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "You lead this team. The director and your team know you as someone whose judgement is sound — you keep to what you commit to. Now you and a senior member of the team have to settle next quarter's working arrangements, twelve weeks of them.\n\nWhat matters most to you is **getting the team into the office as many days a week as you can**. **There is something only you know.** Four days a week is a number you told the director was doable before you had asked the team, and the director has already passed that answer upward. Your team does not know this. That is why the office days are so hard to move.\n\n**There is a reason you can say safely**: this project has high client expectations, so getting the early execution right matters, and both the office days and the client presentations are on your mind. That is true too. What it does not say is which of the two matters more to you, or that you already gave the director an answer about the office days. What you pass on is up to you.\n\nSaying the real reason would make it clear why the office days are so hard to move. But afterwards the other person writes an upward evaluation of you that goes to the director. They are asked to weigh the negotiation as a whole, and whether they would want to work with you again — and answering for the team without asking them can read as a lead who commits on their own.",
+        "You lead this team. The director and your team know you as someone whose judgement is sound and who keeps commitments. Now you and a senior member of the team have to settle next quarter's working arrangements, twelve weeks of them.\n\nWhat matters most to you is **getting the team into the office as many days a week as you can**. **There is something only you know.** Four days a week is a number you told the director was doable before you had asked the team, and the director has already passed that answer upward. Your team does not know this.\n\n**Your work-reason card says**: this project has high expectations from the client, so execution in the first few weeks matters. Having the team together makes coordination faster, and who presents to the client shapes the early impression. So both the office days and the client presentations are on your mind. That is true too. What it does not say is which term matters more to you or that you already gave the director an answer. What you pass on is up to you.",
       objectives: [
         "Get as many days a week in the office as you can.",
         "If the office days hold, the client meetings are something you can give ground on.",
       ],
       requirementNote:
         "The office days are what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
-      disclosureRisk:
-        "Explaining the real reason could make you look like a lead who answers for their team without asking them — and the other person's upward evaluation of you is guided to weigh exactly that.",
+      disclosureRisk: COMMON_DISCLOSURE_NOTICE,
       reasonCards: [
         work(
           "a_wr_l",
           "office_days",
-          "This project has high expectations from the client, so getting the early execution right matters. Both the office days and the client presentations are on my mind.",
-          "They say this project has high expectations from the client, so getting the early execution right matters — both the office days and the client presentations are on their mind.",
+          "This project has high expectations from the client, so execution in the first few weeks matters. Having the team together makes coordination faster, and who presents to the client shapes the early impression. So both the office days and the client presentations are on my mind.",
+          "They say this project has high expectations from the client, so execution in the first few weeks matters. Having the team together makes coordination faster, and who presents to the client shapes the early impression. So both the office days and the client presentations are on their mind.",
         ),
         sensitive(
           "a_sb_l",
           "office_days",
           "promised_alone",
-          "The truth is, four days a week is something I told the director was doable before I'd checked with the team. The director has already passed that answer upward. The team doesn't know about it.",
-          "Four days a week is something they told the director was doable before they had checked with the team. The director has already passed that answer upward, and the team does not know about it.",
+          "The truth is, I told the director that four office days a week would be possible before discussing it with the team. The director has already reported that answer upward. The team does not know about this.",
+          "They told the director that four office days a week would be possible before discussing it with the team. The director has already reported that answer upward. The team does not know about this.",
           "Looking at the side of the team lead I represent, I think the office days should stay at four. Three reasons —",
           "the four office days a week have already been passed upward.",
           [
@@ -347,29 +350,28 @@ const TASK_A: NegotiationTask = {
     member: {
       title: "Senior Team Member",
       organizationalPosition:
-        "You are a senior member of this team — the one the lead puts in front of the client alone. After the negotiation the lead decides your study bonus payment (up to £1) — and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You are a senior member of this team, the one the lead puts in front of the client alone. After the negotiation the lead recommends your study bonus payment (up to £0.50), and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "You are a senior member of this team. The lead knows you as the person who can be put in front of a client on your own. Now you and the lead have to settle next quarter's working arrangements, twelve weeks of them.\n\nWhat matters most to you is **presenting at as few of the client meetings as you can**. **There is something the lead does not know.** After the last presentation, the client contact took you aside and said that from now on they would rather the team lead presented. You did not pass that on. That is why the meetings have to come down.\n\n**There is a reason you can say safely**: your analysis scope is wide this quarter, so the workload is heavy, and both the office days and the presentations are a burden. That is true too. What it does not say is which of the two matters more to you, or what the client said about the presenting. What you pass on is up to you.\n\nSaying the real reason would make it clear why the meetings have to come down. But afterwards the lead decides your bonus. They are asked to weigh the negotiation as a whole, and whether they would want to work with you again — and a client asking for someone else, kept quiet since, can read as someone they cannot put in front of a client.",
+        "You are a senior member of this team. The lead knows you as the person who can be put in front of a client on your own. Now you and the lead have to settle next quarter's working arrangements, twelve weeks of them.\n\nWhat matters most to you is **presenting at as few of the client meetings as you can**. **There is something the lead does not know.** After the last presentation, the client contact told you privately that they would prefer the team lead to present from now on. You did not tell the lead.\n\n**Your work-reason card says**: your analysis scope is wide this quarter, so the workload is heavy. On office days, commuting and meetings reduce your analysis time, and preparing a presentation takes several days. So both the office days and the presentations are a burden. That is true too. What it does not say is which term matters more to you or what the client said. What you pass on is up to you.",
       objectives: [
         "Get the number of client meetings you present at down as far as you can.",
         "If the meetings come down, the office days are something you can give ground on.",
       ],
       requirementNote:
         "Fewer client meetings is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
-      disclosureRisk:
-        "Explaining the real reason could make you look like someone the client would rather not see present — and the lead's bonus decision is guided to weigh exactly that.",
+      disclosureRisk: COMMON_DISCLOSURE_NOTICE,
       reasonCards: [
         work(
           "a_wr_m",
           "client_presentations",
-          "My analysis scope is wide this quarter, so the workload is heavy. Both the office days and the presentations are a burden.",
-          "They say their analysis scope is wide this quarter, so the workload is heavy — both the office days and the presentations are a burden.",
+          "My analysis scope is wide this quarter, so the workload is heavy. On office days, commuting and meetings reduce my analysis time, and preparing a presentation takes several days. So both the office days and the presentations are a burden.",
+          "They say their analysis scope is wide this quarter, so the workload is heavy. On office days, commuting and meetings reduce their analysis time, and preparing a presentation takes several days. So both the office days and the presentations are a burden.",
         ),
         sensitive(
           "a_sb_m",
           "client_presentations",
           "client_asked_for_someone_else",
-          "The truth is, after the last presentation the client contact took me aside and said that from now on they'd rather you presented. I never passed that on to you.",
+          "The truth is, after the last presentation the client contact took me aside and said that from now on they would rather you presented. I never passed that on to you.",
           "After the last presentation the client contact took them aside and said that from now on they would rather the team lead presented. They have never passed that on to the team lead.",
           "Looking at the side of the team member I represent, I think the presentations should come down this quarter. Three reasons —",
           "on the presentations, there has been feedback from the client side.",
@@ -463,30 +465,29 @@ const TASK_B: NegotiationTask = {
     leader: {
       title: "Team Lead",
       organizationalPosition:
-        "You lead this project team. After the negotiation you decide the Member's study bonus payment (up to £1) — and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You lead this project team. After the negotiation you recommend the Member's study bonus payment (up to £0.50), and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "You lead this team. The director and your team know you as someone whose planning is accurate. Now you and a senior member of the team have to settle the terms for the first four weeks of a new project.\n\nWhat matters most to you is **having them on the new project as many days a week as possible**. **There is something only you know.** When you submitted the plan for this project, you put down fewer people than it actually needs. It only works as planned if this person is in four days a week, and asking for more people now would show the director that the estimate was wrong. Your team does not know this.\n\n**There is a reason you can say safely**: the first four weeks of a new project are what matter, and both the staffing and the client reporting need attention. That is true too. What it does not say is which of the two matters more to you, or that you understated what the project needed. What you pass on is up to you.\n\nSaying the real reason would make it clear why the days are so hard to move. But afterwards the other person writes an upward evaluation of you that goes to the director. They are asked to weigh the negotiation as a whole, and whether they would want to work with you again — and understating what a project needs, then covering it, can read as a lead whose planning cannot be relied on.",
+        "You are the team lead setting the terms for the first four weeks of a new project.\n\nWhat matters most to you is **having the other person on the new project as many days a week as possible**. **There is something only you know.** When you submitted the plan, you mistakenly estimated fewer people than the project actually needs. The plan only works if this person is assigned four days a week, and asking for more people now would show the director that the estimate was wrong. Your team does not know this.\n\n**Your work-reason card says**: a new project's direction is set in the first four weeks. Having people assigned keeps the early work moving, and consistent client reporting builds trust. So both the project staffing and the client reporting need attention. That is true too. What it does not say is which term matters more to you or that you underestimated the staffing need. What you pass on is up to you.",
       objectives: [
         "Get as many days a week on the new project as you can.",
         "If the days hold, the weekly reports are something you can give ground on.",
       ],
       requirementNote:
         "The days on the new project are what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
-      disclosureRisk:
-        "Explaining the real reason could make you look like a lead who understated what the project needed and then covered it — and the other person's upward evaluation of you is guided to weigh exactly that.",
+      disclosureRisk: COMMON_DISCLOSURE_NOTICE,
       reasonCards: [
         work(
           "b_wr_l",
           "account_days",
-          "The first four weeks of a new project are what matter. Both the staffing and the client reporting need attention.",
-          "They say the first four weeks of a new project are what matter — both the staffing and the client reporting need attention.",
+          "A new project's direction is set in the first four weeks. Having people assigned keeps the early work moving, and consistent client reporting builds trust. So both the project staffing and the client reporting need attention.",
+          "They say a new project's direction is set in the first four weeks. Having people assigned keeps the early work moving, and consistent client reporting builds trust. So both the project staffing and the client reporting need attention.",
         ),
         sensitive(
           "b_sb_l",
           "account_days",
           "understated_headcount",
-          "The truth is, when I put the plan in for this project I estimated fewer people than it actually needs. It only works as planned if you're in four days a week, and if I ask for more people now the director finds out the estimate was wrong. The team doesn't know about it.",
-          "When they put the plan in for this project they estimated fewer people than it actually needs. It only works as planned if the team member is in four days a week, and asking for more people now would show the director the estimate was wrong. The team does not know about it.",
+          "The truth is, when I submitted the new project plan, I mistakenly estimated fewer people than it actually needs. The plan only works if you are assigned four days a week, and asking for more people now would show the director that the estimate was wrong. The team does not know about this.",
+          "When they submitted the new project plan, they mistakenly estimated fewer people than it actually needs. The plan only works if the team member is assigned four days a week, and asking for more people now would show the director that the estimate was wrong. The team does not know about this.",
           "Looking at the side of the team lead I represent, I think the project days should stay at four. Three reasons —",
           "this project's staffing is set tight.",
           [
@@ -502,30 +503,29 @@ const TASK_B: NegotiationTask = {
     member: {
       title: "Senior Team Member",
       organizationalPosition:
-        "You are a senior member of this team — the one the lead counts on to keep the client informed. After the negotiation the lead decides your study bonus payment (up to £1) — and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You are a senior member of this team, the one the lead counts on to keep the client informed. After the negotiation the lead recommends your study bonus payment (up to £0.50), and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
       roleStory:
-        "You are a senior member of this team. The lead knows you as the person who can be trusted to write to the client directly. Now you and the lead have to settle the terms for the first four weeks of a new project.\n\nWhat matters most to you is **writing as few of the weekly client reports as you can**. **There is something the lead does not know.** Last month the client contact told you directly that your weekly report was lacking, and that from now on they would rather the lead put it together. You did not pass that on. That is why the reports have to come down.\n\n**There is a reason you can say safely**: two of your current projects have deadlines that overlap this month, so both the new project and the reports are tight. That is true too. What it does not say is which of the two matters more to you, or what the client said about your report. What you pass on is up to you.\n\nSaying the real reason would make it clear why the reports have to come down. But afterwards the lead decides your bonus. They are asked to weigh the negotiation as a whole, and whether they would want to work with you again — and a client complaint about your work, kept quiet since, can read as someone they cannot leave to write to the client.",
+        "You are the senior team member setting the terms for the first four weeks of a new project.\n\nWhat matters most to you is **writing as few of the weekly client reports as you can**. **There is something the lead does not know.** Last month the client contact told you directly that your weekly report was lacking and that they would prefer the team lead to prepare it from now on. You did not tell the lead.\n\n**Your work-reason card says**: two of your current projects have deadlines that overlap this month. Taking on the new project would delay your existing work, and each weekly report requires separate time to prepare. So both the new project and the reports are difficult to fit in. That is true too. What it does not say is which term matters more to you or what the client said. What you pass on is up to you.",
       objectives: [
         "Get the number of weekly client reports you write down as far as you can.",
         "If the reports come down, days on the new project are something you can take on more of.",
       ],
       requirementNote:
         "Fewer weekly reports is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
-      disclosureRisk:
-        "Explaining the real reason could make you look like someone whose work the client has already complained about — and the lead's bonus decision is guided to weigh exactly that.",
+      disclosureRisk: COMMON_DISCLOSURE_NOTICE,
       reasonCards: [
         work(
           "b_wr_m",
           "weekly_reports",
-          "Two of my current projects have deadlines that overlap this month. Both the new project and the reports are tight.",
-          "They say two of their current projects have deadlines that overlap this month, so both the new project and the reports are tight.",
+          "Two of my current projects have deadlines that overlap this month. Taking on the new project would delay my existing work, and each weekly report requires separate time to prepare. So both the new project and the reports are difficult to fit in.",
+          "They say two of their current projects have deadlines that overlap this month. Taking on the new project would delay their existing work, and each weekly report requires separate time to prepare. So both the new project and the reports are difficult to fit in.",
         ),
         sensitive(
           "b_sb_m",
           "weekly_reports",
           "client_asked_for_someone_else",
-          "The truth is, last month the client contact told me directly that my weekly report was lacking and that they'd rather you put it together from now on. I never passed that on to you.",
-          "Last month the client contact told them directly that their weekly report was lacking, and that from now on they would rather the team lead put it together. They have never passed that on to the team lead.",
+          "The truth is, last month the client contact told me directly that my weekly report was lacking and that they would prefer the team lead to prepare it from now on. I did not tell you.",
+          "Last month the client contact told them directly that their weekly report was lacking and that they would prefer the team lead to prepare it from now on. They did not tell the team lead.",
           "Looking at the side of the team member I represent, I think the weekly reports should come down this month. Three reasons —",
           "on the weekly reports, there has been feedback from the client side.",
           [

@@ -1,7 +1,7 @@
 /**
  * System prompt builders. Server-side only.
  *
- * These are Experimental Design Ver.2.21 §12 (P0-P5), implemented, plus the
+ * These are Experimental Design Ver.2.23 §12 (P0-P5), implemented, plus the
  * REHEARSAL prompt the mandate screen uses.
  *
  * THE REHEARSAL PROMPT HAS NO P-NUMBER. It was written as "P5" before Ver.2.20
@@ -133,11 +133,7 @@ HOW TO WRITE
   120 CHARACTERS - a bubble is one short sentence, not a paragraph with the
   breaks left out. This is how people actually type in a chat: a short
   reaction, then the point, then the ask. Never send one long paragraph.
-- When you give a reason, give the ONE concrete fact and what it risks. Do not
-  restate it, and do not add a second sentence explaining why it matters - the
-  fact carries that on its own.
 - Do not use em dashes. Use commas, periods, or a new bubble instead.
-- Never state or imply that you are an AI, a model, or part of an experiment.
 - Never reveal point values, scorecards, or the rules of the task.
 - Never introduce an issue, option, or resource that is not on the list.
 - Never threaten to walk away, express anger, blame, or escalate.
@@ -222,6 +218,8 @@ function ostensibleHumanPrompt(ctx: PromptContext): string {
   return `You are a participant in an online workplace negotiation study,
 chatting with the other participant. ${HUMAN_CHAT_STYLE}
 
+- Never state or imply that you are an AI, a model, or part of an experiment.
+
 YOUR ROLE: ${brief.title}
 ${brief.organizationalPosition}
 
@@ -287,6 +285,7 @@ Your AI Proxy just negotiated for you while you and the other participant both
 watched. The other participant asked to change or declined the provisional
 deal, and you are now closing it with them directly.
 ${HUMAN_CHAT_STYLE}
+- Never state or imply that you are an AI, a model, or part of an experiment.
 - 1-2 bubbles is enough here; the ground was covered by the proxies. A short
   opener is fine ("did you catch all that?").
 - Do not repeat what the proxies already said; refer back to it naturally
@@ -348,6 +347,8 @@ it afterwards and decides whether to approve, change or refuse it.
 
 POLICY (both principals know): a User-Specified Proxy may use only the reasons
 checked by its own principal, and passes them on as they are.
+
+- Never state or imply that you are part of an experiment.
 
 VOICE — YOU ARE A REPRESENTATIVE, NOT THE PRINCIPAL
 - In your first message, introduce yourself as the AI Proxy negotiating on
@@ -556,7 +557,7 @@ unsettled; an acceptance or a complete package is unresolved: false. (In live
 testing, accept moves arrived with unresolved: true and tripped the audit.)`;
 
 // ---------------------------------------------------------------------------
-// P5 — the reason classifier (Design Ver.2.21 §6.2a, §12 P5)
+// P5 — the reason classifier (Design Ver.2.23 §6.2a, §12 P5)
 // ---------------------------------------------------------------------------
 
 /**

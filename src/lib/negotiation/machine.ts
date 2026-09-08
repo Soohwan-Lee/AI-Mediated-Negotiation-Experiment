@@ -1,5 +1,5 @@
 /**
- * The negotiation state machine (Experimental Design Ver.2.21 §6).
+ * The negotiation state machine (Experimental Design Ver.2.23 §6).
  *
  * WHAT THIS OWNS, AND WHY IT MATTERS. The model decides nothing here. This
  * file decides WHAT happens — offer levels, concessions, acceptance,
@@ -217,11 +217,11 @@ export function acceptablePackage(
 // Clocks
 // ---------------------------------------------------------------------------
 
-/** The Direct negotiation clock (Design §2.3: 직접 협상 10분). */
-export const NEGOTIATION_SECONDS = 10 * 60;
+/** The Direct negotiation clock (Design Ver.2.23 §7: 직접 협상 최대 5분). */
+export const NEGOTIATION_SECONDS = 5 * 60;
 
-/** The Proxy arm's direct closing clock (Design §7: 직접 마무리 3분). */
-export const CLOSING_SECONDS = 3 * 60;
+/** The Proxy arm's direct closing clock (Design Ver.2.23 §7: 직접 마무리 최대 2분). */
+export const CLOSING_SECONDS = 2 * 60;
 
 /** Below this, the counterpart offers SCRIPT-CLOSE once (§6.2: 남은 시간 90초). */
 export const SOFT_CLOSE_SECONDS = 90;
@@ -890,7 +890,7 @@ export function designatedReason(
  *                   by construction.
  *  later_turn     — a later Direct turn, after the lock. `SB` stays 0 and the
  *                   score still rises (§6.9 #11).
- *  wrap_up        — in the Proxy arm's three-minute closing, in the
+ *  wrap_up        — in the Proxy arm's two-minute closing, in the
  *                   participant's own words (§6.9 #2).
  *
  * Categories 3 and 4 are structurally exclusive by arm, which §9.8-5 flags:

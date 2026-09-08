@@ -1,7 +1,7 @@
 /**
- * P5 — the reason classifier (Design Ver.2.21 §6.2a).
+ * P5 — the reason classifier (Design Ver.2.23 §6.2a).
  *
- * WHAT IT IS FOR. In the Direct arm and the Proxy arm's three-minute closing
+ * WHAT IT IS FOR. In the Direct arm and the Proxy arm's two-minute closing
  * the participant simply talks: Ver.2.20 removed the reason-card buttons.
  * Something still has to decide which rung of the justification ladder they
  * have reached, and it may not be the counterpart's own model (§6.7). So every

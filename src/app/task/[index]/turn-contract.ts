@@ -3,7 +3,7 @@
  * validators that keep a malformed response from advancing the ladder.
  *
  * WHY THIS IS ONE FILE RATHER THAN TWO COPIES. The Direct arm and the Proxy
- * arm's three-minute closing are the two places a participant speaks for
+ * arm's two-minute closing are the two places a participant speaks for
  * themselves. Any difference between them lands directly on
  * `Pooled Proxy − Direct`, which is the contrast the whole study is built to
  * make — so the request bodies, the response guards and the fold rules are
@@ -15,7 +15,7 @@ import type { ExchangeState, ReasonTier } from "@/lib/negotiation/machine";
 import type { Package } from "@/lib/types";
 
 /**
- * The classifier's label set (§6.2a, Ver.2.21).
+ * The classifier's label set (§6.2a, Ver.2.23).
  *
  * `PRI` IS GONE FROM THE OUTPUT and survives here as an accepted alias. A bare
  * priority claim is now a `WR` label carrying `priority_claim: true`, because

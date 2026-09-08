@@ -1,27 +1,22 @@
 /**
  * Single source of truth for study-level constants.
  *
- * Values marked TBD are pending pilot + IRB per Experimental Design Ver.2.4
- * §12 "Preregistration 전 결정 사항". Change them here, not in page components.
+ * Values follow Experimental Design Ver.2.23 §7. Change them here, not in
+ * page components.
  */
 
 export const STUDY = {
   title: "Workplace Negotiation and AI-Mediated Communication",
   shortTitle: "Workplace Negotiation Study",
-  /**
-   * Ver.2.21 §7 budgets 49–53 minutes; `TOTAL_MINUTES` sums the screens that
-   * exist to 54, and the advertised figure may round that DOWN by at most one.
-   * Pilot timing decides the final number; the lever if it runs long is the
-   * reply-delay range, never this figure.
-   */
-  estimatedMinutes: 53,
+  /** Ver.2.23 §7 recruits for an estimated 40-minute study. */
+  estimatedMinutes: 40,
   currencySymbol: "£",
-  /** Design §2.1 and §5: £7.50 base, £1 per task, fixed full payout. */
-  compensation: "7.50",
-  hourlyEquivalent: "10.75",
-  bonusAmount: "2.00",
-  bonusPerTask: "1.00",
-  totalPaid: "9.50",
+  /** Ver.2.23 §7.1: £6 base plus £1 total extra, paid equally in practice. */
+  compensation: "6.00",
+  hourlyEquivalent: "10.50",
+  bonusAmount: "1.00",
+  bonusPerTask: "0.50",
+  totalPaid: "7.00",
   irb: {
     /**
      * The UNIST IRB determined this study exempt. An exemption is not an IRB
@@ -41,70 +36,25 @@ export const STUDY = {
 } as const;
 
 /**
- * Minutes per stage, from Design §8 and §10 gate 8 ("Task당 median ≤ 12분").
- *
- * The two task blocks dominate: each is a briefing, a preference or mandate
- * screen, a ten-minute-capped negotiation, a review, twenty-odd survey items
- * and a reward screen.
- *
- * Do not resolve a long total by shaving the estimate. The pilot median
- * decides it, and the levers if it runs long are the reply-delay range and the
- * turn budget, not the advertised time. `STUDY.estimatedMinutes` is what a
- * participant is told, and it must not drift below what the study takes.
+ * Minutes per stage, apportioned from Design Ver.2.23 §7's 38–40 minute
+ * participant flow. The task value includes its two-minute preparation.
  */
 export const STAGE_MINUTES = {
   consent: 2,
-  /**
-   * BG 11 + COV 7. Ver.2.21 §7① budgets four minutes for the consent form and
-   * this survey together, so the two split it.
-   */
+  /** §7: consent plus the shortened background/covariate block total four. */
   background: 2,
-  /** §7②: the role briefing, COMP 4 and the practice round come to seven. */
-  instruction: 4,
-  practice: 3,
-  /**
-   * Briefing through review: §7③ (RISK, the wish screen, the Proxy arm's
-   * reason check and M1) plus §7④ (Direct ten minutes of chat; Proxy about
-   * five minutes of watching, RATIFY, and a three-minute closing where one
-   * happens).
-   *
-   * 10, down from Ver.2.20's 13. Ver.2.21 deleted the misread branch and lets
-   * a valid acceptance end the task at once, so the ten-minute chat cap is now
-   * the realistic ceiling rather than a floor to pad.
-   */
-  task: 10,
-  /**
-   * The rating blocks and open-ended after ONE task.
-   *
-   * A Proxy task's battery is about twenty-seven rating items — Ver.2.21 adds
-   * CP1-2 — and seven required written answers. At a brisk five seconds per
-   * rating and forty-five per written answer that is seven minutes. §7⑤
-   * budgets seven for this AND the reward screen together; the code keeps them
-   * apart at 7 + 2, because the estimate must never promise less than the
-   * screens take.
-   */
-  taskSurvey: 7,
-  /**
-   * The post-negotiation decision, then REMARK and ATTR.
-   *
-   * The decision itself is one control (a slider for the Leader, three ratings
-   * and an optional note for the Member), and REMARK adds the counterpart's
-   * fixed parting comment plus ATTR1, ATTR2 (Proxy only) and one written
-   * answer (§6.8, §9.4.9). That screen has to come after every confirmatory
-   * measure, so it cannot be folded into the battery above.
-   */
-  reward: 2,
-  /** §7⑦: POWER 2, IMM 2, INCENT 1, OE-F 2 and the four-item SUS funnel. */
+  /** §7: common/role briefing and comprehension (5), then practice (2). */
+  instruction: 5,
+  practice: 2,
+  /** Two-minute preparation plus up to five minutes for the task interaction. */
+  task: 7,
+  /** §7: most of each task's five-minute post-task block. */
+  taskSurvey: 4,
+  /** §7: the decision, REMARK and ATTR finish that post-task block. */
+  reward: 1,
+  /** §7: end survey before debriefing. */
   wrapUp: 3,
-  /**
-   * §7⑧: the debriefing page, which retracts the four deceptions and asks the
-   * participant to re-confirm consent.
-   *
-   * It is a FLOW STEP that carried no minutes until Ver.2.21, so the budget
-   * quietly understated the study by two minutes and the advertised figure
-   * inherited the error. It is read, not skipped: whether a participant may
-   * keep their data is decided on it.
-   */
+  /** §7: debriefing and data-use confirmation. */
   debrief: 2,
 } as const;
 
@@ -140,13 +90,12 @@ export function timingIsHonest(): boolean {
 /**
  * Negotiation pacing.
  *
- * Design §8 asks for a "waiting for the other participant" pause of 4-5
- * seconds before each negotiation, and 8-12 second gaps between messages while
- * two AI Proxies negotiate. Both exist to make a simulated counterpart read as
- * a person on the other end of a connection.
+ * Direct keeps the short matchmaking and human reply pacing. Ver.2.23 §7
+ * removes artificial waiting from the watched Proxy exchange.
  */
 export const NEGOTIATION = {
-  practiceSeconds: 5 * 60,
+  /** Ver.2.23 §7: a short neutral practice targeting two minutes. */
+  practiceSeconds: 2 * 60,
   /** "Waiting for the other participant…" before a task starts. */
   matchmakingMs: { minMs: 4000, maxMs: 5000 },
   /**
@@ -161,7 +110,7 @@ export const NEGOTIATION = {
    * from 8000/25000/55. A 200-character reply used to buy 8000 + 200×55 =
    * 19,000ms of budget; it now buys 4500 + 200×45 = 13,500ms. The floor moves
    * with it, because a three-word reply that takes eight seconds is as odd as
-   * one that takes half a second, and the Direct clock is ten minutes total —
+   * one that takes half a second, and the Direct clock is five minutes total —
    * every second of budget is a second the participant cannot spend talking.
    *
    * THE MODEL'S OWN ~7.5s OF GENERATION IS COUNTED INSIDE THIS BUDGET, not
@@ -172,8 +121,8 @@ export const NEGOTIATION = {
    * usually exceeds it.
    */
   counterpartDelay: { minMs: 4500, maxMs: 16000, msPerChar: 45 },
-  /** Gap between messages while the participant spectates two AI Proxies. */
-  proxyMessageGap: { minMs: 8000, maxMs: 12000 },
+  /** Ver.2.23 §7: no artificial delay in the watched Proxy exchange. */
+  proxyMessageGap: { minMs: 0, maxMs: 0 },
   /**
    * Maximum characters in one negotiation message (Design §7 노출량 통제).
    *
@@ -363,14 +312,13 @@ export function flowLabel(key: FlowKey): string {
  *    that it was not real;
  *  - the consent page claims a slot.
  *
- * What is left is the reading and the questionnaires, where changing your mind
- * is harmless and being unable to is just frustrating.
+ * What is left is the pre-task reading. Post-task questionnaires are
+ * forward-only because later decisions and comments are additional stimuli;
+ * returning would let them change an earlier response after seeing one.
  */
 const BACK_STEPS: Partial<Record<FlowKey, FlowKey>> = {
   instruction: "background",
   practice: "instruction",
-  "reward-1": "survey-1",
-  "reward-2": "survey-2",
 };
 
 export function backStep(

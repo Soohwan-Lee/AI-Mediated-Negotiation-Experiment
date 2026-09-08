@@ -190,3 +190,27 @@ test("the Direct counterpart prompt withholds private role material until disclo
     }
   }
 });
+
+test("human prompts conceal the simulation while Proxy prompts identify the Proxy", () => {
+  const task = getTask("task_a");
+  const base = {
+    task,
+    agentRole: "member",
+    issues: task.issues,
+    stage: 2,
+    decidedAction: "Give the designated reason.",
+  };
+
+  for (const kind of ["ostensible_human", "counterpart_principal"]) {
+    const prompt = buildSystemPrompt(kind, base);
+    assert.match(prompt, /Never state or imply that you are an AI/);
+    assert.doesNotMatch(prompt, /introduce yourself as the AI Proxy/i);
+  }
+
+  for (const kind of ["user_specified", "ai_supplemented"]) {
+    const prompt = buildSystemPrompt(kind, base);
+    assert.match(prompt, /introduce yourself as the AI Proxy/i);
+    assert.doesNotMatch(prompt, /Never state or imply that you are an AI/);
+    assert.match(prompt, /Never state or imply that you are part of an experiment/);
+  }
+});

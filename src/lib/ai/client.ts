@@ -255,7 +255,7 @@ function extractOutputText(payload: ResponsesPayload): string {
 }
 
 // ---------------------------------------------------------------------------
-// P5 — the reason classifier (Design Ver.2.21 §6.2a)
+// P5 — the reason classifier (Design Ver.2.23 §6.2a)
 // ---------------------------------------------------------------------------
 
 /**
