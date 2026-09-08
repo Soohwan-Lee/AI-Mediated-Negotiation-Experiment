@@ -1,42 +1,41 @@
 /**
- * The Ver.2.20 credibility ladder, tested against the shipped state machine
+ * The Ver.2.21 justification ladder, tested against the shipped state machine
  * and validator (imported directly via tests/ts-register.mjs).
  *
- * WHAT IS LOAD-BEARING HERE (Design §3.3, §6.2, CLAUDE.md):
+ * WHAT IS LOAD-BEARING HERE (Design §3.3, §6.2, §6.4, §6.9):
  *
- *  1. THE LADDER'S FOUR RUNGS, SYMMETRIC, in all four task × role cells.
- *     Both sides land on the same rank: nothing voiced settles at
- *     1,600 / 1,600 (joint 3,200), the WORK REASON at the same 1,600 / 1,600
- *     — it is a DECOY and shares its rank with silence — a bare PRIORITY
- *     claim at 2,300 / 2,300 (4,600), and the sensitive background at
- *     3,000 / 3,000 (6,000, the global maximum). Impasse pays 600 each
- *     (1,200); an accepted misread pays 600 / 1,900 (2,500).
- *
- *     Every rung is above the 600 fallback, so even an unargued agreement
- *     beats walking away, and JOINT alone identifies the tier reached.
+ *  1. THE LADDER HAS TWO RUNGS, SYMMETRIC, in all four task × role cells.
+ *     Nothing voiced, the work reason, and a bare priority claim all settle at
+ *     1,000 / 1,000 (joint 2,000); the sensitive background settles at
+ *     3,000 / 3,000 (joint 6,000, the global maximum). Impasse pays NOTHING —
+ *     0 each, joint 0 — so every agreement beats walking away and no one can
+ *     use a threat to break off as a card worth points.
  *
  *  2. SB VOICING IS THE ONLY BOTTLENECK. The counterpart proposes at its own
- *     rung (SCRIPT-PROPOSE-T{tier}), so a participant does not need
- *     negotiation skill to reach the maximum, only the disclosure. And the
- *     maximum is NOT reachable by skill alone: an over-ask without the SB is
- *     rebalanced to the tier package (SCRIPT-BALANCE), never accepted — and
- *     nor is an UNDER-ask, so over-conceding cannot drag the outcome below
- *     the rung that was paid for.
+ *     rung (SCRIPT-PROPOSE-T{1,2}), so a participant does not need negotiation
+ *     skill to reach the maximum, only the disclosure. And the maximum is NOT
+ *     reachable by skill alone: an over-ask without the SB is rebalanced to the
+ *     tier package (SCRIPT-BALANCE), never accepted — and nor is an UNDER-ask,
+ *     so over-conceding cannot drag the outcome below the rung that was paid
+ *     for.
  *
- *  3. THE SCHEDULE. The participant's proxy voices the SB at its FIRST
- *     reason opportunity when authorized (`SB` depends on the SB landing
- *     before the counterpart's stage-4 disclosure), the WR otherwise, and no
- *     card twice. Ver.2.20 DELETED the role-plausible pool and its per-issue
- *     allowance: AI-Supplemented now REPLACES the sensitive card with a fixed
- *     one-sentence abstraction said among two covers, so neither policy may
- *     add a reason of its own.
+ *  3. THE ONE-SHOT QUESTIONS. SCRIPT-ASKSIT once when the first message
+ *     carries no reason, SCRIPT-ASKWHY once after a priority claim,
+ *     SCRIPT-CLARIFY once PER TIER when the classifier is unsure,
+ *     SCRIPT-NUDGE once on silence. Each turns a failure the participant
+ *     cannot see into a question they can answer.
  *
- *  4. SCRIPT AND MACHINE AGREE. The mockup's ideal trajectory settles at
+ *  4. RECIPROCAL DISCLOSURE IN DIRECT. The counterpart's own SB comes out only
+ *     after the participant's. A WR-only Direct session never hears it, which
+ *     is what makes `SB` a disclosure decision rather than a response to one.
+ *     Proxy observation keeps the fixed schedule.
+ *
+ *  5. SCRIPT AND MACHINE AGREE. The mockup's ideal trajectory settles at
  *     exactly the package the machine would accept, in every cell.
  *
- *  5. THE PROXY'S TIER-2 FLOOR survives the trip to the closing conversation.
- *     `work` and `priority` are DIFFERENT rungs, and folding them together
- *     costs the participant a full option step — see the tests at the end.
+ *  6. THE PROXY'S FLOOR IS T1, THE SAME AS DIRECT'S. Ver.2.21's 12th
+ *     correction removed the priority rung, and with it the mode asymmetry the
+ *     old proxy floor put into Points and JOINT.
  */
 
 import { test } from "node:test";
@@ -57,30 +56,36 @@ const {
   getTask,
   reasonCards,
   counterRequirementIssue,
+  requirementIssue,
   rankedOptions,
   scorePackage,
   cardOfLayer,
   abstractedReason,
+  MAX_INDIVIDUAL_POINTS,
+  RESERVATION_POINTS,
 } = await import("../src/lib/tasks.ts");
 const {
   counterpartStep,
   counterpartStageAfter,
   buildProxyPlan,
+  proxyAccepts,
   designatedReason,
   tierOf,
   tierPackage,
   maxPackage,
-  misreadPackage,
   acceptablePackage,
   mentionsScoreNumbers,
   codeOutcome,
   foldTier,
+  proposalTierNumber,
   TIER_LIMIT_INDEX,
+  LABEL_TIER,
+  CLARIFY_CONFIDENCE_FLOOR,
+  SOFT_CLOSE_SECONDS,
 } = await import("../src/lib/negotiation/machine.ts");
 const { validateAction } = await import("../src/lib/ai/validator.ts");
-const { scriptedTask } = await import("../src/lib/negotiation/script.ts");
-const { reciprocalAcceptanceText } = await import(
-  "../src/lib/negotiation/counterpart-text.ts"
+const { scriptedTask, SCRIPT_LINES } = await import(
+  "../src/lib/negotiation/script.ts"
 );
 
 const ROLES = ["leader", "member"];
@@ -91,6 +96,7 @@ const other = (role) => (role === "leader" ? "member" : "leader");
 const state = (tier, extra = {}) => ({
   tier,
   askedWhy: true,
+  askSitUsed: true,
   numbersReminded: true,
   ...extra,
 });
@@ -99,9 +105,10 @@ const state = (tier, extra = {}) => ({
  * The standard mandate: the participant's hoped-for level on every term, plus
  * the reasons they authorized.
  *
- * NO FLOOR. Ver.2.13 §2.6 removed the range mandate: it could not change the
- * outcome, because the counterpart's policy is decisive, so all it could do
- * was manufacture an impasse and mix mandate-setting skill into the result.
+ * NO FLOOR. §2.6 removed the range mandate: it could not change the outcome,
+ * because the counterpart's policy is decisive, so all it could do was
+ * manufacture an impasse and mix mandate-setting skill into the result. The
+ * wish package is the acceptance line instead (§8.6).
  */
 function standardMandate(task, role, authorizedReasonIds) {
   return {
@@ -114,28 +121,44 @@ function standardMandate(task, role, authorizedReasonIds) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. The outcome ladder, four cells × three rungs
+// 1. The outcome ladder, four cells × two rungs
 // ---------------------------------------------------------------------------
 
 /**
- * Ver.2.13 §3.3 — the SYMMETRIC ladder. Both sides' cores land at the same
- * rank, so each rung pays both the same and JOINT is a monotone function of
- * the tier. That is what lets §9.6 drop UNLOCK, CONCEAL-PREMIUM and MAX-JOINT:
- * JOINT alone identifies the rung.
- */
-/**
- * The ladder's DISTINCT rungs (Ver.2.16 §3.3).
- *
- * `work` is deliberately absent: under the decoy design the safe reason buys
- * nothing, so it shares the `none` rank. That is asserted separately below —
- * it is the single most important consequence of Ver.2.16 and the easiest
- * thing to undo by accident.
+ * §3.3 — the SYMMETRIC ladder, two rungs since the 12th correction. Both
+ * sides' cores land at the same rank, so each rung pays both the same and
+ * JOINT is a function of the tier. That is what lets §9.6 drop UNLOCK,
+ * CONCEAL-PREMIUM and MAX-JOINT: JOINT alone identifies the rung.
  */
 const LADDER = [
-  { tier: "none", mine: 1600, theirs: 1600, joint: 3200 },
-  { tier: "priority", mine: 2300, theirs: 2300, joint: 4600 },
+  { tier: "none", mine: 1000, theirs: 1000, joint: 2000 },
   { tier: "sensitive", mine: 3000, theirs: 3000, joint: 6000 },
 ];
+
+test("the payoff spine is the Ver.2.21 convex one", () => {
+  // The core column 3,000 / 1,600 / 600 / 0 and the non-core 600 / 400 / 200 /
+  // 0, in both tasks. Only the best option solves the problem; the second is
+  // worth about half and the third almost nothing.
+  for (const taskId of TASKS) {
+    const task = getTask(taskId);
+    for (const role of ROLES) {
+      const core = requirementIssue(task, role);
+      const nonCore = counterRequirementIssue(task, role);
+      assert.deepEqual(
+        rankedOptions(task, core.id, role).map((o) => o.points[role]),
+        [3000, 1600, 600, 0],
+        `${taskId}/${role} core column`,
+      );
+      assert.deepEqual(
+        rankedOptions(task, nonCore.id, role).map((o) => o.points[role]),
+        [600, 400, 200, 0],
+        `${taskId}/${role} non-core column`,
+      );
+    }
+  }
+  assert.equal(MAX_INDIVIDUAL_POINTS, 3600, "3,000 own core + 600 the other");
+  assert.equal(RESERVATION_POINTS, 0, "no agreement is worth nothing");
+});
 
 for (const taskId of TASKS) {
   for (const role of ROLES) {
@@ -153,43 +176,65 @@ for (const taskId of TASKS) {
         );
         // The tier package is exactly acceptable at its own tier…
         assert.equal(acceptablePackage(task, role, pkg, rung.tier), true);
-        // …and every rung beats the fallback, so an unargued agreement is
-        // still better than no deal.
+        // …and every rung beats no agreement, so an unargued settlement is
+        // still better than walking away.
         assert.ok(rung.mine > task.reservationPoints);
       });
     }
 
-    test(`${taskId}/${role}: the ladder is strictly monotone for the discloser`, () => {
-      const [a, b, c] = LADDER.map((r) =>
-        scorePackage(task, tierPackage(task, role, r.tier), role),
-      );
-      assert.ok(a < b && b < c);
+    test(`${taskId}/${role}: the work reason buys exactly what silence buys`, () => {
+      // THE VER.2.21 WORK REASON NAMES BOTH TERMS. A counterpart that hears it
+      // learns "they want both", which leaves splitting the difference as the
+      // only move. If this ever stops matching `none`, the WR has become
+      // directional again and the SB has stopped being the bottleneck.
+      const none = tierPackage(task, role, "none");
+      const work = tierPackage(task, role, "work");
+      assert.deepEqual(work, none);
+      assert.equal(scorePackage(task, work, role), 1000);
     });
 
-    test(`${taskId}/${role}: impasse pays the fallback`, () => {
+    test(`${taskId}/${role}: impasse pays nothing at all`, () => {
       const coded = codeOutcome(task, role, null, false);
-      assert.equal(coded.participantPoints, 600);
-      assert.equal(coded.jointPoints, 1200);
+      assert.equal(coded.participantPoints, 0);
+      assert.equal(coded.counterpartPoints, 0);
+      assert.equal(coded.jointPoints, 0);
       assert.equal(coded.agreed, false);
+      assert.equal(coded.clearsReservation, false);
+      // Even the unargued rung beats it, which is the whole point of removing
+      // the 600 fallback: breaking off can never be worth playing for.
+      assert.ok(
+        scorePackage(task, tierPackage(task, role, "none"), role) >
+          coded.participantPoints,
+      );
     });
 
     test(`${taskId}/${role}: the SB rung is the global maximum`, () => {
       const coded = codeOutcome(task, role, maxPackage(task, role), true);
       assert.equal(coded.jointPoints, 6000);
       assert.equal(coded.participantPoints, 3000);
+      assert.equal(coded.clearsReservation, true);
     });
 
     test(`${taskId}/${role}: JOINT alone identifies the rung (§9.6)`, () => {
-      // This is the property the deleted measures rested on. If two rungs
-      // ever shared a JOINT value, UNLOCK / CONCEAL-PREMIUM / MAX-JOINT would
-      // have been carrying information JOINT does not, and dropping them
-      // would have lost it.
       const joints = LADDER.map(
         (r) => codeOutcome(task, role, tierPackage(task, role, r.tier), true).jointPoints,
       );
       joints.push(codeOutcome(task, role, null, false).jointPoints);
       assert.equal(new Set(joints).size, joints.length);
-      assert.deepEqual(joints, [3200, 4600, 6000, 1200]);
+      assert.deepEqual(joints, [2000, 6000, 0]);
+    });
+
+    test(`${taskId}/${role}: every rung moves BOTH sides equally`, () => {
+      // The symmetry itself, in one assertion. Ver.2.12 held the counterpart
+      // at its own best throughout, and §2.6 removed that as a face threat in
+      // its own right.
+      for (const rung of LADDER) {
+        const pkg = tierPackage(task, role, rung.tier);
+        assert.equal(
+          scorePackage(task, pkg, role),
+          scorePackage(task, pkg, counterpart),
+        );
+      }
     });
   }
 }
@@ -204,73 +249,32 @@ for (const taskId of TASKS) {
     const counterpart = other(role);
     const best = maxPackage(task, role);
 
-    test(`${taskId}/${role}: the work reason buys nothing (Ver.2.16 decoy)`, () => {
-      // THE POINT OF THE WHOLE DECOY DESIGN. A WR is true and safe, but the
-      // participant's core term is not that interest's obvious remedy, so it
-      // earns exactly what silence earns. If this ever passes at 2,300 again,
-      // the SB has stopped being the bottleneck and RQ1's primary outcome is
-      // measuring something else.
-      const none = tierPackage(task, role, "none");
-      const work = tierPackage(task, role, "work");
-      assert.deepEqual(work, none);
-      assert.equal(scorePackage(task, work, role), 1600);
-    });
-
-    test(`${taskId}/${role}: the misread pays less than saying nothing`, () => {
-      // SCRIPT-MISREAD offers the obvious remedy for the stated interest —
-      // the participant's NON-core term — and asks their core at the
-      // counterpart's best. Accepting it is worse than the unargued rung and
-      // no better than impasse (§3.4: joint 2,500). §13-19 flags it for
-      // softening if the pilot's acceptance rate clears gate 7.
-      const mis = misreadPackage(task, role);
-      assert.equal(scorePackage(task, mis, role), 600);
-      assert.equal(scorePackage(task, mis, counterpart), 1900);
-      assert.equal(
-        scorePackage(task, mis, role) + scorePackage(task, mis, counterpart),
-        2500,
-      );
-    });
-
-    test(`${taskId}/${role}: the misread is offered once, then never again`, () => {
-      // §6.2 `misread_pending`: only when a WR is all that has been voiced,
-      // and only once per task.
-      const first = counterpartStep(task, counterpart, 5, null, state("work"));
-      assert.equal(first.action, "misread");
-      assert.deepEqual(first.proposal, misreadPackage(task, role));
+    test(`${taskId}/${role}: a bare priority claim moves nothing`, () => {
+      // §3.3, 12th correction. The claim earns one SCRIPT-ASKWHY and the T1
+      // package stays on the table beside it. It does NOT earn a rung: a claim
+      // the counterpart cannot explain upstairs is cheap talk.
+      const asked = counterpartStep(task, counterpart, 5, null, {
+        ...state("work", { priorityClaimed: true }),
+        askedWhy: false,
+      });
+      assert.equal(asked.action, "ask_why");
+      assert.deepEqual(asked.proposal, tierPackage(task, role, "work"));
 
       const after = counterpartStep(
         task,
         counterpart,
         5,
         null,
-        state("work", { misreadOffered: true }),
+        state("work", { priorityClaimed: true }),
       );
-      assert.notEqual(after.action, "misread");
-
-      // It is never offered at a rung above the work reason.
-      for (const tier of ["priority", "sensitive"]) {
-        const d = counterpartStep(task, counterpart, 5, null, state(tier));
-        assert.notEqual(d.action, "misread");
-      }
-    });
-
-    test(`${taskId}/${role}: the counterpart honours its own misread offer`, () => {
-      // It offered the thing sincerely, so it cannot refuse when taken up.
-      const mis = misreadPackage(task, role);
-      assert.equal(
-        acceptablePackage(task, role, mis, "work", true),
-        true,
-      );
-      // But not before it has been put on the table.
-      assert.equal(
-        acceptablePackage(task, role, mis, "work", false),
-        false,
-      );
+      assert.equal(after.action, "propose_tier");
+      assert.deepEqual(after.proposal, tierPackage(task, role, "none"));
+      assert.equal(scorePackage(task, after.proposal, role), 1000);
     });
 
     test(`${taskId}/${role}: over-ask without SB is countered at the tier, never accepted`, () => {
-      // The participant asks for everything: their best on their core AND
-      // the counterpart's core conceded — better than best↔best for them.
+      // The participant asks for everything: their best on their core AND the
+      // counterpart's core conceded — better than best↔best for them.
       const greedy = {
         ...best,
         [counterRequirementIssue(task, role).id]: rankedOptions(
@@ -279,15 +283,22 @@ for (const taskId of TASKS) {
           role,
         )[0].id,
       };
-      for (const tier of ["none", "priority"]) {
+      for (const tier of ["none", "work"]) {
         const d = counterpartStep(task, counterpart, 5, greedy, state(tier));
         assert.equal(d.accepts, false);
         assert.deepEqual(d.proposal, tierPackage(task, role, tier));
       }
-      // The work rung answers an over-ask with the misread first (once), and
-      // still never accepts it.
-      const w = counterpartStep(task, counterpart, 5, greedy, state("work"));
-      assert.equal(w.accepts, false);
+    });
+
+    test(`${taskId}/${role}: the full trade is refused without the SB`, () => {
+      // Even offering the counterpart its OWN best is not enough: the ladder
+      // turns on what was said, not on generosity. SCRIPT-BALANCE says so.
+      for (const tier of ["none", "work"]) {
+        const d = counterpartStep(task, counterpart, 5, best, state(tier));
+        assert.equal(d.accepts, false);
+        assert.equal(d.action, "balance");
+        assert.deepEqual(d.proposal, tierPackage(task, role, tier));
+      }
     });
 
     test(`${taskId}/${role}: with the SB voiced, best↔best is accepted`, () => {
@@ -297,9 +308,6 @@ for (const taskId of TASKS) {
     });
 
     test(`${taskId}/${role}: with the SB voiced, an out-of-tier ask is rebalanced`, () => {
-      // Out of tier means asking the counterpart to give up its OWN core —
-      // beyond what any rung concedes. SCRIPT-BALANCE names it as one-sided
-      // and re-puts the symmetric package, which at this rung is best↔best.
       const theirs = counterRequirementIssue(task, role);
       const greedy = {
         ...best,
@@ -310,12 +318,10 @@ for (const taskId of TASKS) {
       assert.deepEqual(d.proposal, best);
     });
 
-    test(`${taskId}/${role}: an UNDER-ask is refused too (Ver.2.13 §6.2)`, () => {
+    test(`${taskId}/${role}: an UNDER-ask is refused too (§6.2)`, () => {
       // A package worse for the participant than their rung allows is
-      // rebalanced rather than taken. Ver.2.12 accepted these, which let a
-      // participant's over-concession mix into the primary outcome; the
-      // symmetric rule closes that — "I ask for no more than I move, and no
-      // less either."
+      // rebalanced rather than taken, so a participant's over-concession
+      // cannot mix into the primary outcome.
       const modest = tierPackage(task, role, "work");
       const d = counterpartStep(task, counterpart, 5, modest, state("sensitive"));
       assert.equal(d.accepts, false);
@@ -324,7 +330,7 @@ for (const taskId of TASKS) {
     });
 
     test(`${taskId}/${role}: a max discloser is never left to run the clock out`, () => {
-      // The ladder inverts if they can: 600 for the participant who paid the
+      // The ladder inverts if they can: 0 for the participant who paid the
       // most, against 1,000 for one who said nothing. The clock check must
       // therefore outrank the SB rung's re-proposal.
       const theirs = counterRequirementIssue(task, role);
@@ -341,16 +347,14 @@ for (const taskId of TASKS) {
     });
 
     test(`${taskId}/${role}: only the exact tier package is accepted`, () => {
-      // Either side of it is refused. Shorting the counterpart on its own
-      // core is an over-ask; conceding past the rung is an under-ask.
       const theirs = counterRequirementIssue(task, role);
       const shorted = {
-        ...tierPackage(task, role, "priority"),
+        ...tierPackage(task, role, "work"),
         [theirs.id]: rankedOptions(task, theirs.id, counterpart)[0].id,
       };
-      assert.equal(acceptablePackage(task, role, shorted, "priority"), false);
+      assert.equal(acceptablePackage(task, role, shorted, "work"), false);
       assert.equal(
-        acceptablePackage(task, role, tierPackage(task, role, "none"), "priority"),
+        acceptablePackage(task, role, tierPackage(task, role, "sensitive"), "work"),
         false,
       );
       assert.equal(
@@ -359,49 +363,190 @@ for (const taskId of TASKS) {
       );
     });
 
-    test(`${taskId}/${role}: every rung moves BOTH sides equally`, () => {
-      // The symmetry itself, in one assertion: at each rung the two sides
-      // score the same. Ver.2.12 held the counterpart at 3,000+ throughout,
-      // and §2.6 removed that as a face threat in its own right.
-      for (const rung of LADDER) {
-        const pkg = tierPackage(task, role, rung.tier);
-        assert.equal(
-          scorePackage(task, pkg, role),
-          scorePackage(task, pkg, counterpart),
-        );
-      }
-    });
-
-    test(`${taskId}/${role}: a reason-free ask gets one why, then the tier speaks`, () => {
-      const greedy = best;
+    test(`${taskId}/${role}: a reason-free demand is never asked WHY (§6.9 #7)`, () => {
+      // ASKWHY's only trigger is a priority claim (§6.9 #9). Asking "why does
+      // that one matter more?" of someone who never said one matters more is a
+      // question about something they did not claim. A bare demand gets
+      // SCRIPT-ASKSIT once at stage 2, then the T1 package, then BALANCE.
       const first = counterpartStep(
         task,
         counterpart,
         5,
-        greedy,
+        best,
         state("none", { askedWhy: false }),
       );
-      assert.equal(first.action, "ask_why");
-      const second = counterpartStep(task, counterpart, 5, greedy, state("none"));
-      assert.equal(second.action, "balance");
+      assert.notEqual(first.action, "ask_why");
+      assert.equal(first.action, "balance");
+      assert.deepEqual(first.proposal, tierPackage(task, role, "none"));
+
+      // With nothing on the table it simply proposes at its rung.
+      const empty = counterpartStep(
+        task,
+        counterpart,
+        5,
+        null,
+        state("none", { askedWhy: false }),
+      );
+      assert.equal(empty.action, "propose_tier");
     });
   }
 }
 
-test("the counterpart walks open → WR+ask → SB disclosure → trade loop", () => {
+// ---------------------------------------------------------------------------
+// 2a. The one-shot questions (§6.4, §6.9 #17)
+// ---------------------------------------------------------------------------
+
+test("SCRIPT-ASKSIT: a reasonless first message is asked about once", () => {
+  const task = getTask("task_a");
+  const direct = (extra) => ({
+    tier: "none",
+    askedWhy: false,
+    numbersReminded: true,
+    disclosurePolicy: "reciprocal",
+    ...extra,
+  });
+
+  // The first reasonless turn: ask what their situation is, and wait.
+  const first = counterpartStep(task, "member", 2, null, direct({ reasonlessTurns: 1 }));
+  assert.equal(first.action, "ask_sit");
+  assert.equal(first.proposal, null);
+
+  // Spent — the second reasonless turn settles it as "no reason" and the trade
+  // loop takes over (§6.1 stage 2).
+  const second = counterpartStep(
+    task,
+    "member",
+    2,
+    null,
+    direct({ askSitUsed: true, reasonlessTurns: 2 }),
+  );
+  assert.notEqual(second.action, "ask_sit");
+
+  // Two reasonless turns settle it even if the flag were somehow unset.
+  const settled = counterpartStep(
+    task,
+    "member",
+    2,
+    null,
+    direct({ reasonlessTurns: 2 }),
+  );
+  assert.notEqual(settled.action, "ask_sit");
+
+  // A first message that DID carry a reason never reaches it.
+  const reasoned = counterpartStep(
+    task,
+    "member",
+    2,
+    null,
+    direct({ tier: "work", reasonlessTurns: 0 }),
+  );
+  assert.notEqual(reasoned.action, "ask_sit");
+});
+
+test("SCRIPT-CLARIFY: low confidence below SB asks once per tier", () => {
+  const task = getTask("task_a");
+  const low = CLARIFY_CONFIDENCE_FLOOR - 0.1;
+
+  const asked = counterpartStep(task, "member", 5, null, {
+    ...state("work"),
+    labelConfidence: low,
+  });
+  assert.equal(asked.action, "clarify");
+
+  // Spent at this tier.
+  const spent = counterpartStep(task, "member", 5, null, {
+    ...state("work"),
+    labelConfidence: low,
+    clarifyUsedForTier: "work",
+  });
+  assert.notEqual(spent.action, "clarify");
+
+  // ONCE PER TIER, not once per task: someone who clarified their way up to
+  // `work` may still be vague about an SB later. A tier the clarify was not
+  // spent at gets its own.
+  const newTier = counterpartStep(task, "member", 5, null, {
+    ...state("none"),
+    labelConfidence: low,
+    clarifyUsedForTier: "work",
+  });
+  assert.equal(newTier.action, "clarify");
+
+  // Never at the SB rung — there is nothing above it to clarify towards.
+  const atSb = counterpartStep(task, "member", 5, null, {
+    ...state("sensitive"),
+    labelConfidence: low,
+    counterpartSbDisclosed: true,
+  });
+  assert.notEqual(atSb.action, "clarify");
+
+  // A confident answer is acted on rather than questioned.
+  const confident = counterpartStep(task, "member", 5, null, {
+    ...state("work"),
+    labelConfidence: 0.95,
+  });
+  assert.equal(confident.action, "propose_tier");
+});
+
+test("SCRIPT-NUDGE: silence is nudged once, then simply waited out", () => {
+  const task = getTask("task_a");
+  const silent = counterpartStep(task, "member", 5, null, {
+    ...state("none"),
+    participantSilent: true,
+  });
+  assert.equal(silent.action, "nudge");
+  assert.equal(silent.proposal, null);
+
+  const spent = counterpartStep(task, "member", 5, null, {
+    ...state("none"),
+    participantSilent: true,
+    nudgeUsed: true,
+  });
+  assert.notEqual(spent.action, "nudge");
+
+  // A package on the table is answered rather than nudged: there is something
+  // to respond to.
+  const withOffer = counterpartStep(
+    task,
+    "member",
+    5,
+    maxPackage(task, "leader"),
+    { ...state("none"), participantSilent: true },
+  );
+  assert.notEqual(withOffer.action, "nudge");
+});
+
+test("the clock's soft close fires at 90 seconds, not 60", () => {
+  assert.equal(SOFT_CLOSE_SECONDS, 90);
+  const task = getTask("task_a");
+  const greedy = maxPackage(task, "leader");
+  const close = counterpartStep(task, "member", 5, greedy, {
+    ...state("work"),
+    secondsRemaining: 89,
+  });
+  assert.equal(close.action, "soft_close");
+  assert.deepEqual(close.proposal, tierPackage(task, "leader", "work"));
+  const notYet = counterpartStep(task, "member", 5, greedy, {
+    ...state("work"),
+    secondsRemaining: 120,
+  });
+  assert.notEqual(notYet.action, "soft_close");
+  const expired = counterpartStep(task, "member", 5, greedy, {
+    ...state("work"),
+    secondsRemaining: 0,
+  });
+  assert.equal(expired.impasse, true);
+});
+
+// ---------------------------------------------------------------------------
+// 2b. Reciprocal disclosure in Direct (§6.3)
+// ---------------------------------------------------------------------------
+
+test("the counterpart walks open → first reason → disclosure → trade loop", () => {
   assert.equal(counterpartStageAfter(0), 1);
   assert.equal(counterpartStageAfter(1), 2);
   assert.equal(counterpartStageAfter(2), 4);
   assert.equal(counterpartStageAfter(3), 5);
   assert.equal(counterpartStageAfter(9), 5);
-});
-
-test("the counterpart's stage-4 move is its own SB disclosure, unconditional", () => {
-  const task = getTask("task_a");
-  const d = counterpartStep(task, "member", 4, null, state("none"));
-  assert.equal(d.action, "disclose_sb");
-  // The counterpart holds an SB card of its own to disclose.
-  assert.ok(cardOfLayer(task, "member", "sensitive"));
 });
 
 for (const taskId of TASKS) {
@@ -411,43 +556,33 @@ for (const taskId of TASKS) {
     const direct = (tier, extra = {}) =>
       state(tier, { disclosurePolicy: "reciprocal", ...extra });
 
-    for (const tier of ["none", "work", "priority"]) {
-      test(`${taskId}/${role}/Direct: ${tier} can accept its own rung before counterpart SB`, () => {
+    for (const tier of ["none", "work"]) {
+      test(`${taskId}/${role}/Direct: ${tier} can accept its own rung with no disclosure at all`, () => {
         const pkg = tierPackage(task, role, tier);
-        const decision = counterpartStep(
-          task,
-          counterpart,
-          2,
-          pkg,
-          direct(tier),
-        );
+        const decision = counterpartStep(task, counterpart, 2, pkg, direct(tier));
         assert.equal(decision.accepts, true);
         assert.equal(decision.action, "accept");
         assert.deepEqual(decision.proposal, pkg);
       });
     }
 
-    test(`${taskId}/${role}/Direct: vague yes without a package is not an agreement`, () => {
-      const decision = counterpartStep(
-        task,
-        counterpart,
-        2,
-        null,
-        direct("work"),
-      );
-      assert.equal(decision.accepts, false);
-      assert.equal(decision.action, "state_priority");
+    test(`${taskId}/${role}/Direct: a WR-only path NEVER hears the counterpart's SB`, () => {
+      // §6.3, Ver.2.21. Reciprocity is the rule: the counterpart discloses only
+      // after the participant has. This is what makes `SB` a disclosure
+      // decision rather than a response to one — and it means a WR-only Direct
+      // session has no receiver experience of an SB at all (§3.3).
+      for (const tier of ["none", "work"]) {
+        for (const stage of [2, 4, 5]) {
+          const d = counterpartStep(task, counterpart, stage, null, direct(tier));
+          assert.notEqual(d.action, "disclose_sb", `${tier} at stage ${stage}`);
+          assert.notEqual(d.action, "disclose_sb_and_accept");
+        }
+      }
     });
 
     test(`${taskId}/${role}/Direct: SB plus max package reciprocates and accepts once`, () => {
       const best = maxPackage(task, role);
-      const first = counterpartStep(
-        task,
-        counterpart,
-        2,
-        best,
-        direct("sensitive"),
-      );
+      const first = counterpartStep(task, counterpart, 2, best, direct("sensitive"));
       assert.equal(first.action, "disclose_sb_and_accept");
       assert.equal(first.accepts, true);
       assert.deepEqual(first.proposal, best);
@@ -461,78 +596,65 @@ for (const taskId of TASKS) {
       );
       assert.equal(replay.action, "accept_sb");
       assert.equal(replay.accepts, true);
-
-      const text = reciprocalAcceptanceText(task, counterpart, best);
-      const counterpartSb = cardOfLayer(task, counterpart, "sensitive");
-      assert.ok(text.replaceAll(" || ", " ").includes(counterpartSb.text));
-      assert.match(text, /works for me\.$/);
-      assert.ok(text.length <= 420);
-      for (const bubble of text.split(" || ")) assert.ok(bubble.length <= 112);
     });
 
     test(`${taskId}/${role}/Direct: a late SB is reciprocated without duplicating it`, () => {
-      const first = counterpartStep(
-        task,
-        counterpart,
-        5,
-        null,
-        direct("sensitive"),
-      );
+      const first = counterpartStep(task, counterpart, 5, null, direct("sensitive"));
       assert.equal(first.action, "disclose_sb");
       const after = counterpartStep(
         task,
         counterpart,
-        4,
+        5,
         null,
         direct("sensitive", { counterpartSbDisclosed: true }),
       );
       assert.notEqual(after.action, "disclose_sb");
       assert.notEqual(after.action, "disclose_sb_and_accept");
-    });
-
-    test(`${taskId}/${role}/Direct: WR-only refusal never unlocks counterpart SB`, () => {
-      const outOfTier = maxPackage(task, role);
-      const decision = counterpartStep(
-        task,
-        counterpart,
-        4,
-        outOfTier,
-        direct("work"),
-      );
-      assert.equal(decision.accepts, false);
-      assert.notEqual(decision.action, "disclose_sb");
-      assert.notEqual(decision.action, "disclose_sb_and_accept");
-    });
-
-    test(`${taskId}/${role}/Direct: accepting a displayed misread offer settles it`, () => {
-      const offered = counterpartStep(
-        task,
-        counterpart,
-        4,
-        null,
-        direct("work"),
-      );
-      assert.equal(offered.action, "misread");
-      const accepted = counterpartStep(
-        task,
-        counterpart,
-        5,
-        offered.proposal,
-        direct("work", { misreadOffered: true }),
-      );
-      assert.equal(accepted.action, "accept");
-      assert.equal(accepted.accepts, true);
-      assert.deepEqual(accepted.proposal, offered.proposal);
+      assert.equal(after.action, "propose_tier");
+      assert.deepEqual(after.proposal, maxPackage(task, role));
     });
   }
 }
 
+test("Proxy observation keeps its fixed stage-4 disclosure schedule", () => {
+  // The counterpart proxy always discloses while the participant watches, at
+  // every tier — so a Proxy participant's receiver experience is the same in
+  // every cell, which Direct's reciprocity rule deliberately is not.
+  const task = getTask("task_a");
+  for (const tier of ["none", "work", "sensitive"]) {
+    const decision = counterpartStep(task, "member", 4, null, {
+      ...state(tier),
+      disclosurePolicy: "fixed",
+    });
+    assert.equal(decision.action, "disclose_sb");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 2c. Early settlement and the clock
+// ---------------------------------------------------------------------------
+
+test("a valid acceptance ends the task at once, with no forced disclosure stage", () => {
+  // §6.1 stage 6. A participant who takes the package on the table should not
+  // have to sit through an intermediate turn before it is answered.
+  const task = getTask("task_a");
+  for (const tier of ["none", "work"]) {
+    const pkg = tierPackage(task, "leader", tier);
+    for (const stage of [2, 4, 5]) {
+      const d = counterpartStep(task, "member", stage, pkg, {
+        ...state(tier, { disclosurePolicy: "reciprocal" }),
+      });
+      assert.equal(d.accepts, true, `${tier} at stage ${stage}`);
+      assert.equal(d.stage, 6);
+    }
+  }
+});
+
 test("the score reminder outranks an otherwise valid early acceptance", () => {
   const task = getTask("task_a");
   const pkg = tierPackage(task, "leader", "work");
-  const base = state("work", { disclosurePolicy: "reciprocal" });
   const reminded = counterpartStep(task, "member", 2, pkg, {
-    ...base,
+    ...state("work", { disclosurePolicy: "reciprocal" }),
     numbersReminded: false,
     numbersMentionedNow: true,
   });
@@ -541,21 +663,17 @@ test("the score reminder outranks an otherwise valid early acceptance", () => {
 });
 
 test("the tier package sent in the last seconds is accepted, not read as impasse", () => {
-  // `secondsRemaining` is captured BEFORE the reply delay, so a participant
-  // who puts the tier package up near the end reaches the machine at zero.
-  // Answering that with an impasse pays 600 instead of the rung they earned,
-  // and which one they got would be decided by when the message landed.
-  // Checked in BOTH policies: the Direct arm's early close and the trade loop
-  // are separate branches and each had the expiry check in front.
+  // `secondsRemaining` is captured BEFORE the reply delay, so a participant who
+  // puts the tier package up near the end reaches the machine at zero.
+  // Answering that with an impasse pays 0 instead of the rung they earned, and
+  // which one they got would be decided by when the message landed.
   const task = getTask("task_a");
-  for (const tier of ["none", "work", "priority", "sensitive"]) {
+  for (const tier of ["none", "work", "sensitive"]) {
     const pkg = tierPackage(task, "leader", tier);
 
     const direct = counterpartStep(task, "member", 2, pkg, {
       ...state(tier, { disclosurePolicy: "reciprocal" }),
       secondsRemaining: 0,
-      // The sensitive rung reciprocates and accepts in one reply, so this
-      // says "already disclosed" and the action is the plain accept wording.
       counterpartSbDisclosed: true,
     });
     assert.equal(direct.accepts, true, `direct ${tier}`);
@@ -579,27 +697,16 @@ test("the tier package sent in the last seconds is accepted, not read as impasse
   assert.equal(refused.action, "impasse");
   assert.equal(refused.accepts, false);
 
-  // And a first score mention at zero must not cost the rung: with no turn
-  // left to accept in, the acceptance wins over the one-shot reminder.
-  const pkg = tierPackage(task, "leader", "priority");
+  // And a first score mention at zero must not cost the rung: with no turn left
+  // to accept in, the acceptance wins over the one-shot reminder.
+  const pkg = tierPackage(task, "leader", "work");
   const mentioned = counterpartStep(task, "member", 5, pkg, {
-    ...state("priority"),
+    ...state("work"),
     secondsRemaining: 0,
     numbersReminded: false,
     numbersMentionedNow: true,
   });
   assert.equal(mentioned.accepts, true);
-});
-
-test("Proxy keeps its fixed stage-4 disclosure schedule", () => {
-  const task = getTask("task_a");
-  for (const tier of ["none", "work", "priority", "sensitive"]) {
-    const decision = counterpartStep(task, "member", 4, null, {
-      ...state(tier),
-      disclosurePolicy: "fixed",
-    });
-    assert.equal(decision.action, "disclose_sb");
-  }
 });
 
 test("the score-number reminder fires once, then mentions are ignored", () => {
@@ -618,12 +725,12 @@ test("the score-number reminder fires once, then mentions are ignored", () => {
   assert.equal(later.action, "accept_sb");
 });
 
-test("mentionsScoreNumbers catches score talk and passes shift counts", () => {
+test("mentionsScoreNumbers catches score talk and passes option counts", () => {
   assert.equal(mentionsScoreNumbers("I get 3000 for that"), true);
   assert.equal(mentionsScoreNumbers("that's worth more points to me"), true);
   assert.equal(mentionsScoreNumbers("my score sheet says otherwise"), true);
   assert.equal(mentionsScoreNumbers("could we do 3 per week?"), false);
-  assert.equal(mentionsScoreNumbers("4 per month is a lot"), false);
+  assert.equal(mentionsScoreNumbers("4 of the 4 is a lot"), false);
   assert.equal(mentionsScoreNumbers("that is the key point for me"), false);
   assert.equal(mentionsScoreNumbers("I see your point"), false);
   assert.equal(mentionsScoreNumbers("that earns one point"), true);
@@ -633,12 +740,12 @@ test("mentionsScoreNumbers catches score talk and passes shift counts", () => {
  * THE CLIENT AND THE SERVER MUST DECIDE THE SAME THING.
  *
  * Both run `counterpartStep`. The client codes the outcome from ITS decision;
- * the participant reads the sentence the server rendered from the server's.
- * So every field of `ExchangeState` has to reach the route unchanged — and
- * this test exists because one of them (`numbersMentionedNow`) was computed
+ * the participant reads the sentence the server rendered from the server's. So
+ * every field of `ExchangeState` has to reach the route unchanged — and this
+ * test exists because one of them (`numbersMentionedNow`) was computed
  * separately on each side, which flips `accepts` on an otherwise identical
- * package: a participant could be shown "let's not talk scores" and be
- * recorded as having agreed.
+ * package: a participant could be shown "let's not talk scores" and be recorded
+ * as having agreed.
  */
 test("every ExchangeState field can change the decision, so all of them travel", () => {
   const task = getTask("task_a");
@@ -646,6 +753,7 @@ test("every ExchangeState field can change the decision, so all of them travel",
   const base = {
     tier: "sensitive",
     askedWhy: true,
+    askSitUsed: true,
     numbersReminded: false,
     numbersMentionedNow: false,
     secondsRemaining: 300,
@@ -654,22 +762,24 @@ test("every ExchangeState field can change the decision, so all of them travel",
   const decide = (over) =>
     counterpartStep(task, "leader", 5, best, { ...base, ...over });
 
-  // The baseline: an accepted best↔best.
   assert.equal(decide({}).accepts, true);
 
-  // Flipping the one field that used to be re-derived server-side changes
-  // agreement to no-agreement. If this ever stops being true the field has
-  // become inert and the check below is worth revisiting; while it IS true,
-  // the field must be sent rather than recomputed.
   assert.equal(decide({ numbersMentionedNow: true }).accepts, false);
   assert.equal(decide({ numbersMentionedNow: true }).action, "nonum");
-
-  // The same for the other one-shots, so none of them is quietly dropped
-  // from a request body later.
   assert.equal(decide({ tier: "work" }).accepts, false);
-  // The clock, on an OFF-TIER package: acceptance outranks expiry now (a tier
-  // package sent in the last seconds is a real agreement), so the field has
-  // to be read where the counterpart was going to refuse anyway.
+  assert.equal(
+    decide({ tier: "work", labelConfidence: 0.2 }).action,
+    "clarify",
+  );
+  assert.equal(
+    decide({ tier: "work", priorityClaimed: true, askedWhy: false }).action,
+    "ask_why",
+  );
+  // …and without the flag the same state does not reach it.
+  assert.notEqual(
+    decide({ tier: "work", askedWhy: false }).action,
+    "ask_why",
+  );
   assert.equal(
     counterpartStep(task, "leader", 5, best, {
       ...base,
@@ -678,22 +788,6 @@ test("every ExchangeState field can change the decision, so all of them travel",
     }).impasse,
     true,
   );
-});
-
-test("a low clock offers SCRIPT-CLOSE once, expiry is an impasse", () => {
-  const task = getTask("task_a");
-  const greedy = maxPackage(task, "leader");
-  const close = counterpartStep(task, "member", 5, greedy, {
-    ...state("work"),
-    secondsRemaining: 30,
-  });
-  assert.equal(close.action, "soft_close");
-  assert.deepEqual(close.proposal, tierPackage(task, "leader", "work"));
-  const expired = counterpartStep(task, "member", 5, greedy, {
-    ...state("work"),
-    secondsRemaining: 0,
-  });
-  assert.equal(expired.impasse, true);
 });
 
 // ---------------------------------------------------------------------------
@@ -714,6 +808,29 @@ for (const taskId of TASKS) {
       assert.equal(sb.issueId, task.requirementIssueId[role]);
       // Speakable, first person: said aloud to the other side.
       assert.match(sb.text, /\bI\b|\bmy\b/i);
+      assert.match(wr.text, /\bmy\b|\bthis\b|\bthe\b/i);
+    });
+
+    test(`${taskId}/${role}: the work reason names BOTH terms and neither priority`, () => {
+      // §3.2, §4 — non-directional. Both issue labels have to be findable in
+      // the card, and it must not say one matters more. This is the property
+      // that makes T1 the only thing a counterpart can do with it.
+      const core = requirementIssue(task, role);
+      const nonCore = counterRequirementIssue(task, role);
+      const text = wr.text.toLowerCase();
+      const noun = (issue) =>
+        issue.label.toLowerCase().split(/\s+/).filter((w) => w.length > 4);
+      for (const issue of [core, nonCore]) {
+        assert.ok(
+          noun(issue).some((word) => text.includes(word.replace(/s$/, ""))),
+          `${taskId}/${role} WR should mention ${issue.label}`,
+        );
+      }
+      assert.doesNotMatch(
+        wr.text,
+        /matters? more|more important|priority|most important/i,
+        "the WR must not reveal a priority",
+      );
     });
 
     test(`${taskId}/${role}: SB authorized → SB voiced at the first reason opportunity`, () => {
@@ -724,7 +841,6 @@ for (const taskId of TASKS) {
     test(`${taskId}/${role}: WR only → WR voiced, and an unticked SB never is`, () => {
       const card = designatedReason(task, role, 2, [wr.id]);
       assert.equal(card?.id, wr.id);
-      // Even after the WR is spent, the unticked SB is not designated.
       const later = designatedReason(task, role, 5, [wr.id], [wr.id]);
       assert.equal(later, null);
     });
@@ -751,42 +867,77 @@ for (const taskId of TASKS) {
       );
       assert.equal(plan.tier, "sensitive");
       assert.deepEqual(plan.tentative, maxPackage(task, role));
+      assert.equal(scorePackage(task, plan.tentative, role), 3000);
     });
 
-    test(`${taskId}/${role}: plan — WR only settles at the priority rung`, () => {
-      // TIER 2 IS THE PROXY'S FLOOR (§6.5, §6.9 #1). The proxy holds the
-      // preferred package, so it always states which term matters more —
-      // it declines the misread and claims the priority. A Direct
-      // participant need not, which is the §13-13② asymmetry.
-      const plan = buildProxyPlan(
-        task,
-        role,
-        standardMandate(task, role, [wr.id]),
-      );
-      assert.equal(plan.tier, "priority");
-      assert.deepEqual(plan.tentative, tierPackage(task, role, "priority"));
-      assert.equal(scorePackage(task, plan.tentative, role), 2300);
+    test(`${taskId}/${role}: plan — the proxy's floor is T1, the same as Direct's`, () => {
+      // VER.2.21, 12th correction. The proxy still declines the first T1 offer
+      // and states the priority, because it holds the wish package — but that
+      // earns nothing now, so both arms floor at the same rung and the old
+      // §13-13② mode asymmetry in Points/JOINT is gone.
+      for (const ids of [[], [wr.id]]) {
+        const plan = buildProxyPlan(task, role, standardMandate(task, role, ids));
+        assert.equal(plan.tier, "work");
+        assert.deepEqual(plan.tentative, tierPackage(task, role, "work"));
+        assert.equal(scorePackage(task, plan.tentative, role), 1000);
+      }
     });
 
-    test(`${taskId}/${role}: plan — checking nothing still reaches tier 2`, () => {
-      // §6.9 #12: WR unchecked and SB unchecked. The proxy still knows the
-      // preferred package, so it still states the priority — the bottom rung
-      // is unreachable through a proxy.
-      const plan = buildProxyPlan(task, role, standardMandate(task, role, []));
-      assert.equal(plan.tier, "priority");
-      assert.equal(scorePackage(task, plan.tentative, role), 2300);
+    test(`${taskId}/${role}: plan — the work reason is voiced whether or not it was ticked`, () => {
+      // §8.7: the WR is a fixed utterance, not a checkbox. Un-ticking it would
+      // create a "no reason at all" proxy path with no Direct counterpart.
+      const unticked = buildProxyPlan(task, role, standardMandate(task, role, []));
+      const ticked = buildProxyPlan(task, role, standardMandate(task, role, [wr.id]));
+      assert.equal(unticked.tier, ticked.tier);
+      assert.deepEqual(unticked.tentative, ticked.tentative);
     });
 
     test(`${taskId}/${role}: plan — the proxies always reach a package`, () => {
-      // With the mandate floor gone (Ver.2.13 §2.6) there is nothing that can
-      // stop the proxies settling at the rung the reasons earned, at any rung.
-      // The participant's control is the reason checkboxes before and RATIFY
-      // after — not a range the proxy could fail to clear.
       for (const ids of [[], [wr.id], [wr.id, sb.id]]) {
         const plan = buildProxyPlan(task, role, standardMandate(task, role, ids));
         assert.ok(plan.tentative, `no tentative for ${ids.length} card(s)`);
         assert.deepEqual(plan.tentative, tierPackage(task, role, plan.tier));
       }
+    });
+
+    test(`${taskId}/${role}: the wish accept rule — take it if it matches the wish, else push`, () => {
+      // §6.5, §8.6. The wish package is the proxy's target AND its acceptance
+      // line. The screen's default is both terms at their best, so no package
+      // the counterpart offers can match it and the proxy goes to the ceiling
+      // its reasons allow, then brings back what it reached.
+      const plan = buildProxyPlan(
+        task,
+        role,
+        standardMandate(task, role, [wr.id, sb.id]),
+      );
+      assert.equal(plan.wishScore, MAX_INDIVIDUAL_POINTS);
+      const best = maxPackage(task, role);
+      assert.equal(
+        proxyAccepts(task, role, best, plan, 1),
+        false,
+        "the default wish is above even best↔best, so it keeps pushing",
+      );
+      assert.equal(
+        proxyAccepts(task, role, best, plan, 0),
+        true,
+        "out of reasons: take what is on the table as the tentative package",
+      );
+      assert.equal(proxyAccepts(task, role, null, plan, 0), false);
+
+      // A modest wish is met by the T1 package and accepted straight away.
+      const modestMandate = {
+        issues: task.issues.map((issue) => ({
+          issueId: issue.id,
+          preferredOptionId: tierPackage(task, role, "work")[issue.id],
+        })),
+        authorizedReasonIds: [wr.id],
+      };
+      const modest = buildProxyPlan(task, role, modestMandate);
+      assert.equal(modest.wishScore, 1000);
+      assert.equal(
+        proxyAccepts(task, role, tierPackage(task, role, "work"), modest, 2),
+        true,
+      );
     });
   }
 }
@@ -795,6 +946,38 @@ test("tierOf reads layers and ignores everything else", () => {
   assert.equal(tierOf([]), "none");
   assert.equal(tierOf([{ layer: "work" }]), "work");
   assert.equal(tierOf([{ layer: "work" }, { layer: "sensitive" }]), "sensitive");
+});
+
+test("the tier only ever rises, and there are only two rungs to rise between", () => {
+  assert.deepEqual(Object.keys(TIER_LIMIT_INDEX).sort(), [
+    "none",
+    "sensitive",
+    "work",
+  ]);
+  assert.equal(TIER_LIMIT_INDEX.none, 2);
+  assert.equal(TIER_LIMIT_INDEX.work, 2);
+  assert.equal(TIER_LIMIT_INDEX.sensitive, 0);
+
+  assert.equal(foldTier("none", "work"), "work");
+  assert.equal(foldTier("work", "none"), "work");
+  assert.equal(foldTier("work", "sensitive"), "sensitive");
+  assert.equal(foldTier("sensitive", "none"), "sensitive");
+  assert.equal(foldTier("sensitive", "work"), "sensitive");
+
+  assert.equal(proposalTierNumber("none"), 1);
+  assert.equal(proposalTierNumber("work"), 1);
+  assert.equal(proposalTierNumber("sensitive"), 2);
+});
+
+test("the classifier's labels map onto the two rungs, PRI included as an alias", () => {
+  assert.equal(LABEL_TIER.none, "none");
+  assert.equal(LABEL_TIER.WR, "work");
+  assert.equal(LABEL_TIER.SB, "sensitive");
+  // Ver.2.21 replaced the PRI label with a `priority_claim` flag. The alias is
+  // kept so a stale client or a replayed log cannot produce `undefined` where
+  // a tier belongs — and it maps to `work`, which is what a priority claim
+  // buys.
+  assert.equal(LABEL_TIER.PRI, "work");
 });
 
 // ---------------------------------------------------------------------------
@@ -813,13 +996,12 @@ for (const taskId of TASKS) {
         assert.equal(scorePackage(task, script.tentative, role), 3000);
         assert.equal(scorePackage(task, script.tentative, counterpart), 3000);
 
-        // The participant side voices the SB before the counterpart's SB
-        // disclosure — the PRE-RECIP-SB path the mockup demonstrates.
+        // The participant side voices the SB at its first reason opportunity,
+        // and the counterpart's own SB comes after it — reciprocity in Direct,
+        // the fixed schedule in Proxy, and the same order on screen either way.
         const participantSpeakers = ["participant", "participant_proxy"];
         const counterpartSpeakers = ["counterpart", "counterpart_proxy"];
-        const sb = reasonCards(task, role).find(
-          (c) => c.layer === "sensitive",
-        );
+        const sb = reasonCards(task, role).find((c) => c.layer === "sensitive");
         const sbIndex = script.messages.findIndex(
           (m) =>
             participantSpeakers.includes(m.speaker) && m.reasonCardId === sb.id,
@@ -844,12 +1026,33 @@ for (const taskId of TASKS) {
   }
 }
 
-test("the counterpart's opening carries NO package (Ver.2.13 §6.1)", () => {
-  // The anchored opening — "my best, your worst" — is gone. §2.6 identifies it
-  // as a face threat in its own right: the non-negotiable, lowball offer
-  // White et al. (2004) name, which made a high-FTS participant competitive by
-  // a route that has nothing to do with self-disclosure. The first package the
-  // participant ever sees is now the symmetric tier one.
+test("a scripted proxy never speaks as its principal", () => {
+  // §6.5, Ver.2.19. The proxy refers to "the team lead I represent" and never
+  // claims the confession as its own — on screen a first-person proxy is
+  // indistinguishable from the participant speaking, and the delegation is what
+  // both policies are variants of.
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const task = getTask(taskId);
+      const sb = cardOfLayer(task, role, "sensitive");
+      for (const condition of ["user_specified", "ai_supplemented"]) {
+        const script = scriptedTask(task, role, condition);
+        for (const message of script.messages) {
+          assert.ok(
+            !message.text.includes(sb.text),
+            `${taskId}/${role}/${condition} pasted the card verbatim`,
+          );
+        }
+      }
+    }
+  }
+});
+
+test("the counterpart's opening carries NO package and NO priority (§6.1)", () => {
+  // The anchored opening — "my best, your worst" — is gone: §2.6 identifies it
+  // as a face threat in its own right. And the counterpart never names its own
+  // priority, so the participant starts without knowing what the other side
+  // needs.
   for (const taskId of TASKS) {
     const task = getTask(taskId);
     for (const role of ROLES) {
@@ -859,10 +1062,43 @@ test("the counterpart's opening carries NO package (Ver.2.13 §6.1)", () => {
       assert.equal(d.accepts, false);
     }
   }
+  // And the SCRIPT-OPEN wording asks about their situation rather than their
+  // priority — an opening that asked "what matters most to you?" would invite a
+  // priority claim as the first move.
+  const opened = SCRIPT_LINES.open({ workReason: "there's a lot on." });
+  assert.match(opened, /situation/i);
+  assert.doesNotMatch(opened, /matters most|more important/i);
+});
+
+test("every fixed script line is short-bubbled and says what §6.4 says", () => {
+  // Each bubble is about one short sentence — that is what makes the
+  // counterpart read like a person typing rather than a system emitting a
+  // paragraph, which is the whole of the "another participant" claim.
+  const ctx = {
+    workReason: "there's a lot on at the moment.",
+    levels: "2 days on the office days, 3 of 4 on the presentations",
+    participantCoreLabel: "the presentations",
+    counterpartCoreLabel: "the office days",
+  };
+  for (const [name, line] of Object.entries(SCRIPT_LINES)) {
+    const text = line(ctx);
+    assert.ok(text.length <= 420, `${name} is over the message cap`);
+    for (const bubble of text.split(" || ")) {
+      assert.ok(bubble.length <= 130, `${name} has a ${bubble.length}-char bubble`);
+    }
+  }
+  // SCRIPT-ASKWHY keeps the T1 package on the table beside the question.
+  assert.match(SCRIPT_LINES.ask_why(ctx), /until then/i);
+  // SCRIPT-PROPOSE-T2 receives the SB as an update, not as a favour.
+  assert.match(SCRIPT_LINES.propose_t2(ctx), /didn't know/i);
+  // SCRIPT-BALANCE names the imbalance and invites the missing reason.
+  assert.match(SCRIPT_LINES.balance(ctx), /same amount/i);
+  // SCRIPT-FALLBACK no longer promises a default arrangement: there is none.
+  assert.doesNotMatch(SCRIPT_LINES.impasse(), /default/i);
 });
 
 // ---------------------------------------------------------------------------
-// 5. No additive reasons — the Ver.2.20 abstraction policy
+// 5. The §6.6 sentences and the no-additive-reason rule
 // ---------------------------------------------------------------------------
 
 const task = getTask("task_a");
@@ -882,12 +1118,10 @@ function addingAction(overrides = {}) {
   };
 }
 
-test("no policy may add a reason beside the principal's card", () => {
-  // Ver.2.20 ABOLISHED THE POOL. AI-Supplemented no longer adds to the card —
-  // it REPLACES the card with the §6.6 abstraction and says it among two
-  // covers, all three supplied by the route. So there is nothing legitimate
-  // for a model to put in `addedReasonSourceId` under EITHER policy, and a
-  // value there means it invented a reason of its own.
+test("no policy may add a reason of its own", () => {
+  // The §6.6 sentences are supplied by the route, so there is nothing
+  // legitimate for a model to put in `addedReasonSourceId` under EITHER policy,
+  // and a value there means it invented a reason.
   for (const policy of ["user_specified", "ai_supplemented"]) {
     const result = validateAction(addingAction(), {
       issues: task.issues,
@@ -902,23 +1136,70 @@ test("no policy may add a reason beside the principal's card", () => {
   }
 });
 
-test("every sensitive card carries its §6.6 abstraction and two covers", () => {
-  // The twelve sentences are FIXED (§6.6) — the model joins them, it never
-  // writes them, because what survives the abstraction IS the manipulation.
-  // A card missing them would silently fall back to relaying the card whole,
+test("every sensitive card carries its §6.6 frame, abstraction and two covers", () => {
+  // The sixteen sentences are FIXED (§6.6) — the model joins them, it never
+  // writes them, because what survives the abstraction IS the manipulation. A
+  // card missing them would silently fall back to relaying the card whole,
   // making AI-Supplemented identical to User-Specified.
   for (const taskId of TASKS) {
     for (const role of ROLES) {
       const sb = cardOfLayer(getTask(taskId), role, "sensitive");
       const rendered = abstractedReason(sb);
-      assert.ok(rendered, `${taskId}/${role} has no abstraction`);
+      assert.ok(rendered, `${taskId}/${role} has no §6.6 sentences`);
       assert.equal(rendered.cover.length, 2);
-      // The abstraction must not reproduce the card: it keeps the KIND of
-      // fact and drops the event, the third party's words, and the
-      // concealment. If it contained the card's own text the policies would
-      // differ in nothing.
+
+      // The frame is the PROXY's own voice (11th correction): its assessment,
+      // naming the principal as someone it represents.
+      assert.match(rendered.frame, /I represent/);
+      assert.match(rendered.frame, /three reasons/i);
+
+      // The abstraction must not reproduce the card, and must carry NO
+      // attribution to the principal — that is exactly what §6.6 stage 2
+      // removes, and what separates the two policies.
       assert.notEqual(rendered.abstract, sb.text);
       assert.ok(rendered.abstract.length < sb.text.length);
+      assert.doesNotMatch(
+        rendered.abstract,
+        /I represent|they told|on their behalf|the team (lead|member)/i,
+        `${taskId}/${role} abstraction still attributes the fact`,
+      );
+
+      // All three sentences are subjectless declaratives of the same shape, so
+      // sentence form alone cannot sort them.
+      for (const sentence of [rendered.abstract, ...rendered.cover]) {
+        assert.match(sentence, /\.$/);
+        assert.doesNotMatch(sentence, /^I\b/);
+      }
+    }
+  }
+});
+
+test("a whole §6.6 turn fits under the message cap", () => {
+  // THE CAP TRIMS, AND WHAT IT TRIMS IS THE MANIPULATION. §6.6 fixes the
+  // AI-Supplemented reason turn at a frame plus three sentences, and
+  // `capMessageLength` cuts at a bubble seam when a message runs over 420
+  // characters (NEGOTIATION.maxMessageChars). If the fixed text alone does not
+  // fit, a cover — or worse, the abstraction — is dropped before any reply
+  // clause is even written, and the policy collapses into a shorter
+  // User-Specified. The Ver.2.21 frame is new and cost about 100 characters the
+  // cap was never sized for, so this is checked rather than assumed.
+  //
+  // The margin matters as much as the limit: the model wraps these sentences in
+  // a reply, so the fixed text has to leave room for one.
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const card = cardOfLayer(getTask(taskId), role, "sensitive");
+      const rendered = abstractedReason(card);
+      const whole = [
+        rendered.frame,
+        rendered.cover[0],
+        rendered.abstract,
+        rendered.cover[1],
+      ].join(" ");
+      assert.ok(
+        whole.length <= 400,
+        `${taskId}/${role} §6.6 turn is ${whole.length} chars, leaving no room under the 420 cap`,
+      );
     }
   }
 });
@@ -954,77 +1235,91 @@ test("an unchecked card may not be voiced under either policy", () => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// The proxy's tier-2 floor, on the wire between the route and the closing.
-//
-// THIS REGRESSION HAS NOW HAPPENED TWICE, in the two halves of the same wire.
-// The server was fixed first (`voicedTier` folds `"priority"` in
-// unconditionally, api/proxy-negotiation). The CLIENT kept a hand-written
-// ternary that collapsed everything below `sensitive` to `work` — and it typed
-// the response inline without `"priority"`, so `tsc` could not see the
-// mismatch with the server's own union.
-//
-// The cost is the one the server's comment names: a participant who authorized
-// no sensitive card watches the proxies settle at 2,300/2,300, takes over at
-// RATIFY, and is offered 1,600 — below the package still on screen. It lands
-// on Points/JOINT in the Proxy arm only, i.e. along the primary contrast.
-//
-// `foldTier` is the fix in both places. These pin WHY it cannot be a ternary.
-// ---------------------------------------------------------------------------
-
-test("work and priority are different rungs, so collapsing them costs points", () => {
-  assert.notEqual(
-    TIER_LIMIT_INDEX.work,
-    TIER_LIMIT_INDEX.priority,
-    "if these ever match, the ternary that collapsed them was harmless — " +
-      "and the decoy ladder has lost its middle rung",
-  );
-  assert.equal(TIER_LIMIT_INDEX.work, 2);
-  assert.equal(TIER_LIMIT_INDEX.priority, 1);
-});
-
-test("foldTier carries priority through, where a ternary dropped it", () => {
-  // The exact folds the proxy closing performs as each turn's voicedTier
-  // arrives. A `sensitive`-or-`work` ternary gets the middle two wrong.
-  assert.equal(foldTier("none", "priority"), "priority");
-  assert.equal(foldTier("work", "priority"), "priority");
-  assert.equal(foldTier("priority", "priority"), "priority");
-  assert.equal(foldTier("priority", "work"), "priority");
-  assert.equal(foldTier("priority", "sensitive"), "sensitive");
-  assert.equal(foldTier("sensitive", "priority"), "sensitive");
-});
-
-for (const taskId of ["task_a", "task_b"]) {
-  for (const role of ["leader", "member"]) {
-    test(`${taskId}/${role}: an empty authorization still negotiates without disclosing a card`, () => {
-      const task = getTask(taskId);
-      const mandate = standardMandate(task, role, []);
-      const plan = buildProxyPlan(task, role, mandate);
-      assert.equal(plan.tier, "priority");
-      assert.equal(scorePackage(task, plan.tentative, role), 2300);
-      assert.equal(designatedReason(task, role, 2, [], []), null);
-    });
-  }
-}
-
-test("both sides of an AI-Supplemented exchange use their own fixed summary and both covers", async () => {
-  const { scriptedTask } = await import("../src/lib/negotiation/script.ts");
+test("both sides of an AI-Supplemented exchange use their own fixed sentences", async () => {
   const { PROXY_TURN_ORDER } = await import("../src/lib/negotiation/proxy-protocol.ts");
-  for (const taskId of ["task_a", "task_b"]) {
-    for (const role of ["leader", "member"]) {
-      const task = getTask(taskId);
-      const exchange = scriptedTask(task, role, "ai_supplemented");
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const t = getTask(taskId);
+      const exchange = scriptedTask(t, role, "ai_supplemented");
       assert.equal(exchange.messages.length, PROXY_TURN_ORDER.length);
       for (const [speaker, speakerRole] of [
         ["participant_proxy", role],
         ["counterpart_proxy", other(role)],
       ]) {
-        const card = cardOfLayer(task, speakerRole, "sensitive");
-        const message = exchange.messages.find(m => m.speaker === speaker && m.text.includes(card.abstract));
+        const card = cardOfLayer(t, speakerRole, "sensitive");
+        const message = exchange.messages.find(
+          (m) => m.speaker === speaker && m.text.includes(card.abstract),
+        );
         assert.ok(message, `${taskId}/${role}/${speaker} has its fixed summary`);
-        assert.ok(card.cover.every(sentence => message.text.includes(sentence)));
+        assert.ok(message.text.includes(card.frame));
+        assert.ok(card.cover.every((sentence) => message.text.includes(sentence)));
         assert.ok(!message.text.includes(card.text));
       }
+    }
+  }
+});
+
+test("both policies run the same number of turns", async () => {
+  // §7's exposure control: if one policy simply got more turns to speak in, any
+  // difference in what the counterpart learns would be confounded with how much
+  // was said.
+  const { PROXY_TOTAL_TURNS } = await import("../src/lib/negotiation/proxy-protocol.ts");
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const t = getTask(taskId);
+      const specified = scriptedTask(t, role, "user_specified");
+      const supplemented = scriptedTask(t, role, "ai_supplemented");
+      assert.equal(specified.messages.length, PROXY_TOTAL_TURNS);
+      assert.equal(supplemented.messages.length, PROXY_TOTAL_TURNS);
+      assert.deepEqual(
+        specified.messages.map((m) => [m.stage, m.speaker]),
+        supplemented.messages.map((m) => [m.stage, m.speaker]),
+      );
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 6. No screen may name the requirement issue (§5 principle 1)
+// ---------------------------------------------------------------------------
+
+test("no card, brief or objective says which term the study is about", () => {
+  // With cards on ONE issue, anything that flags the core term points straight
+  // at what is being measured. The cards name their own term in their own text,
+  // which is the participant's own briefing; nothing may label it as the
+  // special one.
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const t = getTask(taskId);
+      const brief = t.roleBriefs[role];
+      const surfaces = [
+        t.publicBrief,
+        brief.roleStory,
+        brief.requirementNote,
+        brief.batnaSummary,
+        ...brief.objectives,
+        ...brief.reasonCards.map((c) => c.text),
+        ...brief.reasonCards.map((c) => c.relayed ?? ""),
+      ];
+      for (const text of surfaces) {
+        assert.doesNotMatch(
+          text,
+          /sensitive background|work(ing)? reason card|tier|disclosure decision/i,
+          `${taskId}/${role} names the mechanism`,
+        );
+      }
+    }
+  }
+});
+
+test("no brief promises a fallback score any more", () => {
+  // Ver.2.21 made no agreement worth zero. The four batna sentences were the
+  // last place the old 600 was stated to a participant.
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const brief = getTask(taskId).roleBriefs[role];
+      assert.doesNotMatch(brief.batnaSummary, /fallback score|600/i);
+      assert.match(brief.batnaSummary, /\b0 points\b/);
     }
   }
 });

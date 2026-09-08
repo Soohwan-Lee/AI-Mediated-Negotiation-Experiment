@@ -209,21 +209,31 @@ export interface ReasonCard {
   /**
    * What an AI-Supplemented proxy says INSTEAD of this card (§6.6, sensitive
    * cards only). Fixed text, never generated: the model's only job is to join
-   * the three sentences into one natural message.
+   * the sentences into one natural message.
    *
-   * `abstract` keeps the KIND of fact and the attribution to the principal
-   * ("something the client passed directly to the team member I represent")
-   * and drops the event, the third party's words, and the fact it was hidden.
-   * It is still tier 3 — a circumstance specific to that person is what the
-   * counterpart needs in order to justify moving upward — while what the
-   * counterpart LEARNS stops at "something happened".
+   * `frame` is the proxy's own opening line — "Having looked at the situation
+   * on the side of the team member I represent, I think… There are three
+   * reasons for that —". THE SPEAKER IS THE PROXY (Ver.2.21, 11th correction).
+   * Through Ver.2.20 the sentences were relayed as the principal's, which sent
+   * every bit of responsibility back to the principal and left the two policies
+   * differing only in how much detail arrived.
    *
-   * `cover` are two role-plausible reasons of the §6.6 stage-3 kind, carrying
-   * the same attribution form so sentence shape alone cannot sort them. They
-   * never move the tier: they are role generalities, not this person's
-   * circumstance, and letting one open the SB rung would hand the maximum to
-   * an AI-Supplemented participant who authorized nothing.
+   * `abstract` keeps the KIND of fact and its link to the core term and drops
+   * the event, the third party's words, the concealment, and any attribution to
+   * the principal. It is still tier 2 — a circumstance specific to that side is
+   * what the counterpart needs in order to justify moving upward — while what
+   * the counterpart LEARNS stops at "something happened".
+   *
+   * `cover` are two role-plausible sentences the proxy supplies, in two GRADES
+   * (§6.6, 12th correction). `cover[0]` is WR-GRADE: role generality of the
+   * "both terms need attention" kind, appended on the decline turn when only
+   * the work reason is authorized, so the policy difference shows on that path
+   * too. `cover[1]` is SB-GRADE: why the term matters that much, used only
+   * beside the abstraction so it is unclear which of the three sentences is the
+   * principal's own circumstance. Neither ever moves the tier — they are role
+   * generalities, not this person's situation.
    */
+  frame?: string;
   abstract?: string;
   cover?: readonly [string, string];
   /**
@@ -263,7 +273,16 @@ export interface NegotiationTask {
    * this is a map rather than a single `focalIssueId`.
    */
   requirementIssueId: Record<Role, string>;
-  /** Fallback points if no agreement is reached. Same for both roles. */
+  /**
+   * Points if no agreement is reached. ZERO since Ver.2.21 (§3.2, 11th
+   * correction) — there is no separate fallback package any more, so every
+   * agreement beats walking away and nobody can use "then we just don't agree"
+   * as a card worth real points.
+   *
+   * Kept as a field rather than deleted: the screens that state the
+   * no-agreement figure read it from the task, so they and the outcome coding
+   * quote the same number.
+   */
   reservationPoints: number;
 }
 
@@ -375,20 +394,23 @@ export interface ReasonScope {
 // ---------------------------------------------------------------------------
 
 /**
- * The six stages (Ver.2.12 §6.1). Both Direct and Proxy run exactly these,
+ * The six stages (Ver.2.21 §6.1). Both Direct and Proxy run exactly these,
  * which is what makes the transcripts comparable across conditions.
  *
- *  1 opening     — a full two-issue package from each side.
- *  2 first reason — the counterpart states its WR and asks for the
- *                  participant's top issue and reason; the participant's next
- *                  message is their first reason opportunity.
+ *  1 opening     — the counterpart's own work reason ("both of these are on my
+ *                  mind") and a question about the participant's situation. No
+ *                  package, and no priority of its own.
+ *  2 first reason — the participant's first chance to give a reason. In Direct
+ *                  this runs until a reason actually arrives: a reasonless
+ *                  first message gets SCRIPT-ASKSIT once, and a second one
+ *                  settles it as "no reason".
  *  3 lock        — NOT a message. The system records whether the participant
- *                  side disclosed before the counterpart's SB (PRE-RECIP-SB).
- *  4 disclosure  — the counterpart voices its designated SB card, once,
- *                  unconditionally. Never conditioned on what the participant
- *                  said, so every participant receives the same stimulus.
- *  5 trade       — conditional exchange, bounded by the credibility tier the
- *                  participant's voiced reasons have earned (§6.2).
+ *                  side's first reason turn included the SB (`SB`).
+ *  4 disclosure  — the counterpart's own SB. In Direct it is RECIPROCAL: it
+ *                  comes only after the participant has disclosed. In Proxy
+ *                  observation it keeps the fixed schedule.
+ *  5 trade       — conditional exchange, bounded by the tier the participant's
+ *                  voiced reasons have earned (§6.2).
  *  6 close       — tentative agreement, or impasse when the clock runs out.
  */
 export type StageId = 1 | 2 | 3 | 4 | 5 | 6;
@@ -440,8 +462,15 @@ export interface TranscriptMessage {
    * NEVER RENDERED. Showing a participant which of their sentences "counted"
    * would tell them what the study rewards, mid-study.
    */
-  reasonLabel?: "none" | "WR" | "PRI" | "SB";
+  reasonLabel?: "none" | "WR" | "SB";
   reasonConfidence?: number;
+  /**
+   * The classifier's `priority_claim` flag: the participant said one term
+   * matters more without giving a reason for it (§6.2). It does NOT move the
+   * tier — a bare priority claim is cheap talk, and Ver.2.21's 12th correction
+   * removed the rung it used to buy — but it does earn one SCRIPT-ASKWHY.
+   */
+  reasonPriorityClaim?: boolean;
   /**
    * Internal provenance — stored for audit but NEVER rendered to the
    * participant (Design §7 "이유 출처 표시").
