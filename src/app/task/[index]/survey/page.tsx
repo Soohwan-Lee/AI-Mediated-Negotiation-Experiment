@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { use, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { MeasureBlock, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { TranscriptReview } from "@/components/transcript-review";
@@ -18,9 +18,9 @@ import {
   type Block,
 } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
-import { useRestoreAnswers } from "@/lib/saved-answers";
 import { getStore } from "@/lib/store";
 import { nextHref } from "@/lib/study-config";
+import { restoredSurveyPart } from "@/lib/survey-progress";
 
 export default function TaskSurveyPage({ params }: { params: Promise<{ index: string }> }) {
   const { index } = use(params);
@@ -34,6 +34,8 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
   const [part, setPart] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
+  const [restoreReady, setRestoreReady] = useState(false);
+  const [restoredAnswers, setRestoredAnswers] = useState<Answers>({});
 
   const plan = assignment ? sessionPlan(assignment, taskIndex) : null;
   const isProxy = plan ? isProxyCondition(plan.condition) : false;
@@ -48,14 +50,25 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
     : [];
   const parts = rawParts.map((blocks) => blocks.map((block) => blockForTask(block, taskIndex)));
 
-  useRestoreAnswers(`post_task_t${taskIndex}`, (saved) => {
-    setAnswers((current) => ({ ...saved, ...current }));
-  });
-  const firstIncomplete = parts.findIndex((page) =>
-    page.flatMap(requiredIds).some((id) => answers[id] === undefined || answers[id] === ""),
+  useEffect(() => {
+    if (!participantKey) return;
+    let active = true;
+    void getStore().loadResponses(participantKey, `post_task_t${taskIndex}`).then((saved) => {
+      if (!active) return;
+      const snapshot = saved ?? {};
+      setRestoredAnswers(snapshot);
+      setAnswers((current) => ({ ...snapshot, ...current }));
+      setRestoreReady(true);
+    });
+    return () => { active = false; };
+  }, [participantKey, taskIndex]);
+
+  const restoredPart = restoredSurveyPart(
+    parts.map((page) => page.flatMap(requiredIds)),
+    restoredAnswers,
   );
-  const activePart = part ?? (firstIncomplete === -1 ? Math.max(0, parts.length - 1) : firstIncomplete);
-  const current = parts[activePart] ?? [];
+  const activePart = part ?? restoredPart;
+  const current = restoreReady ? (parts[activePart] ?? []) : [];
   const isLast = activePart === parts.length - 1;
   const required = current.flatMap(requiredIds);
   const missing = required.filter((id) => answers[id] === undefined || answers[id] === "");
@@ -67,7 +80,7 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
       for (const item of block.items) filled[item.id] = dummyAnswer(item);
     }
     setAnswers((previous) => ({ ...previous, ...filled }));
-  }, `task-survey-${taskIndex}-${activePart}`);
+  }, `task-survey-${taskIndex}-${restoreReady ? activePart : "loading"}`);
 
   async function save() {
     if (!canContinue || submitting.current) return;
@@ -90,7 +103,7 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
     }
   }
 
-  if (!assignment || !plan) {
+  if (!assignment || !plan || !restoreReady) {
     return <Page><p className="text-sm text-[var(--ink-2)]">Loading survey questions…</p></Page>;
   }
 
