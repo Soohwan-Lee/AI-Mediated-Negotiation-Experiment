@@ -131,12 +131,19 @@ export async function POST(request: Request) {
     );
   }
   const cards = brief.reasonCards;
-  const authorized = cards.filter((c) =>
-    body.mandate.authorizedReasonIds.includes(c.id),
-  );
-  const forbidden = cards.filter(
-    (c) => !body.mandate.authorizedReasonIds.includes(c.id),
-  );
+  /**
+   * THE WORK REASON IS ALWAYS SHARED, AND THE SERVER DECIDES THAT (Ver.2.21
+   * §8.7). The mandate screen shows it ticked and locked, so a well-behaved
+   * client always sends its id — but the rule may not depend on that. If a
+   * client ever omitted it, the card would fall into `forbidden` and
+   * `reason-leak.ts` would suppress the one reason the proxy is required to
+   * give, in the arm where the participant chose nothing sensitive. That
+   * failure is invisible: it looks like an ordinary helpful answer.
+   */
+  const alwaysAuthorized = (card: (typeof cards)[number]) =>
+    card.layer === "work" || body.mandate.authorizedReasonIds.includes(card.id);
+  const authorized = cards.filter(alwaysAuthorized);
+  const forbidden = cards.filter((c) => !alwaysAuthorized(c));
 
   try {
     const { text, stubbed } = await generateText({
