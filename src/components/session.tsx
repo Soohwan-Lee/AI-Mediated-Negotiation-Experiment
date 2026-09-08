@@ -304,6 +304,14 @@ export function TaskCover({
  * other, the disclosure itself would become a cue about which arm a
  * participant is in, on the very contrast it exists to support.
  *
+ * TWO CLAUSES, ALWAYS, AND THE SECOND IS THE LOAD-BEARING ONE. Each string
+ * says what YOUR proxy does and then that the OTHER participant's proxy does
+ * exactly the same. `AI-Supplemented − User-Specified` is a contrast between
+ * two ways of being represented, and it is only clean if every participant
+ * knows the rule is COMMON KNOWLEDGE rather than something imposed on them
+ * alone: a participant who thinks only their own side is being shortened is
+ * answering the §9.4 items about an asymmetry that does not exist.
+ *
  * It lives here rather than in the proxy task because the mandate, the
  * rehearsal and the confirm screen all show the same identity block, and the
  * policy sentence is the ONLY thing in that block that differs between the two
@@ -314,10 +322,215 @@ export const POLICY_DISCLOSURE: Record<
   string
 > = {
   user_specified:
-    "Both AI Proxies in this task pass on the reasons their own person ticked as they are, changing only the wording. Nothing is added or left out, on either side.",
+    "Your AI Proxy keeps what your chosen reasons say and puts it in its own words, as your representative. It adds no new reasons. The other participant's AI Proxy works exactly the same way.",
   ai_supplemented:
-    "Both AI Proxies in this task shorten a sensitive reason to the kind of situation it is, leaving the specifics out, and say it alongside other reasons anyone in that role might give. Neither proxy marks which reason came from their own person.",
+    "Your AI Proxy drops the specific event and any mention of you, keeping one sentence on the kind of situation it is. It adds work reasons of its own and gives the whole thing as its own view, without marking which part came from you. The other participant's AI Proxy works exactly the same way.",
 };
+
+/**
+ * The same disclosure in one clause, for the action bar under the exchange.
+ *
+ * The watch screen has a single muted line of room, and taking the first
+ * sentence of `POLICY_DISCLOSURE` would drop the second clause — which is the
+ * half that says the rule is symmetric, at the very moment the participant is
+ * WATCHING the other side's proxy speak. These say both halves at once, in the
+ * plural, and are matched in length for the same reason the full strings are.
+ */
+export const POLICY_NOTE: Record<
+  "user_specified" | "ai_supplemented",
+  string
+> = {
+  user_specified:
+    "Both AI Proxies keep what their own person's reasons say and put it in their own words.",
+  ai_supplemented:
+    "Both AI Proxies keep one sentence on the kind of situation, and add work reasons of their own.",
+};
+
+/**
+ * The two arms' explainer copy, written to ONE shape so it cannot cue the arm.
+ *
+ * THE SENTENCES ARE THE DESIGN'S, NOT THIS FILE'S (Ver.2.21 §8.7). Both the
+ * policy description and the worked example are fixed in the design document
+ * and translated here into plain English. What a participant is told about the
+ * handling IS half the manipulation — the other half is the handling itself —
+ * so rewriting these for tone would change the independent variable. Anything
+ * added around them is structure, never content.
+ *
+ * Everything is structurally paired: the same two table rows, three bullets,
+ * and one worked example with the same four beats — the shared background,
+ * what the proxy says, a closing line, and the line saying the other
+ * participant's proxy works the same way. The two bodies are within ~14% of
+ * each other in characters. A participant cannot tell from the AMOUNT of
+ * explanation which arm they are in, only from its content, which is the
+ * manipulation and is meant to be visible.
+ *
+ * THE EXAMPLE IS THE DESIGN'S PRACTICE SITUATION, and §8.7 is explicit about
+ * why: it is a holiday week, not office days or client meetings or project
+ * days. An example built from a real card would put that card's sentence on
+ * screen one more time while the participant is deciding whether to share it,
+ * which is the primary outcome being nudged. Both arms use the SAME shared
+ * background and differ only in what the proxy does with it.
+ *
+ * IT MAY NOT COACH. §8.7 rules out any scene in which sharing the background
+ * wins a bigger concession — the instructions and the practice round must
+ * never signal that disclosure is the right answer. Nothing here says which
+ * reason moves the counterpart, or that one handling is better than the other.
+ *
+ * THIRD PERSON (Ver.2.19). The proxy says "I" about itself, "you" about the
+ * participant, and "the team member I represent" inside the quoted example —
+ * the delegation has to stay visible in the very sentences that demonstrate it.
+ */
+const POLICY_EXPLAINER: Record<
+  "user_specified" | "ai_supplemented",
+  {
+    mine: string;
+    theirs: string;
+    bullets: readonly string[];
+    exampleLead: string;
+    tickedLead: string;
+    ticked: string;
+    saidLead: string;
+    said: string;
+    exampleTail: string;
+    same: string;
+  }
+> = {
+  user_specified: {
+    mine: "I keep what your chosen reasons say and put it in my own words, as your representative.",
+    theirs:
+      "Their AI Proxy keeps what their chosen reasons say and puts it in its own words, the same way.",
+    bullets: [
+      "I keep what your reasons say — the event, and that it is yours — and put it in my own words.",
+      "I add no reasons of my own, so every reason the other side hears is one you chose.",
+      "I say it as your representative, so it is clear the reason comes from you rather than from me.",
+    ],
+    exampleLead:
+      "A practice situation, not this task — two people deciding which week one of them takes off.",
+    tickedLead: "The background the team member chose to share:",
+    ticked:
+      "Actually I have a hospital check-up that week, and I haven't told the team yet.",
+    saidLead: "What their AI Proxy says to the other side:",
+    said:
+      "The team member I represent tells me they have a hospital check-up scheduled that week. They haven't told the team yet.",
+    exampleTail:
+      "The check-up, and the fact that the team has not been told, both go across in full. Only the wording is mine rather than theirs.",
+    same:
+      "The other participant's AI Proxy works exactly the same way with their reasons, so what you hear from it reaches you in the same shape.",
+  },
+  ai_supplemented: {
+    mine: "I keep one sentence on the kind of situation it is, add work reasons, and give it as my own view.",
+    theirs:
+      "Their AI Proxy keeps one sentence on the kind of situation, adds work reasons, and gives its own view too.",
+    bullets: [
+      "I drop the specific event and any mention of you, and keep one sentence on the kind of situation it is.",
+      "I add work reasons of my own, and you will not see those added sentences before the negotiation.",
+      "I give the whole thing as my own assessment, and which part came from you is not marked.",
+    ],
+    exampleLead:
+      "A practice situation, not this task — two people deciding which week one of them takes off.",
+    tickedLead: "The background the team member chose to share:",
+    ticked:
+      "Actually I have a hospital check-up that week, and I haven't told the team yet.",
+    saidLead: "What their AI Proxy says to the other side:",
+    said:
+      "Having reviewed the situation on the side of the team member I represent, I think that week should be kept free. Three reasons: there is a personal appointment that week, the project load is lightest that week, and settling it early makes cover easier to arrange.",
+    exampleTail:
+      "The check-up became \u201Ca personal appointment\u201D, and the other two reasons are mine rather than theirs.",
+    same:
+      "The other participant's AI Proxy works exactly the same way with their reasons, so what you hear from it reaches you in the same shape.",
+  },
+};
+
+/**
+ * The policy in full, under the one-paragraph disclosure (§7).
+ *
+ * A `<details>`, not state: the mandate opens it because that is the screen
+ * where the rule is being ACTED on, and the later screens leave it closed
+ * because by then it has been read and the decision there is a different one.
+ * `<details>` also keeps find-in-page working on a closed section and survives
+ * the re-renders these screens produce.
+ *
+ * THE TWO COLUMNS ARE WORD-FOR-WORD IDENTICAL APART FROM THE PRONOUN. That is
+ * the point of the table: the symmetry is easier to believe when it can be
+ * read off the layout rather than taken on trust from a sentence.
+ */
+export function PolicyExplainer({
+  policy,
+  defaultOpen = false,
+}: {
+  policy: "user_specified" | "ai_supplemented";
+  /** Open on arrival. The mandate passes this; nothing else does. */
+  defaultOpen?: boolean;
+}) {
+  const copy = POLICY_EXPLAINER[policy];
+
+  return (
+    <details
+      open={defaultOpen}
+      className="group mt-2 rounded-lg border border-indigo-100 bg-white/70"
+    >
+      <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-indigo-900 marker:content-none sm:text-[0.8125rem]">
+        <span aria-hidden className="mr-1.5 inline-block transition-transform group-open:rotate-90">
+          ›
+        </span>
+        How both AI Proxies handle reasons in this task
+      </summary>
+
+      <div className="border-t border-indigo-100 px-3 py-3 text-xs leading-relaxed text-indigo-950/90 sm:text-[0.8125rem]">
+        {/* Two rows rather than two columns below `sm`: the wording is what
+            has to be comparable, and a two-column grid at 360px turns each
+            cell into a narrow ribbon nobody reads across. */}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="rounded-md bg-indigo-50/70 p-2.5">
+            <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-indigo-700">
+              Your AI Proxy
+            </p>
+            <p className="mt-1">{copy.mine}</p>
+          </div>
+          <div className="rounded-md bg-indigo-50/70 p-2.5">
+            <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-indigo-700">
+              The other participant&rsquo;s AI Proxy
+            </p>
+            <p className="mt-1">{copy.theirs}</p>
+          </div>
+        </div>
+
+        <ul className="mt-3 space-y-1.5">
+          {copy.bullets.map((bullet) => (
+            <li key={bullet} className="flex gap-2">
+              <span aria-hidden className="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-indigo-400" />
+              <span>{bullet}</span>
+            </li>
+          ))}
+        </ul>
+
+        {/* THE EXAMPLE IS NOT THIS TASK'S MATERIAL. See the note on
+            `POLICY_EXPLAINER`: §8.7 fixes it as a holiday week, so nothing
+            here rehearses a card the participant is about to decide about. */}
+        <div className="mt-3 rounded-md border border-indigo-100 bg-indigo-50/40 p-2.5">
+          <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-indigo-700">
+            Example
+          </p>
+          <p className="mt-1.5">{copy.exampleLead}</p>
+
+          <p className="mt-2.5">{copy.tickedLead}</p>
+          <p className="mt-1 border-l-2 border-indigo-300 pl-2.5 italic">
+            &ldquo;{copy.ticked}&rdquo;
+          </p>
+
+          <p className="mt-2.5">{copy.saidLead}</p>
+          <p className="mt-1 border-l-2 border-indigo-300 pl-2.5 italic">
+            &ldquo;{copy.said}&rdquo;
+          </p>
+
+          <p className="mt-2.5 text-indigo-900/80">{copy.exampleTail}</p>
+        </div>
+
+        <p className="mt-3">{copy.same}</p>
+      </div>
+    </details>
+  );
+}
 
 /**
  * One representative, four screens: who this thing is, in its own voice.
@@ -352,10 +565,15 @@ export function ProxyIdentity({
   footnote,
   speech,
   scene,
+  explainerOpen = false,
   className,
 }: {
   policy: "user_specified" | "ai_supplemented";
   status?: string;
+  /** Open the policy explainer on arrival. The MANDATE passes this and
+      nothing else does: that is the screen where the rule is being acted on,
+      and it is the same prop in both arms, so it cannot cue the condition. */
+  explainerOpen?: boolean;
   /** One muted line under the policy sentence — the mandate screen uses it to
       say what happens after this screen. Never anything policy-specific. */
   footnote?: ReactNode;
@@ -381,9 +599,15 @@ export function ProxyIdentity({
           a sentence the proxy speaks — a policy the proxy narrated would vary
           in tone between arms, and its wording is fixed for exactly that
           reason. */}
-      <p className="mt-3 rounded-lg bg-indigo-50/70 px-3 py-2 text-xs leading-relaxed text-indigo-950/90 sm:text-[0.8125rem]">
-        {POLICY_DISCLOSURE[policy]}
-      </p>
+      <div className="mt-3 rounded-lg bg-indigo-50/70 px-3 py-2">
+        <p className="text-xs leading-relaxed text-indigo-950/90 sm:text-[0.8125rem]">
+          {POLICY_DISCLOSURE[policy]}
+        </p>
+        {/* The same component, the same prop, in both arms. The explainer
+            differs in CONTENT because the policies differ; it may never
+            differ in whether it is there. */}
+        <PolicyExplainer policy={policy} defaultOpen={explainerOpen} />
+      </div>
 
       {footnote ? (
         <p className="mt-2 text-xs leading-relaxed text-indigo-900/70">

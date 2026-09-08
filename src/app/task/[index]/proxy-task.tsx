@@ -51,7 +51,7 @@ import {
 import {
   BriefingPanel,
   IssueReasonGroups,
-  POLICY_DISCLOSURE,
+  POLICY_NOTE,
   ProxyIdentity,
   TaskCover,
   TaskHeader,
@@ -844,6 +844,12 @@ export function ProxyTask({
           <ProxyIdentity
             policy={policy}
             scene="briefing"
+            /* OPEN HERE AND NOWHERE ELSE. This is the screen where the
+               reasons are actually ticked, so the rule governing what happens
+               to them belongs in front of the participant rather than behind a
+               click. The later screens leave it closed: by then it has been
+               read, and the decision on those screens is a different one. */
+            explainerOpen
             status="Waiting for your instructions"
             speech={
               <>
@@ -1334,7 +1340,12 @@ export function ProxyTask({
         </Page>
 
         <ActionBar
-          note={`${POLICY_DISCLOSURE[policy].split(".")[0]}. You decide whether to accept what they reach.`}
+          /* `POLICY_NOTE`, not the first sentence of `POLICY_DISCLOSURE`:
+             the disclosure's second clause is the one saying the rule is the
+             SAME on both sides, and this is the screen where the participant
+             is watching the other side's proxy speak. Slicing at the first
+             period would drop exactly that half. */
+          note={`${POLICY_NOTE[policy]} You decide whether to accept what they reach.`}
         />
       </>
     );
