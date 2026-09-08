@@ -10,9 +10,15 @@
  * the within-participant contrast would be unrecoverable.
  *
  * THE ORDER OF THE BLOCKS IS FIXED by §9.4 and is not a layout choice: PERC,
- * then the counterpart, then process, then outcome, and only then the two AI
- * blocks. Asking about the other side's AI Proxy before asking about the other
- * side would tell the participant what to notice about them.
+ * then the counterpart, then process, then outcome, then CP, and only then the
+ * two AI blocks. Asking about the other side's AI Proxy before asking about
+ * the other side would tell the participant what to notice about them.
+ *
+ * CP (§9.4.4a) IS CONDITIONAL, and on the conversation rather than on the arm.
+ * It asks whether the other PERSON's messages read as a person's, so it needs
+ * a stretch where the participant talked to them: always in Direct, and in a
+ * Proxy task only when RATIFY was modify-or-refuse. The decision is read back
+ * from the `ratify_t{n}` responses block, written on the RATIFY screen itself.
  *
  * Item ids are suffixed `_t1` / `_t2`. The same construct measured after two
  * differently conditioned tasks is two observations, not one, and they cannot
@@ -42,7 +48,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { MeasureBlock, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { Card, Page } from "@/components/ui";
@@ -182,6 +188,14 @@ export default function TaskSurveyPage({
   // where it is resolved.
   const [part, setPart] = useState<number | null>(null);
   const [returning, setReturning] = useState(false);
+  /**
+   * The RATIFY decision this task ended on, read back from the store.
+   *
+   * Only a Proxy task has one, and it is what CP (§9.4.4a) turns on: modify or
+   * refuse means the participant went on to talk to the other person, approve
+   * means they never did. `null` while the read is in flight.
+   */
+  const [ratify, setRatify] = useState<string | null>(null);
 
   // Reachable again via Back from the bonus screen (BACK_STEPS), and every
   // answer is component state — without this the return trip lands on an empty
@@ -195,10 +209,47 @@ export default function TaskSurveyPage({
   const isProxy = plan ? isProxyCondition(plan.condition) : false;
   const task = plan ? getTask(plan.taskId) : null;
 
+  // RATIFY is written at the decision screen (`ratify.tsx`), where the
+  // decision is actually taken — never inferred from the final package, which
+  // would code a participant who asked for a change and then agreed the same
+  // package as an approver.
+  useEffect(() => {
+    if (!isProxy || !participantKey) return;
+    let cancelled = false;
+    void getStore()
+      .loadResponses(participantKey, `ratify_t${taskIndex}`)
+      .then((saved) => {
+        if (cancelled) return;
+        setRatify(String(saved?.[`RATIFY_t${taskIndex}`] ?? "unknown"));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isProxy, participantKey, taskIndex]);
+
+  /**
+   * Whether the participant actually talked to the other person in this task.
+   *
+   * Derived during render rather than held in state: Direct needs no read at
+   * all, and an effect that set it would cascade a second render on arrival
+   * for every participant in the arm that already knows the answer.
+   *
+   * An unreadable or missing Proxy decision falls back to NOT asking CP. The
+   * two items are a simulation check, not a confirmatory measure, so a missing
+   * value costs a validity data point — while asking an approver about a
+   * conversation they never had would put an unanswerable item into a
+   * confirmatory battery.
+   */
+  const hadConversation = !isProxy
+    ? true
+    : ratify === null
+      ? null
+      : ratify === "modified" || ratify === "rejected";
+
   const blocks: Block[] =
-    assignment && task && plan
+    assignment && task && plan && hadConversation !== null
       ? [
-          ...postTaskBlocks(isProxy),
+          ...postTaskBlocks(isProxy, hadConversation),
           // The open-ended set depends on the CONDITION, not just proxy-ness:
           // the AI-Supplemented's two extra questions (OE-P6/P7) are the only data
           // source that separates its policy's two elements (Design §9.4.7).
@@ -282,7 +333,7 @@ export default function TaskSurveyPage({
     router.push(nextHref(flowKey));
   }
 
-  if (!assignment || !task) {
+  if (!assignment || !task || hadConversation === null) {
     return (
       <Page>
         <div className="flex min-h-[40vh] items-center justify-center">

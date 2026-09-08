@@ -15,9 +15,17 @@
  *
  * The SUSPICION PROBE stays last, immediately before the debriefing. Asked any
  * earlier it plants the idea it is trying to detect; asked afterwards it
- * measures nothing at all. Its two items are the only place a participant is
- * invited to say they thought the counterpart was not a person, and §10 gate
- * 11 records every response for the sensitivity analysis.
+ * measures nothing at all. Ver.2.21 makes it a FUNNEL of four — an open "did
+ * anything strike you as odd", then who produced the behaviour, then what the
+ * study was about, and only last the direct question about whether the other
+ * participant was a real person. A "yes" volunteered at the wide end is much
+ * stronger evidence than a "yes" to a question that supplied the idea, and
+ * §10 gate 11 records every response for the sensitivity analysis.
+ *
+ * ELEVEN MEASURES IN ALL (§9.5), in this order: POWER1, POWER2, IMM1, IMM2,
+ * INCENT1, OE-F1, OE-F2, SUS0, SUS1, SUS2, SUS3. SUS3 renders as two controls
+ * — a Yes/No and an optional "from when, and what made you think so" — which
+ * is one measure asked in the two halves the design specifies.
  */
 
 import { useRouter } from "next/navigation";

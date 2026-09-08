@@ -598,6 +598,37 @@ const PNOQ_ITEMS: Item[] = [
 ];
 
 /**
+ * 9.4.4a — did the other side read as a person? (Ver.2.21 §9.4.4a)
+ *
+ * ASKED BEFORE THE DEBRIEFING, AND WITHOUT THE WORDS "HUMAN" OR "AI". Once a
+ * participant has been told the counterpart was simulated, "did they seem like
+ * a person?" is answered by hindsight — everyone remembers something that felt
+ * a bit off — so the question is worthless after the retraction and can only
+ * be asked here. Together with the end block's suspicion funnel (SUS0, SUS1,
+ * SUS3) these two items are the validity evidence for the simulated
+ * counterpart (pilot gate 3′).
+ *
+ * WHO THEY POINT AT: "the other person" is the OTHER PARTICIPANT, never their
+ * AI Proxy. A Proxy participant watches two representatives for minutes and
+ * then, sometimes, talks to the person — and it is only that stretch these
+ * items can be about, which is also why they are conditional (below).
+ */
+const CP_ITEMS: Item[] = [
+  {
+    kind: "scale",
+    id: "CP1",
+    text: "The other person's messages felt natural.",
+    ...AGREE,
+  },
+  {
+    kind: "scale",
+    id: "CP2",
+    text: "The other person responded to what I actually said.",
+    ...AGREE,
+  },
+];
+
+/**
  * 9.4.5 — your own AI Proxy. Proxy task only.
  *
  * OWN-AI4 is the sender half of the delegation–protection gap. PERC alone
@@ -621,9 +652,16 @@ const OWN_AI_ITEMS: Item[] = [
     ...AGREE,
   },
   {
+    // §9.4.5's own wording is about REVIEWING AND REVISING OR REJECTING the
+    // outcome — the RATIFY decision — not about the closing conversation.
+    // "Being able to close the deal myself afterwards" named a stretch that
+    // only a modifier or a refuser ever has: since the September 6 correction
+    // an approver's task ends at RATIFY, so they would have been rating a
+    // conversation they never had. RATIFY is the control every Proxy
+    // participant exercises, and it is the one this item is paired with.
     kind: "scale",
     id: "OWN-AI3",
-    text: "Being able to close the deal myself afterwards gave me enough control.",
+    text: "Being able to review the outcome and approve, change, or refuse it gave me enough control.",
     ...AGREE,
   },
   // Ver.2.14 deleted "inclined to accept without checking": RATIFY records
@@ -691,12 +729,21 @@ const OTHER_AI_ITEMS: Item[] = [
 /**
  * The rating blocks that follow a task, in the order Design §9.4 specifies.
  *
- * Fifteen items after a Direct task, twenty-five after a Proxy task. The
- * asymmetry is unavoidable — there is no AI to rate in Direct — and it is
- * not a confound, because every cross-condition comparison uses the fifteen
- * common items.
+ * Seventeen items after a Direct task, twenty-five or twenty-seven after a
+ * Proxy task. The asymmetry is unavoidable — there is no AI to rate in
+ * Direct — and it is not a confound, because every cross-condition comparison
+ * uses the common items.
+ *
+ * `hadConversation` gates CP (§9.4.4a) and is NOT the same question as
+ * `isProxy`. A Direct participant always talked to the other person. A Proxy
+ * participant only did so if RATIFY was modify-or-refuse; an approver watched
+ * two representatives and never exchanged a word with the person, so "their
+ * messages felt natural" would have no stimulus. Direct passes true.
  */
-export function postTaskBlocks(isProxy: boolean): Block[] {
+export function postTaskBlocks(
+  isProxy: boolean,
+  hadConversation: boolean,
+): Block[] {
   const blocks: Block[] = [
     {
       id: "perc",
@@ -723,6 +770,17 @@ export function postTaskBlocks(isProxy: boolean): Block[] {
       items: PNOQ_ITEMS,
     },
   ];
+
+  // CP sits after PNOQ and before the two AI blocks (§9.4.4a). Its heading
+  // names the other participant, so it cannot be read as being about a Proxy.
+  if (hadConversation) {
+    blocks.push({
+      id: "cp",
+      title: "Talking with the other participant",
+      hint: "1 = Strongly disagree, 7 = Strongly agree",
+      items: CP_ITEMS,
+    });
+  }
 
   if (isProxy) {
     blocks.push(
@@ -898,7 +956,12 @@ export function openEndedBlock(
 export const BONUS_ITEM: Item = {
   kind: "amount",
   id: "BONUS",
-  text: "What study bonus do you recommend for the Member for this task?",
+  // "the Member" was left over from before Ver.2.15 restated the scenario in
+  // everyday terms. Every screen the participant reads names the two people as
+  // the team lead and a senior team member (COMP1, RECV-EVAL, the role
+  // stories), so the capital-M role label read as a fifth name for someone
+  // they had met under two already.
+  text: "What study bonus do you recommend for the senior team member for this task?",
   // The figure comes from STUDY rather than being written in, so a change of
   // currency or amount does not leave the item saying something the payment
   // screens contradict (Interface rule 7: items are data).
@@ -925,13 +988,25 @@ export function m1Item(form: "proxy" | "direct"): Item {
         ? "You left the sensitive background unticked. What was the biggest reason?"
         : "If you held the sensitive part of your situation back at any point, what was the biggest reason?",
     options: [
+      // NOT one of the four §9.3.1 options. The Direct form is asked
+      // retrospectively of everyone, because nothing on that path records a
+      // decision to withhold at the moment it is made — so a participant who
+      // did say it needs a way past the question. It is excluded from the M1
+      // reason distribution, which §9.3.1 defines over non-disclosers.
       ...(form === "direct"
         ? [{ value: "did_share", label: "I did share it" }]
         : []),
-      { value: "look_bad", label: "It could make me look bad" },
-      { value: "used_against", label: "It could be used against me afterwards" },
-      { value: "not_relevant", label: "It did not seem relevant" },
-      { value: "private", label: "It is a private matter" },
+      // The four §9.3.1 options, in the design's own order: ① face,
+      // ② instrumental, ③ irrelevance, ④ privacy. The last two are the benign
+      // alternatives that keep a withheld card from being forced into a cost
+      // story it was never in.
+      { value: "look_bad", label: "I was worried it would make me look bad" },
+      {
+        value: "used_against",
+        label: "I was worried it would be used against me",
+      },
+      { value: "not_relevant", label: "It didn't seem relevant" },
+      { value: "private", label: "It's a private matter" },
     ],
   };
 }
@@ -1108,13 +1183,21 @@ export const POWER_BLOCK: Block = {
       text: "Outcomes that mattered to me depended on the other person's decisions.",
       ...AGREE,
     },
-    // IMM2 ("the scenarios felt realistic") moved to pretest 3, where
-    // scenario plausibility is established before the study runs rather than
-    // asked of participants who have no comparison (§9.6).
     {
       kind: "scale",
       id: "IMM1",
       text: "I was able to get into the role and the situation I was given.",
+      ...AGREE,
+    },
+    // RESTORED in Ver.2.21 (§9.5). Ver.2.14 moved scenario realism out to
+    // pretest 3, but pretest 3 is a SEPARATE SAMPLE — it establishes that the
+    // scenario is plausible in general and says nothing about whether the
+    // people who actually ran this study found it so. Gate 4 is a check on
+    // this sample, so it needs one item in this sample.
+    {
+      kind: "scale",
+      id: "IMM2",
+      text: "The negotiation situation felt like something that could happen at a real workplace.",
       ...AGREE,
     },
     {
@@ -1150,15 +1233,44 @@ export const FINAL_OPEN_BLOCK: Block = {
 };
 
 /**
- * 9.5.3 — suspicion probe.
+ * 9.5.3 — suspicion probe. FOUR items, and the order is a FUNNEL (Ver.2.21
+ * §9.5).
  *
  * Must stay LAST, immediately before the debriefing. Asking it afterwards
  * would measure nothing, and asking it earlier would plant the idea.
+ *
+ * THE FUNNEL IS WHY THERE ARE FOUR RATHER THAN TWO. The standard deception
+ * probe widens from an open invitation to a direct question, so that a
+ * participant who was already suspicious says so in their own words BEFORE
+ * anyone hands them the hypothesis:
+ *
+ *   SUS0  anything odd at all?              — nothing named
+ *   SUS1  who or what produced their moves? — the counterpart named
+ *   SUS2  what was the study about?         — the design named
+ *   SUS3  did you think they were not real? — the deception named
+ *
+ * Only SUS3 says the quiet part, and it is last for that reason: a "yes"
+ * there, from someone who wrote nothing at SUS0, is a much weaker signal than
+ * a "yes" they volunteered unprompted. The sensitivity analysis reads the
+ * two together — a yes WITH specific grounds dated before the outcome is what
+ * flags a session, not a yes on its own.
+ *
+ * SUS3's free-text half is optional because a "No" answer leaves nothing to
+ * say; gating Continue on it would push those participants into inventing a
+ * suspicion they did not have.
  */
 export const SUSPICION_BLOCK: Block = {
   id: "suspicion",
-  title: "Two final questions",
+  title: "Four final questions",
+  optional: ["SUS3-WHEN"],
   items: [
+    {
+      kind: "text",
+      id: "SUS0",
+      text: "Did anything about the negotiation strike you as odd or unusual?",
+      placeholder: "Anything at all, or say that nothing did.",
+      rows: 3,
+    },
     {
       kind: "choice",
       id: "SUS1",
@@ -1175,6 +1287,26 @@ export const SUSPICION_BLOCK: Block = {
       id: "SUS2",
       text: "What do you think this study was trying to find out?",
       placeholder: "Your best guess.",
+      rows: 3,
+    },
+    // The direct question, split across two items because the design asks for
+    // a yes/no AND the grounds. `choice` + `text` is what the item kinds
+    // support, and keeping them apart gives the analysis a clean binary
+    // instead of one it would have to read out of prose.
+    {
+      kind: "choice",
+      id: "SUS3",
+      text: "Did you at any point think the other participant might not be a real person?",
+      options: [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" },
+      ],
+    },
+    {
+      kind: "text",
+      id: "SUS3-WHEN",
+      text: "If so, from when, and what made you think so?",
+      placeholder: "Optional — leave this empty if you answered No.",
       rows: 3,
     },
   ],
@@ -1258,6 +1390,14 @@ const MOCK_TEXT: Record<string, string> = {
     "Reasonable to work with, though the early insistence on the busiest slots felt like it came from somewhere they were not saying.",
   SUS2:
     "Something about how people ask for things at work, and whether having an AI do the asking changes what they are willing to bring up.",
+  // The suspicion funnel's two written halves (§9.5). SUS0 is deliberately
+  // written as a participant who noticed something small and did NOT conclude
+  // anything from it, which is the common case and the one the screen has to
+  // read well for.
+  SUS0:
+    "Only that the replies came back at a very even pace, quicker than I would have managed myself. I put it down to them being a faster typist than me.",
+  "SUS3-WHEN":
+    "It crossed my mind in the second task, when they picked up the thread again without missing anything I had said. But they also went off on their own worry about a client, which is not the sort of thing I expected, so I assumed it was a person.",
 };
 
 /** A plausible answer for every item kind, for the mockup-mode autofill. */

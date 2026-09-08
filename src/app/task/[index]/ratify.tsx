@@ -37,6 +37,7 @@ import { ActionBar } from "@/components/study-chrome";
 import { Callout, Card, CardTitle, Cue, Page, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
+import { getStore } from "@/lib/store";
 import type { NegotiationTask, Package, Role } from "@/lib/types";
 import { ProxyTranscriptPanel } from "./shared";
 
@@ -89,7 +90,7 @@ export function RatifyPhase({
   proxyTranscript: DisplayMessage[];
   onDecide: (choice: RatifyChoice) => void;
 }) {
-  const { logEvent } = useParticipant();
+  const { logEvent, participantKey } = useParticipant();
   const [choice, setChoice] = useState<RatifyChoice | null>(null);
   /** Two-step on refusing — the one choice here that leaves nothing standing. */
   const [confirmReject, setConfirmReject] = useState(false);
@@ -237,7 +238,7 @@ export function RatifyPhase({
       </Page>
 
       <ActionBar
-        onClick={() => {
+        onClick={async () => {
           // RATIFY is recorded HERE, where the decision is actually taken.
           // Inferring it afterwards from what the closing conversation
           // produced would code a participant who asked for a change and then
@@ -249,6 +250,20 @@ export function RatifyPhase({
             { ratify: decided, hadPackage: Boolean(tentative) },
             { sessionIndex: taskIndex },
           );
+          // ALSO PERSISTED AS A RESPONSE, because a later screen has to READ
+          // it. CP (§9.4.4a) is asked only of Proxy participants who actually
+          // talked to the other person, which is exactly modify-or-refuse —
+          // and the post-task survey is a different route with no access to
+          // this component's state. The event log is append-only telemetry,
+          // not something a page can query, so the decision is written the
+          // same way M1 is written at the mandate.
+          if (participantKey) {
+            await getStore().saveResponses(
+              participantKey,
+              `ratify_t${taskIndex}`,
+              { [`RATIFY_t${taskIndex}`]: decided },
+            );
+          }
           onDecide(decided);
         }}
         label={

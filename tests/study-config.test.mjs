@@ -43,8 +43,27 @@ test("STAGE_MINUTES sums to TOTAL_MINUTES", () => {
     STAGE_MINUTES.instruction +
     STAGE_MINUTES.practice +
     2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward) +
-    STAGE_MINUTES.wrapUp;
+    STAGE_MINUTES.wrapUp +
+    STAGE_MINUTES.debrief;
   assert.equal(sum, TOTAL_MINUTES);
+});
+
+test("every flow step the participant sits through carries minutes", () => {
+  // The debriefing was a FLOW step with no entry in STAGE_MINUTES until
+  // Ver.2.21, so the budget understated the study by two minutes and the
+  // advertised figure inherited the error. It is read, not skipped: whether a
+  // participant may keep their data is decided on it.
+  assert.ok(STAGE_MINUTES.debrief > 0);
+});
+
+test("the budget sits inside Design Ver.2.21 §7's own estimate", () => {
+  // §7 gives 49-53 minutes. The code's own sum may exceed the doc's upper
+  // bound slightly - it counts screens that exist - but a large gap means one
+  // of the two is describing a different study.
+  assert.ok(
+    TOTAL_MINUTES >= 49 && TOTAL_MINUTES <= 56,
+    `${TOTAL_MINUTES} min is outside the §7 estimate's neighbourhood`,
+  );
 });
 
 test("base + bonus equals the advertised total", () => {

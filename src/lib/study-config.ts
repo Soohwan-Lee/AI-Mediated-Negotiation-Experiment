@@ -8,12 +8,17 @@
 export const STUDY = {
   title: "Workplace Negotiation and AI-Mediated Communication",
   shortTitle: "Workplace Negotiation Study",
-  /** Conservative screen budget; pilot timing must confirm the design's 45–50 minute target. */
-  estimatedMinutes: 61,
+  /**
+   * Ver.2.21 §7 budgets 49–53 minutes; `TOTAL_MINUTES` sums the screens that
+   * exist to 54, and the advertised figure may round that DOWN by at most one.
+   * Pilot timing decides the final number; the lever if it runs long is the
+   * reply-delay range, never this figure.
+   */
+  estimatedMinutes: 53,
   currencySymbol: "£",
   /** Design §2.1 and §5: £7.50 base, £1 per task, fixed full payout. */
   compensation: "7.50",
-  hourlyEquivalent: "9.34",
+  hourlyEquivalent: "10.75",
   bonusAmount: "2.00",
   bonusPerTask: "1.00",
   totalPaid: "9.50",
@@ -49,34 +54,58 @@ export const STUDY = {
  */
 export const STAGE_MINUTES = {
   consent: 2,
-  background: 4,
+  /**
+   * BG 11 + COV 7. Ver.2.21 §7① budgets four minutes for the consent form and
+   * this survey together, so the two split it.
+   */
+  background: 2,
+  /** §7②: the role briefing, COMP 4 and the practice round come to seven. */
   instruction: 4,
-  practice: 4,
-  /** Briefing through review. Approval now skips the optional closing.
-   * Budget 13 minutes per task until pilot timing is available. */
-  task: 13,
+  practice: 3,
+  /**
+   * Briefing through review: §7③ (RISK, the wish screen, the Proxy arm's
+   * reason check and M1) plus §7④ (Direct ten minutes of chat; Proxy about
+   * five minutes of watching, RATIFY, and a three-minute closing where one
+   * happens).
+   *
+   * 10, down from Ver.2.20's 13. Ver.2.21 deleted the misread branch and lets
+   * a valid acceptance end the task at once, so the ten-minute chat cap is now
+   * the realistic ceiling rather than a floor to pad.
+   */
+  task: 10,
   /**
    * The rating blocks and open-ended after ONE task.
    *
-   * A Proxy task's battery is about twenty-five rating items and seven
-   * required written answers. At a brisk five seconds per rating and
-   * forty-five per written answer that is seven minutes, and four was the
-   * old figure — which quietly understated the study by six minutes across
-   * the two tasks and therefore understated the pay owed for them.
+   * A Proxy task's battery is about twenty-seven rating items — Ver.2.21 adds
+   * CP1-2 — and seven required written answers. At a brisk five seconds per
+   * rating and forty-five per written answer that is seven minutes. §7⑤
+   * budgets seven for this AND the reward screen together; the code keeps them
+   * apart at 7 + 2, because the estimate must never promise less than the
+   * screens take.
    */
   taskSurvey: 7,
   /**
    * The post-negotiation decision, then REMARK and ATTR.
    *
-   * 2, up one from Ver.2.13. The decision itself is one control (a slider for
-   * the Leader, three ratings and an optional note for the Member), and
-   * Ver.2.14 added a screen after it: the counterpart's fixed parting comment
-   * plus ATTR1, ATTR2 (Proxy only) and one written answer (§6.8, §9.4.9).
-   * That screen has to come after every confirmatory measure, so it cannot be
-   * folded into the battery above.
+   * The decision itself is one control (a slider for the Leader, three ratings
+   * and an optional note for the Member), and REMARK adds the counterpart's
+   * fixed parting comment plus ATTR1, ATTR2 (Proxy only) and one written
+   * answer (§6.8, §9.4.9). That screen has to come after every confirmatory
+   * measure, so it cannot be folded into the battery above.
    */
   reward: 2,
+  /** §7⑦: POWER 2, IMM 2, INCENT 1, OE-F 2 and the four-item SUS funnel. */
   wrapUp: 3,
+  /**
+   * §7⑧: the debriefing page, which retracts the four deceptions and asks the
+   * participant to re-confirm consent.
+   *
+   * It is a FLOW STEP that carried no minutes until Ver.2.21, so the budget
+   * quietly understated the study by two minutes and the advertised figure
+   * inherited the error. It is read, not skipped: whether a participant may
+   * keep their data is decided on it.
+   */
+  debrief: 2,
 } as const;
 
 /**
@@ -93,7 +122,8 @@ export const TOTAL_MINUTES =
   STAGE_MINUTES.instruction +
   STAGE_MINUTES.practice +
   2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward) +
-  STAGE_MINUTES.wrapUp;
+  STAGE_MINUTES.wrapUp +
+  STAGE_MINUTES.debrief;
 
 /**
  * The advertised figure may round the budget DOWN by at most a minute, and
