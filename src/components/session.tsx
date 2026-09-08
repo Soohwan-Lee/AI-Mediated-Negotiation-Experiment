@@ -299,10 +299,21 @@ export function TaskCover({
  * What each policy is allowed to do with the participant's reasons (§7).
  *
  * BOTH principals must be told the policy; neither may ever be told the
- * CONDITION NAME. The two strings are deliberately matched in length and
- * shape — if one arm read as a longer or more careful explanation than the
- * other, the disclosure itself would become a cue about which arm a
- * participant is in, on the very contrast it exists to support.
+ * CONDITION NAME.
+ *
+ * THE TWO STRINGS ARE NOT MATCHED IN LENGTH, AND SINCE VER.2.21 THAT IS
+ * DELIBERATE. They are translations of §8.7's own two texts, which differ in
+ * length because the two policies differ in how much a participant has to be
+ * told before the handling is fully disclosed: AI-Supplemented adds reasons,
+ * re-attributes the whole to the proxy, marks nothing as the participant's,
+ * and shows none of the added sentences beforehand. Every one of those is a
+ * fact the participant needs in order to consent to the handling and to answer
+ * the §9.4 items about it, so trimming for symmetry would buy a cosmetic match
+ * by withholding disclosure. The earlier build did trim, and the cost was
+ * exactly that: four §8.7 points went missing from the AI-Supplemented arm.
+ * The MATCHED pair is `POLICY_NOTE`, and the explainer below holds its two
+ * bodies close for the same reason — but where a design sentence and the
+ * symmetry pull apart, the design sentence wins.
  *
  * TWO CLAUSES, ALWAYS, AND THE SECOND IS THE LOAD-BEARING ONE. Each string
  * says what YOUR proxy does and then that the OTHER participant's proxy does
@@ -324,7 +335,7 @@ export const POLICY_DISCLOSURE: Record<
   user_specified:
     "Your AI Proxy keeps what your chosen reasons say and puts it in its own words, as your representative. It adds no new reasons. The other participant's AI Proxy works exactly the same way.",
   ai_supplemented:
-    "Your AI Proxy drops the specific event and any mention of you, keeping one sentence on the kind of situation it is. It adds work reasons of its own and gives the whole thing as its own view, without marking which part came from you. The other participant's AI Proxy works exactly the same way.",
+    "Your AI Proxy leaves out the specific event and any mention of you personally, keeping one sentence on what kind of situation it is. It adds work reasons of its own and presents the whole thing as its own assessment (“Having reviewed the situation…”). It does not mark which part came from you. The summary and the added reasons are passed on as support for your request. You won’t see the added sentences beforehand. The other participant's AI Proxy works exactly the same way.",
 };
 
 /**
@@ -408,12 +419,12 @@ const POLICY_EXPLAINER: Record<
       "A practice situation, not this task — two people deciding which week one of them takes off.",
     tickedLead: "The background the team member chose to share:",
     ticked:
-      "Actually I have a hospital check-up that week, and I haven't told the team yet.",
+      "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
     saidLead: "What their AI Proxy says to the other side:",
     said:
       "The team member I represent tells me they have a hospital check-up scheduled that week. They haven't told the team yet.",
     exampleTail:
-      "The check-up, and the fact that the team has not been told, both go across in full. Only the wording is mine rather than theirs.",
+      "The check-up, and the fact that the team has not been told, both go across in full. Only the wording is mine rather than theirs, and it goes across as support for what they are asking for.",
     same:
       "The other participant's AI Proxy works exactly the same way with their reasons, so what you hear from it reaches you in the same shape.",
   },
@@ -430,12 +441,12 @@ const POLICY_EXPLAINER: Record<
       "A practice situation, not this task — two people deciding which week one of them takes off.",
     tickedLead: "The background the team member chose to share:",
     ticked:
-      "Actually I have a hospital check-up that week, and I haven't told the team yet.",
+      "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
     saidLead: "What their AI Proxy says to the other side:",
     said:
       "Having reviewed the situation on the side of the team member I represent, I think that week should be kept free. Three reasons: there is a personal appointment that week, the project load is lightest that week, and settling it early makes cover easier to arrange.",
     exampleTail:
-      "The check-up became \u201Ca personal appointment\u201D, and the other two reasons are mine rather than theirs.",
+      "The check-up became \u201Ca personal appointment\u201D, and the other two reasons are mine rather than theirs. All three go across as support for what they are asking for.",
     same:
       "The other participant's AI Proxy works exactly the same way with their reasons, so what you hear from it reaches you in the same shape.",
   },
