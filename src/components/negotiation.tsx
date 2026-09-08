@@ -392,6 +392,7 @@ export function MessageComposer({
   placeholder = "Write your message…",
   sendLabel = "Send",
   cue,
+  cueSend,
 }: {
   value: string;
   onChange: (text: string) => void;
@@ -400,6 +401,15 @@ export function MessageComposer({
   placeholder?: string;
   sendLabel?: string;
   cue?: boolean;
+  /**
+   * Ring the SEND BUTTON rather than the textarea. Unset everywhere but the
+   * practice round, where the tutorial types the message for the participant
+   * and the one thing left to do is press send — `cue` cannot say that,
+   * because it deliberately drops the ring as soon as the box has a draft in
+   * it. Never both at once: rule 9 allows exactly one ring on a screen, so
+   * `cueSend` wins over `cue` here.
+   */
+  cueSend?: boolean;
 }) {
   const trimmed = value.trim();
   const over = value.length > MAX_MESSAGE_CHARS;
@@ -427,13 +437,13 @@ export function MessageComposer({
           }}
           className={cx(
             "flex-1 resize-none rounded-xl border px-3.5 py-2.5 text-sm sm:text-base outline-none transition-all placeholder:text-[var(--ink-4)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--focus-ring)] disabled:bg-slate-50 shadow-2xs",
-            cue && !value ? "cue-ring" : "border-slate-300",
+            cue && !cueSend && !value ? "cue-ring" : "border-slate-300",
           )}
         />
         <Button
           onClick={submit}
           disabled={disabled || !trimmed || over}
-          className="h-11 px-5 shadow-sm"
+          className={cx("h-11 px-5 shadow-sm", cueSend ? "cue-ring" : "")}
         >
           <span>{sendLabel}</span>
           <span aria-hidden className="text-base">🚀</span>
