@@ -255,13 +255,31 @@ function extractOutputText(payload: ResponsesPayload): string {
 }
 
 // ---------------------------------------------------------------------------
-// P5 — the reason classifier (Design Ver.2.20 §6.2a)
+// P5 — the reason classifier (Design Ver.2.21 §6.2a)
 // ---------------------------------------------------------------------------
 
-/** The four labels P5 may return, and the confidence it reports with them. */
+/**
+ * What P5 returns.
+ *
+ * THREE LABELS SINCE VER.2.21. The `PRI` label went with the rung it used to
+ * buy (12th correction): a bare priority claim is a `WR` carrying
+ * `priorityClaim`, and that flag's only effect is one SCRIPT-ASKWHY.
+ *
+ * `stance` and `counterTerms` are separate from the label on purpose. "yes,
+ * let's do that" is an acceptance with no reason in it, so reading agreement
+ * as a label would let it move the ladder. The terms come back as the model's
+ * words and are resolved against the task's own option labels by the route —
+ * never trusted as ids.
+ */
 export interface ReasonClassification {
-  label: "none" | "WR" | "PRI" | "SB";
+  label: "none" | "WR" | "SB";
+  /** They said one term matters more, without a reason for it (§6.2). */
+  priorityClaim: boolean;
   confidence: number;
+  /** About the LATEST message only. */
+  stance: "accept" | "counter" | "none";
+  /** Issue label -> option label, as the model read them. Route resolves. */
+  counterTerms: Record<string, string>;
   /** True when no model was configured and the fallback was used. */
   stubbed: boolean;
 }
@@ -269,10 +287,35 @@ export interface ReasonClassification {
 const CLASSIFIER_SCHEMA = {
   type: "object",
   properties: {
-    label: { type: "string", enum: ["none", "WR", "PRI", "SB"] },
+    label: { type: "string", enum: ["none", "WR", "SB"] },
+    priority_claim: { type: "boolean" },
     confidence: { type: "number" },
+    stance: { type: "string", enum: ["accept", "counter", "none"] },
+    // AN ARRAY OF PAIRS, NOT A MAP. Structured output runs with strict: true,
+    // which requires every object to declare its properties and forbid the
+    // rest — so a free-form `{issueLabel: optionLabel}` map is not expressible.
+    // The route maps these words onto option ids and drops anything that does
+    // not match one of the task's own labels.
+    counter_terms: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["issue", "option"],
+        properties: {
+          issue: { type: "string" },
+          option: { type: "string" },
+        },
+      },
+    },
   },
-  required: ["label", "confidence"],
+  required: [
+    "label",
+    "priority_claim",
+    "confidence",
+    "stance",
+    "counter_terms",
+  ],
   additionalProperties: false,
 } as const;
 
@@ -301,7 +344,14 @@ export async function classifyReason(args: {
     // throws, and transient provider failures also throw through the route so
     // the participant's staged turn can be retried without changing its tier.
     assertNotLiveWithoutModel();
-    return { label: "none", confidence: 0, stubbed: true };
+    return {
+      label: "none",
+      priorityClaim: false,
+      confidence: 0,
+      stance: "none",
+      counterTerms: {},
+      stubbed: true,
+    };
   }
 
   const response = await postToModel(apiKey, {
@@ -338,7 +388,32 @@ export async function classifyReason(args: {
 
   const parsed = JSON.parse(text) as {
     label: ReasonClassification["label"];
+    priority_claim?: boolean;
     confidence: number;
+    stance?: ReasonClassification["stance"];
+    counter_terms?: Array<{ issue?: string; option?: string }>;
   };
-  return { ...parsed, stubbed: false };
+
+  // NORMALISED HERE, NOT AT THE CALL SITES. Two routes and the simulation read
+  // this, and a missing `stance` treated as `undefined` in one of them and as
+  // `"none"` in another is exactly the kind of split that made the two ends of
+  // `voicedTier` disagree in Ver.2.20. The label itself is NOT defaulted: an
+  // unrecognised label is a failed classification, and the route must be able
+  // to hold the turn rather than record a guess.
+  const counterTerms: Record<string, string> = {};
+  for (const pair of parsed.counter_terms ?? []) {
+    if (typeof pair?.issue === "string" && typeof pair?.option === "string") {
+      counterTerms[pair.issue] = pair.option;
+    }
+  }
+
+  return {
+    label: parsed.label,
+    priorityClaim: parsed.priority_claim === true,
+    confidence:
+      typeof parsed.confidence === "number" ? parsed.confidence : 0,
+    stance: parsed.stance ?? "none",
+    counterTerms,
+    stubbed: false,
+  };
 }

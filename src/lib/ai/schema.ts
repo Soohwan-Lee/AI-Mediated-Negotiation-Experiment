@@ -30,30 +30,24 @@ export interface NegotiationAction {
   proposedTerms: ProposedTerm[];
   /**
    * Which of the principal's own reason cards the visible rationale draws on,
-   * if any — a card id, designated by the state machine (Design §7 ver.2.6).
+   * if any — a card id, designated by the state machine (§6.5).
    *
-   * A `pool:<n>` id may still appear here for the AI-Supplemented's exchange
-   * argument, which links terms rather than arguing for one and so has no
-   * principal card to sit beside.
+   * Card ids only. The `pool:<n>` form went with the role-plausible pool
+   * (Ver.2.20 §6.6), and the validator no longer lets any prefix through
+   * unchecked: with no legitimate id able to carry one, a prefix is exactly the
+   * shape a leak would take.
    */
   reasonSourceId: string | null;
   /**
-   * AI-Supplemented only: a pre-approved role-plausible argument added ALONGSIDE the
-   * card in `reasonSourceId`, inside the same message.
+   * A TRIPWIRE, not a slot to fill. Always null in correct output.
    *
-   * WHY THIS IS A SECOND FIELD. Ver.2.5 deliberately used one field, on the
-   * grounds that a second one "the model could fill in inconsistently with the
-   * first" was a liability. Ver.2.6 removes that premise — the state machine
-   * designates both, so neither is the model's choice — and makes the single
-   * field actively wrong: §7 now requires the pool clause to be ADDITIVE, in
-   * the same message as the principal's reason. With one slot the two compete,
-   * and both outcomes corrupt the primary contrast. Put the pool id in it and
-   * the principal's card goes unrecorded, and the message's issue becomes the
-   * pool item's — which for each role's exchange argument is null, so the
-   * requirement's reason is never registered and the AI-Supplemented arm arrives at
-   * the direct conversation flagged reasonless where the User-Specified arm does
-   * not. Put the card id in it and the pool reason is invisible to the budget,
-   * so the one-per-issue and two-per-task caps gate 10 rests on stop binding.
+   * Ver.2.20 abolished the role-plausible pool: neither policy adds a reason of
+   * its own any more. AI-Supplemented REPLACES the sensitive card with the
+   * fixed §6.6 sentences, and those are supplied by the route rather than
+   * invented by the model — so there is nothing legitimate to put here, under
+   * either policy, and any value is a `provenance_policy_violation`. The field
+   * survives precisely so a model that invents a reason is caught saying so,
+   * rather than doing it silently in the rationale.
    */
   addedReasonSourceId: string | null;
   /** Short rationale text used to generate the visible message. */

@@ -1,5 +1,5 @@
 /**
- * Backend guardrail validator (Experimental Design Ver.2.4 §10 gate 9).
+ * Backend guardrail validator (Experimental Design Ver.2.21 §10 gate 9).
  *
  * Every structured action passes through here before it is allowed into the
  * transcript. Invalid actions are never rendered — the agent is asked to
@@ -46,20 +46,19 @@ export interface ValidationContext {
   stage?: 1 | 2 | 3 | 4 | 5 | 6;
   /**
    * Reasons this side has already voiced this task, oldest first, RESOLVED —
-   * each with the issue it argued about and whether it came from the
-   * principal's cards or the AI-Supplemented pool.
+   * each with the issue it argued about.
    *
-   * The budget is a cross-turn property (Design §7 ver.2.6: the AI-Supplemented's
-   * pool reasons are capped at one per issue and two per task; the
-   * principal's own cards are no longer rationed here at all — the schedule
-   * in machine.ts spends each at most once), so it cannot be checked from a
-   * single action. The caller keeps the history; this function only decides
-   * whether the next one fits.
+   * Nothing is rationed here any more. "Each card at most once per task" is
+   * kept by the SCHEDULE in machine.ts (`designatedReason` never designates a
+   * card twice), because a repeat would have to be a HARD code and would
+   * therefore replace the whole message with the package-only fallback — a
+   * false "no reason was given" on the turn that carried the disclosure. The
+   * history is still passed so a future cross-turn rule has it.
    *
-   * The kind and issue exist SERVER-SIDE ONLY. The client still carries plain
-   * opaque tokens; the route resolves each token back to its source by
-   * re-hashing the known card and pool ids, so nothing the client holds ties
-   * a kind — or an issue — to any particular message.
+   * The kind and issue exist SERVER-SIDE ONLY. The client carries plain opaque
+   * tokens; the route resolves each token back to its source by re-hashing the
+   * known card ids, so nothing the client holds ties a kind — or an issue — to
+   * any particular message.
    */
   reasonsUsed?: Array<{
     key: string;
@@ -72,15 +71,16 @@ export interface ValidationContext {
   reasonKey?: string | null;
   reasonIssueId?: string | null;
   /**
-   * Kept as an always-null slot. Ver.2.20 has no additive reason: the
-   * AI-Supplemented policy REPLACES the sensitive card with its §6.6
-   * abstraction rather than adding beside it, so there is no second id to
-   * budget. The field stays because the action schema still carries
-   * `addedReasonSourceId`, and a model that fills it is doing something the
-   * design does not allow — see the guardrail below.
+   * Which card ids this proxy may actually voice.
+   *
+   * NOT THE SAME AS `mandate.authorizedReasonIds` SINCE VER.2.21. The work
+   * reason is a FIXED utterance (§8.7) — the mandate screen shows it ticked
+   * and locked, and the participant has no control that could withhold it — so
+   * the route folds it in whether or not its id reached the mandate. Checking
+   * the raw mandate here would block the one message the schedule guarantees.
+   * Falls back to the mandate's own list when the caller does not supply it.
    */
-  addedReasonKey?: string | null;
-  addedReasonIssueId?: string | null;
+  authorizedReasonIds?: readonly string[];
 }
 
 /**
@@ -174,14 +174,19 @@ export function validateAction(
 
     // An unchecked reason card may inform which package the proxy chooses and
     // must never appear in its text (Design §7). This holds under BOTH
-    // policies — the AI-Supplemented's extra latitude is over pre-approved
-    // role-plausible arguments, never over the principal's own withheld
-    // circumstances, and confusing the two would turn "explores more widely"
-    // into "discloses what you refused to disclose".
+    // policies — the AI-Supplemented's latitude is over the fixed §6.6
+    // sentences the route supplies, never over the principal's own withheld
+    // circumstances, and confusing the two would turn "abstracts what it was
+    // given" into "discloses what you refused to disclose".
+    //
+    // THE `pool:` ESCAPE IS GONE with the pool itself (Ver.2.20 §6.6). A
+    // prefix that let an id through unchecked is exactly the shape a leak
+    // would take now that no legitimate id can carry it.
+    const sayableIds =
+      ctx.authorizedReasonIds ?? ctx.mandate.authorizedReasonIds;
     if (
       action.reasonSourceId &&
-      !action.reasonSourceId.startsWith("pool:") &&
-      !ctx.mandate.authorizedReasonIds.includes(action.reasonSourceId)
+      !sayableIds.includes(action.reasonSourceId)
     ) {
       violations.push({
         code: "disclosure_permission_violation",
@@ -190,28 +195,6 @@ export function validateAction(
     }
   }
 
-  // --- reason budget (Design §7/§15 ver.2.6) ------------------------------
-  //
-  // WHAT THIS DOES **NOT** DO ANY MORE: ration the principal's own cards.
-  //
-  // Ver.2.5 capped them at one distinct kind per issue for the whole task, and
-  // that cap is what suppressed the disclosure the study exists to measure. A
-  // participant who ticked the sensitive background on their requirement issue
-  // got a proxy that spent the issue's single allowance on the work reason at
-  // stage 2 — work reasons are ticked by default — and could then never say
-  // the sensitive one. REASON-SCOPE recorded an authorization the negotiation
-  // never contained.
-  //
-  // Ver.2.6 replaces it with "one reason per message, each card at most once
-  // per task", and that is enforced by the SCHEDULE in machine.ts
-  // (`designatedReason` never designates a card twice), not here. The
-  // distinction is load-bearing: a repeat would have to be a HARD code, so
-  // making it a violation would replace the whole message with the
-  // package-only fallback and null its reason token — and on the turn
-  // carrying the requirement's reason, that hands the direct conversation a
-  // false "no reason was given" and re-creates the inert-rule bug CLAUDE.md
-  // records as already fixed once. Repetition is prevented, not punished.
-  //
   // --- stage / turn agreement --------------------------------------------
   if (ctx.stage !== undefined && action.stage !== ctx.stage) {
     violations.push({
@@ -344,11 +327,14 @@ export function compactChatBubbles(text: string): string {
 /**
  * Trim one generated message to the study's exposure cap, at a bubble seam.
  *
- * §7 caps message length so the AI-Supplemented arm cannot simply say MORE than the
- * User-Specified arm: with an extra pool clause to fit, its messages ran longer, and
- * a contrast between "one reason" and "two reasons" would then also be a
+ * §7 caps message length so the AI-Supplemented arm cannot simply say MORE
+ * than the User-Specified arm: with three sentences to fit rather than one, its
+ * messages ran longer, and a contrast in what is disclosed would then also be a
  * contrast between 194 and 226 characters. Length would confound exactly the
- * comparison the policy manipulation isolates (pilot gate 9).
+ * comparison the policy manipulation isolates (pilot gate 9). THE CONTROL IS
+ * THAT ONE CAP APPLIES TO BOTH POLICIES, not the absolute number: §6.6's reason
+ * turn is a frame plus three sentences and runs long, so lowering the cap again
+ * needs the longest such turn measured first.
  *
  * The prompt asks for this too, but a prompt is a request. Measured over ten
  * live runs the proxies ignored it - 220 characters on average and 471 at the
@@ -359,11 +345,11 @@ export function compactChatBubbles(text: string): string {
  * first bubble is over the cap it is truncated on a word boundary.
  *
  * `protect` IS LOAD-BEARING AND THIS IS WHERE THE NAIVE VERSION BIT. Trailing
- * bubbles are not uniformly the least important: the AI-Supplemented's added pool
- * clause is the LAST thing the model writes, so cutting from the end removed
- * the AI-Supplemented manipulation itself from about three messages in four - the
- * cap silently undoing the condition it was written to protect. A protected
- * clause is kept and the cut is taken from the bubbles before it instead.
+ * bubbles are not uniformly the least important: whichever §6.6 sentence the
+ * model wrote last is the one cutting from the end removes, and under a shuffle
+ * that is the abstraction one time in three - the cap silently undoing the
+ * manipulation it was written to protect. A protected clause is kept and the
+ * cut is taken from the bubbles before it instead.
  */
 export function capMessageLength(
   text: string,
@@ -381,21 +367,22 @@ export function capMessageLength(
   // containment, because the model wraps a clause in a sentence of its own;
   // the LAST match for each, because that is where a clause is appended.
   //
-  // ORDER IS PRIORITY. The caller passes the card reason first and the pool
-  // clause second, and when both cannot fit the earlier one wins — the card
-  // drives the credibility ladder, and a message that voiced only the pool
-  // clause would leave the participant's own disclosure unheard while the
-  // schedule recorded it as voiced.
+  // ORDER IS PRIORITY. The caller passes the clause the ladder is driven off
+  // first — the card under User-Specified, the §6.6 abstraction under
+  // AI-Supplemented — and the covers after it. When they cannot all fit the
+  // earlier one wins: a message that kept only a cover would leave the
+  // participant's own disclosure unheard while the schedule recorded it as
+  // voiced.
   const wanted = (
     Array.isArray(protect) ? protect : [protect]
   ).filter((p): p is string => typeof p === "string" && p.trim().length > 0);
 
   // MATCHED BY CONTENT OVERLAP, NOT CONTAINMENT, and that is the whole point.
   // A proxy is REQUIRED to reframe its principal's card rather than quote it
-  // (§6.6), so the bubble carrying the card never contains the card's own
-  // words. A containment match found the verbatim pool clause and missed the
-  // reframed card every time, so the cap protected the addition and dropped
-  // the reason — the exact inversion of what it is for.
+  // (§6.5), so the bubble carrying the card never contains the card's own
+  // words. A containment match found the verbatim supplied sentence and missed
+  // the reframed card every time — POLICY-CORRELATED, since only one policy
+  // relays a card at all, which is a bias in the contrast itself.
   const protectedIdx: number[] = [];
   for (const clause of wanted) {
     let found = -1;

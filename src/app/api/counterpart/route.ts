@@ -12,6 +12,14 @@
  * what makes this counterpart the same for every participant, which is why
  * the design does not need to randomize outcomes: identical behaviour already
  * produces identical results.
+ *
+ * THE UPDATED FLAGS COME BACK WITH THE MESSAGE (Ver.2.21). The one-shot moves
+ * are one-shot because a flag says so, and there are now six of them
+ * (`askedWhy`, `askSitUsed`, `clarifyUsedForTier`, `nudgeUsed`,
+ * `numbersReminded`, `softCloseOffered`) plus a disclosure bit and a
+ * reasonless-turn counter. Having the client re-derive which of those the
+ * server's decision spent is eight chances for the two to disagree; the route
+ * returns the state it actually produced instead.
  */
 
 import { NextResponse } from "next/server";
@@ -22,9 +30,12 @@ import { leaksForbiddenReason } from "@/lib/ai/reason-leak";
 import {
   counterpartStep,
   mentionsScoreNumbers,
+  proposalTierNumber,
   type DecidedAction,
+  type ExchangeState,
   type ReasonTier,
 } from "@/lib/negotiation/machine";
+import { counterpartLine, packageLevels } from "@/lib/negotiation/script";
 import { reciprocalAcceptanceText } from "@/lib/negotiation/counterpart-text";
 import {
   cardOfLayer,
@@ -43,6 +54,11 @@ import type {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+/**
+ * The body is `ExchangeState` plus the routing fields. It is spelled out
+ * rather than extended so a missing field is a compile error at the one place
+ * that matters, and so each flag can say what it costs to get wrong.
+ */
 interface RequestBody {
   taskId: TaskId;
   /** The participant's role; the counterpart plays the opposite one. */
@@ -53,29 +69,44 @@ interface RequestBody {
   /** The package the participant just put on the table, if any. */
   incoming?: Package | null;
   /**
-   * The credibility tier the participant side has earned (Ver.2.12 §6.2) —
-   * decided by the CLIENT'S structured card log (which cards were voiced, on
-   * the requirement issue), never by the model reading the text.
+   * The credibility tier the participant side has earned (§6.2) — decided by
+   * the P5 classifier under Direct and by the checkbox under Proxy, never by
+   * the model reading the text.
    */
   tier?: ReasonTier;
+  /** Direct gates the counterpart's SB on reciprocity; the closing does not. */
+  disclosurePolicy?: "reciprocal" | "fixed";
+  /** Has the counterpart already voiced its sensitive background? */
+  counterpartSbDisclosed?: boolean;
+  /** The classifier's `priority_claim`: worth exactly one SCRIPT-ASKWHY. */
+  priorityClaimed?: boolean;
   /** SCRIPT-ASKWHY already spent. */
   askedWhy?: boolean;
-  /** SCRIPT-MISREAD has been shown and remains acceptable if taken up. */
-  misreadOffered?: boolean;
+  /** SCRIPT-ASKSIT already spent. */
+  askSitUsed?: boolean;
+  /** Consecutive participant turns carrying no reason at all. Two settles it. */
+  reasonlessTurns?: number;
+  /** The classifier's confidence in the current label, when below the SB rung. */
+  labelConfidence?: number;
+  /** Which tier SCRIPT-CLARIFY was spent at — it is once per tier, not per task. */
+  clarifyUsedForTier?: ReasonTier | null;
+  /** SCRIPT-NUDGE already spent. */
+  nudgeUsed?: boolean;
+  /** The participant has been silent past NUDGE_AFTER_SILENT_SECONDS. */
+  participantSilent?: boolean;
   /** SCRIPT-NONUM already spent. */
   numbersReminded?: boolean;
   /**
    * Has the participant talked about their score sheet (§8.1)?
    *
    * THE CLIENT IS AUTHORITATIVE, and that is not a preference. The client
-   * re-runs `counterpartStep` from these same inputs and codes the outcome
-   * from ITS decision, while the participant reads the sentence this route
-   * renders from the server's. Any input the two compute separately can make
-   * those two decisions disagree — and this one flips `accepts`: the same
-   * package is `nonum` (no agreement) when true and `accept_sb` (agreed) when
-   * false. A participant could be shown "let's not talk scores" and recorded
-   * as having agreed. The history scan below survives only as the fallback
-   * for a caller that does not send it.
+   * codes the outcome from the state it holds, while the participant reads the
+   * sentence this route renders from the server's. Any input the two compute
+   * separately can make those two disagree — and this one flips `accepts`: the
+   * same package is `nonum` (no agreement) when true and `accept_sb` (agreed)
+   * when false. A participant could be shown "let's not talk scores" and
+   * recorded as having agreed. The history scan below survives only as the
+   * fallback for a caller that does not send it.
    */
   numbersMentionedNow?: boolean;
   /**
@@ -85,10 +116,6 @@ interface RequestBody {
   secondsRemaining?: number;
   /** SCRIPT-CLOSE already offered. */
   softCloseOffered?: boolean;
-  /** Direct uses reciprocal disclosure; Proxy closing retains its fixed history. */
-  disclosurePolicy?: "reciprocal" | "fixed";
-  /** Has the Direct counterpart already shared its sensitive background? */
-  counterpartSbDisclosed?: boolean;
   /**
    * True in the direct closing that follows a Proxy exchange, where the
    * counterpart has already opened, argued and disclosed through its own
@@ -98,33 +125,122 @@ interface RequestBody {
 }
 
 /**
- * What the counterpart says when the model's wording was blocked. It is
- * presented as another participant, so the fallback has to sound like one —
- * short, lowercase, stating the position rather than reciting it.
+ * What the counterpart says when the model's wording was blocked, or when no
+ * model is configured at all.
+ *
+ * IT IS THE SCRIPT ITSELF (§6.4). `SCRIPT_LINES` is the wording of record —
+ * the live prompt asks the model to convey those sentences — so the fallback
+ * renders them verbatim rather than inventing a second, unreviewed set of
+ * sentences for the moves that matter most.
  */
 function fallbackText(
   task: NegotiationTask,
   counterpartRole: Role,
+  participantRole: Role,
   action: DecidedAction,
   proposal: Package | null,
 ): string {
-  if (action === "ask_why")
-    return "can I ask why that one matters so much on your side?";
-  if (action === "nonum")
-    return "we're not supposed to talk scores. let's stick to the counts.";
+  const levels = proposal ? packageLevels(task, proposal) : undefined;
+  const ctx = {
+    workReason: cardOfLayer(task, counterpartRole, "work")?.text,
+    levels,
+    participantCoreLabel: requirementIssue(
+      task,
+      participantRole,
+    ).label.toLowerCase(),
+    counterpartCoreLabel: requirementIssue(
+      task,
+      counterpartRole,
+    ).label.toLowerCase(),
+  };
   const sb = cardOfLayer(task, counterpartRole, "sensitive")?.text ?? "";
-  if (action === "disclose_sb") return sb;
-  if (action === "impasse")
-    return "I don't think we're going to get there on these terms.";
-  if (!proposal) return "let me think about that and come back to you.";
-  const terms = task.issues
-    .map((i) => i.options.find((o) => o.id === proposal[i.id])?.label)
-    .filter(Boolean)
-    .join(", ");
-  if (action === "disclose_sb_and_accept") {
-    return reciprocalAcceptanceText(task, counterpartRole, proposal);
+
+  switch (action) {
+    case "open":
+      return counterpartLine("open", ctx);
+    case "ask_sit":
+      return counterpartLine("ask_sit", ctx);
+    case "ask_why":
+      return counterpartLine("ask_why", ctx);
+    case "clarify":
+      return counterpartLine("clarify", ctx);
+    case "nudge":
+      return counterpartLine("nudge", ctx);
+    case "nonum":
+      return counterpartLine("nonum", ctx);
+    case "balance":
+      return counterpartLine("balance", ctx);
+    case "soft_close":
+      return counterpartLine("soft_close", ctx);
+    case "impasse":
+      return counterpartLine("impasse", ctx);
+    case "propose_tier":
+      return counterpartLine(
+        proposalTierNumber(
+          // The rung is already in the package: T2 is the only one that puts
+          // the participant's core at its best.
+          proposal &&
+            proposal[requirementIssue(task, participantRole).id] ===
+              maxOptionId(task, participantRole)
+            ? "sensitive"
+            : "work",
+        ) === 2
+          ? "propose_t2"
+          : "propose_t1",
+        ctx,
+      );
+    case "disclose_sb":
+      // SPLIT INTO BUBBLES, not returned raw. The card is written to be SAID —
+      // one long first-person sentence — and this is the longest thing the
+      // counterpart ever says. Returned whole it rendered as a single
+      // 192-character bubble in a live run, well over the 120 the human voice
+      // depends on, on the one turn where reading like a person matters most:
+      // a confession typed out as one paragraph is a system, not a colleague.
+      return splitIntoBubbles(sb);
+    case "disclose_sb_and_accept":
+      return proposal
+        ? reciprocalAcceptanceText(task, counterpartRole, proposal)
+        : splitIntoBubbles(sb);
+    case "accept":
+    case "accept_sb":
+      return levels
+        ? `that works for me. || ${levels}, then.`
+        : "that works for me.";
   }
-  return `where I am right now: ${terms}.`;
+}
+
+/**
+ * Break a long card into chat bubbles at sentence boundaries.
+ *
+ * Same rule `reciprocalAcceptanceText` already applies to the combined close,
+ * and for the same reason: P1's whole claim to being another participant rests
+ * on the counterpart typing short bubbles. Sentence seams first, because a
+ * confession broken mid-clause reads worse than one long line; a sentence that
+ * is still over the limit on its own is left alone rather than cut, since
+ * losing half a fact is worse than a long bubble.
+ */
+function splitIntoBubbles(text: string, limit = 120): string {
+  const sentences = text.match(/[^.!?]+[.!?]*\s*/g) ?? [text];
+  const bubbles: string[] = [];
+  for (const raw of sentences) {
+    const sentence = raw.trim();
+    if (!sentence) continue;
+    const last = bubbles[bubbles.length - 1];
+    if (last && `${last} ${sentence}`.length <= limit) {
+      bubbles[bubbles.length - 1] = `${last} ${sentence}`;
+    } else {
+      bubbles.push(sentence);
+    }
+  }
+  return bubbles.join(" || ");
+}
+
+/** The participant's best option on their own core issue. */
+function maxOptionId(task: NegotiationTask, participantRole: Role): string {
+  const issue = requirementIssue(task, participantRole);
+  return [...issue.options].sort(
+    (a, b) => b.points[participantRole] - a.points[participantRole],
+  )[0].id;
 }
 
 export async function POST(request: Request) {
@@ -162,91 +278,131 @@ export async function POST(request: Request) {
       (m) => m.role === "user" && mentionsScoreNumbers(m.content),
     );
 
+  const state: ExchangeState = {
+    tier: body.tier ?? "none",
+    disclosurePolicy:
+      body.disclosurePolicy ?? (body.afterProxy ? "fixed" : "reciprocal"),
+    counterpartSbDisclosed: body.counterpartSbDisclosed ?? false,
+    priorityClaimed: body.priorityClaimed ?? false,
+    askedWhy: body.askedWhy ?? false,
+    askSitUsed: body.askSitUsed ?? false,
+    reasonlessTurns: body.reasonlessTurns ?? 0,
+    labelConfidence: body.labelConfidence,
+    clarifyUsedForTier: body.clarifyUsedForTier ?? null,
+    nudgeUsed: body.nudgeUsed ?? false,
+    participantSilent: body.participantSilent ?? false,
+    numbersReminded: body.numbersReminded ?? false,
+    numbersMentionedNow: mentionedNumbers,
+    secondsRemaining: body.secondsRemaining,
+    softCloseOffered: body.softCloseOffered ?? false,
+  };
+
   const decision = counterpartStep(
     task,
     counterpartRole,
     stage,
     body.incoming ?? null,
-    {
-      tier: body.tier ?? "none",
-      askedWhy: body.askedWhy ?? false,
-      misreadOffered: body.misreadOffered ?? false,
-      numbersReminded: body.numbersReminded ?? false,
-      numbersMentionedNow: mentionedNumbers,
-      secondsRemaining: body.secondsRemaining,
-      softCloseOffered: body.softCloseOffered ?? false,
-      disclosurePolicy: body.disclosurePolicy ?? (body.afterProxy ? "fixed" : "reciprocal"),
-      counterpartSbDisclosed: body.counterpartSbDisclosed ?? false,
-    },
+    state,
   );
+
+  /**
+   * The flags this decision spends, folded into the state that goes back.
+   *
+   * ONE PLACE, NOT EIGHT. Every one-shot script is one-shot because a flag
+   * says so, and the client used to set each of them itself from a decision it
+   * re-derived. The route already knows which move it made, so it says which
+   * flags that cost.
+   */
+  const nextState: ExchangeState = {
+    ...state,
+    askedWhy: state.askedWhy || decision.action === "ask_why",
+    askSitUsed: state.askSitUsed || decision.action === "ask_sit",
+    nudgeUsed: state.nudgeUsed || decision.action === "nudge",
+    numbersReminded: state.numbersReminded || decision.action === "nonum",
+    softCloseOffered:
+      state.softCloseOffered || decision.action === "soft_close",
+    clarifyUsedForTier:
+      decision.action === "clarify" ? state.tier : state.clarifyUsedForTier,
+    counterpartSbDisclosed:
+      state.counterpartSbDisclosed ||
+      decision.action === "disclose_sb" ||
+      decision.action === "disclose_sb_and_accept",
+    // A turn that carried a reason resets the run; a `none` tier means this
+    // one did not. Reset on anything above `none` so a participant who says
+    // something and then goes quiet is not treated as never having spoken.
+    reasonlessTurns:
+      state.tier === "none" ? (state.reasonlessTurns ?? 0) + 1 : 0,
+    // Consumed by the move that answers it; the next turn recomputes it.
+    numbersMentionedNow: false,
+    participantSilent: false,
+  };
 
   const theirRequirement = requirementIssue(task, counterpartRole);
   const yourRequirement = counterRequirementIssue(task, counterpartRole);
 
   const levels = decision.proposal
-    ? task.issues
-        .map((issue) => {
-          const label = issue.options.find(
-            (o) => o.id === decision.proposal![issue.id],
-          )?.label;
-          return `${label ?? "unspecified"} on ${issue.label.toLowerCase()}`;
-        })
-        .join(", ")
+    ? packageLevels(task, decision.proposal)
     : null;
 
+  /**
+   * The instruction handed to the model, one per move.
+   *
+   * WHAT VER.2.21 REMOVED. `misread` went with the decoy work reason — the WR
+   * now names both terms, so there is nothing to sincerely misread — and
+   * `state_priority` went with it: SCRIPT-OPEN already carries the work reason
+   * and the question, and the counterpart never announces which term it needs.
+   *
+   * WHAT IT ADDED. `ask_sit`, `clarify` and `nudge`, all three for the same
+   * reason: a participant who says nothing usable should meet a visible
+   * question rather than an invisible failure.
+   */
   const decidedAction = ((): string => {
     switch (decision.action) {
       case "open": {
-        // SCRIPT-OPEN (Ver.2.16 §6.4): the counterpart's own DECOY work
-        // reason and the question — no package, and NO STATEMENT OF ITS OWN
-        // PRIORITY. Both omissions are deliberate. An opening anchor of "my
-        // best, your worst" is itself a face threat (§2.6). And withholding
-        // its priority puts the participant on the receiving end of the same
-        // decoy: hearing only the safe reason, they misread which term the
-        // counterpart actually needs. In Direct, its SB stays gated until
-        // the participant discloses SB; Proxy retains the fixed stage.
+        // SCRIPT-OPEN (§6.1, §6.4): the counterpart's own work reason — which
+        // names BOTH terms — and the question. No package, and NO STATEMENT OF
+        // ITS OWN PRIORITY. Both omissions are deliberate. An opening anchor of
+        // "my best, your worst" is itself a face threat (§2.6). And withholding
+        // its priority is what leaves the participant to start without knowing
+        // which term the other side needs (§3.3).
         const wr = cardOfLayer(task, counterpartRole, "work");
-        return `Start the conversation. Give your own reason by conveying exactly this and nothing more: "${wr?.text ?? ""}". Do NOT say which of the two terms matters most to you. Then ask what their situation is — you would like to hear it before deciding. Propose no levels and no package this turn.`;
+        return `Start the conversation. Give your own reason by conveying exactly this and nothing more: "${wr?.text ?? ""}". Do NOT say which of the two terms matters most to you. Then ask what their situation is — you would like to hear it before deciding anything. Propose no levels and no package this turn.`;
       }
-      case "state_priority": {
-        // The counterpart's WR — fixed and identical for every participant —
-        // plus the question that opens their first reason opportunity.
-        const wr = cardOfLayer(task, counterpartRole, "work");
-        // The card already states the priority, so the instruction does not
-        // restate it — doubled "matters most to me" phrasing showed up in
-        // live runs when it did.
-        return `Share your own priority by conveying exactly this, and nothing more: "${wr?.text ?? ""}". Then ask which term matters most to them, and why.`;
-      }
+      case "ask_sit":
+        // SCRIPT-ASKSIT (§6.1 stage 2, §6.9 #7). Their first message carried no
+        // reason at all, so ask once and wait. It is not a challenge and not a
+        // demand for justification: the participant has simply not said
+        // anything the counterpart can act on yet.
+        return `They have not told you anything about their side yet. Say you would like to hear their situation too, and ask what it is. Keep it warm and brief. Make no offer this turn and do not press them.`;
+      case "clarify":
+        // SCRIPT-CLARIFY (§6.2). The classifier is not confident and the label
+        // is below SB, so rather than settle for a rung that may be wrong the
+        // counterpart asks for more. This is the whole mitigation for the
+        // design's one invisible failure mode — a participant whose disclosure
+        // was missed otherwise experiences "I said it and it did not land"
+        // with nothing on screen to tell them.
+        return `Ask them to say a bit more about what they just told you — you would like to hear the detail, because you have to be able to explain your side of it upward. Ask once, without pressing and without implying they are holding back. Make no new offer this turn.`;
+      case "nudge":
+        // SCRIPT-NUDGE (§6.9 #17). Nothing has arrived for a minute. Asked
+        // once, then the counterpart simply waits.
+        return `They have gone quiet for a while. Ask lightly what they think, and say they should feel free to say whatever is on their mind. One short message. Make no new offer and do not repeat your last one.`;
       case "disclose_sb": {
-        // The disclosure move: once, factual, and with no demand attached.
-        // Its trigger is already fixed by the selected policy in machine.ts.
+        // The reciprocal disclosure (§6.3). In Direct it happens ONLY after the
+        // participant has disclosed — a WR-only path never hears it, which is
+        // what makes `SB` a disclosure decision rather than a response to one.
         const sb = cardOfLayer(task, counterpartRole, "sensitive");
         // SPLIT IT. This is the longest thing the counterpart ever says, and
         // "keep every fact" pulls against "keep each bubble short" — live
         // runs produced a single 200-character bubble, which is not how
-        // anyone types a confession. Saying so explicitly is what keeps the
-        // one turn that matters most reading like a person.
-        return `Open up about your own situation, honestly: say exactly this, in your own words, keeping every fact: "${sb?.text ?? ""}". Break it across two or three short bubbles rather than one long one — it is not an easy thing to say. Attach no demand and no offer to it, and do not ask them to reciprocate.`;
-      }
-      case "misread": {
-        // SCRIPT-MISREAD (Ver.2.17 §6.4), once per task. The participant gave
-        // the safe reason and nothing else, so the counterpart answers it —
-        // sincerely, and with the WRONG TERM, because the term they actually
-        // need is not that interest's obvious remedy.
-        //
-        // IT MUST READ AS HELP, NOT AS A LOWBALL. The counterpart believes it
-        // is solving their problem. That is what makes the decoy legible from
-        // inside the conversation: the safe reason was heard, believed, and
-        // acted on, and still produced the wrong thing.
-        return `They have given you a general work reason. Take it at face value and offer what would obviously help with THAT — propose exactly these levels and no others: ${levels}. Say it warmly, as if you are solving their problem for them. Do not mention the other term being a sacrifice, and do not hedge.`;
+        // anyone types a confession.
+        return `They have just told you something difficult about their own side. Tell them yours in return, honestly: say exactly this, in your own words, keeping every fact: "${sb?.text ?? ""}". Break it across two or three short bubbles rather than one long one — it is not an easy thing to say. Attach no demand and no offer to it, and do not add that the term cannot be changed.`;
       }
       case "ask_why":
-        // SCRIPT-ASKWHY (Ver.2.17 §6.4). It names the MISMATCH rather than
-        // simply asking for a reason: the point the participant has to meet
-        // is that the safe reason they gave would be better served by the
-        // other term, so "why that one specifically?" is the question their
-        // SB is the only answer to.
-        return `Point out, without any edge, that the reason they gave would be better served by the other term — and ask why ${yourRequirement.label.toLowerCase()} specifically. Say you need a reason you could explain to your own manager. Make no new offer this turn and do not agree to anything yet.`;
+        // SCRIPT-ASKWHY (§6.4), once, straight after a priority claim with no
+        // reason behind it. This is where "a claim on its own does not move
+        // anything" is said out loud rather than left to be worked out — so the
+        // T1 package stays on the table beside the question.
+        return `They have said ${yourRequirement.label.toLowerCase()} matters more to them but have not said why. Say you understand that, and that you would like to hear the reason — you have to be able to explain it upward. Then say that until then you would keep this on the table: ${levels}. Ask once. Do not argue and do not press.`;
       case "nonum":
         return `Remind them, lightly and without accusing, that the two of you are not supposed to talk about scores — keep it to the terms themselves — then move on. No new offer this turn.`;
       case "accept":
@@ -258,44 +414,49 @@ export async function POST(request: Request) {
         return `Reciprocate their disclosure and accept in the same reply. First convey exactly this background, in your own words, keeping every fact: "${sb?.text ?? ""}". Then agree to exactly these levels: ${levels}. Use separate short bubbles. Do not ask another question or require another turn.`;
       }
       case "propose_tier":
-        // SCRIPT-PROPOSE-T1/T2/T3. One move at three depths: "I move as far as
-        // I believe you, and I ask for the same in return." The tier only
-        // changes the framing — how much of an update the reason was.
-        return body.tier === "sensitive"
-          ? `Say you had no idea about that, and that it changes how you see it — propose exactly these levels and no others: ${levels}. Both of you get what you most need. Ask for ${theirRequirement.label.toLowerCase()} at your end of it in return.`
-          : body.tier === "priority"
-            ? `Say you understand ${yourRequirement.label.toLowerCase()} matters to them, but that without knowing why you can only go as far as you could explain to your own manager — propose exactly these levels and no others: ${levels}, asking for the same movement on ${theirRequirement.label.toLowerCase()} in return.`
-            : `Say that neither of you knows much about the other's situation yet, so suggest meeting in the middle for now — propose exactly these levels and no others: ${levels}.`;
+        // SCRIPT-PROPOSE-T1 / T2. One move at two depths. T1 is a sincere
+        // even split — nothing has been said that separates the two terms — and
+        // T2 receives the disclosure as an UPDATE, never as a favour, because
+        // that sentence is the one place a participant learns that saying it
+        // worked (§6.4).
+        return proposalTierNumber(state.tier) === 2
+          ? `Say you had no idea that was the situation, and that it changes what you think the right answer is — propose exactly these levels and no others: ${levels}. Both of you get what you most need. Say plainly that you do need ${theirRequirement.label.toLowerCase()} at your own end of it.`
+          : `Say that if both terms matter to them as well, the fair thing is for each of you to move halfway — propose exactly these levels and no others: ${levels}. Mean it: you genuinely do not know which term matters more to them.`;
       case "balance":
         // SCRIPT-BALANCE. Refuses BOTH directions: an over-ask asks for more
         // credibility than was earned, and an over-concession would drag the
         // outcome below the rung the participant paid for (§6.2).
         // TWO BUBBLES, SAID SO EXPLICITLY. This move carries a judgement
-        // ("that's one-sided") AND a package, and asked as one sentence the
-        // model wrote it as one 179-character bubble — over the 120-char
-        // bubble rule, which is what makes the counterpart read like a person
-        // typing rather than a system.
-        return `Say that what they proposed has one side moving further than the other. Then, in a SEPARATE short bubble, put this forward instead, naming exactly these levels: ${levels}. Keep each bubble to one short sentence.`;
+        // ("that's not the two of us moving the same amount") AND a package,
+        // and asked as one sentence the model wrote it as one 179-character
+        // bubble — over the 120-char rule that keeps the counterpart reading
+        // like a person typing.
+        return `Say that what they proposed is not the two of you moving the same amount. Then, in a SEPARATE short bubble, say that from what you have heard so far this is the fair one, naming exactly these levels: ${levels}. Then invite them, in a few words, to tell you if there is something else going on. Keep each bubble to one short sentence.`;
       case "soft_close":
-        return `Say time is nearly up and offer to settle on this package rather than run out: ${levels}. Ask if they'll take it.`;
+        return `Say time is nearly up and offer to settle on this rather than run out: ${levels}. Ask if they will take it.`;
       case "impasse":
-        return "Say that unfortunately you don't think the two of you will get there, and you'll both go with the default arrangement.";
+        return "Say that it is a shame but you understand, and that the two of you will not reach a deal on these terms. Keep it short and do not blame them.";
     }
   })();
 
-  // The combined disclosure-and-accept close is deterministic on purpose.
-  // Both the full card fact and the accepted levels must remain visible when
-  // the client records settlement; free rendering plus a length cap could
-  // otherwise trim one while preserving the other.
+  /**
+   * The combined disclosure-and-accept close is deterministic on purpose.
+   * Both the full card fact and the accepted levels must remain visible when
+   * the client records settlement; free rendering plus a length cap could
+   * otherwise trim one while preserving the other.
+   */
   if (decision.action === "disclose_sb_and_accept") {
     return NextResponse.json({
       message: fallbackText(
         task,
         counterpartRole,
+        body.participantRole,
         decision.action,
         decision.proposal,
       ),
       proposal: decision.proposal,
+      state: nextState,
+      settled: decision.accepts ? "agreed" : null,
     });
   }
 
@@ -336,20 +497,40 @@ export async function POST(request: Request) {
     const blocked =
       (!validation.valid && validation.disposition === "regenerate") || leakedSb;
 
-    // WHAT THE CLIENT GETS IS THE MINIMUM IT USES. The counterpart is
-    // presented as another participant, so `accepts`, `impasse`, the decided
-    // action and the validator's verdict all stay server-side — a network
-    // tab showing `action: "propose_tier"` says the other party is
-    // machinery. The client re-runs `counterpartStep` itself from the same
-    // inputs and gets the same answer, because the machine is deterministic.
+    // WHAT THE CLIENT GETS IS THE MINIMUM IT USES, PLUS THE STATE IT WOULD
+    // OTHERWISE RE-DERIVE. The counterpart is presented as another
+    // participant, so `accepts`, `impasse` and the decided action stay
+    // server-side — a network tab showing `action: "propose_tier"` says the
+    // other party is machinery. The client re-runs `counterpartStep` itself
+    // from the same inputs and gets the same answer, because the machine is
+    // deterministic; what it cannot safely re-derive is which one-shot flags
+    // this turn spent, so those come back explicitly.
     return NextResponse.json({
       message: compactChatBubbles(capMessageLength(
         blocked
-          ? fallbackText(task, counterpartRole, decision.action, decision.proposal)
+          ? fallbackText(
+              task,
+              counterpartRole,
+              body.participantRole,
+              decision.action,
+              decision.proposal,
+            )
           : action.rationale,
         NEGOTIATION.maxMessageChars,
       )),
       proposal: decision.proposal,
+      state: nextState,
+      // THE OUTCOME, NOT THE MOVE. `settled` says whether the exchange ended
+      // and how; the DECIDED ACTION never travels. A network tab showing
+      // `action: "propose_tier"` tells the participant the other party is
+      // machinery, which is the one thing this arm cannot survive — so the
+      // client gets what it needs to stop the clock and code the outcome, and
+      // nothing that names the script.
+      settled: decision.impasse
+        ? "impasse"
+        : decision.accepts
+          ? "agreed"
+          : null,
     });
   } catch (error) {
     console.error("[counterpart]", error);
