@@ -40,8 +40,109 @@
  * well under the weight that would read as a private surface.
  */
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
+import { STUDY } from "@/lib/study-config";
+import type { Role } from "@/lib/types";
 import { cx } from "./ui";
+
+function FlowArrow({ label }: { label: string }) {
+  return (
+    <div className="flex shrink-0 flex-col items-center justify-center gap-1 px-1 text-center sm:px-2">
+      <span className="sr-only">{label}</span>
+      <svg
+        aria-hidden
+        viewBox="0 0 56 18"
+        className="h-4 w-10 text-slate-400 sm:w-14"
+      >
+        <path
+          d="M2 9h47m-7-6 7 6-7 6"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
+      </svg>
+      <span className="hidden text-[0.625rem] font-bold leading-tight text-slate-500 sm:block">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A role-and-payment map shown before practice.
+ *
+ * This is deliberately made from labelled shapes rather than character art:
+ * the relationship is the information. Both roles see the same two decision
+ * paths, while the participant's own role is the only emphasized node. Money
+ * and the upward evaluation stay on separate rows so neither can be mistaken
+ * for the other.
+ */
+export function RoleDecisionFlow({ role }: { role: Role }) {
+  const titleId = useId();
+  const isLeader = role === "leader";
+  const own =
+    "border-blue-300 bg-blue-50 text-blue-950 ring-2 ring-blue-100";
+  const other = "border-slate-200 bg-white text-slate-800";
+  const node =
+    "min-w-0 flex-1 rounded-xl border px-3 py-3 text-center shadow-2xs sm:px-4";
+
+  return (
+    <figure
+      aria-labelledby={titleId}
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 shadow-2xs"
+    >
+      <figcaption
+        id={titleId}
+        className="border-b border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 sm:px-5"
+      >
+        Two separate decisions after each negotiation
+      </figcaption>
+
+      <div className="space-y-3 p-3 sm:p-5">
+        <div className="flex items-stretch" aria-label="Bonus recommendation path">
+          <div className={cx(node, isLeader ? own : other)}>
+            <span className="block text-[0.625rem] font-extrabold uppercase tracking-wider text-slate-500">
+              Team lead {isLeader ? <span className="ml-1 rounded-full bg-blue-700 px-1.5 py-0.5 text-white">You</span> : null}
+            </span>
+            <strong className="mt-1 block text-sm">Recommends the member&apos;s bonus</strong>
+          </div>
+          <FlowArrow label="after each task" />
+          <div className={cx(node, !isLeader ? own : other)}>
+            <span className="block text-[0.625rem] font-extrabold uppercase tracking-wider text-slate-500">
+              Team member {!isLeader ? <span className="ml-1 rounded-full bg-blue-700 px-1.5 py-0.5 text-white">You</span> : null}
+            </span>
+            <strong className="mt-1 block text-sm">
+              Up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task
+            </strong>
+          </div>
+        </div>
+
+        <div className="flex items-stretch" aria-label="Upward evaluation path">
+          <div className={cx(node, !isLeader ? own : other)}>
+            <span className="block text-[0.625rem] font-extrabold uppercase tracking-wider text-slate-500">
+              Team member {!isLeader ? <span className="ml-1 rounded-full bg-blue-700 px-1.5 py-0.5 text-white">You</span> : null}
+            </span>
+            <strong className="mt-1 block text-sm">Evaluates the team lead</strong>
+          </div>
+          <FlowArrow label="sent to" />
+          <div className={cx(node, other)}>
+            <span className="block text-[0.625rem] font-extrabold uppercase tracking-wider text-slate-500">
+              Project director
+            </span>
+            <strong className="mt-1 block text-sm">Receives that evaluation</strong>
+          </div>
+        </div>
+
+        <p className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-center text-xs leading-relaxed text-slate-600">
+          The team lead and team member still decide the working conditions
+          <strong className="text-slate-900"> together</strong>.
+        </p>
+      </div>
+    </figure>
+  );
+}
 
 /**
  * `mine` is the participant's own representative; `theirs` is the other

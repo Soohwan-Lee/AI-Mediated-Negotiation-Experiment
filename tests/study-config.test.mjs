@@ -8,6 +8,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   STUDY,
   STAGE_MINUTES,
@@ -84,6 +85,21 @@ test("the base alone still clears Prolific's hard floor", () => {
   // not fall under £6.00/hr.
   const perHour = (money(STUDY.compensation) / STUDY.estimatedMinutes) * 60;
   assert.ok(perHour >= 6.0, `base is £${perHour.toFixed(2)}/hr`);
+});
+
+test("the pre-assignment welcome card advertises the base rate, not the eventual total", () => {
+  const welcome = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+  assert.match(welcome, /hint="Base rate"/);
+  assert.match(welcome, /Number\(STUDY\.compensation\)/);
+  assert.doesNotMatch(welcome, /hint="Equivalent total rate"/);
+});
+
+test("the debrief calls the observed bonus input a recommendation, not a transfer", () => {
+  const debrief = readFileSync(new URL("../src/app/debriefing/page.tsx", import.meta.url), "utf8");
+  assert.match(debrief, /recommend a bonus/);
+  assert.match(debrief, /recommended the other side/);
+  assert.doesNotMatch(debrief, /decided the other side/);
+  assert.doesNotMatch(debrief, /waited while/);
 });
 
 test("Ver.2.23 pacing uses a two-minute practice and no artificial Proxy delay", () => {

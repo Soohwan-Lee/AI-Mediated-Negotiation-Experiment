@@ -46,6 +46,10 @@ import {
 import { useParticipant } from "@/lib/participant-context";
 import { STAGE_MINUTES, STUDY, nextHref } from "@/lib/study-config";
 
+const BASE_HOURLY_RATE = (
+  (Number(STUDY.compensation) / STUDY.estimatedMinutes) * 60
+).toFixed(2);
+
 /** Derived from STAGE_MINUTES so the promised times cannot drift from the flow. */
 const STEPS = [
   {
@@ -238,8 +242,8 @@ export default function ConsentPage() {
               <StatCard
                 icon="↗"
                 label="Rate"
-                value={`${STUDY.currencySymbol}${STUDY.hourlyEquivalent}/hr`}
-                hint="Equivalent total rate"
+                value={`${STUDY.currencySymbol}${BASE_HOURLY_RATE}/hr`}
+                hint="Base rate"
                 tone="indigo"
               />
             </div>

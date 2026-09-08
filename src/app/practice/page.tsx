@@ -436,14 +436,14 @@ export default function PracticePage() {
   if (phase === "intro") {
     return (
       <TaskCover
-        eyebrow="Tutorial · Practice Sandbox"
-        title="Interactive Practice Round"
+        eyebrow="Tutorial · Practice round"
+        title="Try the controls before Task 1"
         doesNotCount
         scene={isProxy ? "proxy" : "direct"}
         lead={
           <>
             <p className="mb-2 text-slate-800 font-medium">
-              Welcome to the interactive practice session! Before starting the real tasks, this round lets you try out the controls with a simple practice scenario.
+              Before the real tasks, use this simple scenario to try the controls once.
             </p>
             <p className="text-slate-600 text-sm">
               {isProxy
@@ -469,15 +469,15 @@ export default function PracticePage() {
         }
         minutes={STAGE_MINUTES.practice}
         note={
-          <Callout title="🛡️ Safe Sandbox" tone="neutral">
+          <Callout title="Practice only" tone="neutral">
             <p>
-              Nothing in this practice round affects your task outcome or
-              payment. We will point at each control in turn — take as much
-              time as you need.
+              <strong>Nothing here affects your task points or payment.</strong>{" "}
+              We will point to each control in turn. Take as much time as you
+              need.
             </p>
           </Callout>
         }
-        actionLabel="Start Interactive Practice →"
+        actionLabel="Start practice"
         onStart={() => {
           setPhase("practice");
           goToStep(0);

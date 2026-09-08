@@ -94,27 +94,20 @@ export default function DebriefingPage() {
               <span className="text-xl">💵</span>
               <h2 className="text-sm sm:text-base font-bold text-slate-900">
                 {isMember
-                  ? "2. No Bonus Decision Was Made About You (Full Pay Guaranteed)"
-                  : "2. Reward Decisions Were Scenario-Only (Full Pay Guaranteed)"}
+                  ? "2. No Bonus Recommendation Was Made About You (Full Pay Guaranteed)"
+                  : "2. Bonus Recommendations Were Scenario-Only (Full Pay Guaranteed)"}
               </h2>
             </div>
-            {/* The Member's half of this is the disclosure that closes deception
-                item 4, and it has to RETRACT, not reassure. They waited twice in
-                front of a screen reading "The Project Leader is evaluating your
-                performance bonus…", and that screen implies a decision was made
-                about them. Saying only that no penalty occurred leaves the
-                implication standing — it reads as "a decision happened and it
-                went fine". Saying plainly that no such decision was ever made is
-                the whole disclosure. There is no number to explain away, which
-                is exactly why the sentence has to do the work instead. */}
+            {/* Retract the scenario claim explicitly: no counterpart recommendation
+                or upward evaluation existed, and neither affected actual payment. */}
             <p className="text-xs sm:text-sm leading-relaxed text-slate-700">
               {isMember ? (
                 <>
-                  After each task you wrote an upward evaluation of the manager and then
-                  waited while they decided a bonus for you.{" "}
+                  You were told the Leader would recommend a bonus for you after each
+                  task.{" "}
                   <strong className="text-slate-900">
-                    No such decision was ever made about you, by anyone — there was no
-                    other participant to make one — and your evaluation was not passed
+                    No such recommendation was ever made about you, by anyone — there was no
+                    other participant to make one. Your upward evaluation was not sent
                     to any director
                   </strong>
                   ; there is none. Both were recorded only as research data. Nothing you
@@ -126,11 +119,11 @@ export default function DebriefingPage() {
                 </>
               ) : (
                 <>
-                  After each task you decided the other side&apos;s bonus, and were told
+                  After each task you recommended the other side&apos;s bonus, and were told
                   they wrote an upward evaluation of you. Because there was no other
                   participant,{" "}
                   <strong className="text-slate-900">
-                    no one received or lost money as a result of your decision, and no
+                    no one received or lost money as a result of your recommendation, and no
                     evaluation of you was ever written or forwarded
                   </strong>{" "}
                   — your choices were recorded as research data about how authority is

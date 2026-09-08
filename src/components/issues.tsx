@@ -92,12 +92,15 @@ export function PointsKey({
         className,
       )}
     >
-      <div className="flex items-center gap-2 font-bold text-sm text-[var(--private-strong)] mb-1.5">
-        <span>🔢</span>
-        <span>How Points Work (Private to You)</span>
+      <div className="flex items-center justify-between gap-2 font-bold text-sm text-[var(--private-strong)] mb-1.5">
+        <span>How your points work</span>
+        <span className="rounded-full border border-[var(--private-line)] bg-white/80 px-2 py-0.5 text-[0.625rem] font-extrabold uppercase tracking-wider">
+          Private
+        </span>
       </div>
       <p className="mb-3 text-xs leading-relaxed text-[var(--private-ink)]/90">
-        Points show how well an option fits your personal priorities (more points = better outcome). Your sheet is 100% private — the other person never sees your scores.
+        <strong>More points means a better outcome for you.</strong> The other
+        person never sees your point values.
       </p>
       {/* Label above value, not beside it. These pills live in the ~355px
           briefing rail as well as the wide task column, and as one inline row
@@ -109,7 +112,7 @@ export function PointsKey({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
         <span className="min-w-0 flex flex-col justify-between rounded-xl border border-amber-300 bg-amber-100/80 px-3 py-2 font-semibold text-amber-950 shadow-2xs">
           <span className="block text-[0.6875rem] leading-tight opacity-90 font-medium break-words">
-            🏆 Ideal Target ({termCount})
+            Best possible ({termCount})
           </span>
           <strong className="tabular block text-sm font-black leading-tight mt-1 shrink-0">
             {best.toLocaleString()} pts
@@ -117,7 +120,7 @@ export function PointsKey({
         </span>
         <span className="min-w-0 flex flex-col justify-between rounded-xl border border-slate-300 bg-white/90 px-3 py-2 font-semibold text-slate-800 shadow-2xs">
           <span className="block text-[0.6875rem] leading-tight opacity-90 font-medium break-words">
-            🚫 No Agreement (both score 0)
+            No agreement (both score 0)
           </span>
           <strong className="tabular block text-sm font-black leading-tight mt-1 shrink-0">
             {reservationPoints.toLocaleString()} pts
@@ -232,7 +235,7 @@ export function IssueValueTable({
               compact ? "mb-2 p-2" : "mb-3 p-2.5",
             )}
           >
-            <span className="font-bold text-amber-950">💡 Why it matters to you: </span>
+            <span className="font-bold text-amber-950">Why it matters to you: </span>
             <span>{issue.rationale[role]}</span>
           </div>
 

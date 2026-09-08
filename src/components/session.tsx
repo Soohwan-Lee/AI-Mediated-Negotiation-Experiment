@@ -25,6 +25,7 @@ import { IssueValueTable } from "./issues";
 import { ProxyScene, ProxySpeech } from "./proxy-art";
 import { ActionBar } from "./study-chrome";
 import { Card, CardTitle, Page, PrivateTag, cx } from "./ui";
+import { STUDY } from "@/lib/study-config";
 import type { NegotiationTask, Role } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -649,14 +650,12 @@ function emphasise(text: string) {
 }
 
 /**
- * Headings follow the four paragraphs in the current design's role story.
+ * Headings follow the role-story paragraphs in the current design.
  *
- * The emoji is a scanning aid, not decoration: the four sections do four
- * different jobs and a reader mid-negotiation is looking for one of them. The
- * last section sits in its own box because it is the one that describes a
- * cost — but the box stays in the private (sand) tone, because the surface is
- * what says who can see the content (interface rule 1) and this is all
- * private.
+ * The numbered headings are scanning aids: the four sections do four
+ * different jobs and a reader mid-negotiation is looking for one of them.
+ * They remain neutral labels: the interface must not tell participants what
+ * sharing a reason will mean for how the other person evaluates them.
  *
  * `compact` is what the briefing rail passes: the same treatment at the rail's
  * 13px, with no figure and tighter spacing. The illustration lives on the
@@ -664,32 +663,26 @@ function emphasise(text: string) {
  */
 export function RoleStory({ story, compact = false }: { story: string; compact?: boolean }) {
   const paragraphs = story.split("\n\n").map(p => p.trim()).filter(Boolean);
-  const headings = [
-    { emoji: "👤", label: "Your role on the team" },
-    { emoji: "🎯", label: "What matters to you" },
-    { emoji: "💼", label: "Your work situation" },
-    { emoji: "⚖️", label: "What sharing could mean" },
-  ];
-  const labelled = paragraphs.length === headings.length;
+  const headings = paragraphs.length === 3
+    ? ["Your role on the team", "What matters to you", "What you can share"]
+    : paragraphs.length === 4
+      ? ["Your role on the team", "What matters to you", "What you can share", "Your choice about sharing"]
+      : [];
+  const labelled = headings.length > 0;
   return <div className={compact ? "space-y-3" : "space-y-4"}>
     {paragraphs.map((paragraph, index) => {
       const heading = labelled ? headings[index] : null;
-      const boxed = labelled && index === headings.length - 1;
       return <section
         key={index}
-        className={boxed
-          ? cx(
-            "rounded-xl border border-[var(--private-line)] bg-white/60",
-            compact ? "px-2.5 py-2" : "px-4 py-3.5",
-          )
-          : undefined}
       >
         {heading ? <h3 className={cx(
           "flex items-baseline gap-1.5 font-bold tracking-tight text-[var(--private-strong)]",
           compact ? "mb-1 text-[0.8125rem]" : "mb-1.5 text-[0.9375rem]",
         )}>
-          <span aria-hidden="true" className={compact ? "text-[0.75rem]" : "text-sm"}>{heading.emoji}</span>
-          {heading.label}
+          <span aria-hidden="true" className="tabular flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[var(--private-line)] bg-white text-[0.625rem]">
+            {index + 1}
+          </span>
+          {heading}
         </h3> : null}
         <p className={cx(
           "text-[var(--private-ink)]",
@@ -769,6 +762,19 @@ export function BriefingPanel({
         </h3>
         <p className="mt-1 text-sm leading-relaxed text-[var(--private-ink)]/90">
           {memberContext}{brief.organizationalPosition}
+        </p>
+        <p className="mt-2 border-t border-amber-200 pt-2 text-xs leading-relaxed text-[var(--private-ink)]">
+          {role === "leader" ? (
+            <>
+              <strong>Payment: {STUDY.currencySymbol}{STUDY.totalPaid} guaranteed.</strong>{" "}
+              Recommending the member&apos;s bonus does not reduce it.
+            </>
+          ) : (
+            <>
+              <strong>Payment: {STUDY.currencySymbol}{STUDY.compensation} guaranteed.</strong>{" "}
+              The leader can recommend up to {STUDY.currencySymbol}{STUDY.bonusAmount} across both tasks.
+            </>
+          )}
         </p>
       </section>
 
@@ -851,7 +857,8 @@ export function BriefingPanel({
         hidden={currentTab !== "points"}
       >
         <p className="mb-2 text-xs leading-relaxed text-[var(--private-ink)]/85">
-          More points mean an option fits your goals better. These values are private.
+          <strong>These task points are not money.</strong> More points mean an
+          option fits your goals better, and the values are private.
         </p>
         <dl className="mb-3 grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-lg border border-[var(--private-line)] bg-white/75 px-2.5 py-2">

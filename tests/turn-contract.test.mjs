@@ -1,8 +1,8 @@
 /**
  * The client-side turn contract shared by the two participant-facing
- * negotiations (Design Ver.2.21 §6.1 stage 3, §6.2, §6.2a).
+ * negotiations (Design Ver.2.23 §6.1 stage 3, §6.2, §6.2a).
  *
- * WHY IT IS TESTED AT ALL. The Direct arm and the Proxy arm's three-minute
+ * WHY IT IS TESTED AT ALL. The Direct arm and the Proxy arm's two-minute
  * closing are the only two places a participant speaks for themselves, so
  * anything that differs between them lands on `Pooled Proxy − Direct`, the
  * contrast the study is built to make. The wire shapes, the response guards

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { ActionBar, BackButton } from "./study-chrome";
+import { RoleDecisionFlow } from "./proxy-art";
 import { Card, CardTitle, Page, PageHeader } from "./ui";
 import { STUDY } from "@/lib/study-config";
 import type { Role } from "@/lib/types";
@@ -129,46 +130,87 @@ export function StudyOrientation({
               </figcaption>
             </figure>
 
-            <Card tone="private">
-              <CardTitle>{isLeader ? "Team lead" : "Team member"}</CardTitle>
-              <p className="mt-2 text-base leading-relaxed">{isLeader
-                ? "You lead the project and answer to the director. You finalize the working conditions once both people agree. You also influence the member's evaluation and future work assignments."
-                : "You are an experienced team member trusted to work directly with the client. You can ask for changes or refuse a proposed package. You and the team lead must agree on both working conditions."}</p>
-            </Card>
+            <div className="space-y-4">
+              <Card tone="private">
+                <CardTitle>{isLeader ? "Team lead" : "Team member"}</CardTitle>
+                <p className="mt-2 text-base leading-relaxed">{isLeader
+                  ? "You lead the project and answer to the director. You finalize the working conditions once both people agree. After each negotiation, you recommend the member's bonus."
+                  : "You are an experienced team member trusted to work directly with the client. You can ask for changes or refuse a proposed package. After each negotiation, the team lead recommends your bonus."}</p>
+              </Card>
+
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-950 shadow-2xs">
+                <p className="text-[0.6875rem] font-extrabold uppercase tracking-[0.12em] text-emerald-800">
+                  Your study payment
+                </p>
+                {isLeader ? (
+                  <>
+                    <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                      <strong className="text-xl tabular-nums">
+                        {STUDY.currencySymbol}{STUDY.compensation}
+                      </strong>
+                      <span className="text-sm font-semibold">base</span>
+                      <span aria-hidden className="text-emerald-700">+</span>
+                      <strong className="text-xl tabular-nums">
+                        {STUDY.currencySymbol}{STUDY.bonusAmount}
+                      </strong>
+                      <span className="text-sm font-semibold">guaranteed role addition</span>
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed">
+                      Your total is <strong>{STUDY.currencySymbol}{STUDY.totalPaid}</strong> from the time you are assigned this role. Your recommendations for the member <strong>do not reduce your payment</strong>.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                      <strong className="text-xl tabular-nums">
+                        {STUDY.currencySymbol}{STUDY.compensation}
+                      </strong>
+                      <span className="text-sm font-semibold">guaranteed base</span>
+                      <span aria-hidden className="text-emerald-700">+</span>
+                      <strong className="text-xl tabular-nums">
+                        up to {STUDY.currencySymbol}{STUDY.bonusAmount}
+                      </strong>
+                      <span className="text-sm font-semibold">across two tasks</span>
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed">
+                      Your total can be <strong>{STUDY.currencySymbol}{STUDY.compensation}–{STUDY.currencySymbol}{STUDY.totalPaid}</strong>. Bonus amounts are not shown before both tasks are complete.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         ) : page === 2 ? (
-          <div className="space-y-5">
-            <Card>
-              <CardTitle>Two separate decisions</CardTitle>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2" aria-label="How the two roles affect each other after a negotiation">
-                <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm leading-relaxed">
-                  <p className="text-xs font-bold uppercase tracking-[0.1em] text-blue-700">Team lead <span aria-hidden>→</span> Team member</p>
-                  <p className="mt-2 font-bold text-slate-900">Study bonus payment</p>
-                  <p className="mt-1.5 text-slate-600">The lead decides the member&apos;s bonus, up to {STUDY.currencySymbol}{STUDY.bonusPerTask} per task.</p>
-                </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm leading-relaxed">
-                  <p className="text-xs font-bold uppercase tracking-[0.1em] text-amber-800">Team member <span aria-hidden>→</span> Project director</p>
-                  <p className="mt-2 font-bold text-slate-900">Upward evaluation of the team lead</p>
-                  <p className="mt-1.5 text-slate-600">The member writes the evaluation; the director receives it.</p>
-                </div>
-              </div>
-              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-700">
-                <span className="font-bold">Working conditions are a joint decision:</span> the team lead and team member must agree on both.
-              </div>
-            </Card>
-            <Card>
-              <CardTitle>Both people receive the same instruction</CardTitle>
-              <blockquote className="mt-3 border-l-2 border-slate-400 pl-4 text-base leading-relaxed">
+          <div className="space-y-4">
+            <RoleDecisionFlow role={role} />
+            <Card padded={false} className="p-4 sm:p-5">
+              <p className="rounded-xl border border-[var(--private-line)] bg-[var(--private-surface)] px-3 py-2.5 text-sm leading-relaxed text-[var(--private-ink)]">
+                {isLeader ? (
+                  <>
+                    Your <strong>{STUDY.currencySymbol}{STUDY.totalPaid} total is already guaranteed</strong>. After each task, you recommend up to <strong>{STUDY.currencySymbol}{STUDY.bonusPerTask}</strong> for the member. That recommendation does not come out of your payment.
+                  </>
+                ) : (
+                  <>
+                    Your <strong>{STUDY.currencySymbol}{STUDY.compensation} base is guaranteed</strong>. The leader recommends up to <strong>{STUDY.currencySymbol}{STUDY.bonusPerTask} after each task</strong>, for up to {STUDY.currencySymbol}{STUDY.bonusAmount} across both tasks. Bonus amounts are not shown during the tasks.
+                  </>
+                )}
+              </p>
+              <p className="mt-3 text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-slate-500">
+                Both people receive the same instruction
+              </p>
+              <blockquote className="mt-1.5 border-l-2 border-slate-400 pl-3 text-sm leading-relaxed text-slate-800">
                 Consider not just the result, but the negotiation as a whole and whether you would want to work with this person again.
               </blockquote>
-              <p className="mt-3 text-sm text-slate-600">Your points describe how well the agreed conditions fit your goals. They do not automatically determine the bonus.</p>
+              <p className="mt-3 border-t border-slate-200 pt-3 text-xs leading-relaxed text-slate-700">
+                <strong>Negotiation points are not money.</strong> They show how well the working conditions fit your goals; they do not directly determine study payment.
+              </p>
             </Card>
           </div>
         ) : (
           <div className="space-y-4">
             <Card>
               <CardTitle>Agree on both conditions</CardTitle>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">Each condition has four options. Your aim is a package worth more points to you. If you don&apos;t agree on both, you each get 0 points for that task. Direct negotiation lasts up to 10 minutes; you can finish sooner when you agree.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">Each condition has four options. Your aim is a package worth more points to you. If you don&apos;t agree on both, you each get 0 points for that task. Direct negotiation lasts up to 5 minutes; you can finish sooner when you agree.</p>
             </Card>
             <Card tone="private">
               <CardTitle>Keep point values private</CardTitle>
@@ -176,7 +218,7 @@ export function StudyOrientation({
             </Card>
             <Card>
               <CardTitle>Choose what to explain</CardTitle>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">You can explain your priorities and ask about the other person&apos;s situation. They adjust conditions based on the reasons they hear.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">You can explain what matters to you and ask about the other person&apos;s situation.</p>
               <p className="mt-3 text-sm leading-relaxed text-slate-900">Sharing sensitive background is optional. You can negotiate and reach an agreement without it. If you or your AI Proxy shares it, the other person may consider it in their later bonus decision or upward evaluation.</p>
             </Card>
             <Card>
