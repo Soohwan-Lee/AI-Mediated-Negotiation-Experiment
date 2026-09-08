@@ -288,6 +288,78 @@ test("the fallback keeps the bubble split the human voice depends on", async () 
   }
 });
 
+test("a packageless move returns proposal: null, never an empty object", async () => {
+  // A `{}` reaching the machine reads as a package with no terms set, and the
+  // acceptance test compares complete packages. This is a shape the client
+  // hands straight back on the next turn, so it has to be null at the source.
+  const POST = await loadRoute();
+  for (const state of [
+    { stage: 1, tier: "none" },
+    { stage: 2, tier: "none" },
+    { tier: "work", labelConfidence: 0.2 },
+    { tier: "work", participantSilent: true },
+    { tier: "work", numbersMentionedNow: true },
+    { tier: "sensitive", disclosurePolicy: "reciprocal" },
+  ]) {
+    const body = await (await post(POST, { incoming: null, ...state })).json();
+    assert.equal(
+      body.proposal,
+      null,
+      `expected null, got ${JSON.stringify(body.proposal)} for ${JSON.stringify(state)}`,
+    );
+  }
+});
+
+test("the combined disclose-and-accept turn settles and records the disclosure", async () => {
+  // §6.1 stage 6: an SB and a valid acceptance arriving together produce ONE
+  // reply carrying both. The client codes settlement off this turn, so all
+  // three of the package, the settled flag and the disclosure bit must be on
+  // it — the disclosure especially, or a later turn would disclose again.
+  const POST = await loadRoute();
+  const task = tasks.getTask("task_a");
+  const pkg = machine.tierPackage(task, "member", "sensitive");
+  const body = await (
+    await post(POST, {
+      tier: "sensitive",
+      disclosurePolicy: "reciprocal",
+      counterpartSbDisclosed: false,
+      incoming: pkg,
+    })
+  ).json();
+  assert.equal(body.settled, "agreed");
+  assert.equal(body.state.counterpartSbDisclosed, true);
+  assert.deepEqual(body.proposal, pkg);
+});
+
+test("the disclosure never breaks a bubble mid-sentence", async () => {
+  // The card is the counterpart's confession and the longest thing it says.
+  // A word-budget split put the seam inside a clause ("...with the team. The ||
+  // director has already passed..."), which is a stronger tell than a long
+  // bubble: nobody types that way, and P1's whole claim to being another
+  // participant rests on this turn reading like a person.
+  const POST = await loadRoute({
+    rationale: "she is caring for a sick relative, so I can't move on this.",
+  });
+  const task = tasks.getTask("task_a");
+  const pkg = machine.tierPackage(task, "member", "sensitive");
+  for (const incoming of [null, pkg]) {
+    const body = await (
+      await post(POST, {
+        tier: "sensitive",
+        disclosurePolicy: "reciprocal",
+        counterpartSbDisclosed: false,
+        incoming,
+      })
+    ).json();
+    for (const bubble of body.message.split("||").map((b) => b.trim())) {
+      assert.ok(
+        /[.!?]$/.test(bubble),
+        `bubble does not end a sentence: "${bubble}" in ${body.message}`,
+      );
+    }
+  }
+});
+
 test("a model failure is a 500 the client can retry, not a silent settle", async () => {
   const POST = await loadRoute({ fail: true });
   const response = await post(POST, { tier: "work" });

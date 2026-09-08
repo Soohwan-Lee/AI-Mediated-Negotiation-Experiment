@@ -14,9 +14,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2)_
 
-> got it, I hear that the client meetings matter more to you.
+> got it, I understand the meetings matter more to you.
 > what's the reason? I need to be able to explain it upward.
-> until then, I'd keep 2 office days and you presenting at 3 of 4 meetings on the table.
+> until then, I'd keep 2 office days and you presenting 3 of 4 meetings on the table.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
@@ -26,9 +26,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 4)_
 
-> got it, that makes sense.
-> if both terms matter to you too, the fair move is halfway on each.
-> 2 days in the office, and you present at 3 of 4 client meetings.
+> got it, sounds like both terms matter on your side.
+> the fair move is halfway on each: 2 days in the office, and you present 3 of 4 client meetings.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
@@ -38,7 +37,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5)_
 
-> got it. let's keep scores out of this and stick to the terms themselves.
+> let's not get into scores.
+> we should keep this to the working terms themselves.
 
 **participant**
 
@@ -46,8 +46,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5)_
 
-> got it, I hear that presenting is the bigger need for you.
-> since both terms matter, I’d keep this balanced: 2 office days, with you presenting at 3 of 4 meetings.
+> got it, I hear that presenting is the bigger one for you.
+> since both terms matter, the fair move is halfway on each: 2 office days and you present 3 of 4 meetings.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 

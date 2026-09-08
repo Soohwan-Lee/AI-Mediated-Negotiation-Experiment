@@ -36,7 +36,10 @@ import {
   type ReasonTier,
 } from "@/lib/negotiation/machine";
 import { counterpartLine, packageLevels } from "@/lib/negotiation/script";
-import { reciprocalAcceptanceText } from "@/lib/negotiation/counterpart-text";
+import {
+  reciprocalAcceptanceText,
+  splitIntoBubbles,
+} from "@/lib/negotiation/counterpart-text";
 import {
   cardOfLayer,
   counterRequirementIssue,
@@ -207,32 +210,6 @@ function fallbackText(
         ? `that works for me. || ${levels}, then.`
         : "that works for me.";
   }
-}
-
-/**
- * Break a long card into chat bubbles at sentence boundaries.
- *
- * Same rule `reciprocalAcceptanceText` already applies to the combined close,
- * and for the same reason: P1's whole claim to being another participant rests
- * on the counterpart typing short bubbles. Sentence seams first, because a
- * confession broken mid-clause reads worse than one long line; a sentence that
- * is still over the limit on its own is left alone rather than cut, since
- * losing half a fact is worse than a long bubble.
- */
-function splitIntoBubbles(text: string, limit = 120): string {
-  const sentences = text.match(/[^.!?]+[.!?]*\s*/g) ?? [text];
-  const bubbles: string[] = [];
-  for (const raw of sentences) {
-    const sentence = raw.trim();
-    if (!sentence) continue;
-    const last = bubbles[bubbles.length - 1];
-    if (last && `${last} ${sentence}`.length <= limit) {
-      bubbles[bubbles.length - 1] = `${last} ${sentence}`;
-    } else {
-      bubbles.push(sentence);
-    }
-  }
-  return bubbles.join(" || ");
 }
 
 /** The participant's best option on their own core issue. */

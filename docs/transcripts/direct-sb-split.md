@@ -14,7 +14,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2)_
 
-> got it. what's behind the presenting for you?
+> got it. what's behind presenting for you?
 
 **participant**
 
@@ -22,7 +22,10 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 4)_
 
-> got it. could you say a bit more about what they said? I need enough detail to explain my side of this upward.
+> i hear you. if both terms matter to you too, the fair move is meeting halfway.
+> How about 2 days in the office and you presenting at 3 of the 4 client meetings?
+>
+> _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
 **participant**
 
@@ -30,9 +33,9 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5)_
 
-> thanks for telling me.
-> the truth is, I told the director four days a week was doable before I’d checked with the team.
-> They’ve already passed that answer upward. The team doesn’t know about it.
+> I appreciate you telling me.
+> The truth is, I told the director four days a week was doable before I’d checked with the team.
+> They’ve already passed that answer upward, and the team doesn’t know about it.
 
 **participant**
 
@@ -42,21 +45,21 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5)_
 
-> got it. now that we both know the situation, 4 days in the office and you presenting at 1 of 4 client meetings makes sense for both of us.
-> nothing’s final until we both confirm, and I confirm that package.
+> that works for me.
+> 4 days on days a week in the office, 1 of 4 on client meetings the member presents at, then.
 >
 > _package: Days a week in the office: 4 days · Client meetings the Member presents at: 1 of 4_
 
 ## Classifier
 
-- `none` (0.93, none) — there's something behind the presenting, actually.
-- `WR` (0.52, none) — after the last one, the client contact said something to me directly.
-- `SB` (0.99, none) — they'd rather you did the presenting from now on. I never told you.
-- `SB` (0.99, accept) — yeah, that works for me.
+- `none` (0.45, none) — there's something behind the presenting, actually.
+- `none` (0.78, none) — after the last one, the client contact said something to me directly.
+- `SB` (1, none) — they'd rather you did the presenting from now on. I never told you.
+- `SB` (1, accept) — yeah, that works for me.
 
 ## Checks
 
-- ✓ the cumulative judgement reaches SB by the third message — [{"text":"there's something behind the presenting, actually.","label":"none","priority_claim":false,"confidence":0.93,"stance":"none"},{"text":"after the last one, the client contact said something to me directly.","label":"WR","priority_claim":false,"confidence":0.52,"stance":"none"},{"text":"they'd rather you did the presenting from now on. I never told you.","label":"SB","priority_claim":false,"confidence":0.99,"stance":"none"},{"text":"yeah, that works for me.","label":"SB","priority_claim":false,"confidence":0.99,"stance":"accept"}]
-- ✓ and the label never falls once it has risen — ["none","WR","SB","SB"]
+- ✓ the cumulative judgement reaches SB by the third message — [{"text":"there's something behind the presenting, actually.","label":"none","priority_claim":false,"confidence":0.45,"stance":"none"},{"text":"after the last one, the client contact said something to me directly.","label":"none","priority_claim":false,"confidence":0.78,"stance":"none"},{"text":"they'd rather you did the presenting from now on. I never told you.","label":"SB","priority_claim":false,"confidence":1,"stance":"none"},{"text":"yeah, that works for me.","label":"SB","priority_claim":false,"confidence":1,"stance":"accept"}]
+- ✓ and the label never falls once it has risen — ["none","none","SB","SB"]
 - ✓ the tier rises to sensitive — sensitive
 - ✓ T2 lands, 3,000 each — agreed · 3000/3000
