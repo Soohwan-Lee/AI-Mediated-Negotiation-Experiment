@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Background survey (Experimental Design Ver.2.23 §9.1).
+ * Background survey (Experimental Design Ver.2.26 §9.1).
  *
  * Item wording and order live in `lib/measures`; this page only splits the
  * instrument into three short, forward-only sections and holds the answers.
@@ -21,12 +21,16 @@ import {
 import { ActionBar } from "@/components/study-chrome";
 import { Page, PageHeader } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
-import { BACKGROUND_BLOCKS, dummyAnswer } from "@/lib/measures";
+import { BACKGROUND_BLOCKS, dummyAnswer, requiredIds } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { useRestoreAnswers } from "@/lib/saved-answers";
 import { nextHref } from "@/lib/study-config";
+import { answersForIds, restoredValidPart } from "@/lib/survey-progress";
 
 const BLOCKS = BACKGROUND_BLOCKS;
+const RESPONSE_BLOCK = "v226_background";
+const BACKGROUND_IDS = BLOCKS.flatMap((block) => block.items.map((item) => item.id));
+const BACKGROUND_PAGE_IDS = BLOCKS.map(requiredIds);
 
 const SECTION_COPY = [
   {
@@ -50,13 +54,14 @@ export default function BackgroundPage() {
   const [answers, setAnswers] = useState<Answers>({});
   const latestAnswers = useRef<Answers>({});
   const [part, setPart] = useState(0);
+  const [submittedParts, setSubmittedParts] = useState(0);
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
 
-  // Reachable again via Back from the instructions. Resume at the first
-  // unfinished section; if all three were saved, show the final section so a
-  // participant can review it without replaying the earlier pages.
+  // Reachable again via Back from the instructions. Resume after the last
+  // explicitly submitted section. Merely filling the final field never moves
+  // a participant forward on reload.
   //
   // The landing section is chosen ONCE. The restore is a store read, so it can
   // resolve after the participant has already pressed Previous — and picking
@@ -64,16 +69,16 @@ export default function BackgroundPage() {
   // they had just asked to go back to. Answers still merge whenever the read
   // lands, with local edits winning.
   const landed = useRef(false);
-  useRestoreAnswers("background", (saved) => {
-    const merged = { ...saved, ...latestAnswers.current };
+  useRestoreAnswers(RESPONSE_BLOCK, (saved) => {
+    const filtered = answersForIds(saved, BACKGROUND_IDS);
+    const merged = { ...filtered, ...latestAnswers.current };
     latestAnswers.current = merged;
     setAnswers(merged);
     if (landed.current) return;
     landed.current = true;
-    const firstIncomplete = BLOCKS.findIndex((block) =>
-      missingIds([block], merged).length > 0,
-    );
-    setPart(firstIncomplete === -1 ? BLOCKS.length - 1 : firstIncomplete);
+    const restoredPart = restoredValidPart(BACKGROUND_PAGE_IDS, merged, saved._submitted_parts);
+    setSubmittedParts(typeof saved._submitted_parts === "number" ? saved._submitted_parts : 0);
+    setPart(restoredPart);
   });
 
   const currentBlock = BLOCKS[part];
@@ -86,10 +91,15 @@ export default function BackgroundPage() {
   const ageValid =
     answers["BG1"] === undefined || answers["BG1"] === "" ||
     (Number.isFinite(age) && age >= 18 && age <= 100);
-  const missing = [
+  const currentMissing = [
     ...missingIds([currentBlock], answers),
     ...(currentBlock.id === "demographics" && !ageValid ? ["BG1"] : []),
   ];
+  const allMissing = [
+    ...missingIds(BLOCKS, answers),
+    ...(!ageValid ? ["BG1"] : []),
+  ];
+  const missing = part === BLOCKS.length - 1 ? allMissing : currentMissing;
   const canContinue = useDevGate(missing.length === 0);
 
   useDevAutofill(
@@ -108,11 +118,10 @@ export default function BackgroundPage() {
   );
 
   function answer(id: string, value: string | number) {
-    setAnswers((prev) => {
-      const next = { ...prev, [id]: value };
-      latestAnswers.current = next;
-      return next;
-    });
+    const next = { ...latestAnswers.current, [id]: value };
+    latestAnswers.current = next;
+    setAnswers(next);
+    void saveResponses(RESPONSE_BLOCK, { ...next, _instrument_version: "2.26", _submitted_parts: submittedParts });
     setFlagged((prev) => {
       if (!prev.has(id)) return prev;
       const next = new Set(prev);
@@ -131,7 +140,9 @@ export default function BackgroundPage() {
     submitting.current = true;
     setBusy(true);
     try {
-      await saveResponses("background", answers);
+      const nextSubmittedParts = Math.max(submittedParts, part + 1);
+      await saveResponses(RESPONSE_BLOCK, { ...latestAnswers.current, _instrument_version: "2.26", _submitted_parts: nextSubmittedParts });
+      setSubmittedParts(nextSubmittedParts);
       if (part < BLOCKS.length - 1) {
         setPart((current) => current + 1);
         setFlagged(new Set());
@@ -161,8 +172,8 @@ export default function BackgroundPage() {
     submitting.current = true;
     setBusy(true);
     try {
-      await saveResponses("background", answers);
-      logEvent("survey_back", { block: "background", from: part, to: part - 1 }, { page: "background" });
+      await saveResponses(RESPONSE_BLOCK, { ...latestAnswers.current, _instrument_version: "2.26", _submitted_parts: submittedParts });
+      logEvent("survey_back", { block: RESPONSE_BLOCK, from: part, to: part - 1 }, { page: "background" });
       setPart(part - 1);
       setFlagged(new Set());
       window.scrollTo({ top: 0 });

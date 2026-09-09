@@ -12,6 +12,7 @@
 import type { Block, Item } from "@/lib/measures";
 
 import { requiredIds } from "@/lib/measures";
+import { isMissingResponse } from "@/lib/survey-progress";
 import type { SurveyResponses } from "@/lib/types";
 import {
   AmountScale,
@@ -44,7 +45,7 @@ export function MeasureBlock({
 
   const required = requiredIds(block);
   const left = required.filter(
-    (id) => answers[id] === undefined || answers[id] === "",
+    (id) => isMissingResponse(answers[id]),
   ).length;
 
   return (
@@ -129,6 +130,7 @@ function MeasureItem({
 }) {
   const asText = typeof value === "string" ? value : "";
   const asNumber = typeof value === "number" ? value : null;
+  const labelledText = `(${item.id.replace(/_t[12]$/, "")}) ${item.text}`;
 
   if (item.kind === "scale") {
     // No wrapper here: `Scale`'s own `border-b … last:border-b-0` already draws
@@ -140,8 +142,8 @@ function MeasureItem({
     return (
       <Scale
         id={item.id}
-        statement={item.text}
-        srStatement={item.text}
+        statement={labelledText}
+        srStatement={labelledText}
         value={asNumber}
         onChange={(v) => onChange(item.id, v)}
         lowAnchor={item.low}
@@ -159,7 +161,7 @@ function MeasureItem({
     return (
       <div id={`q-${item.id}`} className="scroll-mt-24">
       <Field
-          label={item.text}
+          label={labelledText}
           required={!optional}
           flagged={flagged}
         >
@@ -178,14 +180,14 @@ function MeasureItem({
   return (
     <div id={`q-${item.id}`} className="scroll-mt-24">
       <Field
-        label={item.text}
+        label={labelledText}
         required={!optional}
         flagged={flagged}
       >
         {item.kind === "choice" ? (
           <ChoiceList
             name={item.id}
-            ariaLabel={item.text}
+            ariaLabel={labelledText}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             options={item.options}
@@ -193,7 +195,7 @@ function MeasureItem({
           />
         ) : item.kind === "select" ? (
           <Select
-            ariaLabel={item.text}
+            ariaLabel={labelledText}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             options={item.options}
@@ -202,21 +204,21 @@ function MeasureItem({
           <TextInput
             type="number"
             inputMode="numeric"
-            ariaLabel={item.text}
+            ariaLabel={labelledText}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             placeholder={item.placeholder}
           />
         ) : item.kind === "line" ? (
           <TextInput
-            ariaLabel={item.text}
+            ariaLabel={labelledText}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             placeholder={item.placeholder}
           />
         ) : (
           <TextArea
-            ariaLabel={item.text}
+            ariaLabel={labelledText}
             value={asText}
             onChange={(v) => onChange(item.id, v)}
             rows={item.rows ?? 3}
@@ -237,7 +239,7 @@ function MeasureItem({
 export function missingIds(blocks: Block[], answers: Answers): string[] {
   return blocks
     .flatMap(requiredIds)
-    .filter((id) => answers[id] === undefined || answers[id] === "");
+    .filter((id) => isMissingResponse(answers[id]));
 }
 
 /**

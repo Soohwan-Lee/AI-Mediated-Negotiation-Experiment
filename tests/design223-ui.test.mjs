@@ -1,5 +1,5 @@
 /**
- * Participant-facing guards for the Ver.2.23 briefing and task entry flow.
+ * Participant-facing guards for the Ver.2.26 briefing and task entry flow.
  *
  * These checks intentionally stay at the source boundary. The relevant
  * regressions are extra rendered phases and misleading fixed copy, not the
@@ -53,11 +53,13 @@ test("payment briefing uses study constants and does not promise an amount revea
   assert.ok(!shared.includes("decide the bonus"));
 });
 
-test("background questions are shown and saved one section at a time", () => {
+test("background questions save drafts but advance only after explicit submission", () => {
   assert.match(background, /const \[part, setPart\] = useState\(0\)/);
   assert.match(background, /block=\{currentBlock\}/);
   assert.ok(!background.includes("BLOCKS.map((block)"));
-  assert.match(background, /await saveResponses\("background", answers\)/);
+  assert.match(background, /RESPONSE_BLOCK = "v226_background"/);
+  assert.match(background, /_submitted_parts: nextSubmittedParts/);
+  assert.match(background, /restoredValidPart/);
   assert.match(background, /if \(part < BLOCKS\.length - 1\)/);
   assert.match(background, /if \(submitting\.current\) return/);
 });
