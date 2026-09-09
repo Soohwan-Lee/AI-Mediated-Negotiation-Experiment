@@ -28,6 +28,7 @@
 
 import { useRouter } from "next/navigation";
 import {
+  PhaseStrip,
   PreviousReading,
   STUDY_GUIDE_LAST_PAGE,
   StudyOrientation,
@@ -159,10 +160,11 @@ export default function InstructionPage() {
   return (
     <>
       <Page>
+        <PhaseStrip current="instructions" />
         <PageHeader
           eyebrow="Study guide · Quick check"
           title={`${CHECKS.length} questions before practice`}
-          subtitle="Check your understanding of the setup. If an answer is incorrect, read the explanation and try once more."
+          subtitle="Check your understanding of the setup. If an answer is wrong, read the note and try once more."
         />
 
         <div className="space-y-6">
@@ -217,14 +219,14 @@ export default function InstructionPage() {
       </Page>
 
       <ActionBar
-        label={canContinue ? "Continue to Practice Round" : submitted ? "Retry Missed Questions" : "Check Answers"}
+        label={canContinue ? "Next: the practice round" : submitted ? "Try the missed ones again" : "Check answers"}
         onClick={canContinue ? goNext : submitted ? retry : check}
         disabled={!canContinue && !submitted && !allAnswered}
         note={
           submitted && !allCorrect
-            ? `⚠️ ${wrong.length} question(s) need another look`
+            ? `${wrong.length} to look at again`
             : submitted && allCorrect
-              ? "🎉 All answers correct! Ready to proceed."
+              ? "All correct. Next is a 2-minute practice round. Nothing in it counts."
               : ""
         }
         secondary={

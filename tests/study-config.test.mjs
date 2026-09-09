@@ -10,6 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  PHASES,
   STUDY,
   STAGE_MINUTES,
   TOTAL_MINUTES,
@@ -92,6 +93,60 @@ test("the pre-assignment welcome card advertises the base rate, not the eventual
   assert.match(welcome, /hint="Base rate"/);
   assert.match(welcome, /Number\(STUDY\.compensation\)/);
   assert.doesNotMatch(welcome, /hint="Equivalent total rate"/);
+});
+
+test("the advertised range spans the two roles' guarantees", () => {
+  // Ver.2.24 §7.1: a Leader's £7 is fixed from assignment; a Member is
+  // guaranteed £6 with up to £1 recommended on top. Role is unknown at
+  // consent, so the range is the only honest pre-assignment headline.
+  assert.equal(money(STUDY.minTotal), money(STUDY.compensation));
+  assert.equal(money(STUDY.maxTotal), money(STUDY.totalPaid));
+  assert.ok(money(STUDY.minTotal) < money(STUDY.maxTotal));
+});
+
+test("the consent page headlines the total as a range, never base-plus-bonus", () => {
+  // "£6 + up to £1 bonus" presents the MEMBER's structure to everyone and
+  // understates what a Leader is guaranteed, which is why the tile shows the
+  // span instead. This pins the shape, not the styling.
+  const welcome = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+  assert.match(welcome, /STUDY\.minTotal.*STUDY\.maxTotal/s);
+  assert.doesNotMatch(welcome, /\+ up to \$\{STUDY\.currencySymbol\}\$\{STUDY\.bonusAmount\} bonus/);
+});
+
+test("both pre-task notices reach the participant before the practice round", () => {
+  // §8.1: keep the point sheet private, and stay anonymous. The point-sheet
+  // half is also pinned by the COMP3 comprehension item; this pins that the
+  // guide page a participant reads before practice actually carries both.
+  const guide = readFileSync(
+    new URL("../src/components/briefing-guide.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(guide, /Never give the other side the numbers/);
+  assert.match(guide, /Stay anonymous in the chat/);
+  assert.match(guide, /your employer/);
+});
+
+test("the guide says the counterpart moves on reasons without naming which reason works", () => {
+  // §8.1 requires the first half. The second is the whole study: saying the
+  // sensitive reason works better would stage the primary outcome.
+  const guide = readFileSync(
+    new URL("../src/components/briefing-guide.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(guide, /depends on the reasons they hear/);
+  assert.doesNotMatch(guide, /sensitive background (works|helps) (better|more)/i);
+});
+
+test("the phase strip names the five phases and marks practice as not counting", () => {
+  const labels = PHASES.map((p) => p.label);
+  assert.deepEqual(labels, [
+    "Instructions",
+    "Practice",
+    "Task 1",
+    "Task 2",
+    "Final questions",
+  ]);
+  assert.equal(PHASES.find((p) => p.key === "practice")?.doesNotCount, true);
 });
 
 test("the debrief calls the observed bonus input a recommendation, not a transfer", () => {

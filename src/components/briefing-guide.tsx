@@ -4,9 +4,64 @@ import Image from "next/image";
 import { useState } from "react";
 import { ActionBar, BackButton } from "./study-chrome";
 import { RoleDecisionFlow } from "./proxy-art";
-import { Card, CardTitle, Page, PageHeader } from "./ui";
-import { STUDY } from "@/lib/study-config";
+import { Card, CardTitle, Page, PageHeader, cx } from "./ui";
+import { PHASES, STUDY, type PhaseKey } from "@/lib/study-config";
 import type { Role } from "@/lib/types";
+
+/**
+ * "What happens next", as five words across the top of the screen.
+ *
+ * NOT the progress bar. The chrome's bar is derived from the URL and counts
+ * thirteen routes (interface rule 3); this one names the five PHASES a
+ * participant can actually hold in mind, and it exists because the PI's note
+ * was that nobody knows which phase they are in. Both can be on screen at
+ * once because they answer different questions: the bar says how far through,
+ * this says what kind of thing is happening.
+ *
+ * It carries no cue ring (rule 9). Nothing on it is waiting to be pressed —
+ * it is a map, not a control — and the screen's one ring belongs to whatever
+ * the participant is being asked to do.
+ */
+export function PhaseStrip({ current }: { current: PhaseKey }) {
+  return (
+    <ol
+      aria-label="What happens next"
+      className="mb-6 flex flex-wrap items-center gap-x-1.5 gap-y-2 text-xs"
+    >
+      {PHASES.map((phase, index) => {
+        const isCurrent = phase.key === current;
+        const isPast = index < PHASES.findIndex((p) => p.key === current);
+        return (
+          <li key={phase.key} className="flex items-center gap-1.5">
+            <span
+              aria-current={isCurrent ? "step" : undefined}
+              className={cx(
+                "rounded-full border px-2.5 py-1 font-bold",
+                isCurrent
+                  ? "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : isPast
+                    ? "border-slate-200 bg-white text-slate-500"
+                    : "border-slate-200 bg-white text-slate-400",
+              )}
+            >
+              {phase.label}
+              {"doesNotCount" in phase && phase.doesNotCount ? (
+                <span className="ml-1 font-semibold opacity-70">
+                  (does not count)
+                </span>
+              ) : null}
+            </span>
+            {index < PHASES.length - 1 ? (
+              <span aria-hidden className="text-slate-300">
+                ›
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 export function ReadingProgress({
   labels,
@@ -42,7 +97,17 @@ export function PreviousReading({
   </button>;
 }
 
-const GUIDE_PAGES = ["The setting", "Your role", "After each task", "The rules"] as const;
+/**
+ * THREE PAGES, DOWN FROM FOUR. "The setting" and "Your role" were two screens
+ * saying one thing — you are one of two colleagues settling two conditions —
+ * and a participant who has just read a consent page with its own three-part
+ * overview does not need it twice. What a participant needs BEFORE the
+ * practice round is: who they are, what they are agreeing on, that the point
+ * sheet is private, that the other side moves on the reasons it hears, and
+ * what they are paid. Anything past that is folded into a `<details>` or is
+ * on the briefing panel where it stays reachable all task.
+ */
+const GUIDE_PAGES = ["Your role", "After each task", "The rules"] as const;
 export const STUDY_GUIDE_LAST_PAGE = GUIDE_PAGES.length - 1;
 
 export function StudyOrientation({
@@ -66,47 +131,15 @@ export function StudyOrientation({
   return (
     <>
       <Page>
+        {/* The map first, then where you are on it. The strip names the five
+            phases; `ReadingProgress` counts the pages of THIS one. */}
+        <PhaseStrip current="instructions" />
         <ReadingProgress labels={GUIDE_PAGES} current={page} />
         <PageHeader eyebrow={`Study guide · ${page + 1} of ${GUIDE_PAGES.length}`}
-          title={["Two colleagues. Two working conditions.", `You are the ${isLeader ? "team lead" : "team member"}`, "What happens after each task", "What to do in each negotiation"][page]}
-          subtitle={["You will play a role in a company project team. Here is the setting before you see your first task.", "You keep this role in both tasks. The other participant plays the other role.", "Both people make one decision about the other after every negotiation.", "Read these rules before a short check and one practice round."][page]} />
+          title={[`You are the ${isLeader ? "team lead" : "team member"}`, "What happens after each task", "What to do in each negotiation"][page]}
+          subtitle={["You and one other participant settle two working conditions. You keep this role in both tasks.", "Both people make one decision about the other after every negotiation.", "Read these before a short check and one practice round."][page]} />
 
         {page === 0 ? (
-          <div className="grid items-center gap-6 lg:grid-cols-[1.05fr_1fr]">
-            <figure className="overflow-hidden rounded-[var(--radius-xl)] border border-slate-200 bg-[#f4efe5] shadow-[var(--shadow-md)]">
-              <Image
-                src="/illustrations/workplace-story.png"
-                width={1536}
-                height={1024}
-                sizes="(min-width: 1024px) 27rem, (min-width: 640px) 48rem, 100vw"
-                alt="Two colleagues separately read their briefings, then consider two unlabeled workplace choices together."
-                className="h-auto w-full"
-              />
-              <figcaption className="border-t border-slate-200/80 bg-white/90 px-4 py-3 text-xs leading-relaxed text-slate-600">
-                One shared project, two private briefings.
-              </figcaption>
-            </figure>
-
-            <ol className="space-y-2">
-              {[
-                ["Work on the same team", "You play colleagues with different roles."],
-                ["Set two conditions", "Choose one option for each. Both people must agree."],
-                ["Use private briefings", "Only you can see your goals, background, and points."],
-                ["Negotiate, then reflect", "Chat directly once and use an AI Proxy once. Questions follow each task."],
-              ].map(([title, text], index) => (
-                <li key={title} className="flex items-start gap-3 rounded-xl bg-white p-3 shadow-[var(--shadow-xs)]">
-                  <span className="tabular flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-border)] bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent)]">
-                    {index + 1}
-                  </span>
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900">{title}</h2>
-                    <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{text}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        ) : page === 1 ? (
           <div className="grid items-start gap-6 md:grid-cols-[0.95fr_1.05fr]">
             <figure className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--private-line)] bg-[var(--private-soft)] shadow-[var(--shadow-sm)]">
               <div className="relative">
@@ -180,7 +213,7 @@ export function StudyOrientation({
               </div>
             </div>
           </div>
-        ) : page === 2 ? (
+        ) : page === 1 ? (
           <div className="space-y-4">
             <RoleDecisionFlow role={role} />
             <Card padded={false} className="p-4 sm:p-5">
@@ -210,21 +243,46 @@ export function StudyOrientation({
           <div className="space-y-4">
             <Card>
               <CardTitle>Agree on both conditions</CardTitle>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">Each condition has four options. Your aim is a package worth more points to you. If you don&apos;t agree on both, you each get 0 points for that task. Direct negotiation lasts up to 5 minutes; you can finish sooner when you agree.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">Each has four options, and you both have to agree. If you do not agree on both, you each get 0 points for that task.</p>
+              {/*
+                §8.1: the participant is told the other side moves on the
+                reasons it hears. It must NOT say which kind of reason works.
+                Saying the sensitive one is better would stage the disclosure
+                the study measures, and naming the trade is pilot gate 6's own
+                question.
+              */}
+              <p className="mt-3 text-sm leading-relaxed text-slate-900">You can say why a condition matters to you, and ask about the other person&apos;s situation. How far they move depends on the reasons they hear.</p>
             </Card>
+
+            {/*
+              THE TWO NOTICES, together, on the page a participant reads right
+              before the practice round. Both are one sentence of instruction
+              plus one of consequence, and the point-sheet half is pinned by
+              the COMP3 comprehension item.
+            */}
             <Card tone="private">
-              <CardTitle>Keep point values private</CardTitle>
-              <p className="mt-2 text-sm leading-relaxed">Discuss the working conditions and why they matter. Never share the numbers from your point sheet in any form.</p>
+              <CardTitle>Two things to keep to yourself</CardTitle>
+              <p className="mt-2 text-sm leading-relaxed"><strong>Your point sheet.</strong> Never give the other side the numbers on it, in any form. Talk about the working conditions instead.</p>
+              <p className="mt-3 text-sm leading-relaxed"><strong>Who you are.</strong> Stay anonymous in the chat. Do not type your name, your employer, or any other identifying detail.</p>
             </Card>
+
             <Card>
-              <CardTitle>Choose what to explain</CardTitle>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">You can explain what matters to you and ask about the other person&apos;s situation.</p>
-              <p className="mt-3 text-sm leading-relaxed text-slate-900">Sharing sensitive background is optional. You can negotiate and reach an agreement without it. If you or your AI Proxy shares it, the other person may consider it in their later bonus recommendation or upward evaluation.</p>
+              <CardTitle>Sharing personal background is your choice</CardTitle>
+              <p className="mt-2 text-sm leading-relaxed text-slate-900">You can negotiate and agree without it. If you or your AI Proxy shares it, the other person may weigh it in their later bonus recommendation or upward evaluation.</p>
             </Card>
-            <Card>
-              <CardTitle>Two ways of taking part</CardTitle>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">In direct chat, use your own words; you do not need to repeat the briefing exactly. In the AI Proxy task, choose what your representative may share, watch the exchange, then approve, request changes, or refuse its proposed agreement. That task explains its policy before you choose.</p>
-            </Card>
+
+            {/*
+              Folded, not cut. This is real and a participant may want it, but
+              it is not needed BEFORE the practice round: the task screens
+              explain their own controls when they arrive, and the AI Proxy
+              task states its policy on the screen where the choice is made.
+            */}
+            <details className="rounded-2xl border border-slate-200 bg-white p-4">
+              <summary className="cursor-pointer text-sm font-bold text-slate-900">More detail on the two tasks</summary>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">In the direct task you chat with the other participant for up to 5 minutes, in your own words. You can finish sooner once you agree.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">In the AI Proxy task you choose what your representative may share, watch the exchange, then approve it, ask for a change, or refuse it. That task explains its policy before you choose.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">{isLeader ? `You are paid ${STUDY.currencySymbol}${STUDY.totalPaid} in total, fixed from now.` : `You are paid ${STUDY.currencySymbol}${STUDY.compensation} as a guaranteed base, and up to ${STUDY.currencySymbol}${STUDY.bonusAmount} more across the two tasks.`}</p>
+            </details>
           </div>
         )}
       </Page>

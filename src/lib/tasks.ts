@@ -317,7 +317,7 @@ const TASK_A: NegotiationTask = {
         "You lead this team. The director and your team know you as someone whose judgement is sound and who keeps commitments. Now you and a senior member of the team have to settle next quarter's working arrangements, twelve weeks of them.\n\nWhat matters most to you is **getting the team into the office as many days a week as you can**. **There is something only you know.** Four days a week is a number you told the director was doable before you had asked the team, and the director has already passed that answer upward. Your team does not know this.\n\n**Your work-reason card says**: this project has high expectations from the client, so execution in the first few weeks matters. Having the team together makes coordination faster, and who presents to the client shapes the early impression. So both the office days and the client presentations are on your mind. That is true too. What it does not say is which term matters more to you or that you already gave the director an answer. What you pass on is up to you.",
       objectives: [
         "Get as many days a week in the office as you can.",
-        "If the office days hold, the client meetings are something you can give ground on.",
+        "The client meetings count too. The point sheet shows what each option is worth to you.",
       ],
       requirementNote:
         "The office days are what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
@@ -355,7 +355,7 @@ const TASK_A: NegotiationTask = {
         "You are a senior member of this team. The lead knows you as the person who can be put in front of a client on your own. Now you and the lead have to settle next quarter's working arrangements, twelve weeks of them.\n\nWhat matters most to you is **presenting at as few of the client meetings as you can**. **There is something the lead does not know.** After the last presentation, the client contact told you privately that they would prefer the team lead to present from now on. You did not tell the lead.\n\n**Your work-reason card says**: your analysis scope is wide this quarter, so the workload is heavy. On office days, commuting and meetings reduce your analysis time, and preparing a presentation takes several days. So both the office days and the presentations are a burden. That is true too. What it does not say is which term matters more to you or what the client said. What you pass on is up to you.",
       objectives: [
         "Get the number of client meetings you present at down as far as you can.",
-        "If the meetings come down, the office days are something you can give ground on.",
+        "The office days count too. The point sheet shows what each option is worth to you.",
       ],
       requirementNote:
         "Fewer client meetings is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
@@ -470,7 +470,7 @@ const TASK_B: NegotiationTask = {
         "You are the team lead setting the terms for the first four weeks of a new project.\n\nWhat matters most to you is **having the other person on the new project as many days a week as possible**. **There is something only you know.** When you submitted the plan, you mistakenly estimated fewer people than the project actually needs. The plan only works if this person is assigned four days a week, and asking for more people now would show the director that the estimate was wrong. Your team does not know this.\n\n**Your work-reason card says**: a new project's direction is set in the first four weeks. Having people assigned keeps the early work moving, and consistent client reporting builds trust. So both the project staffing and the client reporting need attention. That is true too. What it does not say is which term matters more to you or that you underestimated the staffing need. What you pass on is up to you.",
       objectives: [
         "Get as many days a week on the new project as you can.",
-        "If the days hold, the weekly reports are something you can give ground on.",
+        "The weekly reports count too. The point sheet shows what each option is worth to you.",
       ],
       requirementNote:
         "The days on the new project are what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
@@ -508,7 +508,7 @@ const TASK_B: NegotiationTask = {
         "You are the senior team member setting the terms for the first four weeks of a new project.\n\nWhat matters most to you is **writing as few of the weekly client reports as you can**. **There is something the lead does not know.** Last month the client contact told you directly that your weekly report was lacking and that they would prefer the team lead to prepare it from now on. You did not tell the lead.\n\n**Your work-reason card says**: two of your current projects have deadlines that overlap this month. Taking on the new project would delay your existing work, and each weekly report requires separate time to prepare. So both the new project and the reports are difficult to fit in. That is true too. What it does not say is which term matters more to you or what the client said. What you pass on is up to you.",
       objectives: [
         "Get the number of weekly client reports you write down as far as you can.",
-        "If the reports come down, days on the new project are something you can take on more of.",
+        "The days on the new project count too. The point sheet shows what each option is worth to you.",
       ],
       requirementNote:
         "Fewer weekly reports is what you have decided you need. That is a fact about your situation, not an instruction to demand or refuse any particular package.",
@@ -554,8 +554,12 @@ export const PRACTICE_TASK: NegotiationTask = {
   title: "Practice — The Team Room",
   reservationPoints: 0,
   requirementIssueId: { leader: "practice_date", member: "practice_venue" },
+  // TWO SENTENCES. A practice brief is read standing up, on the way to the
+  // real task; anything longer competes with the coach bubble that is telling
+  // the participant what to press. It also stays free of any hint that one
+  // kind of reason works better than another (§8.7, ninth point).
   publicBrief:
-    "This is a practice round at the same company, on two small things nobody has strong feelings about: which week the office move happens, and where the team's new printer goes. Nothing here counts towards your results — it is only to get familiar with reading a point sheet and finding a trade.",
+    "A practice round at the same company, on two small things: which week the team moves floor, and where the new printer goes. Nothing here counts.",
   issues: [
     {
       id: "practice_date",
@@ -595,10 +599,10 @@ export const PRACTICE_TASK: NegotiationTask = {
       title: "Team Lead",
       organizationalPosition: "You are sorting out both of these.",
       roleStory:
-        "You would like this settled quickly. The move week matters to you far more than where the printer goes — which is worth noticing, because the other side feels the opposite way.",
+        "The move week matters to you far more than where the printer goes. The other side feels the opposite way.",
       objectives: [
         "Get the office move done early.",
-        "Where the printer goes matters less to you — so it is what you can trade.",
+        "Where the printer goes matters less to you, so it is what you can trade.",
       ],
       requirementNote: "Nothing here counts. Practise reading the point sheet.",
       disclosureRisk: "",
@@ -609,10 +613,10 @@ export const PRACTICE_TASK: NegotiationTask = {
       title: "Senior Team Member",
       organizationalPosition: "You are at your desk all day.",
       roleStory:
-        "Where the printer goes matters to you far more than the move week does — which is worth noticing, because the other side feels the opposite way.",
+        "Where the printer goes matters to you far more than the move week does. The other side feels the opposite way.",
       objectives: [
         "Keep the printer within reach of your desk.",
-        "The move week matters less to you — so it is what you can trade.",
+        "The move week matters less to you, so it is what you can trade.",
       ],
       requirementNote: "Nothing here counts. Practise reading the point sheet.",
       disclosureRisk: "",

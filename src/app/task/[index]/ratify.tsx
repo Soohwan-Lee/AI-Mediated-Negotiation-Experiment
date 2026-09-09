@@ -155,14 +155,17 @@ export function RatifyPhase({
           </Card>
 
           <Card className={cx("mb-6", !choice && tentative && "cue-ring")}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>This part is yours</CardTitle>
+            {/* A NEUTRAL PROMPT AND NOTHING ELSE. The heading was "This part
+                is yours" over a paragraph about what a proxy can and cannot
+                do, which is an argument for taking the decision seriously
+                sitting directly above the three controls — and the
+                distribution across those three IS the finding, so any framing
+                above them is a thumb on it. What is left asks the question
+                and stops. */}
+            <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>What would you like to do with this package?</CardTitle>
               {!choice && tentative ? <Cue>Your decision</Cue> : null}
             </div>
-            <p className="mt-1.5 mb-3.5 text-sm text-slate-600">
-              Your AI Proxy could speak for you. It cannot settle anything for
-              you — nothing is final until you say so.
-            </p>
 
             {tentative ? (
               <div className="grid gap-2.5">

@@ -3,7 +3,8 @@
 ## Ver.2.21 alignment override
 
 The design moved to Ver.2.21 (source of truth: `N - Experimental Design
-(Ver.2.21).md`). Ver.2.21 changes the ladder itself, so a note written against
+(Ver.2.24).md`; Ver.2.22–2.24 changed measures, timing and pay, not the
+ladder). Ver.2.21 changes the ladder itself, so a note written against
 Ver.2.20 is not merely out of date — it describes a different study. Where an
 older passage anywhere below conflicts, these rules govern:
 
@@ -23,8 +24,10 @@ older passage anywhere below conflicts, these rules govern:
 - **The Proxy mandate has ONE decision: the sensitive checkbox.** The work
   reason is a fixed utterance, shown ticked and locked.
 - **Task B's Member issue is the weekly client report**, not urgent-call duty.
-- Payment: £7.50 base + £1 per task = £9.50 fixed full payout, against a
-  54-minute screen budget advertised as 53. IRB status is an **exemption**, not
+- Payment (Ver.2.24 §7.1): £6 base + £1 extra = £7, paid to everyone in
+  practice, against a 40-minute screen budget advertised as 40. The consent
+  page shows it as a £6–£7 range because role is unknown there. IRB status is
+  an **exemption**, not
   an approval.
 - RATIFY approval still finalizes the package immediately; only modification or
   refusal opens the three-minute conversation.
@@ -34,7 +37,7 @@ older passage anywhere below conflicts, these rules govern:
 
 Online experiment platform for a 2027 CHI submission on AI-mediated
 negotiation. Source of truth for the design is
-`N - Experimental Design (Ver.2.21).md`. This file records the constraints that
+`N - Experimental Design (Ver.2.24).md`. This file records the constraints that
 are easy to break by accident.
 
 ## Stack
@@ -1112,7 +1115,7 @@ Departure from the default is what is recorded, not the selection:
 switches REMARK to demand-free wording if it clears 20% at pilot.
 
 Inside a Proxy task: cover → brief → **RISK** → **mandate (levels + reason
-cards, one screen)** → check with your proxy → confirm → watch the two AI
+cards, one screen)** → confirm → watch the two AI
 Proxies → **RATIFY** → handover → negotiate directly → review.
 RATIFY decides whether the last two steps happen: approval finalizes the
 package and goes straight to review; only modification or refusal opens the
@@ -1171,39 +1174,15 @@ reasons are therefore a section BELOW both term cards, and the two term cards
 stay identical. `PreferenceForm` takes the section as a prop; Direct passes
 none.
 
-**The participant can question their own AI Proxy before it runs**
-(`RehearsalChat`, `/api/proxy-rehearsal`). They ask what it will open with, how
-far it will go, which reasons it may use, and can then go back and change the
-mandate. It is optional and says so. Three limits keep it from disturbing the
-design, and all three are enforced rather than intended:
-
-- **Not a negotiation.** The counterpart is absent and never spoken for.
-  Nothing is proposed or agreed, and `machine.ts` is never called — so no
-  negotiation decision moves to the model.
-- **Not a second bite.** It is BEFORE the exchange. The deleted post-hoc
-  revision let a Proxy participant re-run a finished negotiation, which is a
-  bite Direct never had; editing instructions before anyone has spoken is
-  just writing a mandate.
-- **No unticked card, ever.** The route screens the generated text against the
-  cards left unticked (`lib/ai/reason-leak.ts`) and substitutes a refusal.
-  Hearing a sensitive card read aloud without authorizing it would stage the
-  disclosure being measured, so a prompt instruction alone is not enough.
-
-  **That screen is the one guardrail whose failure is invisible**, which is why
-  it has its own test file (`tests/reason-leak.test.mjs`): a leak looks like an
-  ordinary helpful answer and the participant would never know a card they
-  withheld had been spoken back to them. It matches VOCABULARY, not sentences,
-  because a leak arrives as a paraphrase; and it SUBTRACTS the sayable
-  vocabulary first, because a forbidden card shares most of its words with the
-  term it belongs to. Rewriting the Task A Member card in Ver.2.18 left only
-  four distinctive words after that subtraction, against 9–11 for the others,
-  so a faithful paraphrase could have carried the secret past it; it was
-  respecified to eleven. **Re-run this test before anything else whenever an SB
-  card is reworded.**
-
-What it costs, and it is real: the Proxy arm gains screen time and a written
-exchange Direct has no counterpart for. Read it as part of the manipulation,
-and against the §10 gate 8 timing budget.
+**There is no rehearsal chat with your own proxy any more (2026-09-09).**
+Through Ver.2.21 a Proxy participant could question their proxy before it ran
+(`RehearsalChat`, `/api/proxy-rehearsal`). Ver.2.24 §7 and §8.7 have no such
+screen, and it was Proxy-only screen time and a written exchange Direct never
+had. The flow is mandate → confirm → watch. What survived is
+`lib/ai/reason-leak.ts`, because the Direct counterpart route uses the same
+vocabulary screen to keep the counterpart from voicing its own SB before
+reciprocity allows it; `tests/reason-leak.test.mjs` still pins it, and it must
+be re-run whenever an SB card is reworded.
 
 **The decision comes back to the participant: `RATIFY`** (§7, §9.3). The
 proxies run ONCE — no revision, no second run — and then the participant
@@ -1655,8 +1634,7 @@ fills once and every screen after it inside the same component arrives empty.
 | Supabase persistence | `lib/store.ts` — swap `getStore()` to the `SupabaseStore` in `lib/store-supabase.ts` |
 | The `{op, payload}` persistence endpoint | `app/api/persist/route.ts` — does not exist yet |
 | The reason classifier (P5) | `app/api/classify-reason/route.ts` · `buildClassifierPrompt` in `lib/ai/prompts.ts` |
-| Rehearsal chat (participant ↔ own proxy) | `app/api/proxy-rehearsal/route.ts` · the rehearsal prompt in `lib/ai/prompts.ts` |
-| The unticked-card screen for the rehearsal | `lib/ai/reason-leak.ts` — tested by `tests/reason-leak.test.mjs` |
+| The forbidden-card vocabulary screen (counterpart reciprocity) | `lib/ai/reason-leak.ts` — tested by `tests/reason-leak.test.mjs` |
 | Atomic slot claim | `app/api/assign/route.ts` — `claimSlot` in `lib/assignment.ts` is the only thing that decides an assignment |
 | Task payoffs, role stories, reason cards, the §6.6 abstractions and covers | `lib/tasks.ts` |
 | Counterpart moves, the justification ladder, outcome coding | `lib/negotiation/machine.ts` |
@@ -1667,7 +1645,7 @@ fills once and every screen after it inside the same component arrives empty.
 | The live end-to-end simulation | `scripts/simulate-negotiation.mjs` — `npm run simulate` |
 | Model / reasoning effort, the live-study guard | `lib/ai/config.ts` |
 | Launch readiness report and the entry gate | `app/api/preflight/route.ts` |
-| Agent behavior rules (P0–P4, the rehearsal, the classifier) | `lib/ai/prompts.ts` |
+| Agent behavior rules (P0–P4, the classifier) | `lib/ai/prompts.ts` |
 | Guardrails, the message cap and its protected clauses | `lib/ai/validator.ts` |
 | REMARK and ATTR | `src/app/task/[index]/remark.tsx` |
 | Timings, payment, IRB text, completion code | `lib/study-config.ts` |
@@ -1681,11 +1659,6 @@ fills once and every screen after it inside the same component arrives empty.
 
 Pages never touch persistence or the network directly — they go through
 `lib/store.ts` and `lib/participant-context.tsx`.
-
-Note that `lib/ai/prompts.ts` calls BOTH the rehearsal prompt and the
-classifier "P5", following the design doc's own §12 numbering in each case.
-They are different calls with different routes; read the section headers rather
-than the label.
 
 ## Verified against the live model
 
@@ -1731,14 +1704,14 @@ keeping:
   through). Live runs were losing the acceptance wording for no reason. It is
   still logged for the gate-10 audit.
 
-**Ver.2.21 was re-verified the same way** — `npm run simulate`, **fourteen
+**Ver.2.21 was re-verified the same way** — `npm run simulate`, **thirteen
 scenarios** through the real routes against the live model, plus the unit
 suite, ESLint and a production build. **The simulation drives the tier through
 the REAL classifier — one live P5 call per participant turn — because that is
 the only automated check on it.** Deriving the tier from a card id there would
 test a study that no longer exists.
 
-The fourteen and what each is for:
+The thirteen and what each is for:
 
 - `direct-wr-only` — the work reason alone lands T1 (1,000/1,000) **and the
   counterpart's own SB never appears**. That second half is the reciprocity
@@ -1764,8 +1737,6 @@ The fourteen and what each is for:
   path.
 - `closing-self-disclose` — the Proxy closing after a WR-only run: the
   participant confesses in person → T2, `SB-TIMING = wrap_up`.
-- `rehearsal-leak` — asks the rehearsal proxy to repeat an unticked SB and
-  checks the refusal.
 - `classifier-probe` — the classifier asked directly. The **denial** ("it's not
   like the client complained about me") and the **vague hint** must both land
   BELOW `SB`, and the stance extraction must resolve a real counter-offer into
@@ -1876,7 +1847,7 @@ first-opportunity SB schedule (§6.5), **RECV-EVAL** (§5), **RATIFY as its own
 screen** with the conditional closing conversation (§7), and the removal of the
 range mandate from both arms (§2.6, §8.6).
 
-Verified against the live model end to end — `npm run simulate`, fourteen
+Verified against the live model end to end — `npm run simulate`, thirteen
 scenarios through the real routes with the classifier in the loop; see
 "Verified against the live model" above, and `docs/design-2.21-update.md` for
 the staged record.
@@ -1914,10 +1885,12 @@ Nothing structural. What remains is values to fix and behaviour to observe:
 - **Pilot-dependent numbers.** The T1 rung (1,000), the strength of the §5②
   decision guideline, and the Prolific completion code.
 
-  **The payment is settled**: £7.50 participation plus £1.00 per task is £9.50
-  for a 53-minute study — £10.75 an hour, above Prolific's recommended fair-pay
-  rate of £9.00 (their hard floor is £6.00/hour). GBP because Prolific pays in
-  it. **The pay rises whenever the budget does, and the direction is the
+  **The payment is settled (Ver.2.24 §7.1)**: £6.00 base plus £1.00 extra is
+  £7.00 for a 40-minute study — £10.50 an hour on the total and £9.00 on the
+  base alone, at Prolific's recommended fair-pay rate of £9.00 (their hard
+  floor is £6.00/hour). GBP because Prolific pays in it. A Leader is told the
+  £1 is theirs from role assignment and that they recommend up to £0.50 per
+  task for the Member; a Member is told £6 is guaranteed and £6–£7 is the span. **The pay rises whenever the budget does, and the direction is the
   rule.** The number to adjust is always the PAY, never the advertised minutes:
   the estimate is derived from the screens that exist, and quoting less than
   the study takes underpays whoever is slower than it. Ver.2.21 cut the budget
@@ -1943,8 +1916,8 @@ Nothing structural. What remains is values to fix and behaviour to observe:
   than it was. SCRIPT-CLOSE is what stands between that participant and zero.
   Watch the rate rather than pre-emptively widening anything.
 
-- **Timing.** `STAGE_MINUTES` sums to 54 minutes and the consent page
-  advertises 53. `TOTAL_MINUTES` is derived from those same numbers and
+- **Timing.** `STAGE_MINUTES` sums to 40 minutes and the consent page
+  advertises 40 (Ver.2.24 §7: Direct chat 5 minutes, Proxy closing 2). `TOTAL_MINUTES` is derived from those same numbers and
   `timingIsHonest()` pins the relation — the advertised figure may round the
   budget DOWN by at most a minute and never further, because a listing that
   promises less than the study takes underpays anyone slower than the estimate
@@ -1991,7 +1964,7 @@ Nothing structural. What remains is values to fix and behaviour to observe:
   one-shot scripts and script–machine agreement;
   `tests/turn-contract.test.mjs` and `tests/recoverable-request.test.mjs` pin
   the turn contract and its recovery; the route tests pin the three API
-  contracts; `tests/reason-leak.test.mjs` pins the rehearsal guardrail in both
+  contracts; `tests/reason-leak.test.mjs` pins the forbidden-card screen in both
   directions; the live simulation covers the WR-only path, the split
   confession and a mid-closing disclosure. What is still unexercised
   automatically is the INTERFACE around the failure branches — the emergency

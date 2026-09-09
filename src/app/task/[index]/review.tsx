@@ -23,24 +23,24 @@
  * reached. `ownRequirementPreserved` is coded from the package regardless of
  * how they feel about it, which is what §9.3.1 asks for.
  *
- * The transcript is here too, and the screen waits for its end to come into
- * view. Moving on without reading how it was reached would make the
- * representation and ownership items meaningless — and OWN-AI4
- * (over-reliance) is interpreted against exactly this: whether they looked.
+ * THE TRANSCRIPTS ARE NOT HERE ANY MORE (Ver.2.24 §7). This screen used to
+ * carry the participant's own conversation, the proxies' exchange, and a
+ * scroll-to-the-end gate on the uptake question — three chat panels on a
+ * screen whose job is to say what was settled, and a gate that made a paid
+ * worker scroll back through a conversation they had just had. What every
+ * §9.4 item needs is the transcript on the SURVEY screens that ask about it,
+ * where `ProxyTranscriptPanel` and `TranscriptReview` still live.
+ *
+ * The transcript props are still ACCEPTED rather than removed: both arms pass
+ * them, and dropping them from the signature would be an edit in files this
+ * change does not own. They are simply not rendered here.
  */
 
-import { useEffect, useRef, useState } from "react";
-import { Transcript, type DisplayMessage } from "@/components/negotiation";
+import { useState } from "react";
+import type { DisplayMessage } from "@/components/negotiation";
 import { BriefingPanel, TaskHeader, TaskLayout } from "@/components/session";
 import { ActionBar } from "@/components/study-chrome";
-import {
-  Callout,
-  Card,
-  CardTitle,
-  Cue,
-  Page,
-  cx,
-} from "@/components/ui";
+import { Card, CardTitle, Cue, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { codeOutcome, type SbTiming } from "@/lib/negotiation/machine";
 import { useParticipant } from "@/lib/participant-context";
@@ -51,12 +51,7 @@ import {
   requirementIssue,
 } from "@/lib/tasks";
 import type { NegotiationTask, Package, Role } from "@/lib/types";
-import {
-  DecisionButton,
-  OutcomeValue,
-  ProxyTranscriptPanel,
-  TermsList,
-} from "./shared";
+import { DecisionButton, OutcomeValue, TermsList } from "./shared";
 
 /**
  * How the participant responded to the other side's requirement.
@@ -76,11 +71,6 @@ export function ReviewPhase({
   tentative,
   hoped,
   behaviour,
-  transcript,
-  transcriptTitle,
-  transcriptHint,
-  proxyTranscript,
-  isProxy,
   onDone,
 }: {
   taskIndex: 1 | 2;
@@ -148,21 +138,13 @@ export function ReviewPhase({
      */
     sbTiming?: SbTiming;
   };
+  /** Accepted and not rendered — see the note at the top of this file. */
   transcript: DisplayMessage[];
   transcriptTitle: string;
   transcriptHint: string;
-  /**
-   * The AI Proxies' exchange, in a Proxy task. Shown ALONGSIDE the
-   * participant's own conversation, never instead of it.
-   *
-   * Both have to be here. The participant's own words are what the decision is
-   * about; the proxies' are what several of the following items ask them to
-   * judge — whether the other side's requirement read as genuinely theirs,
-   * whether their own proxy represented them, who is answerable. Showing only
-   * one makes half the questionnaire a memory test.
-   */
+  /** Accepted and not rendered — see the note at the top of this file. */
   proxyTranscript?: DisplayMessage[];
-  /** Proxy tasks show the other participant's closing message. */
+  /** Accepted and not rendered — see the note at the top of this file. */
   isProxy: boolean;
   onDone: () => void;
 }) {
@@ -178,51 +160,16 @@ export function ReviewPhase({
     ? preservesRequirement(task, role, tentative[mine.id])
     : false;
 
-  /**
-   * The counterpart's one closing line. Any agreement is accepted in
-   * conversation by the machine's rules, so there are only two: settled, and
-   * not. Inlined so the mockup reads correctly offline; the voice matches P2's
-   * register.
-   *
-   * NO FALLBACK PLAN IS MENTIONED. There isn't one since Ver.2.21 — nothing is
-   * settled and both sides score zero — and having the counterpart refer to
-   * one would tell the participant, in the other side's own voice, that
-   * something was salvaged.
-   */
-  const principalLine = !tentative
-    ? "ah, that's a shame. || nothing settled then — thanks for trying anyway."
-    : "glad we got that settled. || works for me — confirming it from my side.";
-
   const [requirementResponse, setRequirementResponse] =
     useState<RequirementResponse | null>(null);
 
-  // The question unlocks once the end of the transcript has been seen. A
-  // marker is used rather than a scroll position because a short transcript
-  // may already be fully visible, and that counts as read.
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
-  const [transcriptSeen, setTranscriptSeen] = useState(false);
-
-  useEffect(() => {
-    const el = transcriptEndRef.current;
-    if (!el || transcriptSeen) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) setTranscriptSeen(true);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [transcriptSeen]);
-
   useDevAutofill(() => {
     setRequirementResponse((c) => c ?? "accommodate");
-    // The gate is "have they read to the end"; in mockup mode nobody has, and
-    // waiting for an intersection that will not happen would strand the walk.
-    setTranscriptSeen(true);
   }, `review-t${taskIndex}`);
 
-  const canDecide = useDevGate(transcriptSeen);
   const needsRequirementResponse = Boolean(theirOption);
   const canSubmit = useDevGate(
-    transcriptSeen && (!needsRequirementResponse || requirementResponse !== null),
+    !needsRequirementResponse || requirementResponse !== null,
   );
 
   async function submit() {
@@ -306,214 +253,149 @@ export function ReviewPhase({
         <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
           <TaskHeader
             taskIndex={taskIndex}
-            title="Negotiation Results & Summary"
+            title="Result"
             steps={steps}
             current={stepIndex}
           />
 
-          <div className="mb-6">
-            {tentative ? (
-              <Callout title="✅ Agreement Successfully Reached!">
-                <p className="text-sm leading-relaxed text-emerald-950">
-                  You and the other participant settled on a complete project package. Below is the breakdown of agreed terms, your personal payoff points, and the full exchange transcript.
-                </p>
-              </Callout>
-            ) : (
-              <Callout title="⚠️ Negotiation Concluded Without Agreement" tone="warning">
-                <p className="text-sm leading-relaxed text-amber-950">
-                  You did not agree on both conditions, so nothing is settled. This task scores 0 points for both of you.
-                </p>
-              </Callout>
-            )}
-          </div>
+          {/* ONE SCREEN, THE DECISION ONLY (Ver.2.24 §7).
+              The transcripts used to sit here — the participant's own, the
+              proxies', and a scroll-to-the-end gate on the uptake question
+              below. Three panels of chat on a screen whose job is to say what
+              was agreed, and the gate made a paid worker scroll through a
+              conversation they had just had. What every §9.4 item needs is
+              the transcript on the SURVEY screens that ask about it, not
+              here. This screen answers "what did we settle on, and what is it
+              worth to me". */}
 
-          <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+          {tentative ? (
+            <p className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">
+              You reached an agreement on both issues.
+            </p>
+          ) : (
+            <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+              No agreement. Nothing is settled, and this task scores 0 for both
+              of you.
+            </p>
+          )}
+
+          {/* `items-start` so the left card does not stretch to the height of
+              the points card beside it and leave a block of empty white. */}
+          <div className="mb-6 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
             <Card className="border-slate-200 bg-white">
-              <CardTitle
-                hint={
-                  !tentative
-                    ? "Nothing was settled on either condition."
-                    : hoped
-                    ? "What you set out to get, next to what was agreed:"
-                    : "Settled option for each term:"
-                }
-              >
-                {tentative ? "📦 Final Agreed Package" : "No agreed package"}
-              </CardTitle>
-              <div className="mt-3">
-                {tentative ? (
-                  hoped ? (
-                    <div className="space-y-2.5">
-                      {task.issues.map((issue) => {
-                        const hopedLabel = issue.options.find(
-                          (o) => o.id === hoped[issue.id],
-                        )?.label;
-                        const agreedLabel = issue.options.find(
-                          (o) => o.id === tentative[issue.id],
-                        )?.label;
-                        const same = hoped[issue.id] === tentative[issue.id];
-                        return (
-                          <div
-                            key={issue.id}
-                            className="rounded-xl border border-slate-100 bg-slate-50/60 p-3"
-                          >
-                            <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
-                              {issue.label}
-                            </p>
-                            <p className="mt-1 text-xs sm:text-sm text-[var(--ink-2)]">
-                              You hoped for{" "}
-                              <strong className="text-slate-800">
-                                {hopedLabel ?? "—"}
-                              </strong>
-                              {" · "}agreed{" "}
-                              <strong className="text-slate-800">
-                                {agreedLabel ?? "—"}
-                              </strong>
-                              {same ? " — as you hoped." : "."}
-                            </p>
-                          </div>
-                        );
-                      })}
-                      {(() => {
-                        // The gap is reported on the CORE issue only (§3.3's
-                        // neutral shortfall line). A whole-package delta would
-                        // show a shortfall even on the best reachable
-                        // agreement, because the plan's level on the OTHER
-                        // side's term was never winnable — and reading the
-                        // maximum as a loss is exactly the editorialising
-                        // this screen must not do.
-                        const at = (pkg: Package) =>
-                          mine.options.find((o) => o.id === pkg[mine.id])
-                            ?.points[role] ?? 0;
-                        const gap = at(hoped) - at(tentative);
-                        if (gap <= 0) return null;
-                        return (
-                          <p className="text-xs text-[var(--ink-2)]">
-                            On {mine.label.toLowerCase()}, the agreement is
-                            below what you hoped for — {gap.toLocaleString()}{" "}
-                            points less for you on that term.
+              <CardTitle>{tentative ? "What you agreed" : "Nothing was agreed"}</CardTitle>
+
+              {tentative ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  {task.issues.map((issue, index) => {
+                    const agreedLabel = issue.options.find(
+                      (o) => o.id === tentative[issue.id],
+                    )?.label;
+                    const hopedLabel = hoped
+                      ? issue.options.find((o) => o.id === hoped[issue.id])?.label
+                      : null;
+                    const same = hoped
+                      ? hoped[issue.id] === tentative[issue.id]
+                      : false;
+                    return (
+                      <div
+                        key={issue.id}
+                        className="overflow-hidden rounded-xl border border-slate-200"
+                      >
+                        {/* Positional headings, same two words in the same
+                            order for both roles — they say there are two
+                            issues without saying which one the study is
+                            about (§5 principle 1). */}
+                        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2">
+                          <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-[var(--ink-3)]">
+                            Issue {index + 1}
                           </p>
-                        );
-                      })()}
-                    </div>
-                  ) : (
-                    <TermsList task={task} terms={tentative} />
-                  )
-                ) : (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-center text-xs sm:text-sm font-semibold text-amber-900">
-                    No agreement was reached, so nothing is settled on either condition.
-                  </div>
-                )}
-              </div>
+                          <p className="text-sm font-bold leading-snug text-[var(--ink)]">
+                            {issue.label}
+                          </p>
+                        </div>
+                        <div className="p-3">
+                          <p className="text-base font-black text-[var(--ink)]">
+                            {agreedLabel ?? "—"}
+                          </p>
+                          {hopedLabel ? (
+                            <p className="mt-1 text-xs text-[var(--ink-3)]">
+                              {same
+                                ? "As you hoped for."
+                                : `You hoped for ${hopedLabel}.`}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-3">
+                  <TermsList task={task} terms={tentative ?? {}} />
+                </div>
+              )}
+
+              {/* The gap is reported on the CORE issue only (§3.3's neutral
+                  shortfall line). A whole-package delta would show a
+                  shortfall even on the best reachable agreement, because the
+                  plan's level on the OTHER side's term was never winnable —
+                  and reading the maximum as a loss is exactly the
+                  editorialising this screen must not do. */}
+              {tentative && hoped
+                ? (() => {
+                    const at = (pkg: Package) =>
+                      mine.options.find((o) => o.id === pkg[mine.id])
+                        ?.points[role] ?? 0;
+                    const gap = at(hoped) - at(tentative);
+                    if (gap <= 0) return null;
+                    return (
+                      <p className="mt-3 text-xs leading-relaxed text-[var(--ink-2)]">
+                        On {mine.label.toLowerCase()}, the agreement is below
+                        what you hoped for. That is {gap.toLocaleString()}{" "}
+                        points less for you on that issue.
+                      </p>
+                    );
+                  })()
+                : null}
             </Card>
+
             <OutcomeValue task={task} terms={tentative} role={role} />
           </div>
 
-          {/* Only when the two principals actually spoke. An approver never
-              opened a closing conversation (Ver.2.13 §7), so a "post-negotiation
-              message" from the other side would be a message nobody sent. */}
-          {isProxy && transcript.length > 0 ? (
-            <Card className="mb-6 border-slate-200 bg-white">
-              <CardTitle hint="Post-negotiation message:">👤 Counterpart Reaction</CardTitle>
-              <div className="mt-2">
-                <Transcript
-                  messages={[
-                    {
-                      id: "principal-close",
-                      speaker: "counterpart_principal",
-                      text: principalLine,
-                    },
-                  ]}
-                  flow
-                />
-              </div>
-            </Card>
-          ) : null}
-
-          {proxyTranscript?.length ? (
-            <ProxyTranscriptPanel transcript={proxyTranscript} />
-          ) : null}
-
-          {/* THE PARTICIPANT'S OWN CONVERSATION — when there was one.
-              A Proxy participant who approved the package straight off never
-              spoke to the other side, and an empty panel captioned "your
-              conversation" invites them to look for words they never wrote.
-              The proxies' exchange above IS what they are judging in that
-              case, and it is already on the screen. The end marker moves with
-              the panel so the reflection question still unlocks either way. */}
-          {transcript.length > 0 ? (
-            <Card className="mb-6 flex flex-col overflow-hidden border-slate-200" padded={false}>
-              <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-3.5 flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-xs sm:text-sm font-bold text-[var(--ink)] leading-snug">{transcriptTitle}</h2>
-                  <p className="text-xs text-[var(--ink-2)] leading-relaxed break-words">
-                    {transcriptHint}{" "}
-                    {needsRequirementResponse
-                      ? "(Please scroll to the end to unlock the reflection question below)"
-                      : ""}
-                  </p>
-                </div>
-                <span className="shrink-0 text-2xs font-bold text-slate-500 bg-white px-2.5 py-1 rounded-full border border-slate-200">
-                  {transcript.length} turns
-                </span>
-              </div>
-              <Transcript messages={transcript} flow endRef={transcriptEndRef} />
-            </Card>
-          ) : (
-            <div ref={transcriptEndRef} />
-          )}
-
           {theirOption ? (
             <Card
-              className="mb-6 transition-all"
+              className="mb-6"
               id="q-requirement-response"
-              cue={canDecide && requirementResponse === null}
+              cue={requirementResponse === null}
             >
               <CardTitle
-                hint={`They requested ${theirOption.label.toLowerCase()} on ${theirs.label.toLowerCase()}.`}
+                hint={`They asked for ${theirOption.label.toLowerCase()} on ${theirs.label.toLowerCase()}.`}
                 aside={
-                  canDecide && requirementResponse === null ? (
-                    <Cue>Required Response</Cue>
-                  ) : null
+                  requirementResponse === null ? <Cue>1 to answer</Cue> : null
                 }
               >
-                🤝 Post-Negotiation Reflection: How did you approach their request?
+                How did you handle their request?
               </CardTitle>
 
-              {!canDecide ? (
-                <div className="mb-4 mt-2">
-                  <Callout tone="warning" title="Review Transcript First">
-                    <p className="text-xs sm:text-sm">
-                      Please scroll through the conversation above to review how the discussion unfolded before answering.
-                    </p>
-                  </Callout>
-                </div>
-              ) : null}
-
-              <div
-                className={cx(
-                  "grid gap-3 transition-opacity sm:grid-cols-3 mt-3",
-                  !canDecide && "pointer-events-none opacity-40",
-                )}
-                aria-disabled={!canDecide}
-              >
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <DecisionButton
                   selected={requirementResponse === "accommodate"}
                   onClick={() => setRequirementResponse("accommodate")}
-                  label="I Accepted It Fully"
-                  hint="Conceded on their preferred level without conditions"
+                  label="I accepted it"
+                  hint="Gave them the level they wanted, without conditions"
                 />
                 <DecisionButton
                   selected={requirementResponse === "trade"}
                   onClick={() => setRequirementResponse("trade")}
-                  label="I Traded in Exchange"
-                  hint="Accepted their request in exchange for concessions on other terms"
+                  label="I traded for it"
+                  hint="Gave it in exchange for something on the other issue"
                 />
                 <DecisionButton
                   selected={requirementResponse === "reduce"}
                   onClick={() => setRequirementResponse("reduce")}
-                  label="I Pushed Back / Reduced"
-                  hint="Negotiated down to a lower level or held my ground"
+                  label="I pushed back"
+                  hint="Talked them down, or held my ground"
                 />
               </div>
             </Card>
@@ -522,16 +404,10 @@ export function ReviewPhase({
       </Page>
 
       <ActionBar
-        label="Continue to Post-Task Survey"
+        label="Continue"
         onClick={submit}
         disabled={!canSubmit}
-        note={
-          !canDecide
-            ? "⚠️ Please scroll to the end of the transcript above."
-            : canSubmit
-              ? "✓ Ready to proceed"
-              : "⚠️ Please select your reflection response above."
-        }
+        note={canSubmit ? "" : "One answer left above."}
       />
     </>
   );

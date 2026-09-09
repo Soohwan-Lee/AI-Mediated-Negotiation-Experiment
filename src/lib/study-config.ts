@@ -17,6 +17,24 @@ export const STUDY = {
   bonusAmount: "1.00",
   bonusPerTask: "0.50",
   totalPaid: "7.00",
+  /**
+   * WHAT THE CONSENT PAGE MAY ADVERTISE, AND WHY IT IS A RANGE.
+   *
+   * Role is not known at consent — it is revealed on the instruction page —
+   * and §7.1 gives the two roles different guarantees: a Leader's £7 is fixed
+   * from assignment, while a Member is guaranteed £6 and told the Leader
+   * recommends up to £0.50 per task on top. So the only honest pre-assignment
+   * headline is the TOTAL as a span across both roles.
+   *
+   * It must not be written as "£6 + up to £1 bonus" either. That reads as a
+   * base with an optional extra, which is the Member's structure presented to
+   * everyone, and it understates what a Leader is actually guaranteed.
+   *
+   * In practice every participant is paid `totalPaid`; the difference between
+   * the roles is a scenario claim, retracted at /debriefing.
+   */
+  minTotal: "6.00",
+  maxTotal: "7.00",
   irb: {
     /**
      * The UNIST IRB determined this study exempt. An exemption is not an IRB
@@ -265,6 +283,29 @@ export const FLOW = [
 ] as const;
 
 export type FlowKey = (typeof FLOW)[number]["key"];
+
+/**
+ * The five phases a participant is told about, in order.
+ *
+ * NOT the same list as `FLOW`, and deliberately so. `FLOW` is thirteen routes
+ * and drives the progress bar (interface rule 3); this is the participant's
+ * mental map, which has to be short enough to hold. The PI's note was that the
+ * phases are not signposted — someone in the middle of Task 1 could not say
+ * what came before or after — and thirteen steps is not a fix for that.
+ *
+ * "Practice" carries `doesNotCount` because that is the single fact about it
+ * most worth repeating: the practice round is the only phase a participant
+ * could mistake for something that scores.
+ */
+export const PHASES = [
+  { key: "instructions", label: "Instructions" },
+  { key: "practice", label: "Practice", doesNotCount: true },
+  { key: "task1", label: "Task 1" },
+  { key: "task2", label: "Task 2" },
+  { key: "final", label: "Final questions" },
+] as const;
+
+export type PhaseKey = (typeof PHASES)[number]["key"];
 
 export function nextHref(current: FlowKey): string {
   const i = FLOW.findIndex((s) => s.key === current);

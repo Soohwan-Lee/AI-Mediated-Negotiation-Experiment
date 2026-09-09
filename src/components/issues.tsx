@@ -20,12 +20,6 @@ import type { Issue, Package, Role } from "@/lib/types";
 import { comparePointsToFallback } from "@/lib/points-display";
 import { cx } from "./ui";
 
-/** Share of the best value on this issue, for the bar width. */
-function share(issue: Issue, points: number, role: Role): number {
-  const best = Math.max(...issue.options.map((o) => o.points[role]), 1);
-  return Math.round((points / best) * 100);
-}
-
 /**
  * What the numbers on this screen mean — one line, above the numbers.
  *
@@ -108,21 +102,31 @@ export function PointsKey({
           (both terms):" on one line and "3,900 pts" on the next, which reads
           as a broken badge rather than a stacked one. Stacking deliberately
           gives the same shape at both widths, and `min-w-0` lets the pills
-          shrink instead of pushing the rail wider. */}
+          shrink instead of pushing the rail wider.
+
+          THE TWO PILLS ARE DIFFERENT COLOURS AND CARRY AN ICON EACH. Both
+          used to be warm on a warm ground, so the ceiling and the floor of
+          the whole scale read as one pair of badges and a participant had to
+          read the words to tell which was which. Emerald for the best you
+          could do, slate-and-⛔ for the nothing. Neither colour makes a claim
+          about the negotiation: they mark the two ends of the participant's
+          OWN scale, which is what makes a bare "3,000" mean anything. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-        <span className="min-w-0 flex flex-col justify-between rounded-xl border border-amber-300 bg-amber-100/80 px-3 py-2 font-semibold text-amber-950 shadow-2xs">
-          <span className="block text-[0.6875rem] leading-tight opacity-90 font-medium break-words">
-            Best possible ({termCount})
+        <span className="min-w-0 flex flex-col justify-between rounded-xl border-2 border-emerald-300 bg-emerald-50 px-3 py-2 font-semibold text-emerald-950 shadow-2xs">
+          <span className="flex items-center gap-1.5 text-[0.6875rem] leading-tight font-bold break-words">
+            <span aria-hidden>🏆</span>
+            <span>Best possible ({termCount})</span>
           </span>
-          <strong className="tabular block text-sm font-black leading-tight mt-1 shrink-0">
+          <strong className="tabular block text-base font-black leading-tight mt-1 shrink-0 text-emerald-800">
             {best.toLocaleString()} pts
           </strong>
         </span>
-        <span className="min-w-0 flex flex-col justify-between rounded-xl border border-slate-300 bg-white/90 px-3 py-2 font-semibold text-slate-800 shadow-2xs">
-          <span className="block text-[0.6875rem] leading-tight opacity-90 font-medium break-words">
-            No agreement (both score 0)
+        <span className="min-w-0 flex flex-col justify-between rounded-xl border-2 border-slate-400 bg-slate-100 px-3 py-2 font-semibold text-slate-900 shadow-2xs">
+          <span className="flex items-center gap-1.5 text-[0.6875rem] leading-tight font-bold break-words">
+            <span aria-hidden>⛔</span>
+            <span>No agreement (both score 0)</span>
           </span>
-          <strong className="tabular block text-sm font-black leading-tight mt-1 shrink-0">
+          <strong className="tabular block text-base font-black leading-tight mt-1 shrink-0 text-slate-700">
             {reservationPoints.toLocaleString()} pts
           </strong>
         </span>
@@ -197,79 +201,124 @@ export function IssueValueTable({
   compact?: boolean;
 }) {
   return (
-    <div className={compact ? "space-y-3" : "space-y-6"}>
+    <div className={compact ? "space-y-3" : "space-y-4"}>
       {showPoints && showKey ? (
         <PointsKey
           issues={issues}
           role={role}
           reservationPoints={reservationPoints}
-          className="mb-2"
         />
       ) : null}
-      {issues.map((issue) => (
-        <div
-          key={issue.id}
-          className={cx(
-            "border border-[var(--private-line)] bg-white/80 shadow-2xs",
-            compact ? "rounded-xl p-3" : "rounded-2xl p-4 sm:p-5",
-          )}
-        >
-          {/* No badge marks which issue is this role's priority, and none may
-              be added. Design §5 principle 1 is explicit that issue type and
-              core-requirement marking are not displayed: a star on one issue
-              tells a participant which term the study is about before a word is
-              negotiated, and lets them infer the counterpart sees the same on
-              theirs — which hands over the shape of the logroll. Finding the
-              logroll is the behaviour being observed (pilot gate 6). The points
-              and the one-line rationale below already convey what matters to
-              this role, through the role's own story rather than a label. */}
-          <div className="mb-1.5">
-            <p className="text-sm sm:text-base font-bold text-[var(--ink)]">{issue.label}</p>
-          </div>
-          <p className="mb-2 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)]/80">
-            {issue.description}
-          </p>
-          <div
-            className={cx(
-              "rounded-xl border border-amber-200/80 bg-amber-50/70 text-xs sm:text-[0.8125rem] leading-relaxed text-[var(--private-ink)] font-medium",
-              compact ? "mb-2 p-2" : "mb-3 p-2.5",
-            )}
-          >
-            <span className="font-bold text-amber-950">Why it matters to you: </span>
-            <span>{issue.rationale[role]}</span>
-          </div>
 
-          <ul className={compact ? "space-y-1.5" : "space-y-2"}>
-            {issue.options.map((o) => (
-              <li
-                key={o.id}
-                className={cx(
-                  "flex items-center gap-2.5 text-xs sm:text-sm rounded-xl bg-white border border-slate-100 shadow-2xs",
-                  compact ? "p-2" : "p-2.5",
-                )}
-              >
-                <span className="min-w-0 flex-1 font-semibold text-[var(--ink)] leading-snug break-words">{o.label}</span>
-                {showPoints ? (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span
-                      aria-hidden
-                      className="h-2 w-14 sm:w-20 shrink-0 overflow-hidden rounded-full bg-slate-100 border border-slate-200"
-                    >
-                      <span
-                        className="block h-full rounded-full bg-[var(--accent)] transition-all"
-                        style={{ width: `${share(issue, o.points[role], role)}%` }}
-                      />
-                    </span>
-                    <span className="tabular font-extrabold text-xs sm:text-sm text-[var(--accent)] min-w-[3.25rem] text-right shrink-0">
-                      {o.points[role].toLocaleString()} pts
-                    </span>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {/* ONE LINE SAYING WHAT THE TWO COLUMNS ARE FOR. The two issues sat one
+          under the other in a single column, which made a long scroll read as
+          a list of options rather than as two separate choices — participants
+          asked whether they were picking one option in total. Side by side
+          from `md` up, with this line above them, says it in a glance. */}
+      <p
+        className={cx(
+          "rounded-lg bg-white/70 px-3 py-2 font-semibold text-[var(--private-ink)] border border-[var(--private-line)]",
+          compact ? "text-xs" : "text-xs sm:text-sm",
+        )}
+      >
+        Both of these get negotiated. One option is agreed on each.
+      </p>
+
+      {/* Stacked below `md`: two columns at 400px turns each option label into
+          a two-word ribbon, and the labels are short phrases that have to be
+          read whole. */}
+      <div
+        className={cx(
+          "grid gap-3",
+          compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2",
+        )}
+      >
+        {issues.map((issue, index) => {
+          const best = Math.max(...issue.options.map((o) => o.points[role]));
+          return (
+            <div
+              key={issue.id}
+              className={cx(
+                "flex flex-col overflow-hidden border border-[var(--private-line)] bg-white shadow-2xs",
+                compact ? "rounded-xl" : "rounded-2xl",
+              )}
+            >
+              {/* No badge marks which issue is this role's priority, and none
+                  may be added. Design §5 principle 1 is explicit that issue
+                  type and core-requirement marking are not displayed: a star
+                  on one issue tells a participant which term the study is
+                  about before a word is negotiated. "Issue 1" and "Issue 2"
+                  are POSITIONAL and carry no such claim — they are the same
+                  two words in the same order for both roles, and the order is
+                  the task's own. */}
+              <div className="border-b border-[var(--private-line)] bg-[var(--private-soft)] px-3 py-2">
+                <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-[var(--private-strong)]">
+                  Issue {index + 1}
+                </p>
+                <p className="text-sm font-bold leading-snug text-[var(--ink)]">
+                  {issue.label}
+                </p>
+              </div>
+
+              <div className={cx("flex-1", compact ? "p-2.5" : "p-3")}>
+                <p className="mb-2 text-xs leading-relaxed text-[var(--private-ink)]/80">
+                  {issue.description}
+                </p>
+                <p className="mb-2.5 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs leading-relaxed font-medium text-[var(--private-ink)]">
+                  <span className="font-bold text-amber-950">Why it matters to you: </span>
+                  {issue.rationale[role]}
+                </p>
+
+                <ul className="space-y-1.5">
+                  {issue.options.map((o) => {
+                    const points = o.points[role];
+                    const isBest = showPoints && points === best;
+                    return (
+                      <li
+                        key={o.id}
+                        className={cx(
+                          "flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs sm:text-[0.8125rem]",
+                          isBest
+                            ? "border-emerald-300 bg-emerald-50/70"
+                            : "border-slate-200 bg-white",
+                        )}
+                      >
+                        <span className="min-w-0 flex-1 font-semibold leading-snug text-[var(--ink)] break-words">
+                          {o.label}
+                        </span>
+                        {showPoints ? (
+                          <>
+                            {/* The bar goes on the best row only. Four bars of
+                                four different lengths made the reader compare
+                                bar lengths; what they need is which row is the
+                                top one and what each row pays. */}
+                            {isBest ? (
+                              <span
+                                aria-hidden
+                                className="shrink-0 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[0.5625rem] font-black uppercase tracking-wide text-white"
+                              >
+                                Best
+                              </span>
+                            ) : null}
+                            <span
+                              className={cx(
+                                "tabular shrink-0 min-w-[3.5rem] text-right font-extrabold",
+                                isBest ? "text-emerald-800" : "text-[var(--ink-3)]",
+                              )}
+                            >
+                              {points.toLocaleString()} pts
+                            </span>
+                          </>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -46,6 +46,19 @@ import {
 import { useParticipant } from "@/lib/participant-context";
 import { STAGE_MINUTES, STUDY, nextHref } from "@/lib/study-config";
 
+/**
+ * "£6" rather than "£6.00" for the headline tile only.
+ *
+ * The stored strings keep their pence because they are money and the tests
+ * compare them numerically; a 40-point display number reads better without
+ * two zeros that never change. Anywhere the amount sits inside a sentence it
+ * keeps its pence, because there it is a figure being quoted rather than a
+ * headline.
+ */
+function trimPence(amount: string): string {
+  return amount.replace(/\.00$/, "");
+}
+
 const BASE_HOURLY_RATE = (
   (Number(STUDY.compensation) / STUDY.estimatedMinutes) * 60
 ).toFixed(2);
@@ -232,11 +245,19 @@ export default function ConsentPage() {
                 hint="From consent to debrief"
                 tone="blue"
               />
+              {/*
+                THE HEADLINE IS THE TOTAL, AS A RANGE. Role is not known yet
+                (it is revealed on the instruction page) and §7.1 guarantees
+                the two roles different amounts, so "£6 + up to £1 bonus" would
+                present the Member's structure to everyone and understate what
+                a Leader is guaranteed. `minTotal`/`maxTotal` in study-config
+                carry the span; see the note there.
+              */}
               <StatCard
                 icon="£"
                 label="Payment"
-                value={`${STUDY.currencySymbol}${STUDY.compensation}`}
-                hint={`+ up to ${STUDY.currencySymbol}${STUDY.bonusAmount} bonus`}
+                value={`${STUDY.currencySymbol}${trimPence(STUDY.minTotal)}–${STUDY.currencySymbol}${trimPence(STUDY.maxTotal)}`}
+                hint="Total, depending on your role"
                 tone="emerald"
               />
               <StatCard
@@ -333,8 +354,9 @@ export default function ConsentPage() {
                   Prolific ID is used only to process payment.
                 </p>
                 <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
-                  Please do not enter real names or personal contact information
-                  in text boxes.
+                  Please stay anonymous. Do not type your name, your employer,
+                  or any other identifying detail, in the chat or in any text
+                  box.
                 </p>
               </Card>
             </div>
@@ -405,9 +427,10 @@ export default function ConsentPage() {
               <CardTitle>One last review</CardTitle>
               <ul className="grid gap-3 text-sm leading-relaxed text-slate-700 sm:grid-cols-2">
                 <li><strong>Time:</strong> about {STUDY.estimatedMinutes} minutes on a desktop or laptop.</li>
-                <li><strong>Payment:</strong> {STUDY.currencySymbol}{STUDY.compensation}, plus up to {STUDY.currencySymbol}{STUDY.bonusAmount} bonus.</li>
+                <li><strong>Payment:</strong> {STUDY.currencySymbol}{STUDY.minTotal}–{STUDY.currencySymbol}{STUDY.maxTotal} in total. Your role decides the amount.</li>
                 <li><strong>Activities:</strong> background questions, practice, two negotiations, and surveys.</li>
                 <li><strong>Your choice:</strong> you can stop at any time without penalty.</li>
+                <li className="sm:col-span-2"><strong>In the chat:</strong> stay anonymous, and never give the other side the numbers from your point sheet.</li>
               </ul>
             </Card>
 

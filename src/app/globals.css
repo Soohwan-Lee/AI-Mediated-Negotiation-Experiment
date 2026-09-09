@@ -49,6 +49,22 @@
   --private-strong: #b45309;
   --private-soft: #fffbeb;
 
+  /*
+   * THREE DEPTHS INSIDE THE PRIVATE FAMILY, so the briefing rail is readable.
+   *
+   * Everything in the rail sat within a few percent of everything else: the
+   * panel ground, its cards and the selected tab were all near-yellow, so a
+   * participant mid-negotiation could not find the payoff table without
+   * reading the headings. These give the rail a floor, a raised card and a
+   * header strip that separate by VALUE rather than by hue, which keeps rule
+   * 1 intact — the whole rail is still unmistakably sand, and nothing private
+   * moves onto a plain white card.
+   */
+  --private-ground: #fdf0d9;   /* the rail's own floor, a step darker */
+  --private-card: #fffdf8;     /* a card raised off it */
+  --private-header: #fbe4b4;   /* a section's header strip */
+  --private-edge: #e0a94a;     /* a border with enough weight to be seen */
+
   /* Signals: crisp & friendly */
   --caution: #d97706;
   --caution-soft: #fffbeb;
@@ -99,6 +115,10 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-private: var(--private);
   --color-private-line: var(--private-line);
+  --color-private-ground: var(--private-ground);
+  --color-private-card: var(--private-card);
+  --color-private-header: var(--private-header);
+  --color-private-edge: var(--private-edge);
   --color-private-ink: var(--private-ink);
   --color-private-strong: var(--private-strong);
   --color-caution: var(--caution);

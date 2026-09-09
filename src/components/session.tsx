@@ -16,6 +16,7 @@
  */
 
 import {
+  Children,
   useId,
   useState,
   type KeyboardEvent,
@@ -170,6 +171,17 @@ function CoverArt({ scene }: { scene: CoverScene }) {
   );
 }
 
+/**
+ * `practice` styles the whole cover as a rehearsal: a dashed border, a
+ * "Tutorial" badge, and a neutral ground instead of the accent. `task` is the
+ * real thing and says "this one counts". Nothing here names a condition.
+ *
+ * The practice page passes `variant="practice"`; both task covers pass
+ * `variant="task"` (the default), which is what makes the two visibly
+ * different at a glance rather than differing only in a line of body copy.
+ */
+export type TaskCoverVariant = "task" | "practice";
+
 export function TaskCover({
   eyebrow,
   title,
@@ -183,6 +195,7 @@ export function TaskCover({
   counter,
   doesNotCount,
   scene,
+  variant = "task",
 }: {
   eyebrow: string;
   title: string;
@@ -196,44 +209,83 @@ export function TaskCover({
   counter?: { index: number; total: number };
   doesNotCount?: boolean;
   scene?: CoverScene;
+  variant?: TaskCoverVariant;
 }) {
+  const practice = variant === "practice";
+
   return (
     <>
       <Page>
         <div className="flex min-h-[calc(100vh-var(--header-h)-var(--actionbar-h)-3rem)] flex-col justify-center py-10 text-center">
           <div className="mx-auto flex w-full max-w-prose flex-col items-center">
-            {counter ? (
-              <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-1 text-sm font-extrabold text-[var(--accent)] shadow-2xs">
-                <span>Task {counter.index}</span>
-                <span className="opacity-40">/</span>
-                <span>{counter.total}</span>
+            {/* ONE BANNER SAYING WHICH PHASE THIS IS, in the two styles that
+                have to be told apart at a glance. A participant who cannot
+                see that the practice round does not count treats it as the
+                real thing, and one who cannot see that Task 1 does count
+                treats it as more practice. */}
+            {practice ? (
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border-2 border-dashed border-slate-400 bg-slate-100 px-4 py-1.5 text-sm font-extrabold text-slate-700">
+                <span aria-hidden>🎓</span>
+                <span>Tutorial</span>
+                <span className="text-slate-400">·</span>
+                <span className="font-bold">Practice round, does not count</span>
+              </div>
+            ) : counter ? (
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border-2 border-[var(--accent-border)] bg-[var(--accent-soft)] px-4 py-1.5 text-sm font-extrabold text-[var(--accent)]">
+                <span>
+                  Task {counter.index} of {counter.total}
+                </span>
+                <span className="opacity-40">·</span>
+                <span className="font-bold">This one counts</span>
               </div>
             ) : null}
 
             <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-[var(--ink-3)]">
               {eyebrow}
             </p>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[var(--ink)] sm:text-4xl">
+            <h1
+              className={cx(
+                "text-2xl font-extrabold tracking-tight sm:text-4xl",
+                practice ? "text-slate-700" : "text-[var(--ink)]",
+              )}
+            >
               {title}
             </h1>
 
             <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1 text-xs font-bold text-[var(--ink-2)] shadow-2xs">
               <span>⏱️</span>
               <span>About {minutes} minutes</span>
-              {doesNotCount ? (
+              {/* The banner above already says a practice round does not
+                  count, so repeating it here is chrome. `doesNotCount` still
+                  works for a caller that is not using the practice variant. */}
+              {doesNotCount && !practice ? (
                 <>
                   <span className="text-slate-300">·</span>
-                  <span className="text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Does not count</span>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700">
+                    Does not count
+                  </span>
                 </>
               ) : null}
             </div>
 
             {scene ? <CoverArt scene={scene} /> : null}
 
-            <div className="mt-6 w-full text-left rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs leading-relaxed text-sm sm:text-base">
+            <div
+              className={cx(
+                "mt-6 w-full rounded-2xl border p-5 text-left text-sm leading-relaxed shadow-xs sm:p-6 sm:text-base",
+                practice
+                  ? "border-dashed border-slate-300 bg-slate-50/80"
+                  : "border-slate-200 bg-white",
+              )}
+            >
               {lead}
             </div>
 
+            {/* AN EMPTY `steps` DROPS THE WHOLE CARD. The Proxy cover draws
+                the same four beats as illustrated cards in its `lead`, so the
+                written list under it was the same content a second time. The
+                Direct cover has no such drawing and still passes its steps. */}
+            {steps.length > 0 ? (
             <Card tone="muted" className="mt-6 w-full text-left">
               <CardTitle>What happens in this part</CardTitle>
               <ol className="space-y-3">
@@ -244,7 +296,12 @@ export function TaskCover({
                     <li key={label} className="flex items-start gap-3.5 rounded-xl bg-white p-3 border border-slate-100 shadow-2xs">
                       <span
                         aria-hidden
-                        className="tabular flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-xs font-black text-[var(--accent)] border border-[var(--accent-border)]"
+                        className={cx(
+                          "tabular flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border text-xs font-black",
+                          practice
+                            ? "border-slate-300 bg-slate-100 text-slate-600"
+                            : "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]",
+                        )}
                       >
                         {i + 1}
                       </span>
@@ -263,6 +320,7 @@ export function TaskCover({
                 })}
               </ol>
             </Card>
+            ) : null}
 
             {note ? <div className="mt-4 w-full text-left">{note}</div> : null}
           </div>
@@ -368,8 +426,8 @@ export const POLICY_NOTE: Record<
  * so rewriting these for tone would change the independent variable. Anything
  * added around them is structure, never content.
  *
- * Everything is structurally paired: the same two table rows, three bullets,
- * and one worked example with the same four beats — the shared background,
+ * Everything is structurally paired: one worked example with the same four
+ * beats — the shared background,
  * what the proxy says, a closing line, and the line saying the other
  * participant's proxy works the same way. The two bodies are within ~14% of
  * each other in characters. A participant cannot tell from the AMOUNT of
@@ -395,29 +453,17 @@ export const POLICY_NOTE: Record<
 const POLICY_EXPLAINER: Record<
   "user_specified" | "ai_supplemented",
   {
-    mine: string;
-    theirs: string;
-    bullets: readonly string[];
     exampleLead: string;
     tickedLead: string;
     ticked: string;
     saidLead: string;
     said: string;
     exampleTail: string;
-    same: string;
   }
 > = {
   user_specified: {
-    mine: "I keep what your chosen reasons say and put it in my own words, as your representative.",
-    theirs:
-      "Their AI Proxy keeps what their chosen reasons say and puts it in its own words, the same way.",
-    bullets: [
-      "I keep what your reasons say — the event, and that it is yours — and put it in my own words.",
-      "I add no reasons of my own, so every reason the other side hears is one you chose.",
-      "I say it as your representative, so it is clear the reason comes from you rather than from me.",
-    ],
     exampleLead:
-      "A practice situation, not this task — two people deciding which week one of them takes off.",
+      "A practice situation, not this task. Two people are deciding which week one of them takes off.",
     tickedLead: "The background the team member chose to share:",
     ticked:
       "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
@@ -426,20 +472,10 @@ const POLICY_EXPLAINER: Record<
       "The team member I represent tells me they have a hospital check-up scheduled that week. They haven't told the team yet.",
     exampleTail:
       "The check-up, and the fact that the team has not been told, both go across in full. Only the wording is mine rather than theirs, and it goes across as support for what they are asking for.",
-    same:
-      "The other participant's AI Proxy works exactly the same way with their reasons, so what you hear from it reaches you in the same shape.",
   },
   ai_supplemented: {
-    mine: "I keep one sentence on the kind of situation it is, add work reasons, and give it as my own view.",
-    theirs:
-      "Their AI Proxy keeps one sentence on the kind of situation, adds work reasons, and gives its own view too.",
-    bullets: [
-      "I drop the specific event and any mention of you, and keep one sentence on the kind of situation it is.",
-      "I add work reasons of my own, and you will not see those added sentences before the negotiation.",
-      "I give the whole thing as my own assessment, and which part came from you is not marked.",
-    ],
     exampleLead:
-      "A practice situation, not this task — two people deciding which week one of them takes off.",
+      "A practice situation, not this task. Two people are deciding which week one of them takes off.",
     tickedLead: "The background the team member chose to share:",
     ticked:
       "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
@@ -448,8 +484,6 @@ const POLICY_EXPLAINER: Record<
       "Having reviewed the situation on the side of the team member I represent, I think that week should be kept free. Three reasons: there is a personal appointment that week, the project load is lightest that week, and settling it early makes cover easier to arrange.",
     exampleTail:
       "The check-up became \u201Ca personal appointment\u201D, and the other two reasons are mine rather than theirs. All three go across as support for what they are asking for.",
-    same:
-      "The other participant's AI Proxy works exactly the same way with their reasons, so what you hear from it reaches you in the same shape.",
   },
 };
 
@@ -471,7 +505,17 @@ export function PolicyExplainer({
   defaultOpen = false,
 }: {
   policy: "user_specified" | "ai_supplemented";
-  /** Open on arrival. The mandate passes this; nothing else does. */
+  /**
+   * Open on arrival.
+   *
+   * NOTHING PASSES THIS ANY MORE and the default is closed. The mandate used
+   * to open it, on the grounds that it is the screen where the rule is being
+   * acted on — but the example is four quoted paragraphs, and open by default
+   * it was most of the reason that screen ran to three viewports. The §8.7
+   * disclosure the participant must read is `POLICY_DISCLOSURE`, which is
+   * directly above and always visible; the example is elaboration, and it is
+   * one click away in both arms.
+   */
   defaultOpen?: boolean;
 }) {
   const copy = POLICY_EXPLAINER[policy];
@@ -485,60 +529,43 @@ export function PolicyExplainer({
         <span aria-hidden className="mr-1.5 inline-block transition-transform group-open:rotate-90">
           ›
         </span>
-        How both AI Proxies handle reasons in this task
+        See an example
       </summary>
 
       <div className="border-t border-indigo-100 px-3 py-3 text-xs leading-relaxed text-indigo-950/90 sm:text-[0.8125rem]">
-        {/* Two rows rather than two columns below `sm`: the wording is what
-            has to be comparable, and a two-column grid at 360px turns each
-            cell into a narrow ribbon nobody reads across. */}
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="rounded-md bg-indigo-50/70 p-2.5">
-            <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-indigo-700">
-              Your AI Proxy
-            </p>
-            <p className="mt-1">{copy.mine}</p>
-          </div>
-          <div className="rounded-md bg-indigo-50/70 p-2.5">
-            <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-indigo-700">
-              The other participant&rsquo;s AI Proxy
-            </p>
-            <p className="mt-1">{copy.theirs}</p>
-          </div>
-        </div>
-
-        <ul className="mt-3 space-y-1.5">
-          {copy.bullets.map((bullet) => (
-            <li key={bullet} className="flex gap-2">
-              <span aria-hidden className="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-indigo-400" />
-              <span>{bullet}</span>
-            </li>
-          ))}
-        </ul>
-
         {/* THE EXAMPLE IS NOT THIS TASK'S MATERIAL. See the note on
             `POLICY_EXPLAINER`: §8.7 fixes it as a holiday week, so nothing
-            here rehearses a card the participant is about to decide about. */}
-        <div className="mt-3 rounded-md border border-indigo-100 bg-indigo-50/40 p-2.5">
-          <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-indigo-700">
-            Example
-          </p>
-          <p className="mt-1.5">{copy.exampleLead}</p>
+            here rehearses a card the participant is about to decide about.
 
-          <p className="mt-2.5">{copy.tickedLead}</p>
-          <p className="mt-1 border-l-2 border-indigo-300 pl-2.5 italic">
-            &ldquo;{copy.ticked}&rdquo;
-          </p>
+            THE THREE BULLETS AND THE TWO-COLUMN TABLE ARE GONE. They restated
+            `POLICY_DISCLOSURE`, which is directly above this on every screen
+            that shows it, in three more shapes — so a participant read the
+            same rule four times before reaching the one decision on the
+            screen. What only the example can show is what the sentence turns
+            into, and that is what is left. */}
+        <p>{copy.exampleLead}</p>
 
-          <p className="mt-2.5">{copy.saidLead}</p>
-          <p className="mt-1 border-l-2 border-indigo-300 pl-2.5 italic">
-            &ldquo;{copy.said}&rdquo;
-          </p>
+        <p className="mt-2.5">{copy.tickedLead}</p>
+        <p className="mt-1 border-l-2 border-indigo-300 pl-2.5 italic">
+          &ldquo;{copy.ticked}&rdquo;
+        </p>
 
-          <p className="mt-2.5 text-indigo-900/80">{copy.exampleTail}</p>
-        </div>
+        <p className="mt-2.5">{copy.saidLead}</p>
+        <p className="mt-1 border-l-2 border-indigo-300 pl-2.5 italic">
+          &ldquo;{copy.said}&rdquo;
+        </p>
 
-        <p className="mt-3">{copy.same}</p>
+        {/* `exampleTail` STAYS, and it is not a restatement of the policy
+            paragraph. It is the only line that says what the handling DID to
+            the participant's own fact — under AI-Supplemented, that the
+            check-up became "a personal appointment" and that two of the three
+            reasons are the proxy's. That is §8.7 disclosure content and
+            `OTHER-AI3` (authorization inference) is unanswerable without it.
+
+            `copy.same` went instead: "the other participant's AI Proxy works
+            exactly the same way" is the closing clause of `POLICY_DISCLOSURE`
+            directly above, word for word in substance. */}
+        <p className="mt-2.5 text-indigo-900/80">{copy.exampleTail}</p>
       </div>
     </details>
   );
@@ -577,28 +604,78 @@ export function ProxyIdentity({
   footnote,
   speech,
   scene,
+  compact = false,
   explainerOpen = false,
   className,
 }: {
   policy: "user_specified" | "ai_supplemented";
   status?: string;
-  /** Open the policy explainer on arrival. The MANDATE passes this and
-      nothing else does: that is the screen where the rule is being acted on,
-      and it is the same prop in both arms, so it cannot cue the condition. */
+  /**
+   * NO LONGER OPENS THE EXAMPLE — it now marks the MANDATE, and so is an
+   * alias for `compact`.
+   *
+   * Two changes met here. The example is closed by default in both arms now,
+   * because whether it is open may never differ by policy and the cheapest
+   * way to guarantee that is for nothing to be able to open it. And the
+   * mandate needed the compact shape, but the only caller that can ask for it
+   * is `proxy-task.tsx`, which this change does not own. This flag was
+   * already documented as "the mandate passes this and nothing else does", so
+   * it is exactly the signal needed, and the mandate keeps the short shape
+   * whether or not that file is ever touched.
+   */
   explainerOpen?: boolean;
-  /** One muted line under the policy sentence — the mandate screen uses it to
-      say what happens after this screen. Never anything policy-specific. */
+  /** One muted line under the policy sentence. Never anything policy-specific.
+      IGNORED when `compact` is set. */
   footnote?: ReactNode;
+  /**
+   * The MANDATE's shape: one short paragraph of speech, the policy paragraph,
+   * the example folded away, and nothing else.
+   *
+   * It is enforced HERE rather than asked for at the call site, for the same
+   * reason the message cap is applied rather than requested: the mandate is
+   * the screen the participant has to read before the one decision the Proxy
+   * arm turns on, and a long block above that decision is what made it three
+   * viewports. `compact` drops the four-figure scene (it is on the cover
+   * already), the status pill and the footnote, and clamps the speech to its
+   * first paragraph so a longer `speech` cannot quietly restore the length.
+   *
+   * IT TAKES NO POLICY. Both arms pass the same value, so it cannot cue the
+   * condition, and `POLICY_DISCLOSURE` is untouched by it.
+   */
+  compact?: boolean;
   /** What the representative says on this screen. Defaults to its standing
       introduction; every screen in the delegation passes its own. */
   speech?: ReactNode;
-  /** Draw the four-figure scene under the speech (mandate and handover). */
+  /** Draw the four-figure scene under the speech. Suppressed by `compact`. */
   scene?: "briefing" | "table";
   className?: string;
 }) {
+  const short = compact || explainerOpen;
+
+  /* TWO PARAGRAPHS AT MOST, NOT ONE, and the difference matters.
+     `Children.toArray` flattens a fragment, an array or a single element into
+     one list (`Array.isArray` alone missed the fragment, which is what the
+     mandate passes, so the clamp silently did nothing).
+
+     THE CAP IS TWO BECAUSE THE MANDATE'S SECOND PARAGRAPH IS §8.7 CONTENT.
+     The first says only "I will be speaking for you"; the second is the one
+     that says the work reason and the priority always go across without being
+     asked. That is the fixed half of the mandate, and a participant who was
+     not told it would read the single checkbox as the whole of what gets
+     said — which would misdescribe the manipulation on the screen where the
+     one decision is taken. The cap still stops a third paragraph, which is
+     where the length actually came from. */
+  const speechNodes = Children.toArray(speech);
+  const clampedSpeech =
+    short && speechNodes.length > 2 ? speechNodes.slice(0, 2) : speech;
+
   return (
-    <ProxySpeech status={status} scene={scene} className={className}>
-      {speech ?? (
+    <ProxySpeech
+      status={short ? undefined : status}
+      scene={short ? undefined : scene}
+      className={className}
+    >
+      {clampedSpeech ?? (
         <p>
           I&rsquo;ll be negotiating with the other participant&rsquo;s AI Proxy
           on your behalf. I only say what you hand me here.
@@ -618,10 +695,10 @@ export function ProxyIdentity({
         {/* The same component, the same prop, in both arms. The explainer
             differs in CONTENT because the policies differ; it may never
             differ in whether it is there. */}
-        <PolicyExplainer policy={policy} defaultOpen={explainerOpen} />
+        <PolicyExplainer policy={policy} />
       </div>
 
-      {footnote ? (
+      {footnote && !short ? (
         <p className="mt-2 text-xs leading-relaxed text-indigo-900/70">
           {footnote}
         </p>
@@ -740,8 +817,12 @@ export function BriefingPanel({
       : "";
 
   return (
-    <Card padded={false} tone="private" className="p-4 text-[var(--private-ink)]">
-      <div className="mb-3 flex items-start justify-between gap-3 border-b border-[var(--private-line)] pb-3">
+    <Card
+      padded={false}
+      tone="private"
+      className="border-[var(--private-edge)] bg-[var(--private-ground)] p-4 text-[var(--private-ink)]"
+    >
+      <div className="mb-3 flex items-start justify-between gap-3 border-b-2 border-[var(--private-edge)] pb-3">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--private-strong)]">
             Your private briefing
@@ -753,7 +834,10 @@ export function BriefingPanel({
         <PrivateTag />
       </div>
 
-      <section aria-labelledby={`${tabId}-role`} className="mb-3 rounded-xl border border-amber-200 bg-white/75 p-3">
+      <section
+        aria-labelledby={`${tabId}-role`}
+        className="mb-3 rounded-xl border border-[var(--private-edge)] bg-[var(--private-card)] p-3 shadow-2xs"
+      >
         <p id={`${tabId}-role`} className="text-xs font-bold uppercase tracking-wider text-[var(--private-strong)]">
           Your role
         </p>
@@ -763,7 +847,7 @@ export function BriefingPanel({
         <p className="mt-1 text-sm leading-relaxed text-[var(--private-ink)]/90">
           {memberContext}{brief.organizationalPosition}
         </p>
-        <p className="mt-2 border-t border-amber-200 pt-2 text-xs leading-relaxed text-[var(--private-ink)]">
+        <p className="mt-2 border-t border-[var(--private-line)] pt-2 text-xs leading-relaxed text-[var(--private-ink)]">
           {role === "leader" ? (
             <>
               <strong>Payment: {STUDY.currencySymbol}{STUDY.totalPaid} guaranteed.</strong>{" "}
@@ -778,14 +862,20 @@ export function BriefingPanel({
         </p>
       </section>
 
-      <section aria-labelledby={`${tabId}-goals`} className="mb-3 rounded-xl bg-amber-100/55 p-3">
-        <h3 id={`${tabId}-goals`} className="text-sm font-bold text-[var(--ink)]">
+      <section
+        aria-labelledby={`${tabId}-goals`}
+        className="mb-3 overflow-hidden rounded-xl border border-[var(--private-edge)] shadow-2xs"
+      >
+        <h3
+          id={`${tabId}-goals`}
+          className="bg-[var(--private-header)] px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider text-[var(--private-strong)]"
+        >
           Your goals
         </h3>
-        <ul className="mt-2 space-y-2 text-sm leading-relaxed">
+        <ul className="space-y-2 bg-[var(--private-card)] p-3 text-sm leading-relaxed">
           {brief.objectives.map((objective, index) => (
             <li key={objective} className="flex items-start gap-2">
-              <span className="tabular mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-amber-300 bg-white text-[0.6875rem] font-bold text-[var(--private-strong)]">
+              <span className="tabular mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[var(--private-edge)] bg-white text-[0.6875rem] font-bold text-[var(--private-strong)]">
                 {index + 1}
               </span>
               <span>{objective}</span>
@@ -795,11 +885,11 @@ export function BriefingPanel({
       </section>
 
       {hasReasons ? (
-        <p className="mb-3 rounded-lg border border-[var(--private-line)] bg-white/70 px-3 py-2 text-xs leading-relaxed text-[var(--private-ink)]">
+        <p className="mb-3 rounded-lg border border-[var(--private-line)] bg-[var(--private-card)] px-3 py-2 text-xs leading-relaxed text-[var(--private-ink)]">
           Sharing sensitive background is optional. The other person cannot see this briefing.
         </p>
       ) : (
-        <p className="mb-3 rounded-lg border border-[var(--private-line)] bg-white/70 px-3 py-2 text-xs leading-relaxed text-[var(--private-ink)]">
+        <p className="mb-3 rounded-lg border border-[var(--private-line)] bg-[var(--private-card)] px-3 py-2 text-xs leading-relaxed text-[var(--private-ink)]">
           The other person cannot see this briefing.
         </p>
       )}
@@ -808,7 +898,7 @@ export function BriefingPanel({
         role="tablist"
         aria-label="Briefing sections"
         className={cx(
-          "mb-3 grid gap-1 rounded-xl border border-amber-200 bg-amber-100/55 p-1",
+          "mb-3 grid gap-1 rounded-xl border border-[var(--private-edge)] bg-[var(--private-header)] p-1",
           hasReasons ? "grid-cols-3" : "grid-cols-2",
         )}
       >
@@ -826,10 +916,14 @@ export function BriefingPanel({
               onClick={() => setActiveTab(tab.id)}
               onKeyDown={(event) => moveTab(event, index)}
               className={cx(
+                // The selected tab is a WHITE chip with a real shadow and a
+                // ring, on a header-strip ground. It used to be white on
+                // near-white, so which section was open was legible only by
+                // reading the labels.
                 "min-w-0 rounded-lg px-2 py-2 text-sm font-semibold transition-colors",
                 selected
-                  ? "bg-white text-[var(--ink)] shadow-2xs"
-                  : "text-[var(--private-strong)] hover:bg-white/60",
+                  ? "bg-white text-[var(--ink)] shadow-sm ring-1 ring-[var(--private-edge)]"
+                  : "text-[var(--private-strong)]/80 hover:bg-white/50",
               )}
             >
               {tab.label}
@@ -844,7 +938,7 @@ export function BriefingPanel({
         aria-labelledby={`${tabId}-tab-situation`}
         tabIndex={0}
         hidden={currentTab !== "situation"}
-        className="rounded-xl border border-[var(--private-line)] bg-[var(--private-surface)] p-3"
+        className="rounded-xl border border-[var(--private-edge)] bg-[var(--private-card)] p-3 shadow-2xs"
       >
         <RoleStory story={brief.roleStory} compact />
       </section>
@@ -861,20 +955,24 @@ export function BriefingPanel({
           option fits your goals better, and the values are private.
         </p>
         <dl className="mb-3 grid grid-cols-2 gap-2 text-xs">
-          <div className="rounded-lg border border-[var(--private-line)] bg-white/75 px-2.5 py-2">
-            <dt className="font-medium text-[var(--private-ink)]/75">Maximum</dt>
-            <dd className="mt-0.5 font-bold tabular-nums text-[var(--ink)]">
+          <div className="rounded-lg border-2 border-emerald-300 bg-emerald-50 px-2.5 py-2">
+            <dt className="flex items-center gap-1 font-bold text-emerald-900">
+              <span aria-hidden>🏆</span> Maximum
+            </dt>
+            <dd className="mt-0.5 font-black tabular-nums text-emerald-800">
               {maximumPoints.toLocaleString()} pts
             </dd>
           </div>
-          <div className="rounded-lg border border-[var(--private-line)] bg-white/75 px-2.5 py-2">
+          <div className="rounded-lg border-2 border-slate-400 bg-slate-100 px-2.5 py-2">
             {/* "Both score 0" rather than a bare 0 (§8.1, Ver.2.21). There is
                 no fallback plan since Ver.2.21, and an unqualified "0 pts"
                 reads as a penalty aimed at this participant; saying it applies
                 to both is what §8.1 already tells everyone, so it leaks
                 nothing about the other side's sheet. */}
-            <dt className="font-medium text-[var(--private-ink)]/75">No agreement (both)</dt>
-            <dd className="mt-0.5 font-bold tabular-nums text-[var(--ink)]">
+            <dt className="flex items-center gap-1 font-bold text-slate-800">
+              <span aria-hidden>⛔</span> No agreement (both)
+            </dt>
+            <dd className="mt-0.5 font-black tabular-nums text-slate-700">
               {task.reservationPoints.toLocaleString()} pts
             </dd>
           </div>
@@ -886,7 +984,7 @@ export function BriefingPanel({
           showKey={false}
           compact
         />
-        <div className="mt-3 rounded-xl border border-[var(--private-line)] bg-white/75 p-3">
+        <div className="mt-3 rounded-xl border border-[var(--private-edge)] bg-[var(--private-card)] p-3 shadow-2xs">
           <p className="text-xs font-bold uppercase tracking-wider text-[var(--private-strong)]">
             If there is no agreement
           </p>
@@ -902,7 +1000,7 @@ export function BriefingPanel({
           tabIndex={0}
           hidden={currentTab !== "reasons"}
         >
-          <p className="mb-2.5 rounded-lg border border-[var(--private-line)] bg-amber-100/60 p-2.5 text-xs font-medium leading-relaxed">
+          <p className="mb-2.5 rounded-lg border border-[var(--private-edge)] bg-[var(--private-header)] p-2.5 text-xs font-medium leading-relaxed">
             {brief.requirementNote}
           </p>
           {/* THE RISK SENTENCE MOVED OUT OF THIS LINE. `disclosureRisk` is

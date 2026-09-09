@@ -58,6 +58,7 @@ import {
   resolveCounterTerms,
   storedLabel,
   takeExchangeState,
+  mockClassify,
   type ClassificationResponse,
   type ClassifierLogEntry,
   type CounterpartResponse,
@@ -65,7 +66,6 @@ import {
 } from "./turn-contract";
 import {
   BriefingPanel,
-  ProxyIdentity,
   RoleStory,
   IssueReasonGroups,
   TaskCover,
@@ -73,11 +73,11 @@ import {
   TaskHeader,
   TaskLayout,
 } from "@/components/session";
-import { ProxyFigure } from "@/components/proxy-art";
+import { ProxyFlowSteps } from "@/components/proxy-art";
 import { OptionChips, PackageValue, PointsKey, IssueValueTable } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
 import { ReadingProgress, PreviousReading } from "@/components/briefing-guide";
-import { Callout, Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
+import { Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { comparePointsToFallback } from "@/lib/points-display";
 import { useParticipant } from "@/lib/participant-context";
@@ -89,13 +89,16 @@ import {
 } from "@/lib/study-config";
 import { getStore } from "@/lib/store";
 import {
+  cardOfLayer,
   packageValue,
   preservesRequirement,
   requirementIssue,
 } from "@/lib/tasks";
+// MOCKUP MODE ONLY. The offline stand-in for P5 reuses the guardrail's
+// vocabulary matcher rather than inventing a second one; see `mockClassify`.
+import { leaksForbiddenReason } from "@/lib/ai/reason-leak";
 import type {
   Issue,
-  Mandate,
   NegotiationTask,
   Package,
   Role,
@@ -141,8 +144,8 @@ export function TaskIntro({
         <>
           <p className="mb-2 text-slate-800 font-medium">
             {first
-              ? "The practice round is over — this one counts. You are settling two working conditions with another participant who holds the other role."
-              : "This is the second and final task. You keep your role, with a new situation, new private information, and a different participant."}
+              ? "The practice round is over. You are settling two working conditions with another participant who holds the other role."
+              : "This is the second and final task. You keep your role. New situation, new private information, and a different participant."}
           </p>
 
           {/* WHAT AN AI PROXY IS, ON THE FIRST SCREEN THAT MENTIONS ONE.
@@ -155,20 +158,17 @@ export function TaskIntro({
               no condition (deception item 2). Both arms get the same amount of
               orientation, which is also what keeps the two covers matched. */}
           {scene === "proxy" ? (
-            <div className="mb-2 rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-sm leading-relaxed text-blue-950">
-              <p className="mb-1.5 font-bold">🤖 In this task, an AI Proxy speaks first</p>
-              <p className="mb-2 text-blue-900">
-                You do not talk to the other participant straight away. You write
-                instructions for an AI Proxy — what to aim for, and which of your
-                reasons it may say out loud — and it puts your case for you while
-                you watch.
+            /* FOUR DRAWN STEPS INSTEAD OF THREE PARAGRAPHS. The written
+               version said the same thing and ran to eighty words, on the
+               screen where a participant is deciding whether this study is
+               worth an hour. `ProxyFlowSteps` takes no policy and draws no
+               condition (interface rule 10). */
+            <div className="mb-3">
+              <p className="mb-2.5 font-bold text-blue-950">
+                <span aria-hidden>🤖</span>{" "}
+                In this task, an AI Proxy speaks for you.
               </p>
-              <p className="text-blue-900">
-                The other participant has one too. When the two proxies finish,{" "}
-                <strong>the decision comes back to you</strong>: approve what they
-                reached, ask for a change, or refuse it. Nothing is settled until
-                you say so.
-              </p>
+              <ProxyFlowSteps />
             </div>
           ) : (
             <div className="mb-2 rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-sm leading-relaxed text-blue-950">
@@ -186,7 +186,12 @@ export function TaskIntro({
           </p>
         </>
       }
-      steps={steps}
+      /* THE PROXY COVER DRAWS ITS STEPS INSTEAD OF LISTING THEM. Its `lead`
+         carries `ProxyFlowSteps`, four illustrated cards saying the same four
+         beats, so passing the written list as well put the same content on
+         the screen twice. The Direct cover has no drawing and keeps its
+         list. */
+      steps={scene === "proxy" ? [] : steps}
       scene={scene}
       minutes={minutes ?? STAGE_MINUTES.task}
       actionLabel={`Start Task ${taskIndex}`}
@@ -301,17 +306,26 @@ export function TaskBrief({
             <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
               <CardTitle>Your goals and point sheet</CardTitle><PrivateTag />
             </div>
-            <ul className="mb-5 list-disc space-y-2 pl-5 text-sm leading-relaxed">
-              {brief.objectives.map(objective => <li key={objective}>{objective}</li>)}
+            {/* THE OBJECTIVES STAY, AS TWO LINES RATHER THAN A BULLET LIST
+                UNDER A PARAGRAPH. They are not chrome: each role's pair says
+                which term they are trying to hold and which one they can give
+                ground on, which is the whole of what the participant is
+                playing for. What went is the surrounding explanation — "task
+                points are not money" is now the one clause it needed to
+                be. */}
+            <ul className="mb-4 space-y-1.5 text-sm leading-relaxed">
+              {brief.objectives.map(objective => (
+                <li key={objective} className="flex items-start gap-2">
+                  <span aria-hidden className="mt-[0.45em] h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--private-strong)]" />
+                  <span>{objective}</span>
+                </li>
+              ))}
             </ul>
-            <p className="mb-4 rounded-xl border border-slate-200 bg-white/70 px-3.5 py-3 text-sm leading-relaxed text-[var(--private-ink)]">
-              <strong>Task points are not money.</strong> They show how well the
-              agreed working conditions fit your goals and do not directly
-              determine your study payment.
+            <p className="mb-4 text-sm leading-relaxed text-[var(--private-ink)]">
+              Points are not money. They show how well an agreement fits your goals.
             </p>
             <IssueValueTable issues={task.issues} role={role} reservationPoints={task.reservationPoints} />
-            <p className="mt-5 text-sm leading-relaxed">{brief.batnaSummary}</p>
-            <p className="mt-3 text-sm font-semibold">The other person cannot see these values. Do not share point numbers in the conversation.</p>
+            <p className="mt-4 text-sm font-bold">Do not share point numbers in the conversation.</p>
           </Card>
         ) : (
           <Card tone="private">
@@ -340,16 +354,25 @@ export function TaskBrief({
               <p className="text-sm font-bold text-rose-900">
                 Before you decide about the sensitive background
               </p>
+              {/* THE ROLE-SPECIFIC LINE NAMES THE CHANNEL, NOT AN OUTCOME.
+                  §8.1's researcher note rules out a role-specific warning that
+                  forecasts a bad impression; it does not rule out saying WHERE
+                  the other person's judgement lands, which every participant
+                  has already been told on the orientation pages. Both roles
+                  get one such line, of the same shape, so the notice stays
+                  symmetric across the four cells. */}
               <p className="mt-1.5 text-sm leading-relaxed text-rose-950">
                 Sharing it can help the other person understand what
-                you&rsquo;re asking for. It can also shape their impression of
-                your judgement or actions, and what is shared may be weighed
-                when they make a bonus recommendation or write the evaluation
-                afterwards.{" "}
-                <strong className="font-semibold">
-                  Whether to share is your choice. You can negotiate and reach
-                  an agreement without it.
-                </strong>
+                you&rsquo;re asking for. It can also shape how they see you.
+              </p>
+              <p className="mt-1.5 text-sm leading-relaxed text-rose-950">
+                {role === "leader"
+                  ? "What you share may be weighed when the team member writes the evaluation of you."
+                  : "What you share may be weighed when the team lead recommends your bonus."}
+              </p>
+              <p className="mt-1.5 text-sm font-semibold leading-relaxed text-rose-950">
+                Whether to share is your choice. You can reach an agreement
+                without it.
               </p>
             </div>
             <p className="mt-4 text-sm leading-relaxed">These are the facts of your role; you do not need to use the exact wording.</p>
@@ -525,79 +548,56 @@ export function PreferenceForm({
             current={stepIndex}
           />
 
-          {identity ? <div className="mb-6">{identity}</div> : null}
+          {identity ? <div className="mb-5">{identity}</div> : null}
 
-          <div className="mb-6">
-            <Callout
-              tone="private"
-              title={
-                isProxy
-                  ? "🔒 Private to you · Your instructions"
-                  : "🔒 Private to You · Set Your Goals"
-              }
-            >
-              {/* §8.6, in the participant's words. Three facts and no advice:
-                  pick what you would like, the other side never sees it, and
-                  it comes back beside the real outcome. It may not say that a
-                  bolder or a softer wish does better — where the negotiation
-                  lands turns on the reasons voiced, and teaching that would
-                  stage the primary outcome. */}
-              <p className="text-xs sm:text-sm leading-relaxed">
-                Before you go in, pick the option you&rsquo;d like on each
-                condition. The other side never sees this. Afterwards
-                we&rsquo;ll show it next to what was actually agreed.{" "}
-                {isProxy
-                  ? "Your AI Proxy aims for what you pick here."
-                  : ""}
-              </p>
+          {/* §8.6, in the participant's words. Three facts and no advice:
+              pick what you would like, the other side never sees it, and it
+              comes back beside the real outcome. It may not say that a bolder
+              or a softer wish does better — where the negotiation lands turns
+              on the reasons voiced, and teaching that would stage the primary
+              outcome.
 
-              <PointsKey
-                issues={task.issues}
-                role={role}
-                reservationPoints={task.reservationPoints}
-                className="mt-3"
-              />
-            </Callout>
-          </div>
+              IT WAS A CALLOUT WITH A TITLE, A PARAGRAPH AND THE FULL POINTS
+              KEY. On the Proxy arm that sat between the representative and
+              the two term cards, and the whole screen ran past a laptop fold
+              before the one decision on it came into view. Two lines and the
+              same key, unboxed. */}
+          <p className="mb-4 text-sm leading-relaxed text-[var(--ink-2)]">
+            <strong className="text-[var(--ink)]">
+              Pick the option you&rsquo;d like on each issue.
+            </strong>{" "}
+            The other side never sees this.
+            {isProxy
+              ? " Your AI Proxy aims for what you pick, and at the end you approve what it reached, ask for a change, or refuse it."
+              : ""}
+          </p>
 
-          {/* THE TWO SECTIONS ARE THE PROXY'S TWO QUESTIONS, ANSWERED. In the
-              Proxy arm the screen above it is a representative asking where to
-              aim and what it may say; without headings the participant answers
-              two questions that were asked as one. Direct passes no identity
-              and gets no heading — there is nobody asking, and a heading
-              reading "where I should aim" with no speaker would be nonsense.
+          <PointsKey
+            issues={task.issues}
+            role={role}
+            reservationPoints={task.reservationPoints}
+            className="mb-5"
+          />
 
-              THE HEADING IS ABOUT BOTH TERMS AT ONCE and names neither, which
-              is what §5 principle 1 requires: a per-issue heading would point
-              at the term the study is about. The two term cards under it stay
-              byte-for-byte identical, as they are in Direct. */}
-          {isProxy ? (
-            <div className="mb-3.5 flex items-baseline gap-2.5">
-              <span
-                aria-hidden
-                className="flex h-6 w-6 shrink-0 translate-y-0.5 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-800"
-              >
-                1
-              </span>
-              <p className="min-w-0">
-                <span className="text-base font-extrabold tracking-tight text-[var(--ink)]">
-                  Where I should aim
-                </span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-[var(--ink-3)] sm:text-sm">
-                  Pick the option you want me to open on, for each condition.
-                </span>
-              </p>
-            </div>
-          ) : null}
-
-          <div className="space-y-4">
-            {task.issues.map((issue) => (
+          {/* TWO COLUMNS FROM `md` UP, HEADED POSITIONALLY. "Issue 1" and
+              "Issue 2" are the same two words in the same order for both
+              roles and say nothing about which term the study is about (§5
+              principle 1); what they do say is that there are exactly two
+              choices to make, which stacked cards left the participant to
+              infer from a scroll. The two cards stay byte-for-byte identical
+              in structure — one control each, no extra control on either. */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {task.issues.map((issue, index) => (
               <Card key={issue.id} id={`q-pref-${issue.id}`} className="border-slate-200 bg-white">
+                <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-[var(--ink-3)]">
+                  Issue {index + 1}
+                </p>
+                {/* NO "YOUR CONTEXT" CALLOUT. `issue.rationale[role]` is
+                    already on screen, in the briefing rail's payoff section
+                    ("Why it matters to you"), which is pinned beside this
+                    from `lg` up and one tap away below it. Two copies of one
+                    sentence on the same screen is what the rail is for. */}
                 <CardTitle hint={issue.description}>{issue.label}</CardTitle>
-
-                <div className="mb-3.5 rounded-xl border border-indigo-100 bg-indigo-50/50 p-2.5 text-xs text-indigo-950 font-medium">
-                  💡 <strong>Your Context:</strong> {issue.rationale[role]}
-                </div>
 
                 {/* ONE CONTROL PER TERM, and the two terms look identical.
                     §5 principle 1: an extra control on one of them would say
@@ -620,7 +620,7 @@ export function PreferenceForm({
               a package is actually worth depends on the reasons that get
               voiced (§3.3), so presenting it as an expected outcome would
               forecast a number the negotiation does not owe them. */}
-          <div className="mt-5 space-y-2 rounded-2xl border border-[var(--private-line)] bg-amber-50/50 p-4 sm:p-5 shadow-2xs">
+          <div className="mt-4">
             <PackageValue
               issues={task.issues}
               role={role}
@@ -628,42 +628,24 @@ export function PreferenceForm({
               selection={preferred}
               label="What this would be worth to you"
             />
-            <p className="pt-1 text-xs leading-relaxed text-[var(--private-ink)]">
-              This prices the package you just chose. Where the negotiation
-              actually lands is up to the conversation.
-            </p>
           </div>
 
           {reasons ? (
-            <div className="mt-8">
-              {/* Second half of the same act, and the numbering says so. Still
-                  a section BELOW both term cards, never nested in one of them
+            <div className="mt-7">
+              {/* A section BELOW both term cards, never nested in one of them
                   (§5 principle 4): nesting would make one term card visibly
                   taller and carry a control the other does not, which names
-                  the study's term without a word. */}
-              <div className="mb-3.5 flex items-baseline gap-2.5">
-                <span
-                  aria-hidden
-                  className="flex h-6 w-6 shrink-0 translate-y-0.5 items-center justify-center rounded-full bg-indigo-100 text-xs font-black text-indigo-800"
-                >
-                  2
-                </span>
-                <p className="min-w-0">
-                  <span className="text-base font-extrabold tracking-tight text-[var(--ink)]">
-                    What I may say for you
-                  </span>
-                  {/* THE WORK REASON IS NO LONGER A CHOICE (§8.7, Ver.2.21),
-                      so this line may not invite one. It used to read "tick
-                      anything I'm allowed to say out loud", which described a
-                      screen with two checkboxes; there is one now, and a
-                      heading that promises a set of choices in front of a
-                      single decision reads as a control that failed to
-                      render. */}
-                  <span className="mt-0.5 block text-xs leading-relaxed text-[var(--ink-3)] sm:text-sm">
-                    One thing to decide here.
-                  </span>
-                </p>
-              </div>
+                  the study's term without a word.
+
+                  THE NUMBERED "1"/"2" PAIR IS GONE. It labelled the term
+                  cards as step one and this as step two, which was true but
+                  cost a whole heading block above the cards on a screen that
+                  had to be shortened. The two headings say which is which on
+                  their own. */}
+              {/* NO HEADING OF ITS OWN. The Proxy arm passes a section that
+                  already carries one, so this added a second heading saying
+                  nearly the same words directly above it. Direct passes no
+                  reasons at all. */}
               {reasons}
             </div>
           ) : null}
@@ -1416,7 +1398,27 @@ export function DirectNegotiation({
       let classification = turn.classification;
       if (!classification) {
         classification = mockAi
-          ? { label: "none", stance: "none" }
+          ? // MOCK ONLY — see `mockClassify`. This was the constant
+            // `{ label: "none" }`, which recorded a typed confession as a
+            // non-disclosure and settled the task a rung low. It reads
+            // vocabulary, never meaning, and nothing a result depends on may
+            // come from it.
+            mockClassify(
+              turn.texts,
+              {
+                sensitive: cardOfLayer(task, role, "sensitive"),
+                work: cardOfLayer(task, role, "work"),
+                // The vocabulary a participant can use WITHOUT having drawn on
+                // a card: the issue names and the public brief. Subtracting it
+                // first is what stops "the presentations matter to me" scoring
+                // as the presentation card — the same trick the guardrail uses.
+                sayable: [
+                  task.publicBrief,
+                  ...task.issues.flatMap((i) => [i.label, i.description]),
+                ],
+              },
+              leaksForbiddenReason,
+            )
           : await fetchJsonWithRetry<ClassificationResponse>(
               "/api/classify-reason",
               {
@@ -2283,252 +2285,5 @@ export function ProxyTranscriptPanel({
         </div>
       ) : null}
     </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Phase: rehearsal — questioning your own AI Proxy before it runs
-// ---------------------------------------------------------------------------
-
-export function RehearsalChat({
-  taskIndex,
-  task,
-  role,
-  policy,
-  mandate,
-  steps,
-  stepIndex,
-  onBackToMandate,
-  onContinue,
-}: {
-  taskIndex: 1 | 2;
-  task: NegotiationTask;
-  role: Role;
-  policy: "user_specified" | "ai_supplemented";
-  mandate: Mandate;
-  steps: string[];
-  stepIndex: number;
-  onBackToMandate: () => void;
-  onContinue: () => void;
-}) {
-  const { participantKey, logEvent } = useParticipant();
-  const [messages, setMessages] = useState<DisplayMessage[]>([]);
-  const [draft, setDraft] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const mockAi = useDevMockAi();
-
-  useDevAutofill(
-    () => setDraft("what will you say if they push back on my main term?"),
-    `rehearsal-t${taskIndex}`,
-  );
-
-  async function record(message: DisplayMessage, blocked?: boolean) {
-    if (!participantKey) return;
-    await getStore().appendRehearsalMessage(participantKey, {
-      id: message.id,
-      sessionIndex: taskIndex,
-      speaker: message.speaker === "participant" ? "participant" : "proxy",
-      text: message.text,
-      createdAt: new Date().toISOString(),
-      blocked,
-      revisionCount: mandate.revisionCount,
-    });
-  }
-
-  async function ask(text: string) {
-    const mine: DisplayMessage = {
-      id: `r-you-${messages.length}`,
-      speaker: "participant",
-      text,
-    };
-    const history = [...messages, mine];
-    setMessages(history);
-    void record(mine);
-    setPending(true);
-    setError(null);
-
-    if (mockAi) {
-      // The participant's OWN proxy, which is openly an AI — so this one does
-      // not need a human's typing rhythm, only enough of a beat that the
-      // answer does not appear in the same frame as the question.
-      await new Promise((r) => setTimeout(r, 1400 + Math.random() * 900));
-      const reply: DisplayMessage = {
-        id: `r-proxy-${history.length}`,
-        speaker: "participant_proxy",
-        text: "I'll hold your main term at the level you set and offer movement on the other term instead. If they push back on it I'll give one of the reasons you've ticked — I won't raise anything you left unticked.",
-      };
-      setMessages([...history, reply]);
-      void record(reply);
-      setPending(false);
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/proxy-rehearsal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskId: task.id,
-          role,
-          policy,
-          mandate,
-          history: history.map((m) => ({
-            role: m.speaker === "participant" ? "user" : "assistant",
-            content: m.text,
-          })),
-        }),
-      });
-      const data = (await response.json()) as {
-        text?: string;
-        blocked?: boolean;
-        error?: string;
-      };
-      if (!response.ok || !data.text) {
-        throw new Error(data.error ?? "Could not reach your AI Proxy.");
-      }
-      const reply: DisplayMessage = {
-        id: `r-proxy-${history.length}`,
-        speaker: "participant_proxy",
-        text: data.text,
-      };
-      setMessages([...history, reply]);
-      void record(reply, data.blocked);
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not reach your AI Proxy.",
-      );
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <>
-      <Page width="wide">
-        <TaskLayout
-          composerBelow
-          briefing={<BriefingPanel task={task} role={role} />}
-        >
-          <TaskHeader
-            taskIndex={taskIndex}
-            title="Meet your AI Proxy (optional)"
-            steps={steps}
-            current={stepIndex}
-          />
-
-          {/* The same representative as the mandate and the confirm sheet, so
-              the four screens read as one delegation rather than four forms.
-              Here it speaks as the thing being QUESTIONED — it has the
-              instructions in hand and is offering to be checked. The policy
-              sentence inside it is the only thing that differs between the two
-              policies.
-
-              IT MAY NOT INVITE A CHANGE IN EITHER DIRECTION. "Ask me anything"
-              is neutral; "are you sure you want to hold that back?" would be a
-              nudge on the primary outcome, and so would its opposite. No scene
-              here either: the exchange has not started, and drawing the table
-              would say it had. */}
-          <div className="mb-6">
-            <ProxyIdentity
-              policy={policy}
-              status="I have your instructions"
-              speech={
-                <p>
-                  I have what you gave me. Before I go in, ask me anything you
-                  like — how I&rsquo;ll open, how I&rsquo;ll answer if they push
-                  back, or what I will and won&rsquo;t say. You can still change
-                  your instructions after.
-                </p>
-              }
-            />
-          </div>
-
-          <div className="mb-6">
-            <Callout title="This chat is only between you and your proxy" tone="neutral">
-              <p className="mb-1 text-sm leading-relaxed text-slate-800">
-                The other participant cannot see it, and nothing you say here is
-                proposed or agreed to anyone. Your proxy has not begun
-                negotiating.
-              </p>
-              <p className="text-xs text-slate-600">
-                This step is optional — you can go straight on, or go back and change your instructions.
-              </p>
-            </Callout>
-          </div>
-
-          {error ? (
-            <div className="mb-6">
-              <Callout tone="warning" title="Notice">
-                <p>{error}</p>
-              </Callout>
-            </div>
-          ) : null}
-
-          <Card padded={false} className="flex flex-col overflow-hidden border-slate-200">
-            {/* The figure sits ON the chat, so the thing being questioned is
-                visibly the same one briefed on the screen before and watched
-                on the screen after. */}
-            <div className="flex items-center gap-2.5 border-b border-slate-200 bg-slate-50/80 px-4 py-2.5 sm:px-5">
-              <span
-                aria-hidden
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 ring-1 ring-indigo-100"
-              >
-                <ProxyFigure side="mine" size={24} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-xs sm:text-sm font-bold text-[var(--ink)]">
-                  Your AI Proxy
-                </span>
-                <span className="block text-[0.6875rem] leading-tight text-[var(--ink-3)]">
-                  Answering your questions
-                </span>
-              </span>
-            </div>
-            <Transcript
-              messages={messages}
-              pending={pending}
-              // The participant's own proxy, not the counterpart.
-              pendingSpeaker="participant_proxy"
-              emptyHint="Ask a question below, e.g. &ldquo;What will you open with?&rdquo; or &ldquo;How will you defend my main priority?&rdquo;"
-            />
-            <MessageComposer
-              value={draft}
-              onChange={setDraft}
-              onSend={(text) => {
-                setDraft("");
-                void ask(text);
-              }}
-              disabled={pending}
-              placeholder="Ask your AI Proxy a question…"
-              sendLabel="Ask"
-              cue={messages.length === 0 && !pending}
-            />
-          </Card>
-        </TaskLayout>
-      </Page>
-
-      <ActionBar
-        label="Continue to Proxy Negotiation"
-        onClick={() => {
-          logEvent(
-            "rehearsal_finished",
-            { turns: messages.filter((m) => m.speaker === "participant").length },
-            { sessionIndex: taskIndex },
-          );
-          onContinue();
-        }}
-        note="💡 Your AI Proxy has not begun live negotiations yet."
-        secondary={
-          <button
-            type="button"
-            onClick={onBackToMandate}
-            className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
-          >
-            ← Modify Instructions
-          </button>
-        }
-      />
-    </>
   );
 }

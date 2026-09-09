@@ -12,16 +12,17 @@
  *
  * WHAT IS DRAWN, AND WHY IT IS DRAWN THIS WAY:
  *
- *  - NOT A HUMANOID FACE. The counterpart is presented as another Prolific
- *    participant and is the ONE thing the study may not give away ("Things the
- *    participant must never learn" #1). A representative drawn with eyes, a
- *    mouth and a head would sit one small step from the figure used for a
- *    person, and the two are side by side on the handover scene. So the proxy
- *    is an EMBLEM: a shield-shaped badge on a plinth, holding a folder. It
- *    reads as an office of representation rather than as a creature.
- *  - NOT A CUTE MASCOT either. The participant is about to hand it a
- *    confession; a toy would make the handover feel like a game, and how
- *    costly that handover feels is the thing RISK and PERC measure.
+ *  - A ROBOT, AND NOT A PERSON. The counterpart is presented as another
+ *    Prolific participant and is the ONE thing the study may not give away
+ *    ("Things the participant must never learn" #1), so the proxy has to be
+ *    unmistakably machinery beside the person figure it stands next to on the
+ *    handover scene. A rounded head with a square screen face, two dot eyes,
+ *    an antenna and a boxy body reads as a machine at a glance and never as a
+ *    human silhouette. The earlier emblem — a shield on a plinth — read as a
+ *    badge of office and participants had to be told what it was.
+ *  - FRIENDLY, NOT A MASCOT. Rounded corners and a level gaze, no smile, no
+ *    limbs waving. The participant is about to hand it a confession, and a toy
+ *    would make the handover feel like a game.
  *  - THE SAME PICTURE UNDER BOTH POLICIES (interface rule 10: the art draws
  *    the INTERFACE, never the condition). Nothing in this file takes a policy,
  *    a condition or a role. There is nothing here to branch on.
@@ -158,7 +159,7 @@ const INK = {
     bodyLine: "#6366f1",
     core: "#4338ca",
     accent: "#d97706",
-    folder: "#ffffff",
+    screen: "#eef2ff",
   },
   theirs: {
     plinth: "#e2e8f0",
@@ -166,18 +167,22 @@ const INK = {
     bodyLine: "#94a3b8",
     core: "#475569",
     accent: "#94a3b8",
-    folder: "#ffffff",
+    screen: "#f8fafc",
   },
 } as const;
 
 /**
- * The figure itself.
+ * The figure itself: a friendly robot.
  *
- * A shield on a plinth, a folder held at its side, and a single filled dot at
- * the centre of the shield — the "attending" mark. The dot is the only part
- * that ever changes state (`speaking` fills the ring around it), because a
- * figure that animated its whole body would pull attention off the decision
- * the screen is actually for.
+ * A rounded head with a screen face, two dot eyes and a short antenna, on a
+ * boxy body. The ANTENNA LIGHT is the only part that changes state — filled
+ * and haloed while `speaking`, hollow otherwise — because a figure that
+ * animated its whole body would pull attention off the decision the screen is
+ * actually for. That is the "attending" mark the shield emblem used to carry
+ * at the centre of the badge.
+ *
+ * MINE vs THEIRS is one warm accent stroke and nothing else: same silhouette,
+ * same construction, same size.
  */
 export function ProxyFigure({
   side = "mine",
@@ -187,7 +192,7 @@ export function ProxyFigure({
 }: {
   side?: ProxySide;
   size?: number;
-  /** Draws the outer ring filled, for "at the table" moments. */
+  /** Fills the antenna light, for "at the table" moments. */
   speaking?: boolean;
   className?: string;
 }) {
@@ -201,74 +206,78 @@ export function ProxyFigure({
       aria-label={side === "mine" ? "Your AI Proxy" : "The other participant's AI Proxy"}
       className={cx("shrink-0", className)}
     >
-      {/* Plinth: the figure stands at a table rather than floating. */}
-      <ellipse cx="32" cy="66" rx="21" ry="4" fill={c.plinth} opacity="0.7" />
-      <rect x="27" y="55" width="10" height="9" rx="2.5" fill={c.plinth} />
+      {/* The ground it stands on. */}
+      <ellipse cx="32" cy="67" rx="20" ry="3.5" fill={c.plinth} opacity="0.7" />
 
-      {/* The badge body. */}
-      <path
-        d="M32 5 L54 13 V32 C54 45 44 53.5 32 57 C20 53.5 10 45 10 32 V13 Z"
+      {/* Antenna, and the light on top of it. */}
+      <path d="M32 11 V5" stroke={c.bodyLine} strokeWidth="2" strokeLinecap="round" />
+      {speaking ? (
+        <circle cx="32" cy="4" r="6" fill={c.accent} opacity="0.22" />
+      ) : null}
+      <circle
+        cx="32"
+        cy="4"
+        r="3"
+        fill={speaking ? c.accent : "none"}
+        stroke={c.accent}
+        strokeWidth="2"
+      />
+
+      {/* Head. */}
+      <rect
+        x="12"
+        y="11"
+        width="40"
+        height="30"
+        rx="11"
         fill={c.body}
         stroke={c.bodyLine}
         strokeWidth="2"
-        strokeLinejoin="round"
       />
 
-      {/* Attending mark: a ring and a core. Filled while speaking. */}
-      <circle
-        cx="32"
-        cy="27"
-        r="10"
-        fill={speaking ? c.core : "none"}
-        stroke={c.core}
+      {/* Screen face, with two eyes on it. */}
+      <rect
+        x="18.5"
+        y="18"
+        width="27"
+        height="16"
+        rx="6"
+        fill={c.screen}
+        stroke={c.bodyLine}
+        strokeWidth="1.6"
+      />
+      <circle cx="26.5" cy="26" r="2.8" fill={c.core} />
+      <circle cx="37.5" cy="26" r="2.8" fill={c.core} />
+
+      {/* Ears. */}
+      <rect x="7.5" y="21" width="4" height="10" rx="2" fill={c.bodyLine} opacity="0.55" />
+      <rect x="52.5" y="21" width="4" height="10" rx="2" fill={c.bodyLine} opacity="0.55" />
+
+      {/* Neck. */}
+      <rect x="28.5" y="41" width="7" height="4" fill={c.bodyLine} opacity="0.45" />
+
+      {/* Body. */}
+      <rect
+        x="16"
+        y="44"
+        width="32"
+        height="21"
+        rx="7"
+        fill={c.body}
+        stroke={c.bodyLine}
         strokeWidth="2"
-        opacity={speaking ? 0.18 : 0.55}
       />
-      <circle cx="32" cy="27" r="4.5" fill={c.core} />
 
-      {/* The mandate line: a single rule across the badge, the thing it was
-          given. Warm on the participant's own; neutral on the other side's. */}
+      {/* The mandate line across its front: the thing it was given. Warm on
+          the participant's own proxy; neutral on the other side's. */}
+      <path d="M23 52 H41" stroke={c.accent} strokeWidth="3" strokeLinecap="round" />
       <path
-        d="M18 42 H46"
-        stroke={c.accent}
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path
-        d="M22 48.5 H42"
+        d="M25 58 H39"
         stroke={c.bodyLine}
         strokeWidth="2"
         strokeLinecap="round"
         opacity="0.5"
       />
-
-      {/* The folder it carries: what it was handed, kept shut. */}
-      <g>
-        <rect
-          x="42"
-          y="36"
-          width="16"
-          height="20"
-          rx="2.5"
-          fill={c.folder}
-          stroke={c.bodyLine}
-          strokeWidth="1.8"
-        />
-        <path
-          d="M46 42 H54 M46 46.5 H52"
-          stroke={c.bodyLine}
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          opacity="0.7"
-        />
-        <path
-          d="M42 40 H58"
-          stroke={c.accent}
-          strokeWidth="2"
-          strokeLinecap="round"
-          opacity={side === "mine" ? 1 : 0.45}
-        />
-      </g>
     </svg>
   );
 }
@@ -335,21 +344,58 @@ function SceneFigure({
   );
 }
 
-/** The dashed link between two figures in a scene. */
-function SceneLink({ label }: { label?: string }) {
+/**
+ * The link between two figures in a scene, and it is DIRECTIONAL.
+ *
+ * Who talks to whom is the whole content of this picture, so the arrowheads
+ * carry it: a participant briefs their own proxy and does not talk to the
+ * other side, while the two proxies talk to each other. An undirected dashed
+ * rule said only "these two are related", which left the participant to guess
+ * the part the scene exists to show.
+ */
+function SceneLink({
+  label,
+  direction = "right",
+}: {
+  label?: string;
+  /** "both" draws a head at each end — the two proxies negotiating. */
+  direction?: "right" | "left" | "both";
+}) {
   return (
     <div aria-hidden className="flex min-w-8 flex-1 flex-col items-center gap-1 px-1">
-      <svg viewBox="0 0 60 8" className="h-2 w-full" preserveAspectRatio="none">
+      <svg viewBox="0 0 60 12" className="h-3 w-full text-slate-400">
         <path
-          d="M1 4 H59"
-          stroke="#cbd5e1"
-          strokeWidth="2"
+          d="M4 6 H56"
+          stroke="currentColor"
+          strokeWidth="1.8"
           strokeLinecap="round"
-          strokeDasharray="4 5"
+          vectorEffect="non-scaling-stroke"
         />
+        {direction !== "left" ? (
+          <path
+            d="M51 2 L56 6 L51 10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
+        {direction !== "right" ? (
+          <path
+            d="M9 2 L4 6 L9 10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
       </svg>
       {label ? (
-        <span className="text-[0.5625rem] font-bold uppercase tracking-wider text-[var(--ink-4)]">
+        <span className="text-[0.625rem] font-bold uppercase tracking-wide text-[var(--ink-3)]">
           {label}
         </span>
       ) : null}
@@ -386,24 +432,120 @@ export function ProxyScene({
         <PersonFigure size={44} muted={emphasis === "table"} />
       </SceneFigure>
 
-      <SceneLink label={emphasis === "briefing" ? "your brief" : undefined} />
+      {/* One way: you brief your proxy, and you do not talk to the other
+          side while the proxies are at the table. */}
+      <SceneLink label="briefs" />
 
       <SceneFigure label="Your AI Proxy">
         <ProxyFigure side="mine" size={emphasis === "table" ? 58 : 52} speaking={emphasis === "table"} />
       </SceneFigure>
 
-      <SceneLink label={emphasis === "table" ? "negotiating" : "the table"} />
+      {/* Two ways: this is the only pair that talks to each other. */}
+      <SceneLink label="negotiate" direction="both" />
 
       <SceneFigure label="Their AI Proxy">
         <ProxyFigure side="theirs" size={emphasis === "table" ? 58 : 52} speaking={emphasis === "table"} />
       </SceneFigure>
 
-      <SceneLink />
+      {/* Points LEFT: the other participant briefs their own proxy, the same
+          one-way handover the participant made at the far end of the row. */}
+      <SceneLink label="briefs" direction="left" />
 
       <SceneFigure label="Other Participant">
         <PersonFigure size={44} muted />
       </SceneFigure>
     </div>
+  );
+}
+
+/**
+ * The four steps of a Proxy task, drawn once, before the exchange.
+ *
+ * Participants arrive at the mandate screen without a picture of what the
+ * next twenty minutes look like, and the written version of it ran to a
+ * paragraph nobody finished. One short line per step, each with its own small
+ * scene, is the same information in a fifth of the reading.
+ *
+ * NO CONDITION NAME, and no policy branch (interface rule 10): every Proxy
+ * participant sees this identical row. Step ④ is conditional in the flow and
+ * says so in its own words, because a step drawn as unconditional would tell
+ * an approver they were about to do something they will not do.
+ */
+export function ProxyFlowSteps({ className }: { className?: string }) {
+  const steps: Array<{ art: ReactNode; label: string }> = [
+    {
+      art: (
+        <>
+          <PersonFigure size={30} />
+          <SceneLink />
+          <ProxyFigure side="mine" size={34} />
+        </>
+      ),
+      label: "You brief your AI Proxy.",
+    },
+    {
+      art: (
+        <>
+          <ProxyFigure side="mine" size={34} speaking />
+          <SceneLink direction="both" />
+          <ProxyFigure side="theirs" size={34} speaking />
+        </>
+      ),
+      label: "The two AI Proxies negotiate. You watch.",
+    },
+    {
+      art: (
+        <>
+          <PersonFigure size={30} />
+          <SceneLink direction="left" />
+          <span aria-hidden className="text-xl">📋</span>
+          <SceneLink />
+          <PersonFigure size={30} muted />
+        </>
+      ),
+      label:
+        "You both see the result. Approve it, ask for a change, or refuse.",
+    },
+    {
+      art: (
+        <>
+          <PersonFigure size={30} />
+          <SceneLink direction="both" />
+          <PersonFigure size={30} muted />
+        </>
+      ),
+      label:
+        "If either of you wants a change, you finish it in a short chat.",
+    },
+  ];
+
+  return (
+    <ol
+      className={cx(
+        "grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4",
+        className,
+      )}
+    >
+      {steps.map((step, index) => (
+        <li
+          key={step.label}
+          className="flex flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-2xs"
+        >
+          <div aria-hidden className="flex h-11 items-center justify-center gap-0.5">
+            {step.art}
+          </div>
+          <p className="mt-2.5 flex items-start gap-2 text-[0.8125rem] leading-snug text-[var(--ink-2)]">
+            <span
+              aria-hidden
+              className="tabular mt-px flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[0.625rem] font-black text-indigo-800"
+            >
+              {index + 1}
+            </span>
+            <span className="min-w-0">{step.label}</span>
+          </p>
+        </li>
+      ))}
+    </ol>
   );
 }
 
