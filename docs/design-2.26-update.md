@@ -148,8 +148,26 @@ Focused verification checklist:
   open-ended Previous/reload recovery, the final survey, and the £8 debriefing
   total. The survey run reported no browser console errors or warnings.
 
+## Post-deployment record
+
+- Vercel GitHub deployment `6351619800` completed successfully. The public
+  alias, `/api/preflight?gate=1`, and a newly optimized Ver.2.26 illustration
+  returned HTTP 200; the preflight response was `{ "ready": true }`.
+- A fresh public production session still displayed the `DEV OFF` control.
+  This means that build did not receive the exact public dev-tools-off setting.
+  The available access did not reveal whether the stored value is absent,
+  misspelled, or attached to the wrong Vercel scope, so the record does not
+  infer which configuration error occurred.
+
 ## Launch limits still open
 
+- **Recruitment blocker:** set `NEXT_PUBLIC_DEV_TOOLS=off` exactly in the
+  Vercel Production environment and create a new deployment. Confirm in a
+  fresh public session that the developer panel/control is neither downloaded
+  nor accessible before recruiting participants.
+- The public preflight gate checks model configuration only. A successful
+  `{ "ready": true }` response is not evidence that dev tools, persistence,
+  assignment, Prolific completion, or the rest of launch readiness is safe.
 - Active Direct and Proxy negotiation phase/state is not hydrated after a page
   reload. Stable assignment and restored survey drafts do not mean that a live
   chat can resume safely.
