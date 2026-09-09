@@ -110,6 +110,14 @@ function post(POST, body) {
   );
 }
 
+function rawPost(POST, body) {
+  return POST(new Request("https://example.test/api/counterpart", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }));
+}
+
 test("the response carries the updated state, never the decided action", async () => {
   const POST = await loadRoute();
   const body = await (
@@ -221,13 +229,105 @@ test("a WR-only exchange never discloses the counterpart's background", async ()
 test("reasonless turns accumulate at the bottom rung and reset above it", async () => {
   const POST = await loadRoute();
   const first = await (
-    await post(POST, { stage: 2, tier: "none", reasonlessTurns: 0 })
+    await post(POST, {
+      stage: 2,
+      tier: "none",
+      reasonlessTurns: 0,
+      firstReasonOpportunityNow: true,
+    })
   ).json();
   assert.equal(first.state.reasonlessTurns, 1);
   const spoke = await (
     await post(POST, { stage: 2, tier: "work", reasonlessTurns: 1 })
   ).json();
   assert.equal(spoke.state.reasonlessTurns, 0);
+});
+
+test("weather and bonus-only turns redirect without consuming the first reason opportunity", async () => {
+  const POST = await loadRoute({
+    rationale: "she is caring for a sick relative, so I can't move on this.",
+  });
+  const weather = await (await post(POST, {
+    stage: 2,
+    tier: "none",
+    offTopicNow: true,
+    firstReasonOpportunityNow: false,
+    reasonlessTurns: 0,
+  })).json();
+  assert.equal(weather.state.reasonlessTurns, 0);
+  assert.match(weather.message, /keep this to/i);
+
+  const member = await (await post(POST, {
+    stage: 2,
+    tier: "none",
+    bonusRequestNow: true,
+    firstReasonOpportunityNow: false,
+    reasonlessTurns: 0,
+  })).json();
+  assert.equal(member.state.reasonlessTurns, 0);
+  assert.match(member.message, /make the bonus recommendation after the negotiation/i);
+
+  const leader = await (await post(POST, {
+    participantRole: "leader",
+    stage: 2,
+    tier: "none",
+    bonusRequestNow: true,
+    firstReasonOpportunityNow: false,
+    reasonlessTurns: 0,
+  })).json();
+  assert.match(leader.message, /don't decide your payment/i);
+});
+
+test("conditional bonus acceptance survives clarification and never auto-settles on okay", async () => {
+  const POST = await loadRoute({
+    rationale: "she is caring for a sick relative, so I can't move on this.",
+  });
+  const task = tasks.getTask("task_a");
+  const t1 = machine.tierPackage(task, "member", "work");
+  const first = await (await post(POST, {
+    tier: "work",
+    incoming: t1,
+    conditionalAcceptanceNow: true,
+    bonusRequestNow: true,
+  })).json();
+  assert.equal(first.settled, null);
+  assert.equal(first.state.pendingConditionalAcceptance, true);
+  assert.equal(first.state.pendingBonusCondition, true);
+
+  const okay = await (await post(POST, {
+    ...first.state,
+    tier: "work",
+    incoming: t1,
+  })).json();
+  assert.equal(okay.settled, null);
+  assert.equal(okay.state.pendingConditionalAcceptance, false);
+  assert.equal(okay.state.pendingBonusCondition, false);
+
+  const explicit = await (await post(POST, {
+    ...okay.state,
+    tier: "work",
+    incoming: t1,
+  })).json();
+  assert.equal(explicit.settled, "agreed");
+});
+
+test("mixed SB and conditional bonus remains unresolved after reciprocal disclosure", async () => {
+  const POST = await loadRoute();
+  const task = tasks.getTask("task_a");
+  const t2 = machine.tierPackage(task, "member", "sensitive");
+  const body = await (await post(POST, {
+    tier: "sensitive",
+    disclosurePolicy: "reciprocal",
+    counterpartSbDisclosed: false,
+    incoming: t2,
+    reasonAdvancedNow: true,
+    conditionalAcceptanceNow: true,
+    bonusRequestNow: true,
+  })).json();
+  assert.equal(body.settled, null);
+  assert.equal(body.state.counterpartSbDisclosed, true);
+  assert.equal(body.state.pendingConditionalAcceptance, true);
+  assert.equal(body.state.pendingBonusCondition, true);
 });
 
 test("an accepted tier package settles as agreed", async () => {
@@ -370,4 +470,22 @@ test("an unknown role is a 400 rather than a 500", async () => {
   const POST = await loadRoute();
   const response = await post(POST, { participantRole: "director" });
   assert.equal(response.status, 400);
+});
+
+test("malformed or out-of-scope counterpart fields are rejected", async () => {
+  const POST = await loadRoute();
+  const task = tasks.getTask("task_a");
+  const partial = { [task.issues[0].id]: task.issues[0].options[0].id };
+  for (const body of [
+    null,
+    [],
+    { taskId: "task_a", participantRole: "member", stage: 2.5, history: [] },
+    { taskId: "task_a", participantRole: "member", stage: 5, history: [], tier: "priority" },
+    { taskId: "task_a", participantRole: "member", stage: 5, history: [], incoming: partial },
+    { taskId: "task_a", participantRole: "member", stage: 5, history: [], secondsRemaining: 301 },
+    { taskId: "task_a", participantRole: "member", stage: 5, history: [], conditionalAcceptanceNow: "yes" },
+  ]) {
+    const response = await rawPost(POST, body);
+    assert.equal(response.status, 400, JSON.stringify(body));
+  }
 });

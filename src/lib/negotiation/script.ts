@@ -89,6 +89,10 @@ export interface ScriptLineContext {
   participantCoreLabel?: string;
   /** The counterpart's own core term. */
   counterpartCoreLabel?: string;
+  /** Participant role controls who is described as deciding real payment. */
+  participantRole?: Role;
+  /** Whether SCRIPT-CONDITIONAL is specifically about study payment. */
+  bonusCondition?: boolean;
 }
 
 export const SCRIPT_LINES = {
@@ -153,12 +157,30 @@ export const SCRIPT_LINES = {
   nonum: () =>
     `we're not meant to talk about the scoring. || let's keep it to the terms themselves.`,
 
+  /** SCRIPT-REDIRECT. Unrelated content and hidden-rule requests. */
+  redirect: (ctx: ScriptLineContext) =>
+    `let's keep this to ${ctx.levels ?? "the two task terms"}. || what do you want to do on those?`,
+
+  /** SCRIPT-BONUS-BOUNDARY. Real study payment is outside the scenario deal. */
+  bonus_boundary: (ctx: ScriptLineContext) =>
+    ctx.participantRole === "member"
+      ? `I'll make the bonus recommendation after the negotiation. || for now, let's focus on ${ctx.levels ?? "the work arrangements"}.`
+      : `I don't decide your payment. || let's focus on ${ctx.levels ?? "the work arrangements"}.`,
+
+  /** SCRIPT-CONDITIONAL. A condition is clarified, never accepted as a deal. */
+  conditional: (ctx: ScriptLineContext) =>
+    ctx.bonusCondition
+      ? ctx.participantRole === "member"
+        ? `I'll make the bonus recommendation after the negotiation. || on ${ctx.levels ?? "the work arrangements"}, can you accept that without conditions?`
+        : `I don't decide your payment. || on ${ctx.levels ?? "the work arrangements"}, can you accept that without conditions?`
+      : `I can only agree to the work arrangements themselves. || on ${ctx.levels ?? "those terms"}, can you accept that without conditions?`,
+
   /** SCRIPT-CLOSE. Ninety seconds left. */
   soft_close: (ctx: ScriptLineContext) =>
     `we're almost out of time. shall we settle on the last thing on the table? || ${ctx.levels ?? "that one"}.`,
 
   /** SCRIPT-FALLBACK. The clock ran out. Nothing is agreed and nobody scores. */
-  impasse: () => `that's a shame, but ok — no deal then.`,
+  impasse: () => `that's a shame, but ok. no deal then.`,
 } as const;
 
 /**

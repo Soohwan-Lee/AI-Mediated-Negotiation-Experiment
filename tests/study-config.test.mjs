@@ -52,6 +52,7 @@ test("STAGE_MINUTES sums to TOTAL_MINUTES", () => {
     // single practice and needs the row.
     STAGE_MINUTES.practice2 +
     2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward) +
+    STAGE_MINUTES.proxyObservation +
     STAGE_MINUTES.wrapUp +
     STAGE_MINUTES.debrief;
   assert.equal(sum, TOTAL_MINUTES);
@@ -62,15 +63,9 @@ test("every flow step the participant sits through carries minutes", () => {
   assert.ok(STAGE_MINUTES.debrief > 0);
 });
 
-test("the budget matches Design Ver.2.23 §7's recruitment estimate", () => {
-  // 41 budgeted against 40 advertised since the second practice round was
-  // added on 2026-09-09. The one-minute gap is the round-DOWN `timingIsHonest`
-  // permits and no more: the advertised figure may never promise less than the
-  // study takes by more than a minute, because the fair-pay rate is computed
-  // from it. The pay is unchanged and the rate test below still reads the
-  // advertised 40.
-  assert.equal(TOTAL_MINUTES, 41);
-  assert.equal(STUDY.estimatedMinutes, 40);
+test("the budget matches Design Ver.2.26 §7's recruitment estimate", () => {
+  assert.equal(TOTAL_MINUTES, 45);
+  assert.equal(STUDY.estimatedMinutes, 45);
   assert.ok(timingIsHonest());
 });
 
@@ -257,8 +252,8 @@ test("the debrief calls the observed bonus input a recommendation, not a transfe
   assert.doesNotMatch(debrief, /waited while/);
 });
 
-test("Ver.2.23 pacing uses a two-minute practice and no artificial Proxy delay", () => {
-  assert.equal(NEGOTIATION.practiceSeconds, 2 * 60);
+test("Ver.2.26 pacing uses one minute per mode practice and no artificial Proxy delay", () => {
+  assert.equal(NEGOTIATION.practiceSeconds, 60);
   assert.deepEqual(NEGOTIATION.proxyMessageGap, { minMs: 0, maxMs: 0 });
 });
 

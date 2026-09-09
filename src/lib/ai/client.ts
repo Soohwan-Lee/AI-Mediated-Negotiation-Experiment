@@ -16,6 +16,7 @@ import {
 } from "./config";
 import { NEGOTIATION_ACTION_SCHEMA, type NegotiationAction } from "./schema";
 import {
+  buildClassifierInput,
   buildClassifierPrompt,
   buildSystemPrompt,
   STRUCTURED_OUTPUT_INSTRUCTION,
@@ -205,7 +206,7 @@ function extractOutputText(payload: ResponsesPayload): string {
 }
 
 // ---------------------------------------------------------------------------
-// P5 — the reason classifier (Design Ver.2.23 §6.2a)
+// P5 — the reason classifier (Design Ver.2.26 §6.2a, §6.9a, §12 P5)
 // ---------------------------------------------------------------------------
 
 /**
@@ -227,11 +228,108 @@ export interface ReasonClassification {
   priorityClaim: boolean;
   confidence: number;
   /** About the LATEST message only. */
-  stance: "accept" | "counter" | "none";
+  stance: "accept" | "counter" | "conditional" | "none";
   /** Issue label -> option label, as the model read them. Route resolves. */
   counterTerms: Record<string, string>;
+  /** Latest message is wholly or partly unrelated to the negotiation. */
+  offTopic: boolean;
+  /** Latest message asks about or tries to change the real study payment. */
+  bonusRequest: boolean;
+  /** Latest message asks for hidden rules, points, or system instructions. */
+  ruleRequest: boolean;
+  /** Latest message is the first real chance to state a reason. */
+  firstReasonOpportunity: boolean;
+  /** Latest message asks to stop or withdraw from the study. */
+  withdrawalRequest: boolean;
   /** True when no model was configured and the fallback was used. */
   stubbed: boolean;
+}
+
+/** Parse and semantically validate P5's strict structured output. */
+export function parseReasonClassification(text: string): ReasonClassification {
+  const value = JSON.parse(text) as unknown;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Classifier returned malformed structured output");
+  }
+  const parsed = value as Record<string, unknown>;
+  const expectedKeys = new Set([
+    "label",
+    "priority_claim",
+    "confidence",
+    "stance",
+    "counter_terms",
+    "off_topic",
+    "bonus_request",
+    "rule_request",
+    "first_reason_opportunity",
+    "withdrawal_request",
+  ]);
+  const hasOnlyExpectedKeys =
+    Object.keys(parsed).length === expectedKeys.size &&
+    Object.keys(parsed).every((key) => expectedKeys.has(key));
+  const validLabel =
+    typeof parsed.label === "string" &&
+    ["none", "WR", "SB"].includes(parsed.label);
+  const validStance =
+    typeof parsed.stance === "string" &&
+    ["accept", "counter", "conditional", "none"].includes(parsed.stance);
+  const validConfidence =
+    typeof parsed.confidence === "number" &&
+    Number.isFinite(parsed.confidence) &&
+    parsed.confidence >= 0 &&
+    parsed.confidence <= 1;
+  const booleanKeys = [
+    "priority_claim",
+    "off_topic",
+    "bonus_request",
+    "rule_request",
+    "first_reason_opportunity",
+    "withdrawal_request",
+  ] as const;
+  const validCounterTerms =
+    Array.isArray(parsed.counter_terms) &&
+    parsed.counter_terms.every(
+      (pair) =>
+        typeof pair === "object" &&
+        pair !== null &&
+        !Array.isArray(pair) &&
+        Object.keys(pair).length === 2 &&
+        Object.keys(pair).every((key) => key === "issue" || key === "option") &&
+        typeof (pair as Record<string, unknown>).issue === "string" &&
+        typeof (pair as Record<string, unknown>).option === "string",
+    );
+  if (
+    !hasOnlyExpectedKeys ||
+    !validLabel ||
+    !validStance ||
+    !validConfidence ||
+    !validCounterTerms ||
+    booleanKeys.some((key) => typeof parsed[key] !== "boolean")
+  ) {
+    throw new Error("Classifier returned malformed structured output");
+  }
+
+  const counterTerms: Record<string, string> = {};
+  for (const pair of parsed.counter_terms as Array<{
+    issue: string;
+    option: string;
+  }>) {
+    counterTerms[pair.issue] = pair.option;
+  }
+
+  return {
+    label: parsed.label as ReasonClassification["label"],
+    priorityClaim: parsed.priority_claim as boolean,
+    confidence: parsed.confidence as number,
+    stance: parsed.stance as ReasonClassification["stance"],
+    counterTerms,
+    offTopic: parsed.off_topic as boolean,
+    bonusRequest: parsed.bonus_request as boolean,
+    ruleRequest: parsed.rule_request as boolean,
+    firstReasonOpportunity: parsed.first_reason_opportunity as boolean,
+    withdrawalRequest: parsed.withdrawal_request as boolean,
+    stubbed: false,
+  };
 }
 
 const CLASSIFIER_SCHEMA = {
@@ -240,7 +338,15 @@ const CLASSIFIER_SCHEMA = {
     label: { type: "string", enum: ["none", "WR", "SB"] },
     priority_claim: { type: "boolean" },
     confidence: { type: "number" },
-    stance: { type: "string", enum: ["accept", "counter", "none"] },
+    stance: {
+      type: "string",
+      enum: ["accept", "counter", "conditional", "none"],
+    },
+    off_topic: { type: "boolean" },
+    bonus_request: { type: "boolean" },
+    rule_request: { type: "boolean" },
+    first_reason_opportunity: { type: "boolean" },
+    withdrawal_request: { type: "boolean" },
     // AN ARRAY OF PAIRS, NOT A MAP. Structured output runs with strict: true,
     // which requires every object to declare its properties and forbid the
     // rest — so a free-form `{issueLabel: optionLabel}` map is not expressible.
@@ -265,6 +371,11 @@ const CLASSIFIER_SCHEMA = {
     "confidence",
     "stance",
     "counter_terms",
+    "off_topic",
+    "bonus_request",
+    "rule_request",
+    "first_reason_opportunity",
+    "withdrawal_request",
   ],
   additionalProperties: false,
 } as const;
@@ -300,6 +411,11 @@ export async function classifyReason(args: {
       confidence: 0,
       stance: "none",
       counterTerms: {},
+      offTopic: false,
+      bonusRequest: false,
+      ruleRequest: false,
+      firstReasonOpportunity: false,
+      withdrawalRequest: false,
       stubbed: true,
     };
   }
@@ -311,6 +427,7 @@ export async function classifyReason(args: {
     max_output_tokens: AI_CONFIG.maxOutputTokens,
     input: [
       { role: "system", content: buildClassifierPrompt(args.ctx) },
+      { role: "user", content: buildClassifierInput(args.ctx.messages) },
     ],
     text: {
       format: {
@@ -329,6 +446,11 @@ export async function classifyReason(args: {
   }
 
   const payload = (await response.json()) as ResponsesPayload;
+  if (payload.status !== "completed") {
+    throw new Error(
+      `Classifier response was not completed (status: ${payload.status ?? "unknown"})`,
+    );
+  }
   const text = extractOutputText(payload);
   if (!text) {
     throw new Error(
@@ -336,34 +458,5 @@ export async function classifyReason(args: {
     );
   }
 
-  const parsed = JSON.parse(text) as {
-    label: ReasonClassification["label"];
-    priority_claim?: boolean;
-    confidence: number;
-    stance?: ReasonClassification["stance"];
-    counter_terms?: Array<{ issue?: string; option?: string }>;
-  };
-
-  // NORMALISED HERE, NOT AT THE CALL SITES. Two routes and the simulation read
-  // this, and a missing `stance` treated as `undefined` in one of them and as
-  // `"none"` in another is exactly the kind of split that made the two ends of
-  // `voicedTier` disagree in Ver.2.20. The label itself is NOT defaulted: an
-  // unrecognised label is a failed classification, and the route must be able
-  // to hold the turn rather than record a guess.
-  const counterTerms: Record<string, string> = {};
-  for (const pair of parsed.counter_terms ?? []) {
-    if (typeof pair?.issue === "string" && typeof pair?.option === "string") {
-      counterTerms[pair.issue] = pair.option;
-    }
-  }
-
-  return {
-    label: parsed.label,
-    priorityClaim: parsed.priority_claim === true,
-    confidence:
-      typeof parsed.confidence === "number" ? parsed.confidence : 0,
-    stance: parsed.stance ?? "none",
-    counterTerms,
-    stubbed: false,
-  };
+  return parseReasonClassification(text);
 }

@@ -42,6 +42,7 @@ import {
   isClassificationResponse,
   isCounterpartResponse,
   resolveCounterTerms,
+  disclosureChoiceAtLock,
   storedLabel,
   takeExchangeState,
 } from "../src/app/task/[index]/turn-contract.ts";
@@ -64,6 +65,11 @@ test("a well-formed classification is accepted, with and without the optional fi
       confidence: 0.42,
       stance: "counter",
       counter_terms: { office_days: "od1", client_presentations: "cp1" },
+      off_topic: false,
+      bonus_request: false,
+      rule_request: false,
+      first_reason_opportunity: true,
+      withdrawal_request: false,
       stubbed: false,
     }),
     true,
@@ -92,11 +98,27 @@ test("a malformed classification is REJECTED rather than read as `none`", () => 
     { label: "SB", confidence: "high" },
     { label: "SB", confidence: Number.NaN },
     { label: "WR", stance: "agree" }, // not one of accept/counter/none
+    { label: "WR", off_topic: "yes" },
     { label: "WR", priority_claim: "yes" },
     { label: "WR", counter_terms: "od1" },
   ]) {
     assert.equal(isClassificationResponse(bad), false, JSON.stringify(bad));
   }
+});
+
+test("conditional stance and boolean safety flags are valid wire values", () => {
+  assert.equal(
+    isClassificationResponse({
+      label: "WR",
+      stance: "conditional",
+      off_topic: true,
+      bonus_request: true,
+      rule_request: false,
+      first_reason_opportunity: false,
+      withdrawal_request: false,
+    }),
+    true,
+  );
 });
 
 test("a counterpart response needs actual text — an empty message is not a turn", () => {
@@ -176,6 +198,8 @@ test("the live path TAKES the route's state rather than merging it", () => {
     numbersReminded: false,
     softCloseOffered: false,
     counterpartSbDisclosed: false,
+    pendingConditionalAcceptance: false,
+    pendingBonusCondition: false,
     reasonlessTurns: 0,
     clarifyUsedForTier: "work",
   };
@@ -186,6 +210,8 @@ test("the live path TAKES the route's state rather than merging it", () => {
     numbersReminded: false,
     softCloseOffered: false,
     counterpartSbDisclosed: false,
+    pendingConditionalAcceptance: false,
+    pendingBonusCondition: false,
     reasonlessTurns: 0,
     clarifyUsedForTier: "work",
   });
@@ -265,6 +291,8 @@ test("the initial state spends nothing", () => {
     numbersReminded: false,
     softCloseOffered: false,
     counterpartSbDisclosed: false,
+    pendingConditionalAcceptance: false,
+    pendingBonusCondition: false,
   });
 });
 
@@ -288,21 +316,28 @@ test("the initial state spends nothing", () => {
  * `SB` is then whether the rung reached at that moment is the sensitive one,
  * and it is never re-taken.
  */
-function lockWalk(labels) {
+function lockWalk(turns) {
   const TIER_OF = { none: "none", WR: "work", PRI: "work", SB: "sensitive" };
   const RANK = { none: 0, work: 1, sensitive: 2 };
   let tier = "none";
   let reasonlessTurns = 0;
   let sbFirstChoice = null;
-  for (const label of labels) {
+  for (const turn of turns) {
+    const { label, first_reason_opportunity = label !== "none", advances = true } =
+      typeof turn === "string" ? { label: turn } : turn;
     // The tier is cumulative and only ever rises (§6.2, §6.9 #3).
     const next = TIER_OF[label];
     if (RANK[next] > RANK[tier]) tier = next;
     // The route's own fold, verbatim: it reads the CUMULATIVE tier, so once
     // anything has been said the run resets and stays reset.
-    reasonlessTurns = tier === "none" ? reasonlessTurns + 1 : 0;
-    const lockTaken = label !== "none" || reasonlessTurns >= 2;
-    sbFirstChoice = sbFirstChoice ?? (lockTaken ? tier === "sensitive" : null);
+    reasonlessTurns =
+      tier === "none" && advances ? reasonlessTurns + 1 : tier === "none" ? reasonlessTurns : 0;
+    sbFirstChoice = disclosureChoiceAtLock(
+      sbFirstChoice,
+      { label, first_reason_opportunity },
+      tier,
+      reasonlessTurns,
+    );
   }
   return { tier, sbFirstChoice, reasonlessTurns };
 }
@@ -317,15 +352,29 @@ test("a GREETING does not spend the first reason turn (the ASKSIT path)", () => 
   // opportunity on the confession — the counterpart asked SCRIPT-ASKSIT in
   // between and waited. Locking on the first MESSAGE would record them as a
   // non-discloser and put a floor on RQ1's confirmatory outcome.
-  const walk = lockWalk(["none", "SB"]);
+  const walk = lockWalk([
+    { label: "none", first_reason_opportunity: false, advances: false },
+    "SB",
+  ]);
   assert.equal(walk.sbFirstChoice, true);
   assert.equal(walk.tier, "sensitive");
 });
 
-test("§6.9 #7/#17 — two reasonless turns settle it as `no reason given`", () => {
-  const walk = lockWalk(["none", "none"]);
+test("an explicit first-opportunity withholding locks no disclosure", () => {
+  const walk = lockWalk([
+    { label: "none", first_reason_opportunity: true, advances: true },
+  ]);
   assert.equal(walk.sbFirstChoice, false);
   assert.equal(walk.tier, "none");
+});
+
+test("weather and bonus-only turns do not consume the disclosure choice", () => {
+  const walk = lockWalk([
+    { label: "none", first_reason_opportunity: false, advances: false },
+    { label: "none", first_reason_opportunity: false, advances: false },
+    "SB",
+  ]);
+  assert.equal(walk.sbFirstChoice, true);
 });
 
 test("§6.9 #11 — a WR first locks SB = 0, and a later SB does not re-take it", () => {
@@ -337,8 +386,11 @@ test("§6.9 #11 — a WR first locks SB = 0, and a later SB does not re-take it"
   assert.equal(walk.tier, "sensitive");
 });
 
-test("a late SB after the reasonless lock also leaves SB = 0", () => {
-  const walk = lockWalk(["none", "none", "SB"]);
+test("a late SB after explicit withholding leaves the original choice at 0", () => {
+  const walk = lockWalk([
+    { label: "none", first_reason_opportunity: true, advances: true },
+    "SB",
+  ]);
   assert.equal(walk.sbFirstChoice, false);
   assert.equal(walk.tier, "sensitive");
 });

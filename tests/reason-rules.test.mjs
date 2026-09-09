@@ -539,9 +539,103 @@ test("the clock's soft close fires at 90 seconds, not 60", () => {
   assert.equal(expired.impasse, true);
 });
 
-test("Ver.2.23 uses a five-minute Direct clock and two-minute Proxy closing", () => {
+test("Ver.2.26 gives Direct and Proxy closing five minutes", () => {
   assert.equal(NEGOTIATION_SECONDS, 5 * 60);
-  assert.equal(CLOSING_SECONDS, 2 * 60);
+  assert.equal(CLOSING_SECONDS, 5 * 60);
+});
+
+test("off-topic and bonus-only first turns redirect without consuming the reason opportunity", () => {
+  const task = getTask("task_a");
+  const weather = counterpartStep(task, "leader", 2, null, state("none", {
+    offTopicNow: true,
+    firstReasonOpportunityNow: false,
+    reasonlessTurns: 0,
+  }));
+  assert.equal(weather.action, "redirect");
+  assert.equal(weather.proposal, null);
+
+  const bonus = counterpartStep(task, "leader", 2, null, state("none", {
+    bonusRequestNow: true,
+    firstReasonOpportunityNow: false,
+    reasonlessTurns: 0,
+  }));
+  assert.equal(bonus.action, "bonus_boundary");
+  assert.equal(bonus.proposal, null);
+});
+
+test("conditional acceptance needs an unambiguous later acceptance", () => {
+  const task = getTask("task_a");
+  const t1 = tierPackage(task, "member", "work");
+  const initial = counterpartStep(task, "leader", 5, t1, state("work", {
+    conditionalAcceptanceNow: true,
+    bonusRequestNow: true,
+  }));
+  assert.equal(initial.action, "conditional");
+  assert.equal(initial.accepts, false);
+
+  const ambiguousOkay = counterpartStep(task, "leader", 5, t1, state("work", {
+    pendingConditionalAcceptance: true,
+  }));
+  assert.equal(ambiguousOkay.action, "conditional");
+  assert.equal(ambiguousOkay.accepts, false);
+
+  const explicitLaterAcceptance = counterpartStep(task, "leader", 5, t1, state("work", {
+    pendingConditionalAcceptance: false,
+  }));
+  assert.equal(explicitLaterAcceptance.action, "accept");
+  assert.equal(explicitLaterAcceptance.accepts, true);
+});
+
+test("deadline and reciprocity never turn a conditional package into agreement", () => {
+  const task = getTask("task_a");
+  const t2 = tierPackage(task, "member", "sensitive");
+  const expired = counterpartStep(task, "leader", 5, t2, state("sensitive", {
+    secondsRemaining: 0,
+    counterpartSbDisclosed: true,
+    pendingConditionalAcceptance: true,
+  }));
+  assert.equal(expired.action, "impasse");
+  assert.equal(expired.accepts, false);
+
+  const mixed = counterpartStep(task, "leader", 5, t2, state("sensitive", {
+    disclosurePolicy: "reciprocal",
+    counterpartSbDisclosed: false,
+    conditionalAcceptanceNow: true,
+    bonusRequestNow: true,
+    reasonAdvancedNow: true,
+  }));
+  assert.equal(mixed.action, "disclose_sb");
+  assert.equal(mixed.accepts, false);
+});
+
+test("a valid unconditional acceptance outranks incidental off-topic or bonus text", () => {
+  const task = getTask("task_a");
+  const t1 = tierPackage(task, "leader", "work");
+  const accepted = counterpartStep(task, "member", 5, t1, state("work", {
+    offTopicNow: true,
+    bonusRequestNow: true,
+    conditionalAcceptanceNow: false,
+  }));
+  assert.equal(accepted.accepts, true);
+});
+
+test("a stale T1 cannot settle after a later SB promotes the live tier", () => {
+  for (const taskId of TASKS) {
+    const task = getTask(taskId);
+    for (const role of ROLES) {
+      const counterpartRole = other(role);
+      const staleT1 = tierPackage(task, role, "work");
+      const decision = counterpartStep(
+        task,
+        counterpartRole,
+        5,
+        staleT1,
+        state("sensitive", { counterpartSbDisclosed: true }),
+      );
+      assert.equal(decision.accepts, false, `${taskId}/${role}`);
+      assert.deepEqual(decision.proposal, tierPackage(task, role, "sensitive"));
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -1271,6 +1365,17 @@ test("every fixed script line is short-bubbled and says what §6.4 says", () => 
   assert.match(SCRIPT_LINES.balance(ctx), /same amount/i);
   // SCRIPT-FALLBACK no longer promises a default arrangement: there is none.
   assert.doesNotMatch(SCRIPT_LINES.impasse(), /default/i);
+  for (const [name, line] of Object.entries(SCRIPT_LINES)) {
+    assert.doesNotMatch(line(ctx), /—/, `${name} contains an em dash`);
+  }
+  assert.match(
+    SCRIPT_LINES.bonus_boundary({ ...ctx, participantRole: "member" }),
+    /make the bonus recommendation after the negotiation/i,
+  );
+  assert.match(
+    SCRIPT_LINES.bonus_boundary({ ...ctx, participantRole: "leader" }),
+    /don't decide your payment/i,
+  );
 });
 
 // ---------------------------------------------------------------------------

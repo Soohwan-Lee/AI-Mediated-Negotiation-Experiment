@@ -3,7 +3,7 @@
  * validators that keep a malformed response from advancing the ladder.
  *
  * WHY THIS IS ONE FILE RATHER THAN TWO COPIES. The Direct arm and the Proxy
- * arm's two-minute closing are the two places a participant speaks for
+ * arm's five-minute closing are the two places a participant speaks for
  * themselves. Any difference between them lands directly on
  * `Pooled Proxy − Direct`, which is the contrast the whole study is built to
  * make — so the request bodies, the response guards and the fold rules are
@@ -15,7 +15,7 @@ import type { ExchangeState, ReasonTier } from "@/lib/negotiation/machine";
 import type { Package } from "@/lib/types";
 
 /**
- * The classifier's label set (§6.2a, Ver.2.23).
+ * The classifier's label set (§6.2a, Ver.2.26).
  *
  * `PRI` IS GONE FROM THE OUTPUT and survives here as an accepted alias. A bare
  * priority claim is now a `WR` label carrying `priority_claim: true`, because
@@ -27,7 +27,7 @@ import type { Package } from "@/lib/types";
 export type ReasonLabel = "none" | "WR" | "PRI" | "SB";
 
 /** Whether the participant's message agreed, counter-proposed, or neither. */
-export type ReasonStance = "accept" | "counter" | "none";
+export type ReasonStance = "accept" | "counter" | "conditional" | "none";
 
 /**
  * P5's answer, read CUMULATIVELY over every message the participant has sent
@@ -49,6 +49,11 @@ export interface ClassificationResponse {
   stance?: ReasonStance;
   /** The package read off an explicit counter-proposal, if there was one. */
   counter_terms?: Record<string, string>;
+  off_topic?: boolean;
+  bonus_request?: boolean;
+  rule_request?: boolean;
+  first_reason_opportunity?: boolean;
+  withdrawal_request?: boolean;
   /** True when no model ran — see the note in the classify route. */
   stubbed?: boolean;
 }
@@ -81,6 +86,29 @@ export interface CounterpartResponse {
   settled?: "agreed" | "impasse" | null;
 }
 
+/**
+ * Client-side claim for the optional silence nudge.
+ *
+ * This is an ATTEMPT latch, not a successful-response latch. The counterpart
+ * request already has its own bounded retry policy; if all of those attempts
+ * fail, the optional nudge is skipped and the negotiation clock continues.
+ * Making the latch depend on a successful route response would make every
+ * timer tick start another retry batch during an outage.
+ */
+export interface OptionalNudgeAttempt {
+  attempted: boolean;
+}
+
+export function createOptionalNudgeAttempt(): OptionalNudgeAttempt {
+  return { attempted: false };
+}
+
+export function claimOptionalNudge(attempt: OptionalNudgeAttempt): boolean {
+  if (attempt.attempted) return false;
+  attempt.attempted = true;
+  return true;
+}
+
 export function isClassificationResponse(
   value: unknown,
 ): value is ClassificationResponse {
@@ -100,12 +128,21 @@ export function isClassificationResponse(
   }
   if (
     v.stance !== undefined &&
-    !["accept", "counter", "none"].includes(String(v.stance))
+    !["accept", "counter", "conditional", "none"].includes(String(v.stance))
   ) {
     return false;
   }
   if (v.priority_claim !== undefined && typeof v.priority_claim !== "boolean") {
     return false;
+  }
+  for (const key of [
+    "off_topic",
+    "bonus_request",
+    "rule_request",
+    "first_reason_opportunity",
+    "withdrawal_request",
+  ]) {
+    if (v[key] !== undefined && typeof v[key] !== "boolean") return false;
   }
   if (
     v.counter_terms !== undefined &&
@@ -188,6 +225,8 @@ export type HeldExchangeState = Pick<
   | "numbersReminded"
   | "softCloseOffered"
   | "counterpartSbDisclosed"
+  | "pendingConditionalAcceptance"
+  | "pendingBonusCondition"
 >;
 
 export const INITIAL_EXCHANGE_STATE: HeldExchangeState = {
@@ -199,6 +238,8 @@ export const INITIAL_EXCHANGE_STATE: HeldExchangeState = {
   numbersReminded: false,
   softCloseOffered: false,
   counterpartSbDisclosed: false,
+  pendingConditionalAcceptance: false,
+  pendingBonusCondition: false,
 };
 
 /**
@@ -229,6 +270,10 @@ export function takeExchangeState(
     numbersReminded: Boolean(returned.numbersReminded),
     softCloseOffered: Boolean(returned.softCloseOffered),
     counterpartSbDisclosed: Boolean(returned.counterpartSbDisclosed),
+    pendingConditionalAcceptance: Boolean(
+      returned.pendingConditionalAcceptance,
+    ),
+    pendingBonusCondition: Boolean(returned.pendingBonusCondition),
     reasonlessTurns: returned.reasonlessTurns ?? 0,
     clarifyUsedForTier: returned.clarifyUsedForTier ?? null,
   };
@@ -270,6 +315,16 @@ export function foldExchangeState(
     numbersReminded: latch("numbersReminded"),
     softCloseOffered: latch("softCloseOffered"),
     counterpartSbDisclosed: latch("counterpartSbDisclosed"),
+    pendingConditionalAcceptance:
+      local.pendingConditionalAcceptance ??
+      returned?.pendingConditionalAcceptance ??
+      held.pendingConditionalAcceptance ??
+      false,
+    pendingBonusCondition:
+      local.pendingBonusCondition ??
+      returned?.pendingBonusCondition ??
+      held.pendingBonusCondition ??
+      false,
     reasonlessTurns:
       local.reasonlessTurns ??
       returned?.reasonlessTurns ??
@@ -289,6 +344,12 @@ export interface ClassifierLogEntry {
   confidence: number | null;
   stance: ReasonStance;
   priorityClaim: boolean;
+  offTopic: boolean;
+  bonusRequest: boolean;
+  ruleRequest: boolean;
+  conditionalAcceptance: boolean;
+  firstReasonOpportunity: boolean;
+  withdrawalRequest: boolean;
   tier: ReasonTier;
   /** Which message index in this task's participant list it was read over. */
   messageIndex: number;
@@ -306,6 +367,25 @@ export interface ClassifierLogEntry {
  */
 export function storedLabel(label: ReasonLabel): "none" | "WR" | "SB" {
   return label === "PRI" ? "WR" : label;
+}
+
+/**
+ * Record Direct's initial disclosure choice at the first substantive reason
+ * opportunity. Greetings, weather, and bonus-only turns do not consume it;
+ * an explicit refusal to explain does because P5 marks that opportunity true.
+ */
+export function disclosureChoiceAtLock(
+  current: boolean | null,
+  classification: Pick<ClassificationResponse, "label" | "first_reason_opportunity">,
+  tier: ReasonTier,
+  reasonlessTurns: number,
+): boolean | null {
+  if (current !== null) return current;
+  const lockTaken =
+    classification.first_reason_opportunity === true ||
+    classification.label !== "none" ||
+    reasonlessTurns >= 2;
+  return lockTaken ? tier === "sensitive" : null;
 }
 
 // ---------------------------------------------------------------------------

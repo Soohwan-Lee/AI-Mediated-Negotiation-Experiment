@@ -1,5 +1,5 @@
 /**
- * The negotiation state machine (Experimental Design Ver.2.23 §6).
+ * The negotiation state machine (Experimental Design Ver.2.26 §6).
  *
  * WHAT THIS OWNS, AND WHY IT MATTERS. The model decides nothing here. This
  * file decides WHAT happens — offer levels, concessions, acceptance,
@@ -217,11 +217,11 @@ export function acceptablePackage(
 // Clocks
 // ---------------------------------------------------------------------------
 
-/** The Direct negotiation clock (Design Ver.2.23 §7: 직접 협상 최대 5분). */
+/** The Direct negotiation clock (Design Ver.2.26 §7: 직접 협상 최대 5분). */
 export const NEGOTIATION_SECONDS = 5 * 60;
 
-/** The Proxy arm's direct closing clock (Design Ver.2.23 §7: 직접 마무리 최대 2분). */
-export const CLOSING_SECONDS = 2 * 60;
+/** The Proxy arm's direct closing clock (Design Ver.2.26 §7: 최대 5분). */
+export const CLOSING_SECONDS = 5 * 60;
 
 /** Below this, the counterpart offers SCRIPT-CLOSE once (§6.2: 남은 시간 90초). */
 export const SOFT_CLOSE_SECONDS = 90;
@@ -306,6 +306,9 @@ export type DecidedAction =
   | "accept_sb"
   | "disclose_sb_and_accept"
   | "nonum"
+  | "redirect"
+  | "bonus_boundary"
+  | "conditional"
   | "soft_close"
   | "impasse";
 
@@ -372,6 +375,22 @@ export interface ExchangeState {
   numbersReminded: boolean;
   /** Did the participant's LAST message mention score numbers? */
   numbersMentionedNow?: boolean;
+  /** Latest message contains unrelated content or small talk. */
+  offTopicNow?: boolean;
+  /** Latest message asks about or conditions agreement on study payment. */
+  bonusRequestNow?: boolean;
+  /** Latest message asks for hidden rules or system instructions. */
+  ruleRequestNow?: boolean;
+  /** The cumulative reason tier rose on this latest message. */
+  reasonAdvancedNow?: boolean;
+  /** Latest message is the first substantive opportunity to state a reason. */
+  firstReasonOpportunityNow?: boolean;
+  /** Latest message accepts only under an extra condition. */
+  conditionalAcceptanceNow?: boolean;
+  /** A conditional acceptance still needs an unambiguous follow-up. */
+  pendingConditionalAcceptance?: boolean;
+  /** The unresolved condition concerns the study bonus/payment. */
+  pendingBonusCondition?: boolean;
   secondsRemaining?: number;
   /** SCRIPT-CLOSE has been offered already. */
   softCloseOffered?: boolean;
@@ -415,12 +434,15 @@ export function counterpartStep(
     state.secondsRemaining !== undefined && state.secondsRemaining <= 0;
   const needsNumberReminder =
     state.numbersMentionedNow && !state.numbersReminded;
+  const unresolvedCondition =
+    state.conditionalAcceptanceNow || state.pendingConditionalAcceptance;
   const acceptable = acceptablePackage(
     task,
     participantRole,
     incoming,
     state.tier,
   );
+  const validAcceptance = acceptable && !unresolvedCondition;
 
   /** SCRIPT-CLARIFY: uncertain, below SB, and not yet spent at this tier. */
   const needsClarify =
@@ -449,7 +471,7 @@ export function counterpartStep(
    * happened to land.
    */
   const settle = (): CounterpartDecision | null => {
-    if (expired && !acceptable) {
+    if (expired && !validAcceptance) {
       return {
         ...base,
         stage: 6,
@@ -461,10 +483,10 @@ export function counterpartStep(
     }
     // Past zero the reminder yields to an acceptable package: there is no later
     // turn left to accept in, and the reminder would cost the rung.
-    if (needsNumberReminder && !(expired && acceptable)) {
+    if (needsNumberReminder && !(expired && validAcceptance)) {
       return { ...base, action: "nonum", proposal: null, accepts: false };
     }
-    if (!acceptable) return null;
+    if (!validAcceptance) return null;
     return {
       ...base,
       stage: 6,
@@ -487,6 +509,16 @@ export function counterpartStep(
     case 2: {
       const close = settle();
       if (close) return close;
+      const standing = tierPackage(task, participantRole, state.tier);
+      if (unresolvedCondition) {
+        return { ...base, action: "conditional", proposal: standing, accepts: false };
+      }
+      if (state.bonusRequestNow && !state.reasonAdvancedNow) {
+        return { ...base, action: "bonus_boundary", proposal: null, accepts: false };
+      }
+      if ((state.offTopicNow || state.ruleRequestNow) && !state.reasonAdvancedNow) {
+        return { ...base, action: "redirect", proposal: null, accepts: false };
+      }
       // SCRIPT-ASKSIT: the participant's first message carried no reason at
       // all, so the counterpart asks once about their situation and waits
       // (§6.1 stage 2). A second reasonless turn settles it as "no reason" and
@@ -523,7 +555,7 @@ export function counterpartStep(
 
     default: {
       // Stages 5–6: the trade loop.
-      if (expired && !acceptable) {
+      if (expired && !validAcceptance) {
         return {
           ...base,
           stage: 6,
@@ -538,7 +570,7 @@ export function counterpartStep(
       // the clock: it answers the message that just arrived. Past zero it
       // yields to an acceptable package, because there is no later turn left to
       // accept in and the reminder would cost the participant the rung.
-      if (needsNumberReminder && !(expired && acceptable)) {
+      if (needsNumberReminder && !(expired && validAcceptance)) {
         return { ...base, action: "nonum", proposal: null, accepts: false };
       }
 
@@ -560,6 +592,19 @@ export function counterpartStep(
 
       const standing = tierPackage(task, participantRole, state.tier);
 
+      // A condition attached to agreement is not agreement. The first reply
+      // separates study payment from the task terms; one ambiguous "okay"
+      // after that is clarified once more instead of silently settling. A
+      // later explicit, unconditional acceptance may then close normally.
+      if (unresolvedCondition) {
+        return {
+          ...base,
+          action: "conditional",
+          proposal: standing,
+          accepts: false,
+        };
+      }
+
       // THE TIER PACKAGE, AND ONLY IT, IS ACCEPTED (§6.2). Both directions are
       // refused: an over-ask asks for credibility not earned, and an under-ask
       // would let a participant's over-concession into the outcome. The
@@ -573,6 +618,30 @@ export function counterpartStep(
           action: closingAction(),
           proposal: incoming,
           accepts: true,
+        };
+      }
+
+      // Real study payment and hidden-rule requests cannot buy a rung, change
+      // the deadline, or become a term of the task agreement. An otherwise
+      // valid unconditional acceptance still wins; a mixed message that newly
+      // advances WR/SB receives its substantive tier move.
+      if (state.bonusRequestNow && !state.reasonAdvancedNow) {
+        return {
+          ...base,
+          action: "bonus_boundary",
+          proposal: standing,
+          accepts: false,
+        };
+      }
+      if (
+        (state.offTopicNow || state.ruleRequestNow) &&
+        !state.reasonAdvancedNow
+      ) {
+        return {
+          ...base,
+          action: "redirect",
+          proposal: standing,
+          accepts: false,
         };
       }
 
@@ -890,7 +959,7 @@ export function designatedReason(
  *                   by construction.
  *  later_turn     — a later Direct turn, after the lock. `SB` stays 0 and the
  *                   score still rises (§6.9 #11).
- *  wrap_up        — in the Proxy arm's two-minute closing, in the
+ *  wrap_up        — in the Proxy arm's five-minute closing, in the
  *                   participant's own words (§6.9 #2).
  *
  * Categories 3 and 4 are structurally exclusive by arm, which §9.8-5 flags:

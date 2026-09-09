@@ -190,7 +190,7 @@ function fallbackText(
  * and "this sentence was the sensitive one" (which the participant must not
  * learn). NO KIND MARKER, ever: the token is returned with every message, so
  * any marker would label the AI-Supplemented's abstraction per message for the
- * whole transcript — the judgement OTHER-AI4 asks the participant to make
+ * whole transcript, so receiver-side judgements are not cued by the wire
  * unaided.
  */
 function reasonToken(id: string): string {
@@ -340,12 +340,71 @@ function packageSentence(task: NegotiationTask, pkg: Package): string {
     .join(", ");
 }
 
+function validProxyPackage(
+  task: NegotiationTask,
+  value: unknown,
+): value is Package | null | undefined {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+  const pack = value as Record<string, unknown>;
+  if (Object.keys(pack).length !== task.issues.length) return false;
+  return task.issues.every(
+    (issue) =>
+      typeof pack[issue.id] === "string" &&
+      issue.options.some((option) => option.id === pack[issue.id]),
+  );
+}
+
+function validMandate(
+  task: NegotiationTask,
+  role: Role,
+  sessionIndex: 1 | 2,
+  value: unknown,
+): value is Mandate {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const mandate = value as Record<string, unknown>;
+  if (mandate.sessionIndex !== sessionIndex) return false;
+  if (!Number.isInteger(mandate.revisionCount) || Number(mandate.revisionCount) < 0) {
+    return false;
+  }
+  if (!Array.isArray(mandate.issues) || mandate.issues.length !== task.issues.length) {
+    return false;
+  }
+  const issueRows = mandate.issues as Array<Record<string, unknown>>;
+  if (issueRows.some((row) => typeof row !== "object" || row === null)) return false;
+  const seenIssues = new Set(issueRows.map((row) => row.issueId));
+  if (seenIssues.size !== task.issues.length) return false;
+  if (
+    task.issues.some((issue) => {
+      const row = issueRows.find((candidate) => candidate.issueId === issue.id);
+      return (
+        !row ||
+        typeof row.preferredOptionId !== "string" ||
+        !issue.options.some((option) => option.id === row.preferredOptionId)
+      );
+    })
+  ) {
+    return false;
+  }
+  if (!Array.isArray(mandate.authorizedReasonIds)) return false;
+  const authorized = mandate.authorizedReasonIds;
+  if (authorized.some((id) => typeof id !== "string")) return false;
+  if (new Set(authorized).size !== authorized.length) return false;
+  const ownCardIds = new Set(task.roleBriefs[role].reasonCards.map((card) => card.id));
+  return authorized.every((id) => ownCardIds.has(id));
+}
+
 export async function POST(request: Request) {
   let body: RequestBody;
   try {
     body = (await request.json()) as RequestBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const task = getTask(body.taskId);
@@ -363,9 +422,48 @@ export async function POST(request: Request) {
   ) {
     return NextResponse.json({ error: "Unknown policy" }, { status: 400 });
   }
+  if (body.sessionIndex !== 1 && body.sessionIndex !== 2) {
+    return NextResponse.json({ error: "Invalid session" }, { status: 400 });
+  }
+  if (!validMandate(task, body.participantRole, body.sessionIndex, body.mandate)) {
+    return NextResponse.json({ error: "Invalid mandate" }, { status: 400 });
+  }
+  if (
+    body.history !== undefined &&
+    (!Array.isArray(body.history) ||
+      body.history.some(
+        (entry) =>
+          typeof entry !== "object" ||
+          entry === null ||
+          ![
+            "participant",
+            "counterpart",
+            "participant_proxy",
+            "counterpart_proxy",
+            "counterpart_principal",
+            "system",
+          ].includes(entry.speaker) ||
+          typeof entry.text !== "string",
+      ))
+  ) {
+    return NextResponse.json({ error: "Invalid history" }, { status: 400 });
+  }
+  if (
+    !validProxyPackage(task, body.lastParticipantPackage) ||
+    !validProxyPackage(task, body.lastCounterpartPackage)
+  ) {
+    return NextResponse.json({ error: "Invalid package" }, { status: 400 });
+  }
+  if (
+    body.reasonsUsed !== undefined &&
+    (!Array.isArray(body.reasonsUsed) ||
+      body.reasonsUsed.some((token) => typeof token !== "string"))
+  ) {
+    return NextResponse.json({ error: "Invalid reason history" }, { status: 400 });
+  }
 
-  const turn = Number.isInteger(body.turn) ? body.turn : 0;
-  if (turn < 0 || turn >= TOTAL_TURNS) {
+  const turn = body.turn;
+  if (!Number.isInteger(turn) || turn < 0 || turn >= TOTAL_TURNS) {
     return NextResponse.json(
       { error: `turn must be between 0 and ${TOTAL_TURNS - 1}` },
       { status: 400 },
@@ -852,8 +950,8 @@ export async function POST(request: Request) {
      * Three reasons —"). Without it the abstraction arrives as a bare
      * statement among two others with no speaker attached, and §6.6's whole
      * point is that an AI is recommending this on its own account. Whether
-     * responsibility still lands on the principal is what OTHER-AI4 and ATTR2
-     * measure, so a message missing the frame is measuring something else.
+     * responsibility still lands on the principal is measured downstream, so
+     * a message missing the frame is measuring something else.
      *
      * Prepended only when the model did not produce it, matched by overlap
      * because the proxy paraphrases. It goes AFTER any self-introduction, so

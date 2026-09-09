@@ -119,6 +119,14 @@ function post(POST, body) {
   );
 }
 
+function rawPost(POST, body) {
+  return POST(new Request("https://example.test/api/proxy-negotiation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }));
+}
+
 const SB_A_MEMBER = tasks.cardOfLayer(TASK_A, "member", "sensitive");
 
 test("the §6.6 sentences REACH THE PROMPT, frame and all", async () => {
@@ -409,13 +417,72 @@ test("a model that invents a reason trips provenance_policy_violation", async ()
 
 test("a turn outside the seven-turn order is a 400", async () => {
   const { POST } = await loadRoute();
-  for (const turn of [-1, protocol.PROXY_TOTAL_TURNS]) {
+  for (const turn of [-1, 2.5, protocol.PROXY_TOTAL_TURNS]) {
     const response = await post(POST, {
       policy: "user_specified",
       mandate: mandate("member"),
       turn,
     });
     assert.equal(response.status, 400);
+  }
+});
+
+test("malformed mandates and carried state are rejected before the plan can change", async () => {
+  const { POST } = await loadRoute();
+  const good = mandate("member");
+  const otherRoleCard = tasks.reasonCards(TASK_A, "leader")[0].id;
+  const partialPackage = {
+    [TASK_A.issues[0].id]: TASK_A.issues[0].options[0].id,
+  };
+  const bodies = [
+    null,
+    [],
+    {
+      taskId: "task_a",
+      participantRole: "member",
+      policy: "user_specified",
+      sessionIndex: 1,
+      turn: 0,
+      history: [],
+      mandate: { ...good, sessionIndex: 2 },
+    },
+    {
+      taskId: "task_a",
+      participantRole: "member",
+      policy: "user_specified",
+      sessionIndex: 1,
+      turn: 0,
+      history: [],
+      mandate: {
+        ...good,
+        issues: good.issues.map((row, index) =>
+          index === 0 ? { ...row, preferredOptionId: "not-an-option" } : row,
+        ),
+      },
+    },
+    {
+      taskId: "task_a",
+      participantRole: "member",
+      policy: "user_specified",
+      sessionIndex: 1,
+      turn: 0,
+      history: [],
+      mandate: { ...good, authorizedReasonIds: [otherRoleCard] },
+    },
+    {
+      taskId: "task_a",
+      participantRole: "member",
+      policy: "user_specified",
+      sessionIndex: 1,
+      turn: 0,
+      history: [],
+      mandate: good,
+      lastParticipantPackage: partialPackage,
+    },
+  ];
+  for (const body of bodies) {
+    const response = await rawPost(POST, body);
+    assert.equal(response.status, 400, JSON.stringify(body));
   }
 });
 

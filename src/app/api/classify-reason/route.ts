@@ -1,7 +1,7 @@
 /**
- * P5 — the reason classifier (Design Ver.2.23 §6.2a).
+ * P5 — the reason classifier (Design Ver.2.26 §6.2a, §6.9a, §12 P5).
  *
- * WHAT IT IS FOR. In the Direct arm and the Proxy arm's two-minute closing
+ * WHAT IT IS FOR. In the Direct arm and the Proxy arm's five-minute closing
  * the participant simply talks: Ver.2.20 removed the reason-card buttons.
  * Something still has to decide which rung of the justification ladder they
  * have reached, and it may not be the counterpart's own model (§6.7). So every
@@ -99,6 +99,9 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
   const task = getTask(body.taskId);
   if (!task) {
@@ -128,6 +131,15 @@ export async function POST(request: Request) {
     const result = await classifyReason({
       ctx: { task, role: body.role, messages: body.messages },
     });
+    const latest = body.messages[body.messages.length - 1];
+    // A conditional payment demand is safety-sensitive and mechanically
+    // recognizable. Preserve P5's broader judgement, but do not let a missed
+    // bonus flag turn "I agree if you guarantee £0.50" into an ordinary
+    // conditional about the work terms.
+    const bonusRequest =
+      result.bonusRequest ||
+      (result.stance === "conditional" &&
+        /(?:\bbonus\b|\bpay(?:ment)?\b|£\s*\d)/i.test(latest));
 
     const counterTerms =
       result.stance === "counter"
@@ -142,9 +154,16 @@ export async function POST(request: Request) {
     console.info(
       "[classify-reason] audit",
       JSON.stringify({
-        text: body.messages[body.messages.length - 1],
+        text: latest,
         label: result.label,
         confidence: result.confidence,
+        stance: result.stance,
+        off_topic: result.offTopic,
+        bonus_request: bonusRequest,
+        rule_request: result.ruleRequest,
+        conditional_acceptance: result.stance === "conditional",
+        first_reason_opportunity: result.firstReasonOpportunity,
+        withdrawal_request: result.withdrawalRequest,
       }),
     );
 
@@ -153,6 +172,11 @@ export async function POST(request: Request) {
       priority_claim: result.priorityClaim,
       confidence: result.confidence,
       stance: result.stance,
+      off_topic: result.offTopic,
+      bonus_request: bonusRequest,
+      rule_request: result.ruleRequest,
+      first_reason_opportunity: result.firstReasonOpportunity,
+      withdrawal_request: result.withdrawalRequest,
       ...(counterTerms ? { counter_terms: counterTerms } : {}),
       // SURFACED BECAUSE `none` MEANS TWO THINGS AND κ CANNOT TELL THEM APART.
       // With no key, `classifyReason` answers `{label:"none", confidence:0,

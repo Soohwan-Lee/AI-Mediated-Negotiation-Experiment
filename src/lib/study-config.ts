@@ -1,40 +1,40 @@
 /**
  * Single source of truth for study-level constants.
  *
- * Values follow Experimental Design Ver.2.23 §7. Change them here, not in
+ * Values follow Experimental Design Ver.2.26 §7. Change them here, not in
  * page components.
  */
 
 export const STUDY = {
   title: "Workplace Negotiation and AI-Mediated Communication",
   shortTitle: "Workplace Negotiation Study",
-  /** Ver.2.23 §7 recruits for an estimated 40-minute study. */
-  estimatedMinutes: 40,
+  /** Ver.2.26 §7 recruits for an estimated 45-minute study. */
+  estimatedMinutes: 45,
   currencySymbol: "£",
-  /** Ver.2.23 §7.1: £6 base plus £1 total extra, paid equally in practice. */
-  compensation: "6.00",
-  hourlyEquivalent: "10.50",
+  /** Ver.2.26 §7.1: £7 base plus £1 total extra, paid equally in practice. */
+  compensation: "7.00",
+  hourlyEquivalent: "10.67",
   bonusAmount: "1.00",
   bonusPerTask: "0.50",
-  totalPaid: "7.00",
+  totalPaid: "8.00",
   /**
    * WHAT THE CONSENT PAGE MAY ADVERTISE, AND WHY IT IS A RANGE.
    *
    * Role is not known at consent — it is revealed on the instruction page —
-   * and §7.1 gives the two roles different guarantees: a Leader's £7 is fixed
-   * from assignment, while a Member is guaranteed £6 and told the Leader
+   * and §7.1 gives the two roles different guarantees: a Leader's £8 is fixed
+   * from assignment, while a Member is guaranteed £7 and told the Leader
    * recommends up to £0.50 per task on top. So the only honest pre-assignment
    * headline is the TOTAL as a span across both roles.
    *
-   * It must not be written as "£6 + up to £1 bonus" either. That reads as a
+   * It must not be written as "£7 + up to £1 bonus" either. That reads as a
    * base with an optional extra, which is the Member's structure presented to
    * everyone, and it understates what a Leader is actually guaranteed.
    *
    * In practice every participant is paid `totalPaid`; the difference between
    * the roles is a scenario claim, retracted at /debriefing.
    */
-  minTotal: "6.00",
-  maxTotal: "7.00",
+  minTotal: "7.00",
+  maxTotal: "8.00",
   irb: {
     /**
      * The UNIST IRB determined this study exempt. An exemption is not an IRB
@@ -54,36 +54,29 @@ export const STUDY = {
 } as const;
 
 /**
- * Minutes per stage, apportioned from Design Ver.2.23 §7's 38–40 minute
- * participant flow. The task value includes its two-minute preparation.
+ * Minutes per stage, apportioned from Design Ver.2.26 §7's 45-minute flow.
+ * The task value includes its two-minute preparation.
  */
 export const STAGE_MINUTES = {
   consent: 2,
-  /** §7: consent plus the shortened background/covariate block total four. */
-  background: 2,
-  /** §7: common/role briefing and comprehension (5), then practice (2). */
-  instruction: 5,
-  practice: 2,
+  background: 4,
+  /** §7: common/role briefing and comprehension. */
+  instruction: 3,
+  /** Each negotiation mode has its own one-minute practice. */
+  practice: 1,
   /**
-   * THE SECOND PRACTICE, added 2026-09-09 on the PI's decision.
-   *
-   * One minute rather than two, and the difference is the whole point of it
-   * existing: the participant has already met the controls and the scenario,
-   * so what is left to teach is the OTHER way of negotiating. The
-   * comprehension item is not repeated either — CHK5 is asked once, in
-   * practice 1 — which is what pays for the shorter budget.
-   *
-   * §7's table in the design doc predates this and still lists one practice
-   * round; the row needs adding there. The code's figure is the summed one and
-   * is deliberately the more conservative of the two.
+   * The second one-minute practice appears immediately before the other mode;
+   * IC5/IC6 check the mode-specific action after its corresponding practice.
    */
   practice2: 1,
   /** Two-minute preparation plus up to five minutes for the task interaction. */
   task: 7,
-  /** §7: most of each task's five-minute post-task block. */
-  taskSurvey: 4,
-  /** §7: the decision, REMARK and ATTR finish that post-task block. */
+  /** §7: questionnaire and evaluation, excluding the one-minute role action. */
+  taskSurvey: 5,
+  /** §7: the role-specific bonus recommendation or upward evaluation. */
   reward: 1,
+  /** Proxy observation and behavioural ratification, beyond the common chat. */
+  proxyObservation: 3,
   /** §7: end survey before debriefing. */
   wrapUp: 3,
   /** §7: debriefing and data-use confirmation. */
@@ -105,6 +98,7 @@ export const TOTAL_MINUTES =
   STAGE_MINUTES.practice +
   STAGE_MINUTES.practice2 +
   2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward) +
+  STAGE_MINUTES.proxyObservation +
   STAGE_MINUTES.wrapUp +
   STAGE_MINUTES.debrief;
 
@@ -123,12 +117,12 @@ export function timingIsHonest(): boolean {
 /**
  * Negotiation pacing.
  *
- * Direct keeps the short matchmaking and human reply pacing. Ver.2.23 §7
+ * Direct keeps the short matchmaking and human reply pacing. Ver.2.26 §7
  * removes artificial waiting from the watched Proxy exchange.
  */
 export const NEGOTIATION = {
-  /** Ver.2.23 §7: a short neutral practice targeting two minutes. */
-  practiceSeconds: 2 * 60,
+  /** Ver.2.26 §7: each mode has a one-minute neutral practice. */
+  practiceSeconds: 60,
   /** "Waiting for the other participant…" before a task starts. */
   matchmakingMs: { minMs: 4000, maxMs: 5000 },
   /**
@@ -154,7 +148,7 @@ export const NEGOTIATION = {
    * usually exceeds it.
    */
   counterpartDelay: { minMs: 4500, maxMs: 16000, msPerChar: 45 },
-  /** Ver.2.23 §7: no artificial delay in the watched Proxy exchange. */
+  /** Ver.2.26 §7: no artificial delay in the watched Proxy exchange. */
   proxyMessageGap: { minMs: 0, maxMs: 0 },
   /**
    * Maximum characters in one negotiation message (Design §7 노출량 통제).
@@ -300,8 +294,8 @@ export const FLOW = [
    * exchange and RATIFY for the first time inside the task being measured,
    * while a Proxy-first participant had rehearsed all three.
    *
-   * It sits between `reward-1` and `task-2` so `nextHref` carries REMARK 1
-   * straight into it with no page needing to know it exists.
+   * It sits between `reward-1` and `task-2`, after the first task's complete
+   * questionnaire/evaluation block and before the next mode begins.
    */
   { key: "practice-2", href: "/practice/2", label: "Practice for Task 2" },
   { key: "task-2", href: "/task/2", label: "Task 2" },
@@ -315,7 +309,7 @@ export const FLOW = [
 export type FlowKey = (typeof FLOW)[number]["key"];
 
 /**
- * The five phases a participant is told about, in order.
+ * The six phases a participant is told about, in order.
  *
  * NOT the same list as `FLOW`, and deliberately so. `FLOW` is thirteen routes
  * and drives the progress bar (interface rule 3); this is the participant's
@@ -400,11 +394,9 @@ const BACK_STEPS: Partial<Record<FlowKey, FlowKey>> = {
   practice: "instruction",
   /**
    * `practice-2` IS DELIBERATELY ABSENT, not overlooked. The step before it is
-   * Task 1's reward decision and REMARK, and neither may be re-entered: the
-   * bonus is a behavioural response to one task's interaction, and REMARK is
-   * a stimulus that has already been delivered. Going back there from the
-   * second practice would let a participant revise a recorded decision after
-   * seeing the next task's opening.
+   * Task 1's role-specific evaluation, which may not be re-entered. Going back
+   * from the second practice would let a participant revise a recorded
+   * decision after seeing the next task's opening.
    *
    * A missing key yields `null` from `backStep`, so the practice-2 screens
    * render no Back control at all.

@@ -30,6 +30,7 @@ import { leaksForbiddenReason } from "@/lib/ai/reason-leak";
 import {
   counterpartStep,
   mentionsScoreNumbers,
+  NEGOTIATION_SECONDS,
   proposalTierNumber,
   type DecidedAction,
   type ExchangeState,
@@ -113,6 +114,14 @@ interface RequestBody {
    * fallback for a caller that does not send it.
    */
   numbersMentionedNow?: boolean;
+  offTopicNow?: boolean;
+  bonusRequestNow?: boolean;
+  ruleRequestNow?: boolean;
+  reasonAdvancedNow?: boolean;
+  firstReasonOpportunityNow?: boolean;
+  conditionalAcceptanceNow?: boolean;
+  pendingConditionalAcceptance?: boolean;
+  pendingBonusCondition?: boolean;
   /**
    * Seconds left on the clock. A low clock is what makes the counterpart
    * offer SCRIPT-CLOSE rather than keep trading.
@@ -143,6 +152,7 @@ function fallbackText(
   participantRole: Role,
   action: DecidedAction,
   proposal: Package | null,
+  bonusCondition = false,
 ): string {
   const levels = proposal ? packageLevels(task, proposal) : undefined;
   const ctx = {
@@ -171,6 +181,8 @@ function fallbackText(
       task,
       counterpartRole,
     ).label.toLowerCase(),
+    participantRole,
+    bonusCondition,
   };
   const sb = cardOfLayer(task, counterpartRole, "sensitive")?.text ?? "";
 
@@ -187,6 +199,12 @@ function fallbackText(
       return counterpartLine("nudge", ctx);
     case "nonum":
       return counterpartLine("nonum", ctx);
+    case "redirect":
+      return counterpartLine("redirect", ctx);
+    case "bonus_boundary":
+      return counterpartLine("bonus_boundary", ctx);
+    case "conditional":
+      return counterpartLine("conditional", ctx);
     case "balance":
       return counterpartLine("balance", ctx);
     case "soft_close":
@@ -236,12 +254,110 @@ function maxOptionId(task: NegotiationTask, participantRole: Role): string {
   )[0].id;
 }
 
+function validPackage(
+  task: NegotiationTask,
+  value: unknown,
+): value is Package | null | undefined {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+  const pack = value as Record<string, unknown>;
+  const issueIds = new Set(task.issues.map((issue) => issue.id));
+  if (Object.keys(pack).length !== task.issues.length) return false;
+  if (Object.keys(pack).some((key) => !issueIds.has(key))) return false;
+  return task.issues.every(
+    (issue) =>
+      typeof pack[issue.id] === "string" &&
+      issue.options.some((option) => option.id === pack[issue.id]),
+  );
+}
+
+function malformedRequest(body: RequestBody, task: NegotiationTask): string | null {
+  if (![1, 2, 3, 4, 5, 6].includes(body.stage)) return "Invalid stage";
+  if (body.tier !== undefined && !["none", "work", "sensitive"].includes(body.tier)) {
+    return "Invalid tier";
+  }
+  if (
+    body.disclosurePolicy !== undefined &&
+    body.disclosurePolicy !== "reciprocal" &&
+    body.disclosurePolicy !== "fixed"
+  ) {
+    return "Invalid disclosure policy";
+  }
+  if (!Array.isArray(body.history) || body.history.some(
+    (entry) =>
+      typeof entry !== "object" ||
+      entry === null ||
+      (entry.role !== "assistant" && entry.role !== "user") ||
+      typeof entry.content !== "string",
+  )) {
+    return "Invalid history";
+  }
+  if (!validPackage(task, body.incoming)) return "Invalid package";
+
+  const booleanFields: Array<keyof RequestBody> = [
+    "counterpartSbDisclosed",
+    "priorityClaimed",
+    "askedWhy",
+    "askSitUsed",
+    "nudgeUsed",
+    "participantSilent",
+    "numbersReminded",
+    "numbersMentionedNow",
+    "offTopicNow",
+    "bonusRequestNow",
+    "ruleRequestNow",
+    "reasonAdvancedNow",
+    "firstReasonOpportunityNow",
+    "conditionalAcceptanceNow",
+    "pendingConditionalAcceptance",
+    "pendingBonusCondition",
+    "softCloseOffered",
+    "afterProxy",
+  ];
+  if (booleanFields.some((key) => body[key] !== undefined && typeof body[key] !== "boolean")) {
+    return "Invalid boolean field";
+  }
+  if (
+    body.reasonlessTurns !== undefined &&
+    (!Number.isInteger(body.reasonlessTurns) || body.reasonlessTurns < 0)
+  ) {
+    return "Invalid reasonless turn count";
+  }
+  if (
+    body.labelConfidence !== undefined &&
+    (!Number.isFinite(body.labelConfidence) ||
+      body.labelConfidence < 0 ||
+      body.labelConfidence > 1)
+  ) {
+    return "Invalid confidence";
+  }
+  if (
+    body.secondsRemaining !== undefined &&
+    (!Number.isInteger(body.secondsRemaining) ||
+      body.secondsRemaining < 0 ||
+      body.secondsRemaining > NEGOTIATION_SECONDS)
+  ) {
+    return "Invalid clock";
+  }
+  if (
+    body.clarifyUsedForTier !== undefined &&
+    body.clarifyUsedForTier !== null &&
+    !["none", "work", "sensitive"].includes(body.clarifyUsedForTier)
+  ) {
+    return "Invalid clarify tier";
+  }
+  return null;
+}
+
 export async function POST(request: Request) {
   let body: RequestBody;
   try {
     body = (await request.json()) as RequestBody;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const task = getTask(body.taskId);
@@ -254,12 +370,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown role" }, { status: 400 });
   }
 
+  const malformed = malformedRequest(body, task);
+  if (malformed) {
+    return NextResponse.json({ error: malformed }, { status: 400 });
+  }
+
   const counterpartRole: Role =
     body.participantRole === "leader" ? "member" : "leader";
 
-  const stage = ([1, 2, 3, 4, 5, 6] as StageId[]).includes(body.stage)
-    ? body.stage
-    : 1;
+  const stage = body.stage;
 
   // The client's sticky flag wins; the history scan is the fallback. Either
   // way the question is "has an unreminded mention happened at all", since
@@ -286,6 +405,14 @@ export async function POST(request: Request) {
     participantSilent: body.participantSilent ?? false,
     numbersReminded: body.numbersReminded ?? false,
     numbersMentionedNow: mentionedNumbers,
+    offTopicNow: body.offTopicNow ?? false,
+    bonusRequestNow: body.bonusRequestNow ?? false,
+    ruleRequestNow: body.ruleRequestNow ?? false,
+    reasonAdvancedNow: body.reasonAdvancedNow ?? false,
+    firstReasonOpportunityNow: body.firstReasonOpportunityNow ?? false,
+    conditionalAcceptanceNow: body.conditionalAcceptanceNow ?? false,
+    pendingConditionalAcceptance: body.pendingConditionalAcceptance ?? false,
+    pendingBonusCondition: body.pendingBonusCondition ?? false,
     secondsRemaining: body.secondsRemaining,
     softCloseOffered: body.softCloseOffered ?? false,
   };
@@ -324,9 +451,35 @@ export async function POST(request: Request) {
     // one did not. Reset on anything above `none` so a participant who says
     // something and then goes quiet is not treated as never having spoken.
     reasonlessTurns:
-      state.tier === "none" ? (state.reasonlessTurns ?? 0) + 1 : 0,
+      state.tier === "none" &&
+      !state.offTopicNow &&
+      !state.bonusRequestNow &&
+      !state.ruleRequestNow &&
+      (state.firstReasonOpportunityNow || (state.reasonlessTurns ?? 0) > 0)
+        ? (state.reasonlessTurns ?? 0) + 1
+        : state.tier === "none"
+          ? (state.reasonlessTurns ?? 0)
+          : 0,
     // Consumed by the move that answers it; the next turn recomputes it.
     numbersMentionedNow: false,
+    offTopicNow: false,
+    bonusRequestNow: false,
+    ruleRequestNow: false,
+    reasonAdvancedNow: false,
+    firstReasonOpportunityNow: false,
+    conditionalAcceptanceNow: false,
+    pendingConditionalAcceptance:
+      state.conditionalAcceptanceNow
+        ? true
+        : decision.action === "conditional"
+          ? false
+          : state.pendingConditionalAcceptance,
+    pendingBonusCondition:
+      state.conditionalAcceptanceNow
+        ? state.bonusRequestNow
+        : decision.action === "conditional"
+          ? false
+          : state.pendingBonusCondition,
     participantSilent: false,
   };
 
@@ -403,6 +556,19 @@ export async function POST(request: Request) {
         return `They have said ${yourRequirement.label.toLowerCase()} matters more to them but have not said why. Say you understand that, and that you would like to hear the reason — you have to be able to explain it upward. Then say that until then you would keep this on the table: ${levels}. Ask once. Do not argue and do not press.`;
       case "nonum":
         return `Remind them, lightly and without accusing, that the two of you are not supposed to talk about scores — keep it to the terms themselves — then move on. No new offer this turn.`;
+      case "redirect":
+        return `Briefly redirect the conversation to the two task terms and the standing package: ${levels}. Do not answer unrelated questions or reveal hidden rules.`;
+      case "bonus_boundary":
+        return body.participantRole === "member"
+          ? `Say exactly that you will make the bonus recommendation after the negotiation. For now, redirect to these work arrangements: ${levels}. Do not promise an amount or alter a term.`
+          : `Say exactly that you do not decide their payment. Redirect to these work arrangements: ${levels}. Do not promise an amount or alter a term.`;
+      case "conditional":
+        if (state.bonusRequestNow || state.pendingBonusCondition) {
+          return body.participantRole === "member"
+            ? `Do not accept or record an agreement. Say you will make the bonus recommendation after the negotiation, restate exactly this package: ${levels}, and ask whether they accept it without conditions.`
+            : `Do not accept or record an agreement. Say you do not decide their payment, restate exactly this package: ${levels}, and ask whether they accept it without conditions.`;
+        }
+        return `Do not accept or record an agreement. Say you can only agree to the work arrangements themselves, restate exactly this package: ${levels}, and ask whether they accept it without conditions. Do not introduce payment or bonuses.`;
       case "accept":
         return `Say the package they proposed works for you, naming exactly these levels: ${levels}.`;
       case "accept_sb":
@@ -451,6 +617,7 @@ export async function POST(request: Request) {
         body.participantRole,
         decision.action,
         decision.proposal,
+        state.bonusRequestNow || state.pendingBonusCondition,
       ),
       proposal: decision.proposal,
       state: nextState,
@@ -512,6 +679,7 @@ export async function POST(request: Request) {
               body.participantRole,
               decision.action,
               decision.proposal,
+              state.bonusRequestNow || state.pendingBonusCondition,
             )
           : action.rationale,
         NEGOTIATION.maxMessageChars,

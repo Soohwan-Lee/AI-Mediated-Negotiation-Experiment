@@ -1,5 +1,5 @@
 /**
- * The two negotiation scenarios, from Experimental Design Ver.2.23 §3, §8.
+ * The two negotiation scenarios, from Experimental Design Ver.2.26 §3, §8.
  *
  * Both tasks share one latent payoff structure and differ only on the surface,
  * so Task A and Task B are interchangeable within a participant. Two issues,

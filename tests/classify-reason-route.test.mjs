@@ -106,6 +106,11 @@ function result(overrides = {}) {
     confidence: 0.9,
     stance: "none",
     counterTerms: {},
+    offTopic: false,
+    bonusRequest: false,
+    ruleRequest: false,
+    firstReasonOpportunity: true,
+    withdrawalRequest: false,
     stubbed: false,
     ...overrides,
   };
@@ -150,6 +155,36 @@ test("the priority_claim flag travels beside the label", async () => {
   const body = await (await POST(request())).json();
   assert.equal(body.label, "WR");
   assert.equal(body.priority_claim, true);
+});
+
+test("Ver.2.26 safety flags and conditional stance travel intact", async () => {
+  const POST = await loadRoute(async () => result({
+    stance: "conditional",
+    offTopic: true,
+    bonusRequest: true,
+    ruleRequest: true,
+    firstReasonOpportunity: false,
+    withdrawalRequest: true,
+  }));
+  const body = await (await POST(request())).json();
+  assert.equal(body.stance, "conditional");
+  assert.equal(body.off_topic, true);
+  assert.equal(body.bonus_request, true);
+  assert.equal(body.rule_request, true);
+  assert.equal(body.first_reason_opportunity, false);
+  assert.equal(body.withdrawal_request, true);
+});
+
+test("an obvious conditional £0.50 demand cannot lose the bonus boundary", async () => {
+  const POST = await loadRoute(async () => result({
+    stance: "conditional",
+    bonusRequest: false,
+  }));
+  const body = await (
+    await POST(request({ messages: ["I agree if you guarantee £0.50."] }))
+  ).json();
+  assert.equal(body.stance, "conditional");
+  assert.equal(body.bonus_request, true);
 });
 
 test("every participant message is sent to the classifier, in order", async () => {
@@ -246,4 +281,16 @@ test("an unknown role is a 400 rather than a 500", async () => {
   const POST = await loadRoute(async () => result());
   const response = await POST(request({ role: "director" }));
   assert.equal(response.status, 400);
+});
+
+test("null and array request bodies are clean 400 responses", async () => {
+  const POST = await loadRoute(async () => result());
+  for (const body of [null, []]) {
+    const response = await POST(new Request("https://example.test/api/classify-reason", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }));
+    assert.equal(response.status, 400);
+  }
 });
