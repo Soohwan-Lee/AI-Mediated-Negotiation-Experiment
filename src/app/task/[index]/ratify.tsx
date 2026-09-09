@@ -6,7 +6,7 @@
  * After watching their AI Proxy negotiate, the participant decides what
  * happens to the package it reached: approve it as it stands, ask for a
  * change, or refuse it. Approving ends the task; the other two open a
- * two-minute closing conversation with the other participant.
+ * five-minute closing conversation with the other participant.
  *
  * WHY THIS SCREEN IS BACK. Ver.2.12 deleted a ratification screen, and its
  * reasoning was right about the shape it had: when BOTH arms ended with the
@@ -163,7 +163,7 @@ export function RatifyPhase({
                 above them is a thumb on it. What is left asks the question
                 and stops. */}
             <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>What would you like to do with this package?</CardTitle>
+              <CardTitle>Review the provisional agreement</CardTitle>
               {!choice && tentative ? <Cue>Your decision</Cue> : null}
             </div>
 

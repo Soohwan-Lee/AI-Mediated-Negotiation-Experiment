@@ -26,7 +26,7 @@ export function PhaseStrip({ current }: { current: PhaseKey }) {
   return (
     <ol
       aria-label="What happens next"
-      className="mb-6 flex flex-wrap items-center gap-x-1.5 gap-y-2 text-xs"
+      className="sr-only"
     >
       {PHASES.map((phase, index) => {
         const isCurrent = phase.key === current;

@@ -917,6 +917,10 @@ export function BriefingPanel({
         <PrivateTag />
       </div>
 
+      <p className="mb-2.5 text-xs font-semibold leading-relaxed text-[var(--private-strong)]">
+        {role === "leader" ? "Team Leader" : `Team Member · ${brief.title}`}
+      </p>
+
       <section aria-label="Your point sheet" className="mb-2.5">
         <RailPointSheet
           issues={task.issues}

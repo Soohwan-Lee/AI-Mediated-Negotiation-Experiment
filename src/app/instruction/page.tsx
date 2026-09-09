@@ -33,7 +33,7 @@ import {
   STUDY_GUIDE_LAST_PAGE,
   StudyOrientation,
 } from "@/components/briefing-guide";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
 import {
   Callout,
@@ -51,7 +51,8 @@ import {
 } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { useRestoreAnswers } from "@/lib/saved-answers";
-import { nextHref } from "@/lib/study-config";
+import { nextHref, STUDY } from "@/lib/study-config";
+import { readCheckGate, writeCheckGate, writeStopReason } from "@/lib/check-gates";
 
 /**
  * The three comprehension items (Design §9.1.3). Wording, correct answers and
@@ -83,12 +84,13 @@ const CHECKS: CheckItem[] = COMPREHENSION_BLOCK.items.flatMap((item) =>
 export default function InstructionPage() {
   usePageEnter("instruction");
   const router = useRouter();
-  const { assignment, logEvent, saveResponses } = useParticipant();
+  const { assignment, participantKey, logEvent, saveResponses } = useParticipant();
   const [part, setPart] = useState<"read" | "check">("read");
   const [guideStartPage, setGuideStartPage] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [attempt, setAttempt] = useState(1);
+  const [failed, setFailed] = useState(false);
 
 
   const wrong = useMemo(
@@ -103,6 +105,21 @@ export default function InstructionPage() {
   );
 
   const bypass = useDevBypass();
+
+  useEffect(() => {
+    if (!participantKey) return;
+    const gate = readCheckGate(participantKey, "common");
+    const id = window.setTimeout(() => {
+      if (gate.status === "passed") {
+        setAnswers(Object.fromEntries(CHECKS.map((check) => [check.id, check.correct])));
+        setSubmitted(true);
+      } else {
+        setAttempt(Math.min(gate.attempts + 1, 2));
+        if (gate.status === "failed") router.replace("/study-stop?reason=check");
+      }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [participantKey, router]);
 
   useRestoreAnswers("instruction_check", (saved) => {
     const restored = Object.fromEntries(
@@ -123,7 +140,15 @@ export default function InstructionPage() {
       correctCount: CHECKS.length - wrong.length,
     });
     void saveResponses("instruction_check", answers);
-    if (wrong.length > 0) setAttempt((a) => a + 1);
+    if (wrong.length === 0) {
+      if (participantKey) writeCheckGate(participantKey, "common", { status: "passed", attempts: attempt });
+    } else if (attempt >= 2) {
+      if (participantKey) writeCheckGate(participantKey, "common", { status: "failed", attempts: attempt });
+      if (participantKey) writeStopReason(participantKey, "check");
+      setFailed(true);
+    } else {
+      if (participantKey) writeCheckGate(participantKey, "common", { status: "pending", attempts: attempt });
+    }
   }
 
   function retry() {
@@ -133,6 +158,7 @@ export default function InstructionPage() {
       return next;
     });
     setSubmitted(false);
+    setAttempt(2);
   }
 
   function goNext() {
@@ -167,12 +193,27 @@ export default function InstructionPage() {
           subtitle="Check your understanding of the setup. If an answer is wrong, read the note and try once more."
         />
 
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-950">
+          {assignment?.role === "leader" ? (
+            <p>
+              <strong>Your role: Team Leader · £{STUDY.totalPaid} guaranteed.</strong>{" "}
+              You recommend up to £{STUDY.bonusPerTask} per task for the Team Member;
+              this does not reduce your payment. The Team Member writes an evaluation of you.
+            </p>
+          ) : (
+            <p>
+              <strong>Your role: Team Member · £{STUDY.compensation} guaranteed + up to £{STUDY.bonusPerTask} per task.</strong>{" "}
+              The Team Leader recommends each amount, up to £{STUDY.totalPaid} total.
+            </p>
+          )}
+        </div>
+
         {/* Tighter than the default card rhythm. Four questions on one screen
             is already two viewports; the padding is the only part of that a
             layout change can take back, since the items themselves are the
             instrument (`lib/measures.ts`). */}
         <div className="space-y-4">
-          {CHECKS.map((c, i) => {
+          {CHECKS.map((c) => {
             const answered = answers[c.id];
             const isWrong = submitted && answered && answered !== c.correct;
             const isRight = submitted && answered && answered === c.correct;
@@ -190,7 +231,7 @@ export default function InstructionPage() {
                     not in a badge row above it. The row was a whole line of
                     chrome per card and the number reads just as well inline. */}
                 <p className="mb-3 flex items-baseline gap-2 text-sm sm:text-base font-bold text-[var(--ink)]">
-                  <span className="shrink-0 tabular-nums text-[var(--ink-3)]">{i + 1}.</span>
+                  <span className="shrink-0 tabular-nums text-[var(--ink-3)]">({c.id})</span>
                   <span className="min-w-0 flex-1">{c.question}</span>
                   {isRight ? (
                     <span className="shrink-0 text-xs font-bold text-emerald-700">✓ Correct</span>
@@ -207,9 +248,9 @@ export default function InstructionPage() {
                   options={c.options}
                 />
                 {isWrong ? (
-                  <div className="mt-3.5">
-                    <Callout title="💡 Helpful Review Tip" tone="warning">
-                      <p>{c.remediation}</p>
+                  <div className="mt-3.5" role="alert" aria-live="assertive">
+                    <Callout title="Review this answer" tone="warning">
+                      <p><strong>Correct answer: {c.options.find((option) => option.value === c.correct)?.label}.</strong> {c.remediation}</p>
                     </Callout>
                   </div>
                 ) : null}
@@ -220,14 +261,16 @@ export default function InstructionPage() {
       </Page>
 
       <ActionBar
-        label={canContinue ? "Next: the practice round" : submitted ? "Try the missed ones again" : "Check answers"}
-        onClick={canContinue ? goNext : submitted ? retry : check}
+        label={canContinue ? "Next: the practice round" : failed ? "Contact the research team" : submitted ? "Try the missed ones again" : "Check answers"}
+        onClick={canContinue ? goNext : failed ? () => router.push("/study-stop?reason=check") : submitted ? retry : check}
         disabled={!canContinue && !submitted && !allAnswered}
         note={
-          submitted && !allCorrect
-            ? `${wrong.length} to look at again`
+          failed
+            ? "This check was not passed after two attempts."
+            : submitted && !allCorrect
+            ? `${wrong.length} to look at again · one retry allowed`
             : submitted && allCorrect
-              ? "All correct. Next is a 2-minute practice round. Nothing in it counts."
+              ? "All correct. Next is a 1-minute practice round. Nothing in it counts."
               : ""
         }
         secondary={

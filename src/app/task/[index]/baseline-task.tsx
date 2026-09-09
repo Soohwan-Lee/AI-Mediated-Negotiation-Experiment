@@ -7,7 +7,7 @@
  * they send is understood by the other side as their own position — that is
  * what makes this the benchmark the two Proxy policies are read against.
  *
- * FREE CHAT ON A TEN-MINUTE CLOCK. The participant writes as much or as little
+ * FREE CHAT ON A FIVE-MINUTE CLOCK. The participant writes as much or as little
  * as they like and may finish early; Design §4 is explicit that their
  * behaviour is not forced ("참가자의 행동은 강제하지 않음"). What is fixed is
  * the COUNTERPART: it uses the same standardized thresholds, while Direct
@@ -53,10 +53,13 @@ import {
 } from "@/lib/negotiation/machine";
 import {
   INITIAL_EXCHANGE_STATE,
+  claimOptionalNudge,
+  createOptionalNudgeAttempt,
   foldExchangeState,
   isClassificationResponse,
   isCounterpartResponse,
   resolveCounterTerms,
+  disclosureChoiceAtLock,
   storedLabel,
   takeExchangeState,
   type ClassificationResponse,
@@ -72,6 +75,7 @@ import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
+import { writeStopReason } from "@/lib/check-gates";
 import { awaitCounterpartDelay, nextHref } from "@/lib/study-config";
 import { cardOfLayer, getTask, requirementIssue } from "@/lib/tasks";
 import type { NegotiationTask, Package, Role, TaskId } from "@/lib/types";
@@ -376,7 +380,7 @@ export function BaselineTask({
   const classifierLog = useRef<ClassifierLogEntry[]>([]);
   /** When the participant last sent anything, for the client-timed nudge. */
   const lastParticipantAt = useRef<number>(Date.now());
-  const nudgeRequested = useRef(false);
+  const nudgeAttempt = useRef(createOptionalNudgeAttempt());
   /** A message that arrived while a turn was in flight, waiting to be folded. */
   const queuedText = useRef<string | null>(null);
 
@@ -620,10 +624,71 @@ export function BaselineTask({
         stubbed: classifierStubbed = false,
         stance = "none",
         priority_claim: priorityNow = false,
+        off_topic: offTopicNow = false,
+        bonus_request: bonusRequestNow = false,
+        rule_request: ruleRequestNow = false,
+        first_reason_opportunity: firstReasonOpportunity = label !== "none",
+        withdrawal_request: withdrawalRequest = false,
       } = classification;
       const tierNow: ReasonTier = foldTier(tier, LABEL_TIER[label]);
+      const reasonAdvancedNow = tierNow !== tier;
+      const conditionalAcceptanceNow = stance === "conditional";
       const priorityClaimedNow = priorityClaimed || priorityNow;
       const sbEverNow = sbEverVoiced || label === "SB";
+      if (withdrawalRequest) {
+        classifierLog.current = [
+          ...classifierLog.current,
+          {
+            text: turn.text,
+            label,
+            confidence: confidence ?? null,
+            stance,
+            priorityClaim: priorityNow,
+            offTopic: offTopicNow,
+            bonusRequest: bonusRequestNow,
+            ruleRequest: ruleRequestNow,
+            conditionalAcceptance: conditionalAcceptanceNow,
+            firstReasonOpportunity,
+            withdrawalRequest: true,
+            tier: tierNow,
+            messageIndex: turn.texts.length - 1,
+            createdAt: turn.createdAt,
+          },
+        ];
+        logEvent(
+          "message_sent",
+          {
+            phase: "withdrawal",
+            length: turn.text.length,
+            reasonLabel: label,
+            reasonConfidence: confidence,
+            reasonStance: stance,
+            offTopic: offTopicNow,
+            bonusRequest: bonusRequestNow,
+            ruleRequest: ruleRequestNow,
+            conditionalAcceptance: conditionalAcceptanceNow,
+            firstReasonOpportunity,
+            withdrawalRequest: true,
+          },
+          { sessionIndex: taskIndex },
+        );
+        if (participantKey) {
+          void getStore().appendMessage(participantKey, {
+            id: turn.ownId,
+            sessionIndex: taskIndex,
+            speaker: "participant",
+            text: turn.text,
+            createdAt: turn.createdAt,
+            stage: counterpartStageAfter(replies),
+            proposal: turn.sentPackage ?? undefined,
+            reasonLabel: storedLabel(label),
+            reasonConfidence: confidence,
+          });
+          writeStopReason(participantKey, "withdrawal");
+        }
+        router.push("/study-stop?reason=withdrawal");
+        return;
+      }
 
       /**
        * STANCE, RESOLVED BEFORE THE MACHINE SEES IT (§6.2, §6.9 #18).
@@ -640,7 +705,7 @@ export function BaselineTask({
         classification.counter_terms,
       );
       const incoming: Package | null =
-        stance === "accept" && lastCounterpartPackage
+        (stance === "accept" || stance === "conditional") && lastCounterpartPackage
           ? lastCounterpartPackage
           : stance === "counter" && counterPackage
             ? counterPackage
@@ -674,6 +739,12 @@ export function BaselineTask({
         // timer thought a moment ago.
         participantSilent: false,
         numbersMentionedNow: mentioned,
+        offTopicNow,
+        bonusRequestNow,
+        ruleRequestNow,
+        reasonAdvancedNow,
+        firstReasonOpportunityNow: firstReasonOpportunity,
+        conditionalAcceptanceNow,
         secondsRemaining: turn.secondsAtSend,
       };
 
@@ -707,8 +778,28 @@ export function BaselineTask({
           counterpartSbDisclosed:
             decision.action === "disclose_sb" ||
             decision.action === "disclose_sb_and_accept",
+          pendingConditionalAcceptance:
+            conditionalAcceptanceNow
+              ? true
+              : decision.action === "conditional"
+                ? false
+              : exchange.pendingConditionalAcceptance,
+          pendingBonusCondition:
+            conditionalAcceptanceNow
+              ? bonusRequestNow
+              : decision.action === "conditional"
+                ? false
+                : exchange.pendingBonusCondition,
           reasonlessTurns:
-            tierNow === "none" ? (exchange.reasonlessTurns ?? 0) + 1 : 0,
+            tierNow === "none" &&
+            !offTopicNow &&
+            !bonusRequestNow &&
+            !ruleRequestNow &&
+            (firstReasonOpportunity || sbFirstChoice !== null)
+              ? (exchange.reasonlessTurns ?? 0) + 1
+              : tierNow === "none"
+                ? (exchange.reasonlessTurns ?? 0)
+                : 0,
           clarifyUsedForTier:
             decision.action === "clarify" ? tierNow : exchange.clarifyUsedForTier,
         });
@@ -848,9 +939,12 @@ export function BaselineTask({
        * two ends counting one number is the shape of every drift in this file.
        */
       const reasonlessNow = nextState.reasonlessTurns ?? 0;
-      const lockTaken = label !== "none" || reasonlessNow >= 2;
-      const sbFirstChoiceNow =
-        sbFirstChoice ?? (lockTaken ? tierNow === "sensitive" : null);
+      const sbFirstChoiceNow = disclosureChoiceAtLock(
+        sbFirstChoice,
+        classification,
+        tierNow,
+        reasonlessNow,
+      );
       if (sbFirstChoice === null && sbFirstChoiceNow !== null) {
         setSbFirstChoice(sbFirstChoiceNow);
         // `decision_locked` is the existing event for "a disclosure choice
@@ -910,7 +1004,6 @@ export function BaselineTask({
       setStagedTurn(null);
       setDraft("");
       setTurnError(null);
-      nudgeRequested.current = false;
 
       classifierLog.current = [
         ...classifierLog.current,
@@ -920,6 +1013,12 @@ export function BaselineTask({
           confidence: confidence ?? null,
           stance,
           priorityClaim: priorityNow,
+          offTopic: offTopicNow,
+          bonusRequest: bonusRequestNow,
+          ruleRequest: ruleRequestNow,
+          conditionalAcceptance: conditionalAcceptanceNow,
+          firstReasonOpportunity,
+          withdrawalRequest,
           tier: tierNow,
           messageIndex: turn.texts.length - 1,
           createdAt: turn.createdAt,
@@ -937,6 +1036,12 @@ export function BaselineTask({
           reasonConfidence: confidence,
           reasonStance: stance,
           priorityClaim: priorityNow,
+          offTopic: offTopicNow,
+          bonusRequest: bonusRequestNow,
+          ruleRequest: ruleRequestNow,
+          conditionalAcceptance: conditionalAcceptanceNow,
+          firstReasonOpportunity,
+          withdrawalRequest,
           classifierStubbed,
           tier: tierNow,
         },
@@ -1106,8 +1211,7 @@ export function BaselineTask({
    */
   async function runNudge() {
     if (settledRef.current || pending || stagedTurn) return;
-    if (exchange.nudgeUsed || nudgeRequested.current) return;
-    nudgeRequested.current = true;
+    if (exchange.nudgeUsed || !claimOptionalNudge(nudgeAttempt.current)) return;
     const generation = turnGeneration.current + 1;
     turnGeneration.current = generation;
     const controller = new AbortController();
@@ -1232,8 +1336,10 @@ export function BaselineTask({
       if (error instanceof DOMException && error.name === "AbortError") return;
       // A failed nudge is not worth a recovery banner: nothing the participant
       // did is waiting on it, and the retry path is for their own messages.
+      // The attempt latch deliberately stays spent: fetchJsonWithRetry already
+      // exhausted its bounded attempts, so later timer ticks simply wait for
+      // the participant or the normal quiet timeout.
       console.error("[nudge]", error);
-      nudgeRequested.current = false;
     } finally {
       if (mounted.current && generation === turnGeneration.current) {
         setPending(false);
@@ -1262,7 +1368,6 @@ export function BaselineTask({
   async function send(text: string, sentOffer: Package = offer) {
     if (settledRef.current) return;
     lastParticipantAt.current = Date.now();
-    nudgeRequested.current = false;
 
     if (pending || stagedTurn) {
       const inFlight = stagedTurn;
@@ -1420,6 +1525,10 @@ export function BaselineTask({
           logEvent("negotiation_started", undefined, {
             sessionIndex: taskIndex,
           });
+          // Start the silence window here, not when the briefing component
+          // mounted. A careful reader must not enter chat already past it.
+          lastParticipantAt.current = Date.now();
+          nudgeAttempt.current = createOptionalNudgeAttempt();
           setPhase("negotiate");
         }}
       />
@@ -1509,7 +1618,7 @@ export function BaselineTask({
                       !pending &&
                       !stagedTurn &&
                       !exchange.nudgeUsed &&
-                      !nudgeRequested.current &&
+                      !nudgeAttempt.current.attempted &&
                       Date.now() - lastParticipantAt.current >=
                         NUDGE_AFTER_SILENT_SECONDS * 1000
                     ) {
@@ -1526,11 +1635,13 @@ export function BaselineTask({
                     turnGeneration.current += 1;
                     setTentative(null);
                     setSettled("impasse");
-                    logEvent(
-                      "negotiation_ended",
-                      { phase: "direct", reason: "timeout" },
-                      { sessionIndex: taskIndex },
-                    );
+                    endTask("impasse", null, "timeout", {
+                      replies,
+                      tier,
+                      sbFirstChoice,
+                      sbEverVoiced,
+                      priorityClaimed,
+                    });
                   }}
                 />
                 {settled ? null : recovering && pending ? (

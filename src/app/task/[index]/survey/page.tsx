@@ -119,7 +119,7 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
       </Card>
       <TranscriptReview participantKey={participantKey} taskIndex={taskIndex} />
       <div className="mt-6 grid items-start gap-x-5 lg:grid-cols-2">
-        {blocks.map((block) => <MeasureBlock key={block.id} block={block} answers={answers} onChange={answer} flagged={flagged} />)}
+        {blocks.map((block) => <MeasureBlock key={block.id} block={block} answers={answers} onChange={answer} flagged={flagged} stackedScales />)}
       </div>
     </Page>
     <ActionBar label="Submit & Continue" onClick={submit} busy={busy} remaining={flagged.size > 0 ? missing.length : 0} firstUnansweredId={missing[0] ?? null} note={answeredNote(blocks, answers)} />

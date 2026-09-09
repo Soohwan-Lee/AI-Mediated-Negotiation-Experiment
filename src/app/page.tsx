@@ -110,7 +110,9 @@ const STEPS = [
     title: "Two negotiation tasks",
     detail:
       "Negotiate directly once and use an AI Proxy once. Questions follow each task.",
-    minutes: 2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward),
+    minutes:
+      2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward) +
+      STAGE_MINUTES.proxyObservation,
   },
   {
     title: "Final questions",
@@ -308,14 +310,6 @@ export default function ConsentPage() {
                 hint="From consent to debrief"
                 tone="blue"
               />
-              {/*
-                THE HEADLINE IS THE TOTAL, AS A RANGE. Role is not known yet
-                (it is revealed on the instruction page) and §7.1 guarantees
-                the two roles different amounts, so "£6 + up to £1 bonus" would
-                present the Member's structure to everyone and understate what
-                a Leader is guaranteed. `minTotal`/`maxTotal` in study-config
-                carry the span; see the note there.
-              */}
               <StatCard
                 icon="£"
                 label="Payment"

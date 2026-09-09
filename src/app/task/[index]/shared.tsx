@@ -28,6 +28,7 @@ import {
   type SetStateAction,
 } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { NavigationNotice } from "@/components/navigation-notice";
 import {
   CountdownTimer,
@@ -52,6 +53,8 @@ import {
 import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
 import {
   INITIAL_EXCHANGE_STATE,
+  claimOptionalNudge,
+  createOptionalNudgeAttempt,
   foldExchangeState,
   isClassificationResponse,
   isCounterpartResponse,
@@ -80,6 +83,7 @@ import { ReadingProgress, PreviousReading } from "@/components/briefing-guide";
 import { Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
 import { useDevAutofill, useDevGate, useDevMockAi } from "@/lib/dev-mode";
 import { comparePointsToFallback } from "@/lib/points-display";
+import { ILLUSTRATIONS } from "@/lib/illustrations";
 import { useParticipant } from "@/lib/participant-context";
 import {
   NEGOTIATION,
@@ -88,6 +92,7 @@ import {
   pauseMs,
 } from "@/lib/study-config";
 import { getStore } from "@/lib/store";
+import { writeStopReason } from "@/lib/check-gates";
 import {
   cardOfLayer,
   packageValue,
@@ -190,6 +195,9 @@ export function TaskIntro({
             Your private briefing stays pinned in the sidebar the whole time.
             Neither of you can settle anything alone.
           </p>
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">
+            Before you start, read the three short briefing pages. During the task, use the private briefing on the right whenever you need it.
+          </p>
         </>
       }
       /* BOTH COVERS DRAW THEIR STEPS INSTEAD OF LISTING THEM, so neither
@@ -224,13 +232,17 @@ export function TaskBrief({
   const [page, setPage] = useState(0);
   const { logEvent } = useParticipant();
   const brief = task.roleBriefs[role];
-  const taskImage = task.id === "task_a"
-    ? "/illustrations/task-working-arrangements.png?v=20260907b"
-    : "/illustrations/task-new-project.png?v=20260907b";
-  const roleImage = role === "leader"
-    ? "/illustrations/role-team-lead.png?v=20260907b"
-    : "/illustrations/role-team-member.png?v=20260907b";
-  const labels = ["The task", "Your situation", "Your points", "Your reasons"];
+  const taskImage = ILLUSTRATIONS[task.id === "task_a" ? "taskA" : "taskB"];
+  const roleImage = ILLUSTRATIONS[
+    task.id === "task_a"
+      ? role === "leader"
+        ? "taskALeader"
+        : "taskAMember"
+      : role === "leader"
+        ? "taskBLeader"
+        : "taskBMember"
+  ];
+  const labels = ["Situation", "Your reasons", "Points"];
   function move(next: number) {
     logEvent("page_complete", { briefingPage: page + 1 }, { sessionIndex: taskIndex });
     setPage(next);
@@ -252,14 +264,12 @@ export function TaskBrief({
                 </div>
                 <figure className="overflow-hidden rounded-xl border border-slate-200 bg-[#f4efe5]">
                   <Image
-                    src={taskImage}
-                    width={1536}
-                    height={1024}
+                    src={taskImage.src}
+                    width={taskImage.width}
+                    height={taskImage.height}
                     sizes="(min-width: 1024px) 20rem, (min-width: 640px) 44rem, 100vw"
-                    alt={task.id === "task_a"
-                      ? "An office schedule beside a shared workstation, and a client presentation room with four blank meeting cards."
-                      : "A new-project allocation board, and an idle client-call phone and headset beside a blank rota."}
-                    className="h-auto w-full"
+                    alt={taskImage.alt}
+                    className="h-[clamp(11rem,24vw,14rem)] w-full object-contain"
                   />
                   <figcaption className="grid grid-cols-2 border-t border-slate-200 bg-white/95 text-xs font-semibold leading-relaxed text-slate-700">
                     <span className="border-r border-slate-200 px-3 py-2.5 text-center">{task.issues[0].label}</span>
@@ -279,41 +289,31 @@ export function TaskBrief({
         ) : page === 1 ? (
           <Card tone="private">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>{brief.title} · Your private situation</CardTitle><PrivateTag />
+              <CardTitle>Your private situation and reasons</CardTitle><PrivateTag />
             </div>
-            {/*
-              The role portrait sits beside the story on a wide screen and above
-              it on a narrow one, the same figure treatment page 0 gives the task
-              image. It is only here: the briefing rail renders RoleStory in
-              compact form with no figure, because a 1536x1024 image in a 13px
-              rail would push the story itself off the screen.
-            */}
-            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
-              {/* THE QUOTED WORK-REASON CARD IS DROPPED HERE (round six). It
-                  is shown in full, in its own box, on brief page 4 — two
-                  clicks after this one — so the brief was reading the same
-                  card twice. What survives is the two sentences the card does
-                  not carry: which term the work reason does NOT name, and
-                  that what to pass on is the participant's choice. */}
-              <RoleStory story={brief.roleStory} hideCardQuote />
-              <figure className="order-first overflow-hidden rounded-xl border border-[var(--private-line)] bg-[#f4efe5] lg:order-none lg:sticky lg:top-24">
-                <Image
-                  src={roleImage}
-                  width={1536}
-                  height={1024}
-                  sizes="(min-width: 1024px) 16rem, (min-width: 640px) 44rem, 100vw"
-                  alt={role === "leader"
-                    ? "A team lead at a desk facing a planning board, with the team working behind them."
-                    : "A senior team member at their own desk, with a client meeting room behind them."}
-                  className="h-auto w-full"
-                />
-                <figcaption className="border-t border-[var(--private-line)] bg-white/95 px-3 py-2.5 text-center text-xs font-semibold leading-relaxed text-[var(--private-strong)]">
-                  You in this task · {brief.title}
-                </figcaption>
-              </figure>
-            </div>
+            <figure className="mb-4 overflow-hidden rounded-xl border border-[var(--private-line)] bg-[#f4efe5]">
+              <Image
+                src={roleImage.src}
+                width={roleImage.width}
+                height={roleImage.height}
+                sizes="(min-width: 1024px) 52rem, 100vw"
+                alt={roleImage.alt}
+                className="h-[clamp(11rem,24vw,14rem)] w-full object-contain"
+              />
+              <figcaption className="border-t border-[var(--private-line)] bg-white px-3 py-2 text-center text-xs font-semibold text-[var(--private-strong)]">
+                {role === "leader"
+                  ? "You, Team Leader, and the decision already shared with the Director"
+                  : "Client contact (left) → You, Team Member (right). The Team Leader has not been told."}
+              </figcaption>
+            </figure>
+            <RoleStory story={brief.roleStory} hideCardQuote />
+            <p className="my-4 text-sm leading-relaxed">{brief.requirementNote}</p>
+            <IssueReasonGroups task={task} role={role} caption={false} />
+            <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50/70 p-3 text-sm leading-relaxed text-rose-950">
+              <strong>Sharing is optional.</strong> It can help the other person understand your request, and it may also be considered in the later bonus or evaluation. You can negotiate and agree without sharing it.
+            </p>
           </Card>
-        ) : page === 2 ? (
+        ) : (
           <Card tone="private">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
               <CardTitle>Your goals and point sheet</CardTitle><PrivateTag />
@@ -343,64 +343,14 @@ export function TaskBrief({
             <IssueValueTable issues={task.issues} role={role} reservationPoints={task.reservationPoints} />
             <p className="mt-4 text-sm font-bold">Do not share point numbers in the conversation.</p>
           </Card>
-        ) : (
-          <Card tone="private">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>What you can explain</CardTitle><PrivateTag />
-            </div>
-            <p className="mb-4 text-sm leading-relaxed">{brief.requirementNote}</p>
-            {/* No ⚠ caption here — §8.1's notice below IS that sentence, in
-                full. See `IssueReasonGroups`. */}
-            <IssueReasonGroups task={task} role={role} caption={false} />
-            {/* §8.1's COMMON PRE-DISCLOSURE NOTICE, in full, once. It is shown
-                after the cards and before anything is decided, in both arms
-                and both roles, in identical words — which is what §8.1
-                requires ("두 방식·두 역할에 같은 문구를 사용함").
-
-                IT REPLACED `disclosureRisk`, which is role-specific and
-                forecasts a particular bad impression ("could make you look
-                like a lead who answers for their team"). §8.1's researcher
-                note rules that out by name: no role-specific warning of a
-                negative consequence, and no confirmation pop-up. The notice
-                names BOTH sides of the decision and then says the choice is
-                theirs — because which way they choose is the primary
-                outcome, and a screen that recommends an answer measures the
-                recommendation. */}
-            <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50/70 p-4">
-              <p className="text-sm font-bold text-rose-900">
-                Before you decide about the sensitive background
-              </p>
-              {/* THE ROLE-SPECIFIC LINE NAMES THE CHANNEL, NOT AN OUTCOME.
-                  §8.1's researcher note rules out a role-specific warning that
-                  forecasts a bad impression; it does not rule out saying WHERE
-                  the other person's judgement lands, which every participant
-                  has already been told on the orientation pages. Both roles
-                  get one such line, of the same shape, so the notice stays
-                  symmetric across the four cells. */}
-              <p className="mt-1.5 text-sm leading-relaxed text-rose-950">
-                Sharing it can help the other person understand what
-                you&rsquo;re asking for. It can also shape how they see you.
-              </p>
-              <p className="mt-1.5 text-sm leading-relaxed text-rose-950">
-                {role === "leader"
-                  ? "What you share may be weighed when the team member writes the evaluation of you."
-                  : "What you share may be weighed when the team lead recommends your bonus."}
-              </p>
-              <p className="mt-1.5 text-sm font-semibold leading-relaxed text-rose-950">
-                Whether to share is your choice. You can reach an agreement
-                without it.
-              </p>
-            </div>
-            <p className="mt-4 text-sm leading-relaxed">These are the facts of your role; you do not need to use the exact wording.</p>
-          </Card>
         )}
       </Page>
       <ActionBar
-        label={page === 3 ? "Continue to task setup" : `Next: ${labels[page + 1].toLowerCase()}`}
+        label={page === 2 ? "Continue to task setup" : `Next: ${labels[page + 1].toLowerCase()}`}
         onClick={() => {
-          if (page < 3) move(page + 1);
+          if (page < 2) move(page + 1);
           else {
-            logEvent("page_complete", { briefingPage: 4 }, { sessionIndex: taskIndex });
+            logEvent("page_complete", { briefingPage: 3 }, { sessionIndex: taskIndex });
             onContinue();
             window.scrollTo({ top: 0 });
           }
@@ -410,7 +360,7 @@ export function TaskBrief({
             onClick={() => (page > 0 ? move(page - 1) : onBack())}
           />
         }
-        note={`Briefing ${page + 1} of 4 · Available throughout the task`}
+        note={`Briefing ${page + 1} of 3 · Available throughout the task`}
       />
     </>
   );
@@ -498,17 +448,10 @@ export function PreferenceForm({
    * a considered answer. Here the default is specified: both terms at the
    * participant's OWN BEST option.
    *
-   * TWO THINGS DEPEND ON IT. The wish is the proxy's acceptance line as well
-   * as its target — a proxy holding a wish no package can match pushes to the
-   * ceiling its reasons allow and brings back what it reached, so a blank or
-   * a modest wish would change how far the proxy goes for reasons that have
-   * nothing to do with disclosure. And REMARK's fixed line ("your demands were
-   * a bit strong") presupposes the participant asked for their best; a modest
-   * wish would make that comment factually wrong for them.
-   *
-   * Departure from it is therefore the thing worth recording, not the
-   * selection: `WISH-DEV` is an audit flag, and §13-25 switches REMARK to
-   * demand-free wording if it clears 20% at pilot.
+   * The wish is the proxy's acceptance line as well as its target. A blank or
+   * modest wish would change how far the proxy goes for reasons unrelated to
+   * disclosure. Departure from the specified default is therefore recorded as
+   * the `WISH-DEV` audit flag.
    */
   const defaults = bestWish(task, role);
   const [preferred, setPreferred] = useState<Record<string, string | null>>(
@@ -950,15 +893,15 @@ export function OutcomeValue({
         {terms ? (
           <p className="mt-1 text-xs leading-relaxed text-[var(--private-ink)]/80">
             {comparison === "above"
-              ? `${(mine - task.reservationPoints).toLocaleString()} points more than you would have had with no agreement.`
+              ? `${(mine - task.reservationPoints).toLocaleString()} points more than the points from no agreement.`
               : comparison === "below"
-                ? `${(task.reservationPoints - mine).toLocaleString()} points below what no agreement would have paid.`
-                : "The same as no agreement would have paid."}
+                ? `${(task.reservationPoints - mine).toLocaleString()} points below the points from no agreement.`
+                : "The same number of points as no agreement."}
           </p>
         ) : (
           <p className="mt-1 text-xs leading-relaxed text-[var(--private-ink)]/80">
-            Nothing was settled on either condition, so this task pays
-            nothing.
+            No agreement was reached, so you receive 0 points for this task.
+            Your study payment is separate.
           </p>
         )}
       </div>
@@ -1123,6 +1066,7 @@ export function DirectNegotiation({
     },
   ) => void;
 }) {
+  const router = useRouter();
   const { logEvent, participantKey } = useParticipant();
   const counterpartRole: Role = role === "leader" ? "member" : "leader";
   const requirement = requirementIssue(task, role);
@@ -1219,7 +1163,7 @@ export function DirectNegotiation({
   const classifierLog = useRef<ClassifierLogEntry[]>([]);
   /** When the participant last sent anything, for the client-timed nudge. */
   const lastParticipantAt = useRef<number>(Date.now());
-  const nudgeRequested = useRef(false);
+  const nudgeAttempt = useRef(createOptionalNudgeAttempt());
   /** A message that arrived while a turn was in flight, waiting to be folded. */
   const queuedText = useRef<string | null>(null);
 
@@ -1492,11 +1436,72 @@ export function DirectNegotiation({
         stubbed: classifierStubbed = false,
         stance = "none",
         priority_claim: priorityNow = false,
+        off_topic: offTopicNow = false,
+        bonus_request: bonusRequestNow = false,
+        rule_request: ruleRequestNow = false,
+        first_reason_opportunity: firstReasonOpportunity = label !== "none",
+        withdrawal_request: withdrawalRequest = false,
       } = classification;
       const personalNow = foldTier(personalTier, LABEL_TIER[label]);
       const selfDisclosedNow = selfDisclosed || label === "SB";
       const tierNow: ReasonTier = foldTier(proxyVoicedTier, personalNow);
+      const reasonAdvancedNow = personalNow !== personalTier;
+      const conditionalAcceptanceNow = stance === "conditional";
       const priorityClaimedNow = priorityClaimed || priorityNow;
+      if (withdrawalRequest) {
+        classifierLog.current = [
+          ...classifierLog.current,
+          {
+            text: turn.text,
+            label,
+            confidence: confidence ?? null,
+            stance,
+            priorityClaim: priorityNow,
+            offTopic: offTopicNow,
+            bonusRequest: bonusRequestNow,
+            ruleRequest: ruleRequestNow,
+            conditionalAcceptance: conditionalAcceptanceNow,
+            firstReasonOpportunity,
+            withdrawalRequest: true,
+            tier: tierNow,
+            messageIndex: turn.texts.length - 1,
+            createdAt: turn.createdAt,
+          },
+        ];
+        logEvent(
+          "message_sent",
+          {
+            phase: "withdrawal",
+            length: turn.text.length,
+            reasonLabel: label,
+            reasonConfidence: confidence,
+            reasonStance: stance,
+            offTopic: offTopicNow,
+            bonusRequest: bonusRequestNow,
+            ruleRequest: ruleRequestNow,
+            conditionalAcceptance: conditionalAcceptanceNow,
+            firstReasonOpportunity,
+            withdrawalRequest: true,
+          },
+          { sessionIndex: taskIndex },
+        );
+        if (participantKey) {
+          void getStore().appendMessage(participantKey, {
+            id: turn.ownId,
+            sessionIndex: taskIndex,
+            speaker: "participant",
+            text: turn.text,
+            createdAt: turn.createdAt,
+            stage: counterpartStageAfter(replies + DIRECT_STAGE_OFFSET - 1),
+            proposal: turn.sentPackage ?? undefined,
+            reasonLabel: storedLabel(label),
+            reasonConfidence: confidence,
+          });
+          writeStopReason(participantKey, "withdrawal");
+        }
+        router.push("/study-stop?reason=withdrawal");
+        return;
+      }
 
       /**
        * STANCE, RESOLVED BEFORE THE MACHINE SEES IT (§6.2, §6.9 #18).
@@ -1514,7 +1519,7 @@ export function DirectNegotiation({
         classification.counter_terms,
       );
       const incoming: Package | null =
-        stance === "accept" && lastCounterpartPackage
+        (stance === "accept" || stance === "conditional") && lastCounterpartPackage
           ? lastCounterpartPackage
           : stance === "counter" && counterPackage
             ? counterPackage
@@ -1540,6 +1545,12 @@ export function DirectNegotiation({
         labelConfidence: confidence,
         participantSilent: silentNow,
         numbersMentionedNow: mentioned,
+        offTopicNow,
+        bonusRequestNow,
+        ruleRequestNow,
+        reasonAdvancedNow,
+        firstReasonOpportunityNow: firstReasonOpportunity,
+        conditionalAcceptanceNow,
         secondsRemaining: turn.secondsAtSend,
       };
       let reply: string;
@@ -1571,8 +1582,28 @@ export function DirectNegotiation({
           counterpartSbDisclosed:
             decision.action === "disclose_sb" ||
             decision.action === "disclose_sb_and_accept",
+          pendingConditionalAcceptance:
+            conditionalAcceptanceNow
+              ? true
+              : decision.action === "conditional"
+                ? false
+              : exchange.pendingConditionalAcceptance,
+          pendingBonusCondition:
+            conditionalAcceptanceNow
+              ? bonusRequestNow
+              : decision.action === "conditional"
+                ? false
+                : exchange.pendingBonusCondition,
           reasonlessTurns:
-            tierNow === "none" ? (exchange.reasonlessTurns ?? 0) + 1 : 0,
+            tierNow === "none" &&
+            !offTopicNow &&
+            !bonusRequestNow &&
+            !ruleRequestNow &&
+            firstReasonOpportunity
+              ? (exchange.reasonlessTurns ?? 0) + 1
+              : tierNow === "none"
+                ? (exchange.reasonlessTurns ?? 0)
+                : 0,
           clarifyUsedForTier:
             decision.action === "clarify" ? tierNow : exchange.clarifyUsedForTier,
         });
@@ -1699,7 +1730,6 @@ export function DirectNegotiation({
       setStagedTurn(null);
       setDraft("");
       setTurnError(null);
-      nudgeRequested.current = false;
 
       classifierLog.current = [
         ...classifierLog.current,
@@ -1709,6 +1739,12 @@ export function DirectNegotiation({
           confidence: confidence ?? null,
           stance,
           priorityClaim: priorityNow,
+          offTopic: offTopicNow,
+          bonusRequest: bonusRequestNow,
+          ruleRequest: ruleRequestNow,
+          conditionalAcceptance: conditionalAcceptanceNow,
+          firstReasonOpportunity,
+          withdrawalRequest,
           tier: tierNow,
           messageIndex: turn.texts.length - 1,
           createdAt: turn.createdAt,
@@ -1726,6 +1762,12 @@ export function DirectNegotiation({
           reasonConfidence: confidence,
           reasonStance: stance,
           priorityClaim: priorityNow,
+          offTopic: offTopicNow,
+          bonusRequest: bonusRequestNow,
+          ruleRequest: ruleRequestNow,
+          conditionalAcceptance: conditionalAcceptanceNow,
+          firstReasonOpportunity,
+          withdrawalRequest,
           classifierStubbed,
           tier: tierNow,
         },
@@ -1831,7 +1873,6 @@ export function DirectNegotiation({
   async function send(text: string, sentOffer: Package = offer) {
     if (settledRef.current) return;
     lastParticipantAt.current = Date.now();
-    nudgeRequested.current = false;
 
     if (pending || stagedTurn) {
       const inFlight = stagedTurn;
@@ -1900,8 +1941,7 @@ export function DirectNegotiation({
    */
   async function runNudge() {
     if (settledRef.current || pending || stagedTurn) return;
-    if (exchange.nudgeUsed || nudgeRequested.current) return;
-    nudgeRequested.current = true;
+    if (exchange.nudgeUsed || !claimOptionalNudge(nudgeAttempt.current)) return;
     const generation = turnGeneration.current + 1;
     turnGeneration.current = generation;
     const controller = new AbortController();
@@ -2025,8 +2065,10 @@ export function DirectNegotiation({
       if (error instanceof DOMException && error.name === "AbortError") return;
       // A failed nudge is not worth a recovery banner: nothing the participant
       // did is waiting on it, and the retry path is for their own messages.
+      // The attempt latch deliberately stays spent: fetchJsonWithRetry already
+      // exhausted its bounded attempts, so later timer ticks simply wait for
+      // the participant or the normal quiet timeout.
       console.error("[nudge]", error);
-      nudgeRequested.current = false;
     } finally {
       if (mounted.current && generation === turnGeneration.current) {
         setPending(false);
@@ -2106,7 +2148,7 @@ export function DirectNegotiation({
                       !pending &&
                       !stagedTurn &&
                       !exchange.nudgeUsed &&
-                      !nudgeRequested.current &&
+                      !nudgeAttempt.current.attempted &&
                       Date.now() - lastParticipantAt.current >=
                         NUDGE_AFTER_SILENT_SECONDS * 1000
                     ) {

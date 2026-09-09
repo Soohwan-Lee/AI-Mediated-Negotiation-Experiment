@@ -20,6 +20,7 @@ import {
   CardTitle,
   ChoiceList,
   Cue,
+  cx,
   Field,
   Scale,
   Select,
@@ -34,12 +35,15 @@ export function MeasureBlock({
   answers,
   onChange,
   flagged,
+  stackedScales = false,
 }: {
   block: Block;
   answers: Answers;
   onChange: (id: string, value: string | number) => void;
   /** Ids to mark as missing, after a participant tried to continue. */
   flagged?: Set<string>;
+  /** Give scale prompts the full card width before the 1–7 controls. */
+  stackedScales?: boolean;
 }) {
   const optional = new Set(block.optional ?? []);
 
@@ -49,7 +53,13 @@ export function MeasureBlock({
   ).length;
 
   return (
-    <Card className="mb-6">
+    <Card
+      className={cx(
+        "mb-6",
+        stackedScales &&
+          "[&_fieldset>div]:!block [&_fieldset>div>p]:!mb-3 [&_fieldset>div>div]:!mx-auto",
+      )}
+    >
       <CardTitle
         hint={block.hint}
         aside={

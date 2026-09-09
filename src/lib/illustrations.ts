@@ -33,7 +33,13 @@ export type IllustrationKey =
   | "chat"
   | "directStepRead"
   | "directStepAgree"
-  | "aiProxyPortrait";
+  | "aiProxyPortrait"
+  | "taskA"
+  | "taskB"
+  | "taskALeader"
+  | "taskAMember"
+  | "taskBLeader"
+  | "taskBMember";
 
 export type Illustration = {
   /** Public path, including the `?v=` the image allowlist requires. */
@@ -90,5 +96,41 @@ export const ILLUSTRATIONS: Record<IllustrationKey, Illustration> = {
     alt: "A small friendly robot.",
     width: 512,
     height: 512,
+  },
+  taskA: {
+    src: "/illustrations/design226-task-a.png?v=20260907b",
+    alt: "Alternative office schedules beside two colleagues preparing a client presentation together.",
+    width: 1672,
+    height: 941,
+  },
+  taskB: {
+    src: "/illustrations/design226-task-b.png?v=20260907b",
+    alt: "Two colleagues review a project staffing board and four client report folders.",
+    width: 1536,
+    height: 1024,
+  },
+  taskALeader: {
+    src: "/illustrations/design226-task-a-leader.png?v=20260907b",
+    alt: "A team leader reviews four recurring calendar blocks after a video call with the director.",
+    width: 1672,
+    height: 941,
+  },
+  taskAMember: {
+    src: "/illustrations/design226-task-a-member.png?v=20260907b",
+    alt: "A client contact gives a team member private feedback after a presentation while the team leader's office is empty.",
+    width: 1672,
+    height: 941,
+  },
+  taskBLeader: {
+    src: "/illustrations/design226-task-b-leader.png?v=20260907b",
+    alt: "A team leader privately reviews an understaffed plan across four project days.",
+    width: 1672,
+    height: 941,
+  },
+  taskBMember: {
+    src: "/illustrations/design226-task-b-member.png?v=20260907b",
+    alt: "A client contact privately points out sparse sections in a report to a team member while the team leader's desk is empty.",
+    width: 1672,
+    height: 941,
   },
 };

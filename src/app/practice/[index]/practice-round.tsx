@@ -20,20 +20,10 @@
  *
  * The old objection — that the second round rehearsed controls already used —
  * was answering the wrong question. It is true of the SCENARIO and the
- * chrome, which is why round 2 is shorter and says so; it is false of the
- * arm, which is the half that matters.
+ * chrome; it is false of the arm, which is the half that matters.
  *
- * ROUND 2 IS SHORTER, and what it drops is the comprehension item. CHK5 is a
- * check on whether the participant read the points and the situation
- * together, and that is a fact about the person rather than about the
- * interface — asking it twice would measure practice at answering it. Round 2
- * teaches the other arm's controls and nothing else.
- *
- * PRAC1 IS HERE FOR A REASON. Design §5 adds a payoff–reason check because a
- * participant who reads only the score column will optimize points and ignore
- * the situation, and the situation is what the study is about. It is asked
- * where a correct answer is a REASON rather than a number, so answering it
- * requires having read the two together.
+ * Each practice ends with the understanding check for the arm just rehearsed:
+ * IC5 for Direct and IC6 for Proxy.
  *
  * ---------------------------------------------------------------------------
  * MICRO-STEPS: one action at a time, hand-held.
@@ -81,7 +71,13 @@ import {
 } from "@/components/ui";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { useDevAutofill, useDevBypass } from "@/lib/dev-mode";
-import { PRACTICE_REASON_ANSWER, practiceReasonItem } from "@/lib/measures";
+import {
+  DIRECT_PRACTICE_CHECK,
+  PRACTICE_CHECK_ANSWERS,
+  PRACTICE_CHECK_REMEDIATION,
+  PROXY_PRACTICE_CHECK,
+} from "@/lib/measures";
+import { readCheckGate, writeCheckGate, writeStopReason } from "@/lib/check-gates";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { STAGE_MINUTES, nextHref, type FlowKey } from "@/lib/study-config";
 import { PRACTICE_TASK } from "@/lib/tasks";
@@ -119,16 +115,12 @@ const PRACTICE_DRAFT =
  * the disclosure decision the study measures, on the one round that exists
  * because it has nothing to bias.
  */
-const PRACTICE_REASONS: Record<Role, { work: string; background: string }> = {
+const PRACTICE_REASONS: Record<Role, { work: string }> = {
   leader: {
     work: "The quarterly review is coming up, so when the move happens affects how much settles before it.",
-    background:
-      "You would rather not say in front of the whole team how far behind the review has left you.",
   },
   member: {
     work: "You are at your desk most of the day, so the printer's spot affects how often you are up and down.",
-    background:
-      "You would rather not say in front of the whole team how often you are getting up and down.",
   },
 };
 
@@ -202,7 +194,6 @@ const DIRECT_STEPS = ["read", "pick", "send", "wait", "check"] as const;
 const PROXY_STEPS = [
   "read",
   "pick",
-  "share",
   "watch",
   "decide",
   "check",
@@ -223,7 +214,6 @@ type Step = (typeof DIRECT_STEPS)[number] | (typeof PROXY_STEPS)[number];
  * never a second bubble on the screen.
  */
 const BUBBLE_IN_PLACE: ReadonlySet<string | null> = new Set([
-  "share",
   "composer",
   "decision",
   "checkAnswer",
@@ -232,7 +222,6 @@ const BUBBLE_IN_PLACE: ReadonlySet<string | null> = new Set([
 const STEP_STAGE: Record<Step, 1 | 2 | 3 | 4> = {
   read: 1,
   pick: 2,
-  share: 2,
   send: 3,
   wait: 3,
   watch: 3,
@@ -251,7 +240,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   const router = useRouter();
   const [phase, setPhase] = useState<"intro" | "practice">("intro");
   const [stepIndex, setStepIndex] = useState(0);
-  const { assignment, logEvent, saveResponses } = useParticipant();
+  const { assignment, participantKey, logEvent, saveResponses } = useParticipant();
 
   // Direct practice states
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -271,8 +260,6 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   // sensitive card (§8.7: work on, sensitive off). `touched` is what finishes
   // the step, in either direction — a tutorial that only advanced on a tick
   // would be teaching disclosure as the completed answer.
-  const [proxyBackgroundChecked, setProxyBackgroundChecked] = useState(false);
-  const [proxyReasonTouched, setProxyReasonTouched] = useState(false);
   const [proxyWatchMessages, setProxyWatchMessages] = useState<DisplayMessage[]>([]);
   const [proxyWatchPending, setProxyWatchPending] = useState(false);
   const [proxyDecision, setProxyDecision] = useState<string | null>(null);
@@ -280,6 +267,8 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   // Comprehension check states
   const [reasonAnswer, setReasonAnswer] = useState("");
   const [reasonSubmitted, setReasonSubmitted] = useState(false);
+  const [checkAttempt, setCheckAttempt] = useState(1);
+  const [checkFailed, setCheckFailed] = useState(false);
   const bypass = useDevBypass();
 
   const role = assignment?.role ?? "leader";
@@ -308,41 +297,40 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   const plan = assignment ? sessionPlan(assignment, taskIndex) : null;
   const isProxy = plan ? isProxyCondition(plan.condition) : false;
   const task = PRACTICE_TASK;
-  const prac1 = practiceReasonItem(role);
-  const reasonCorrect = reasonAnswer === PRACTICE_REASON_ANSWER;
+  const practiceCheck = isProxy ? PROXY_PRACTICE_CHECK : DIRECT_PRACTICE_CHECK;
+  const reasonCorrect = reasonAnswer === PRACTICE_CHECK_ANSWERS[practiceCheck.id];
 
-  /*
-    ROUND 2 DROPS THE COMPREHENSION STEP. CHK5 is asked once, in round 1; see
-    the file header for why asking it twice would measure the wrong thing.
-    Everything before it is identical, so the two rounds teach the same
-    controls in the same order for whichever arm they are rehearsing.
-  */
   const allSteps: readonly Step[] = isProxy ? PROXY_STEPS : DIRECT_STEPS;
-  const steps: readonly Step[] = isSecond
-    ? allSteps.filter((s) => s !== "check")
-    : allSteps;
+  const steps: readonly Step[] = allSteps;
   const step = steps[Math.min(stepIndex, steps.length - 1)];
   const stage = STEP_STAGE[step];
-  /*
-    ROUND 2 ENDS ON ITS ARM'S LAST STEP, not on `check`, which it does not
-    have. Derived from the steps array rather than from a step NAME so both
-    arms and both rounds fall out of one rule: Direct round 2 finishes on
-    `wait`, Proxy round 2 on `decide`.
-  */
-  const isLastStep = stepIndex >= steps.length - 1;
+  // Both practice rounds finish after their arm-specific understanding check.
 
   useDevAutofill(() => {
     // The goals fill themselves now: both terms are derived from `bestWish`
     // and only edits are stored, so there is nothing here to pre-answer.
     setDraft(PRACTICE_DRAFT);
-    setProxyBackgroundChecked(false);
-    setProxyReasonTouched(true);
     setProxyDecision((cur) => cur ?? "approve");
-    setReasonAnswer(PRACTICE_REASON_ANSWER);
+    setReasonAnswer(PRACTICE_CHECK_ANSWERS[practiceCheck.id]);
     // The key carries the micro-step, not just the phase: the whole tutorial
     // is one component, so without it the filler runs once and every later
     // micro-step arrives empty (see `useDevAutofill`'s own note).
   }, `practice-${phase}-${step}`);
+
+  useEffect(() => {
+    if (!participantKey) return;
+    const gate = readCheckGate(participantKey, `task-${taskIndex}`);
+    const id = window.setTimeout(() => {
+      setCheckAttempt(Math.min(gate.attempts + 1, 2));
+      if (gate.status === "failed") {
+        router.replace("/study-stop?reason=check");
+      } else if (gate.status === "passed") {
+        setReasonAnswer(PRACTICE_CHECK_ANSWERS[practiceCheck.id]);
+        setReasonSubmitted(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [participantKey, practiceCheck.id, router, taskIndex]);
 
   /**
    * AUTO-ADVANCE, and why it needs a latch.
@@ -361,15 +349,6 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
    * is not an edge, so the tutorial stays there and the participant sees the
    * step they asked for; the action bar's Continue is how they leave it again.
    */
-  /*
-    `finish` is declared below the effect that needs it, and it closes over
-    state the effect must not list as a dependency (re-running the arrival
-    effect on every answer change would break its rising-edge rule). A ref
-    holding the latest one is the narrow fix: the effect calls whatever
-    `finish` is current at the moment the last step completes.
-  */
-  const finishRef = useRef<() => void>(() => {});
-
   const arrivedSatisfiedAt = useRef<{ index: number; done: boolean } | null>(
     null,
   );
@@ -394,7 +373,6 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
      * inflate it.
      */
     pick: false,
-    share: proxyReasonTouched,
     send: participantSpoke,
     wait: replyArrived,
     // Watching is not an action, so the step ends when the exchange does.
@@ -482,42 +460,18 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     // tutorial stays put and the participant sees the step they asked for.
     if (previous?.index !== stepIndex || previous.done) return;
 
-    /*
-      THE LAST STEP HAS NOWHERE TO ADVANCE TO, and round 2 is the case that
-      exposed it. In round 1 the final step is `check`, whose `stepDone` is
-      permanently false, so this line could increment unguarded and never run
-      off the end. Round 2 drops `check`, so its final step is one that DOES
-      complete — `decide` in the Proxy arm, `wait` in the Direct one — and the
-      unclamped increment walked `stepIndex` past the array. The bubble read
-      "Step 6 of 5", the ring stayed on a control that had already been used,
-      and the round could not be finished at all.
-
-      Completing the last step is the participant saying they are done, so it
-      finishes the round rather than advancing into nothing.
-    */
+    // The final check advances only through its explicit answer button.
     const atEnd = stepIndex >= steps.length - 1;
-    finishRef.current = finish;
     // Scheduled rather than run in the effect body, the way the sibling
     // effect above already schedules its scroll: the transition is a
     // consequence of the participant's action, not a synchronisation, and
     // setting state synchronously here cascades a render.
     const id = window.setTimeout(() => {
-      if (atEnd) {
-        if (isSecond) finishRef.current();
-        return;
-      }
+      if (atEnd) return;
       setStepIndex((index) => (index === stepIndex ? index + 1 : index));
     }, 0);
     return () => window.clearTimeout(id);
-    // `finish` is deliberately NOT a dependency. It closes over the
-    // comprehension answer and the router, so listing it would re-run this
-    // effect on every keystroke — and this effect's whole contract is the
-    // rising edge of `done` for one `stepIndex`. Re-running it would make an
-    // arrival look like a change and advance the tutorial by itself. The ref
-    // above exists to give the timeout the current `finish` without putting
-    // it in the dependency list.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, done, stepIndex, steps.length, isSecond]);
+  }, [phase, done, stepIndex, steps.length]);
 
   if (!assignment) {
     return (
@@ -528,16 +482,19 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   }
 
   function finish() {
-    // Round 2 has no comprehension step, so there is no answer to record and
-    // writing an empty PRAC1 would put a blank row beside a real one.
-    if (!isSecond) {
-      logEvent("comprehension_answer", {
-        item: "PRAC1",
-        answer: reasonAnswer,
-        correct: reasonCorrect,
+    if (participantKey) {
+      writeCheckGate(participantKey, `task-${taskIndex}`, {
+        status: "passed",
+        attempts: checkAttempt,
       });
-      void saveResponses("practice", { PRAC1: reasonAnswer });
     }
+    logEvent("comprehension_answer", {
+      item: practiceCheck.id,
+      answer: reasonAnswer,
+      correct: reasonCorrect,
+      attempt: checkAttempt,
+    });
+    void saveResponses(`practice_${taskIndex}`, { [practiceCheck.id]: reasonAnswer });
     logEvent("page_complete", undefined, { page: `practice-${taskIndex}` });
     router.push(nextHref(flowKey));
   }
@@ -594,8 +551,6 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
         // term boxes would read as "change this one" — a cue suggesting an
         // answer on a value that is itself recorded (`WISH-DEV`).
         return "coach";
-      case "share":
-        return "share";
       case "send":
         return "composer";
       case "wait":
@@ -693,9 +648,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                 { label: "Set two goals", hint: "Both terms start at your best option" },
                 { label: "Watch the two proxies", hint: "Yours and the other side's" },
                 { label: "Make the decision", hint: "Approve, ask for a change, or refuse" },
-                ...(isSecond
-                  ? []
-                  : [{ label: "One quick question", hint: "About points and reasons" }]),
+                { label: "One quick check", hint: "About the Proxy controls" },
               ]
             : [
                 { label: "Read the situation", hint: "Your private briefing is on the right" },
@@ -704,9 +657,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                   hint: "Both terms start at your best option",
                 },
                 { label: "Send a message", hint: "The message is already typed" },
-                ...(isSecond
-                  ? []
-                  : [{ label: "One quick question", hint: "About points and reasons" }]),
+                { label: "One quick check", hint: "About the direct-chat controls" },
               ]
         }
         minutes={isSecond ? STAGE_MINUTES.practice2 : STAGE_MINUTES.practice}
@@ -723,8 +674,8 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
           setPhase("practice");
           goToStep(0);
         }}
-        /* `backStep` returns null for `practice-2` — the step before it is
-           Task 1's reward and REMARK, which may not be re-entered — and
+        /* `backStep` returns null for `practice-2` because the preceding
+           Task 1 outcome screens may not be re-entered, and
            `BackButton` renders nothing in that case. Passing the flow key
            rather than a literal keeps that decision in study-config. */
         secondary={<BackButton from={flowKey} />}
@@ -732,11 +683,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     );
   }
 
-  /*
-    ROUND 2 HAS NO QUICK CHECK, so its rail must not promise one. The rail is
-    the participant's map of the round; a fourth stage that never arrives
-    makes the round look unfinished at the moment it ends.
-  */
+  // Both rounds use the same four-stage map and end with their arm-specific IC.
   const progressSteps = [
     "Situation",
     // THE SAME LABEL IN BOTH ARMS, because it is the same act and the same
@@ -745,7 +692,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     // composer instead, which is a different screen with a different rule.
     "Set goals",
     isProxy ? "Watch and decide" : "Try chat",
-    ...(isSecond ? [] : ["Quick check"]),
+    "Quick check",
   ];
 
 
@@ -773,10 +720,6 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
       nextLabel: "Got it",
       onNext: advance,
     },
-    share: {
-      title: "Try it: the sharing box",
-      body: "The work reason always goes across. The one thing you decide is the background box.",
-    },
     send: {
       title: "Try it: click Send",
       body: "A practice message is already typed. Press the glowing Send button.",
@@ -793,22 +736,9 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
       title: "Last, the decision is yours",
       body: "Approve what they reached, ask for a change, or refuse it.",
     },
-    /*
-      ON ROUND 2 THE REPLY IS THE END OF THE PRACTICE. Round 1 hands `wait`
-      straight to the comprehension step, so its bubble needs no button;
-      round 2 has nothing after it, and a bubble that only ever says "nothing
-      to press" would leave the participant with no visible way on. The button
-      appears once the reply has actually landed, so it never invites a press
-      while the transcript is still filling.
-    */
     wait: {
       title: isProxy ? "Your Proxy is replying…" : "The other side is replying…",
-      body:
-        isSecond && isLastStep && !pending
-          ? "That is the practice round. Press the button to begin the task."
-          : "Nothing to press. Replies take a moment in a real task too.",
-      nextLabel: `Start Task ${taskIndex}`,
-      onNext: isSecond && isLastStep && !pending ? finish : undefined,
+      body: "Nothing to press. Replies take a moment in a real task too.",
     },
     check: {
       title: "Last one, a quick question",
@@ -824,10 +754,12 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     step === "check"
       ? canContinue
         ? `Start Task ${taskIndex} (Real Session) →`
-        : "Check My Answer"
-      : isSecond && isLastStep
-        ? `Start Task ${taskIndex} (Real Session) →`
-        : "Continue";
+        : checkFailed
+          ? "Contact the research team"
+          : reasonSubmitted
+            ? "Try once more"
+            : "Check My Answer"
+      : "Continue";
 
   /**
    * The action bar exists for the last step and for the dev bypass. Everything
@@ -865,20 +797,14 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
       case "read":
       case "pick":
         return "Nothing here affects your points or your payment.";
-      case "share":
-        return "Either way is fine in practice.";
       case "decide":
-        return isSecond && isLastStep
-          ? `Practice complete. You are ready to begin Task ${taskIndex}.`
-          : "Either way is fine in practice.";
+        return "Either way is fine in practice.";
       case "send":
         return "";
       case "watch":
         return proxiesFinished ? "" : "Watching. Nothing to press.";
       case "wait":
-        return isSecond && isLastStep && !pending
-          ? `Practice complete. You are ready to begin Task ${taskIndex}.`
-          : "Waiting for the practice reply…";
+        return "Waiting for the practice reply…";
       case "check":
         return canContinue
           ? `Practice complete. You are ready to begin Task ${taskIndex}.`
@@ -897,13 +823,26 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
         finish();
         return;
       }
+      if (checkFailed) {
+        router.push("/study-stop?reason=check");
+        return;
+      }
+      if (reasonSubmitted) {
+        setReasonAnswer("");
+        setReasonSubmitted(false);
+        setCheckAttempt(2);
+        return;
+      }
+      if (!reasonCorrect && participantKey) {
+        const failed = checkAttempt >= 2;
+        writeCheckGate(participantKey, `task-${taskIndex}`, {
+          status: failed ? "failed" : "pending",
+          attempts: checkAttempt,
+        });
+        if (failed) writeStopReason(participantKey, "check");
+        setCheckFailed(failed);
+      }
       setReasonSubmitted(true);
-      return;
-    }
-    // Round 2's last step has no `check` after it, so the action that would
-    // advance is the one that leaves.
-    if (isSecond && isLastStep) {
-      finish();
       return;
     }
     advance();
@@ -975,9 +914,6 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
 
           <ol
             aria-label="Practice progress"
-            // Columns follow the rail's own length: round 2 has three
-            // stages, and a four-column grid would leave a gap where the
-            // quick check used to be.
             className={cx(
               "mb-3 grid grid-cols-2 gap-2",
               progressSteps.length === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3",
@@ -1081,12 +1017,6 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                 ))}
               </div>
 
-              {cueTarget === "share" ? (
-                <div className="mt-4">
-                  <CoachAnchor>{coachBubble("down", true)}</CoachAnchor>
-                </div>
-              ) : null}
-
               {/*
                 THE SHAPE OF THE REAL MANDATE, on practice text (§8.7). Two
                 boxes: the work reason ticked and LOCKED with the label that
@@ -1130,51 +1060,9 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                   </span>
                 </div>
 
-                <p className="mb-2 mt-4 text-[0.6875rem] font-extrabold uppercase tracking-[0.09em] text-rose-700">
-                  Practice background
+                <p className="mt-3 text-xs leading-relaxed text-slate-600">
+                  This neutral practice uses only the work reason above. It does not include personal or sensitive information.
                 </p>
-                <label
-                  className={cx(
-                    "flex cursor-pointer items-start gap-3 rounded-xl border p-3 shadow-2xs transition-all",
-                    proxyBackgroundChecked
-                      ? "border-rose-400 bg-white text-rose-950 ring-2 ring-rose-400/20"
-                      : "border-rose-200 bg-white/70 hover:border-rose-300",
-                    cueTarget === "share" ? "cue-ring-private" : "",
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={proxyBackgroundChecked}
-                    onChange={(event) => {
-                      setProxyBackgroundChecked(event.target.checked);
-                      // Either direction finishes the step. The tutorial must
-                      // not reward one setting over the other: which box a
-                      // participant is willing to draw from is the measure,
-                      // and a practice round that nudged it would be teaching
-                      // the outcome.
-                      setProxyReasonTouched(true);
-                    }}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-rose-300 text-rose-600 accent-rose-600"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span
-                      className={cx(
-                        "mb-1.5 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[0.6875rem] font-bold",
-                        proxyBackgroundChecked
-                          ? "border-rose-300 bg-rose-50 text-rose-800"
-                          : "border-slate-200 bg-slate-50 text-slate-600",
-                      )}
-                    >
-                      <span aria-hidden>{proxyBackgroundChecked ? "🤖" : "🚫"}</span>
-                      {proxyBackgroundChecked
-                        ? "Your proxy may share this"
-                        : "Your proxy will not share this"}
-                    </span>
-                    <span className="block text-xs sm:text-sm leading-relaxed text-slate-800 font-medium">
-                      {PRACTICE_REASONS[role].background}
-                    </span>
-                  </span>
-                </label>
               </div>
             </Card>
           ) : null}
@@ -1278,7 +1166,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                     )}
                     padded={false}
                   >
-                    <CardTitle>What would you like to do?</CardTitle>
+                    <CardTitle>Review the proposed agreement</CardTitle>
                     <p className="mt-1 text-sm leading-relaxed text-slate-600">
                       Nothing is settled until you choose.
                     </p>
@@ -1364,7 +1252,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
 
           {stage === 4 ? (
             <Card
-              id={`q-${prac1.id}`}
+              id={`q-${practiceCheck.id}`}
               className={cx(
                 "mb-6 border-blue-300 bg-white p-4",
                 reasonSubmitted && reasonCorrect
@@ -1378,24 +1266,29 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
               padded={false}
             >
               <CardTitle>Check Your Understanding</CardTitle>
-              <p className="my-3 text-sm font-bold text-slate-900">{prac1.text}</p>
-              {prac1.kind === "choice" ? (
+              <p className="my-3 text-sm font-bold text-slate-900"><span className="mr-2 text-slate-500">({practiceCheck.id})</span>{practiceCheck.text}</p>
+              {practiceCheck.kind === "choice" ? (
                 <ChoiceList
-                  name={prac1.id}
+                  name={practiceCheck.id}
                   value={reasonAnswer}
                   onChange={(value) => {
+                    if (reasonSubmitted) return;
                     setReasonAnswer(value);
-                    setReasonSubmitted(false);
                   }}
-                  options={prac1.options}
+                  options={practiceCheck.options}
                 />
               ) : null}
               {reasonSubmitted && !reasonCorrect ? (
-                <div className="mt-3">
-                  <Callout title="Helpful hint" tone="warning">
+                <div className="mt-3" role="alert" aria-live="assertive">
+                  <Callout title="Review this answer" tone="warning">
                     <p className="text-xs sm:text-sm">
-                      Points show how valuable an option is in the scenario. The
-                      briefing explains the workplace reason behind that value.
+                      <strong>Correct answer: {practiceCheck.options.find((option) => option.value === PRACTICE_CHECK_ANSWERS[practiceCheck.id])?.label}</strong>{" "}
+                      {PRACTICE_CHECK_REMEDIATION[practiceCheck.id]}
+                    </p>
+                    <p className="mt-1 text-xs sm:text-sm">
+                      {checkFailed
+                        ? "This check was not passed after two attempts."
+                        : "Read the explanation, then try once more."}
                     </p>
                   </Callout>
                 </div>

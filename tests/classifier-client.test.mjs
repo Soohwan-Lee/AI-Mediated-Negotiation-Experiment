@@ -36,7 +36,7 @@ test("P5 keeps untrusted cumulative messages out of the system prompt", () => {
   const user = buildClassifierInput(ctx.messages);
 
   assert.doesNotMatch(system, /Ignore the rules/);
-  assert.match(system, /untrusted conversation data/i);
+  assert.match(system, /untrusted\s+conversation\s+data/i);
   assert.match(user, /Ignore the rules/);
   assert.match(user, /\["hello",/);
 });

@@ -25,11 +25,14 @@ import { useEffect, useState } from "react";
 import { useDevMode } from "@/lib/dev-mode";
 import { readFurthest, writeFurthest } from "@/lib/flow-position";
 import { FLOW, flowIndex, flowKeyFromPath } from "@/lib/study-config";
+import { useParticipant } from "@/lib/participant-context";
+import { readCheckGate, readStopReason } from "@/lib/check-gates";
 
 export function NavigationGuard() {
   const pathname = usePathname();
   const router = useRouter();
   const { enabled: devEnabled } = useDevMode();
+  const { participantKey } = useParticipant();
   const [notice, setNotice] = useState(false);
 
   const key = flowKeyFromPath(pathname ?? "");
@@ -55,6 +58,30 @@ export function NavigationGuard() {
   useEffect(() => {
     if (devEnabled || !key) return;
 
+    if (participantKey) {
+      const stopped = readStopReason(participantKey);
+      if (stopped) {
+        router.replace(`/study-stop?reason=${stopped}`);
+        return;
+      }
+    }
+
+    if (key === "task-1" || key === "task-2") {
+      if (!participantKey) return;
+      const taskIndex = key === "task-1" ? 1 : 2;
+      if (readCheckGate(participantKey, "common").status !== "passed") {
+        writeFurthest(flowIndex("instruction"));
+        router.replace("/instruction");
+        return;
+      }
+      if (readCheckGate(participantKey, `task-${taskIndex}`).status !== "passed") {
+        const practiceKey = taskIndex === 1 ? "practice" : "practice-2";
+        writeFurthest(flowIndex(practiceKey));
+        router.replace(`/practice/${taskIndex}`);
+        return;
+      }
+    }
+
     const index = flowIndex(key);
     const furthest = readFurthest();
 
@@ -67,7 +94,7 @@ export function NavigationGuard() {
     // mark before navigating. So: a bookmark, a typed URL, or a back press the
     // sentinel did not catch.
     router.replace(FLOW[furthest].href);
-  }, [devEnabled, key, router]);
+  }, [devEnabled, key, participantKey, router]);
 
   // Warn on reload and on closing the tab, everywhere except the final page.
   useEffect(() => {

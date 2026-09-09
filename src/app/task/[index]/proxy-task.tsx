@@ -5,7 +5,7 @@
  *
  * Flow: cover → brief → mandate (levels + reasons) → confirm →
  *       matchmaking → WATCH the two AI Proxies negotiate → ratify → review.
- *       Modification/refusal instead leads through a two-minute closing.
+ *       Modification/refusal instead leads through a five-minute closing.
  *
  * Three things in that line are recent and easy to write back the old way:
  *
@@ -206,7 +206,7 @@ function proxySbFirstChoice(
  * Two channels, and they are ordered. A ticked SB is voiced at the proxy's
  * FIRST reason opportunity (§6.5), which is this arm's lock — so a ticker is
  * `first_chance` whatever happens afterwards. Only a participant who did NOT
- * tick can reach `wrap_up`, by saying it themselves in the two-minute
+ * tick can reach `wrap_up`, by saying it themselves in the five-minute
  * closing (§6.9 #2).
  *
  * IT READS THE CHECKBOX, for the same reason `SB` does: the timing categories

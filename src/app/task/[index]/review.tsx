@@ -36,12 +36,11 @@
  * change does not own. They are simply not rendered here.
  */
 
-import { useState } from "react";
 import type { DisplayMessage } from "@/components/negotiation";
+import { useRef, useState } from "react";
 import { BriefingPanel, TaskHeader, TaskLayout } from "@/components/session";
 import { ActionBar } from "@/components/study-chrome";
-import { Card, CardTitle, Cue, Page } from "@/components/ui";
-import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
+import { Card, CardTitle, Page } from "@/components/ui";
 import { codeOutcome, type SbTiming } from "@/lib/negotiation/machine";
 import { useParticipant } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
@@ -51,16 +50,7 @@ import {
   requirementIssue,
 } from "@/lib/tasks";
 import type { NegotiationTask, Package, Role } from "@/lib/types";
-import { DecisionButton, OutcomeValue, TermsList } from "./shared";
-
-/**
- * How the participant responded to the other side's requirement.
- *
- *  accommodate  accepted as it stands
- *  trade        kept, but paid for elsewhere
- *  reduce       asked to go below it, or refused
- */
-type RequirementResponse = "accommodate" | "trade" | "reduce";
+import { OutcomeValue, TermsList } from "./shared";
 
 export function ReviewPhase({
   taskIndex,
@@ -149,102 +139,97 @@ export function ReviewPhase({
   onDone: () => void;
 }) {
   const { participantKey, logEvent } = useParticipant();
+  const submitting = useRef(false);
+  const [busy, setBusy] = useState(false);
   const mine = requirementIssue(task, role);
   const theirs = counterRequirementIssue(task, role);
   const counterpartRole: Role = role === "leader" ? "member" : "leader";
 
-  const theirOption = tentative
-    ? theirs.options.find((o) => o.id === tentative[theirs.id])
-    : undefined;
   const heldMine = tentative
     ? preservesRequirement(task, role, tentative[mine.id])
     : false;
 
-  const [requirementResponse, setRequirementResponse] =
-    useState<RequirementResponse | null>(null);
-
-  useDevAutofill(() => {
-    setRequirementResponse((c) => c ?? "accommodate");
-  }, `review-t${taskIndex}`);
-
-  const needsRequirementResponse = Boolean(theirOption);
-  const canSubmit = useDevGate(
-    !needsRequirementResponse || requirementResponse !== null,
-  );
-
   async function submit() {
-    if (participantKey) {
-      await getStore().saveAgreement(participantKey, {
-        sessionIndex: taskIndex,
-        terms: task.issues.map((i) => ({
-          issueId: i.id,
-          optionId: tentative?.[i.id] ?? null,
-          unresolved: !tentative?.[i.id],
-        })),
-        unresolvedIssueIds: tentative
-          ? task.issues.filter((i) => !tentative[i.id]).map((i) => i.id)
-          : task.issues.map((i) => i.id),
-      });
-      await getStore().saveResponses(
-        participantKey,
-        `task_outcome_t${taskIndex}`,
+    if (submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      if (participantKey) {
+        await getStore().saveAgreement(participantKey, {
+          sessionIndex: taskIndex,
+          terms: task.issues.map((i) => ({
+            issueId: i.id,
+            optionId: tentative?.[i.id] ?? null,
+            unresolved: !tentative?.[i.id],
+          })),
+          unresolvedIssueIds: tentative
+            ? task.issues.filter((i) => !tentative[i.id]).map((i) => i.id)
+            : task.issues.map((i) => i.id),
+        });
+        await getStore().saveResponses(
+          participantKey,
+          `task_outcome_t${taskIndex}`,
+          {
+            // Whether the negotiation produced a package at all. This used to be
+            // implicit in the ratification choice; with the choice gone it is
+            // stated, because "no agreement" and "an agreement" are different
+            // outcomes and every downstream measure needs to tell them apart.
+            outcome: tentative ? "agreement" : "no_agreement",
+            ownRequirementOptionId: tentative?.[mine.id] ?? null,
+            ownRequirementPreserved: heldMine,
+            theirRequirementOptionId: tentative?.[theirs.id] ?? null,
+            theirRequirementPreserved: tentative
+              ? preservesRequirement(task, counterpartRole, tentative[theirs.id])
+              : false,
+            // §3.4's outcome pair, derived by `codeOutcome` rather than
+            // recomputed here. UNLOCK, CONCEAL-PREMIUM and MAX-JOINT are GONE
+            // (§9.6): under the symmetric package rule JOINT takes one of four
+            // values, one per rung plus impasse, so it already encodes the tier
+            // reached, the cost of concealing, and whether the maximum opened.
+            // Three booleans computed off one number are three ways to disagree
+            // with it.
+            ...(() => {
+              const coded = codeOutcome(
+                task,
+                role,
+                tentative,
+                Boolean(tentative),
+              );
+              return {
+                POINTS: coded.participantPoints,
+                JOINT: coded.jointPoints,
+              };
+            })(),
+            // §9.3's two disclosure measures, from the arm that ran the exchange.
+            RATIFY: behaviour?.ratify ?? null,
+            SB: behaviour?.sb ?? false,
+            "SB-TIMING": behaviour?.sbTiming ?? "never",
+          },
+        );
+      }
+
+      logEvent(
+        "task_outcome_recorded",
         {
-          // Whether the negotiation produced a package at all. This used to be
-          // implicit in the ratification choice; with the choice gone it is
-          // stated, because "no agreement" and "an agreement" are different
-          // outcomes and every downstream measure needs to tell them apart.
           outcome: tentative ? "agreement" : "no_agreement",
-          // The uptake code (§9.3.1). Asked rather than inferred, because a
-          // coder reading the transcript would be guessing at an intention the
-          // participant can be asked for directly.
-          requirementResponse,
-          ownRequirementOptionId: tentative?.[mine.id] ?? null,
-          ownRequirementPreserved: heldMine,
-          theirRequirementOptionId: tentative?.[theirs.id] ?? null,
-          theirRequirementPreserved: tentative
-            ? preservesRequirement(task, counterpartRole, tentative[theirs.id])
-            : false,
-          // §3.4's outcome pair, derived by `codeOutcome` rather than
-          // recomputed here. UNLOCK, CONCEAL-PREMIUM and MAX-JOINT are GONE
-          // (§9.6): under the symmetric package rule JOINT takes one of four
-          // values, one per rung plus impasse, so it already encodes the tier
-          // reached, the cost of concealing, and whether the maximum opened.
-          // Three booleans computed off one number are three ways to disagree
-          // with it.
-          ...(() => {
-            const coded = codeOutcome(task, role, tentative, Boolean(tentative));
-            return {
-              POINTS: coded.participantPoints,
-              JOINT: coded.jointPoints,
-            };
-          })(),
-          // §9.3's two disclosure measures, from the arm that ran the exchange.
-          RATIFY: behaviour?.ratify ?? null,
-          SB: behaviour?.sb ?? false,
-          "SB-TIMING": behaviour?.sbTiming ?? "never",
         },
+        { sessionIndex: taskIndex },
       );
+
+      // A Proxy task fires `negotiation_ended` more than once — once when the AI
+      // Proxies finish, once when the direct conversation closes. The marker is
+      // what keeps them apart; without it they are distinguishable only by
+      // arrival order, and anything that counts or joins on the event
+      // double-counts the Proxy arm against a Direct arm that fires it fewer
+      // times. This one closes the task itself.
+      logEvent("negotiation_ended", { phase: "task_closed" }, {
+        sessionIndex: taskIndex,
+      });
+      onDone();
+    } finally {
+      submitting.current = false;
+      setBusy(false);
     }
-
-    logEvent(
-      "task_outcome_recorded",
-      {
-        outcome: tentative ? "agreement" : "no_agreement",
-        requirementResponse,
-      },
-      { sessionIndex: taskIndex },
-    );
-
-    // A Proxy task fires `negotiation_ended` more than once — once when the AI
-    // Proxies finish, once when the direct conversation closes. The marker is
-    // what keeps them apart; without it they are distinguishable only by
-    // arrival order, and anything that counts or joins on the event
-    // double-counts the Proxy arm against a Direct arm that fires it fewer
-    // times. This one closes the task itself.
-    logEvent("negotiation_ended", { phase: "task_closed" }, {
-      sessionIndex: taskIndex,
-    });
-    onDone();
   }
 
   return (
@@ -363,51 +348,13 @@ export function ReviewPhase({
             <OutcomeValue task={task} terms={tentative} role={role} />
           </div>
 
-          {theirOption ? (
-            <Card
-              className="mb-6"
-              id="q-requirement-response"
-              cue={requirementResponse === null}
-            >
-              <CardTitle
-                hint={`They asked for ${theirOption.label.toLowerCase()} on ${theirs.label.toLowerCase()}.`}
-                aside={
-                  requirementResponse === null ? <Cue>1 to answer</Cue> : null
-                }
-              >
-                How did you handle their request?
-              </CardTitle>
-
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <DecisionButton
-                  selected={requirementResponse === "accommodate"}
-                  onClick={() => setRequirementResponse("accommodate")}
-                  label="I accepted it"
-                  hint="Gave them the level they wanted, without conditions"
-                />
-                <DecisionButton
-                  selected={requirementResponse === "trade"}
-                  onClick={() => setRequirementResponse("trade")}
-                  label="I traded for it"
-                  hint="Gave it in exchange for something on the other issue"
-                />
-                <DecisionButton
-                  selected={requirementResponse === "reduce"}
-                  onClick={() => setRequirementResponse("reduce")}
-                  label="I pushed back"
-                  hint="Talked them down, or held my ground"
-                />
-              </div>
-            </Card>
-          ) : null}
         </TaskLayout>
       </Page>
 
       <ActionBar
         label="Continue"
         onClick={submit}
-        disabled={!canSubmit}
-        note={canSubmit ? "" : "One answer left above."}
+        busy={busy}
       />
     </>
   );

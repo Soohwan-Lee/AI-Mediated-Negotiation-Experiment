@@ -23,6 +23,15 @@ import {
 } from "@/lib/study-config";
 import { cx } from "./ui";
 
+const ROADMAP: Array<{ label: string; detail?: string; keys: FlowKey[] }> = [
+  { label: "Welcome", keys: ["welcome"] },
+  { label: "Background", keys: ["background"] },
+  { label: "Instructions", keys: ["instruction"] },
+  { label: "Task 1", detail: "Practice · Main · Questions", keys: ["practice", "task-1", "survey-1", "reward-1"] },
+  { label: "Task 2", detail: "Practice · Main · Questions", keys: ["practice-2", "task-2", "survey-2", "reward-2"] },
+  { label: "Finish", keys: ["wrap-up", "debriefing", "complete"] },
+];
+
 export function StudyChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const key = flowKeyFromPath(pathname ?? "");
@@ -30,13 +39,16 @@ export function StudyChrome({ children }: { children: ReactNode }) {
   const step = key ? flowIndex(key) + 1 : 0;
   const total = FLOW.length;
   const pct = key ? Math.round((step / total) * 100) : 0;
+  const roadmapIndex = key
+    ? ROADMAP.findIndex((phase) => phase.keys.includes(key))
+    : -1;
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-md shadow-2xs">
         <div
           className="mx-auto flex h-[var(--header-h)] w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"
-          style={{ maxWidth: "var(--measure-page, var(--measure-reading))" }}
+          style={{ maxWidth: "var(--measure-wide)" }}
         >
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-base shadow-2xs border border-[var(--accent-border)]">
@@ -50,8 +62,32 @@ export function StudyChrome({ children }: { children: ReactNode }) {
           </div>
 
           {key ? (
+            <ol aria-label="Study overview" className="hidden min-w-0 flex-1 items-center justify-center gap-1 lg:flex">
+              {ROADMAP.map((phase, index) => (
+                <li key={phase.label} className="flex min-w-0 items-center gap-1 whitespace-nowrap">
+                  <span
+                    aria-current={index === roadmapIndex ? "step" : undefined}
+                    className={cx(
+                      "rounded-lg px-2 py-1 text-center text-xs font-bold leading-tight",
+                      index === roadmapIndex
+                        ? "bg-[var(--accent-soft)] text-[var(--accent)] ring-1 ring-[var(--accent-border)]"
+                        : index < roadmapIndex
+                          ? "text-slate-600"
+                          : "text-slate-400",
+                    )}
+                  >
+                    <span className="block text-xs">{phase.label}</span>
+                    {phase.detail ? <span className="hidden text-[0.625rem] font-medium min-[1180px]:block">{phase.detail}</span> : null}
+                  </span>
+                  {index < ROADMAP.length - 1 ? <span aria-hidden className="text-slate-300">›</span> : null}
+                </li>
+              ))}
+            </ol>
+          ) : null}
+
+          {key ? (
             <div className="flex min-w-0 items-center gap-2.5">
-              <span className="hidden truncate text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)] sm:block">
+              <span className="hidden truncate text-xs font-semibold uppercase tracking-wider text-[var(--ink-3)] sm:block lg:hidden">
                 {flowLabel(key)}
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100/80 px-3 py-1 text-xs font-bold text-[var(--ink-2)] shadow-2xs">
