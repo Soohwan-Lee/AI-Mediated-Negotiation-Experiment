@@ -12,6 +12,8 @@ import { readFileSync } from "node:fs";
 import {
   PHASES,
   STUDY,
+  FLOW,
+  nextHref,
   STAGE_MINUTES,
   TOTAL_MINUTES,
   timingIsHonest,
@@ -45,6 +47,10 @@ test("STAGE_MINUTES sums to TOTAL_MINUTES", () => {
     STAGE_MINUTES.background +
     STAGE_MINUTES.instruction +
     STAGE_MINUTES.practice +
+    // The PI added a second practice round, one before each task in that
+    // task's own arm, on 2026-09-09. Design §7's timing table still lists a
+    // single practice and needs the row.
+    STAGE_MINUTES.practice2 +
     2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward) +
     STAGE_MINUTES.wrapUp +
     STAGE_MINUTES.debrief;
@@ -57,8 +63,15 @@ test("every flow step the participant sits through carries minutes", () => {
 });
 
 test("the budget matches Design Ver.2.23 §7's recruitment estimate", () => {
-  assert.equal(TOTAL_MINUTES, 40);
+  // 41 budgeted against 40 advertised since the second practice round was
+  // added on 2026-09-09. The one-minute gap is the round-DOWN `timingIsHonest`
+  // permits and no more: the advertised figure may never promise less than the
+  // study takes by more than a minute, because the fair-pay rate is computed
+  // from it. The pay is unchanged and the rate test below still reads the
+  // advertised 40.
+  assert.equal(TOTAL_MINUTES, 41);
   assert.equal(STUDY.estimatedMinutes, 40);
+  assert.ok(timingIsHonest());
 });
 
 test("base + bonus equals the advertised total", () => {
@@ -123,7 +136,10 @@ test("both pre-task notices reach the participant before the practice round", ()
   );
   assert.match(guide, /Never give the other side the numbers/);
   assert.match(guide, /Stay anonymous in the chat/);
-  assert.match(guide, /your employer/);
+  // Named, not merely implied: "stay anonymous" alone is a slogan, and the
+  // employer is the detail a participant is most likely to type without
+  // thinking of it as identifying. The wording is free; naming it is not.
+  assert.match(guide, /employer/);
 });
 
 test("the guide says the counterpart moves on reasons without naming which reason works", () => {
@@ -137,16 +153,100 @@ test("the guide says the counterpart moves on reasons without naming which reaso
   assert.doesNotMatch(guide, /sensitive background (works|helps) (better|more)/i);
 });
 
-test("the phase strip names the five phases and marks practice as not counting", () => {
+test("the phase strip names the six phases and marks both practices as not counting", () => {
   const labels = PHASES.map((p) => p.label);
   assert.deepEqual(labels, [
     "Instructions",
     "Practice",
     "Task 1",
+    "Practice",
     "Task 2",
     "Final questions",
   ]);
+  // BOTH practices carry it. The second is the one a participant is most
+  // likely to mistake for the real thing: it arrives between two tasks,
+  // after they have already negotiated once for points.
   assert.equal(PHASES.find((p) => p.key === "practice")?.doesNotCount, true);
+  assert.equal(PHASES.find((p) => p.key === "practice2")?.doesNotCount, true);
+});
+
+test("the consent page's step list adds up to the whole budget", () => {
+  // Stream V found the visible rows summing to less than the stat card above
+  // them: the list started at the background questions and ended at the final
+  // ones, so this consent page and the debriefing — four minutes of real
+  // reading — were missing. Two different answers to "how long is this" on one
+  // screen, and the smaller one is what underpays anyone slower than the
+  // estimate.
+  //
+  // Read from the SOURCE rather than imported: page.tsx is a "use client"
+  // component full of JSX and cannot be pulled into a node test. Every row's
+  // minutes is an expression over STAGE_MINUTES, so evaluating those
+  // expressions is what makes this catch a wrong figure as well as a missing
+  // row.
+  const welcome = readFileSync(new URL("../src/app/page.tsx", import.meta.url), "utf8");
+  const steps = welcome.slice(
+    welcome.indexOf("const STEPS = ["),
+    welcome.indexOf("export const stepMinutesTotal"),
+  );
+  assert.ok(steps.length > 0, "could not find the STEPS array");
+
+  const expressions = [...steps.matchAll(/minutes:\s*([^,\n]+(?:\n\s*[^,\n]+)*),/g)].map(
+    (m) => m[1].trim(),
+  );
+  assert.ok(expressions.length >= 5, `only found ${expressions.length} rows`);
+
+  const sum = expressions.reduce((total, expression) => {
+    // Only STAGE_MINUTES arithmetic is permitted, so a row cannot smuggle in a
+    // hardcoded number that drifts from the flow.
+    assert.match(
+      expression,
+      /^[\d\s*+()]*(?:STAGE_MINUTES\.\w+[\d\s*+()]*)+$/,
+      `row minutes must be arithmetic over STAGE_MINUTES, got: ${expression}`,
+    );
+    const value = Function(
+      "STAGE_MINUTES",
+      `return (${expression});`,
+    )(STAGE_MINUTES);
+    assert.ok(Number.isFinite(value) && value > 0, `bad minutes: ${expression}`);
+    return total + value;
+  }, 0);
+
+  assert.equal(
+    sum,
+    TOTAL_MINUTES,
+    `the listed steps add to ${sum} but the budget is ${TOTAL_MINUTES}`,
+  );
+  // And the headline the participant reads first may only round it DOWN by a
+  // minute, which is the same rule `timingIsHonest` enforces.
+  assert.ok(sum >= STUDY.estimatedMinutes);
+  assert.ok(sum - STUDY.estimatedMinutes <= 1);
+});
+
+test("a practice round sits before each task, and REMARK 1 leads into the second", () => {
+  // The single practice round ran `sessionPlan(assignment, 1)`, so it always
+  // rehearsed TASK 1's arm. Since every participant does one Direct task and
+  // one Proxy task, whichever arm fell second was met cold — an interface
+  // difference landing on `Pooled Proxy − Direct`, the primary contrast.
+  const keys = FLOW.map((s) => s.key);
+  assert.ok(
+    keys.indexOf("practice") < keys.indexOf("task-1"),
+    "the first practice must precede Task 1",
+  );
+  assert.ok(
+    keys.indexOf("practice-2") < keys.indexOf("task-2"),
+    "the second practice must precede Task 2",
+  );
+  // REMARK is the last phase of the reward route, and it leaves via
+  // `nextHref(flowKey)`. This is what carries Task 1's REMARK into the second
+  // practice without the reward page knowing the practice exists.
+  assert.equal(nextHref("reward-1"), "/practice/2");
+  assert.equal(nextHref("practice-2"), "/task/2");
+  assert.equal(nextHref("practice"), "/task/1");
+  // The URL carries the index and nothing else: no condition name, no arm.
+  for (const key of ["practice", "practice-2"]) {
+    const href = FLOW.find((s) => s.key === key).href;
+    assert.match(href, /^\/practice\/[12]$/);
+  }
 });
 
 test("the debrief calls the observed bonus input a recommendation, not a transfer", () => {
@@ -167,6 +267,10 @@ test("post-task questionnaires cannot be revisited after the decision stimulus",
   assert.equal(backStep("reward-2"), null);
   assert.equal(backStep("instruction")?.key, "background");
   assert.equal(backStep("practice")?.key, "instruction");
+  // The second practice sits directly after Task 1's reward decision and
+  // REMARK, so it must lead nowhere: going back there would let a participant
+  // revise a recorded decision after seeing the next task's opening.
+  assert.equal(backStep("practice-2"), null);
 });
 
 // --- the exposure cap -------------------------------------------------------

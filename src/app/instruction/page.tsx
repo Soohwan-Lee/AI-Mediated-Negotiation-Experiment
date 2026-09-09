@@ -167,7 +167,11 @@ export default function InstructionPage() {
           subtitle="Check your understanding of the setup. If an answer is wrong, read the note and try once more."
         />
 
-        <div className="space-y-6">
+        {/* Tighter than the default card rhythm. Four questions on one screen
+            is already two viewports; the padding is the only part of that a
+            layout change can take back, since the items themselves are the
+            instrument (`lib/measures.ts`). */}
+        <div className="space-y-4">
           {CHECKS.map((c, i) => {
             const answered = answers[c.id];
             const isWrong = submitted && answered && answered !== c.correct;
@@ -176,27 +180,24 @@ export default function InstructionPage() {
             return (
               <Card
                 key={c.id}
+                padded={false}
                 className={cx(
-                  "transition-all",
+                  "p-4 sm:p-5 transition-all",
                   isWrong ? "border-amber-400 bg-amber-50/30" : isRight ? "border-emerald-300 bg-emerald-50/20" : "",
                 )}
               >
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-0.5 text-xs font-extrabold text-slate-700">
-                    Question {i + 1} of {CHECKS.length}
-                  </span>
+                {/* The number and the verdict on one line WITH the question,
+                    not in a badge row above it. The row was a whole line of
+                    chrome per card and the number reads just as well inline. */}
+                <p className="mb-3 flex items-baseline gap-2 text-sm sm:text-base font-bold text-[var(--ink)]">
+                  <span className="shrink-0 tabular-nums text-[var(--ink-3)]">{i + 1}.</span>
+                  <span className="min-w-0 flex-1">{c.question}</span>
                   {isRight ? (
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                      ✓ Correct
-                    </span>
+                    <span className="shrink-0 text-xs font-bold text-emerald-700">✓ Correct</span>
                   ) : isWrong ? (
-                    <span className="text-xs font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full">
-                      ⚠️ Needs review
-                    </span>
+                    <span className="shrink-0 text-xs font-bold text-amber-800">⚠ Needs review</span>
                   ) : null}
-                </div>
-
-                <p className="mb-3.5 text-sm sm:text-base font-bold text-[var(--ink)]">{c.question}</p>
+                </p>
                 <ChoiceList
                   name={c.id}
                   value={answered ?? ""}

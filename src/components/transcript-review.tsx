@@ -7,10 +7,10 @@ import type { Speaker, TranscriptMessage } from "@/lib/types";
 
 const SPEAKER_LABEL: Record<Speaker, string> = {
   participant: "You",
-  counterpart: "Counterpart",
+  counterpart: "Other Participant",
   participant_proxy: "Your AI Proxy",
-  counterpart_proxy: "Counterpart's AI Proxy",
-  counterpart_principal: "Counterpart",
+  counterpart_proxy: "Other Participant's AI Proxy",
+  counterpart_principal: "Other Participant",
   system: "Study",
 };
 

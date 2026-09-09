@@ -198,13 +198,6 @@ const STEP_LABELS = [
   "Review",
 ];
 
-/** The cover's glossed step list — see the note in proxy-task.tsx. */
-const COVER_STEPS = [
-  { label: "Prepare", hint: "Read your briefing and choose your starting goals." },
-  { label: "Chat directly", hint: "Discuss the two conditions with the other participant." },
-  { label: "Review", hint: "Check your final outcome, then answer questions about the task." },
-];
-
 const PHASE_LABELS: Record<Phase, string> = {
   intro: "Start screen",
   brief: "Your briefing",
@@ -1341,10 +1334,14 @@ export function BaselineTask({
     return (
       <TaskIntro
         taskIndex={taskIndex}
-        steps={COVER_STEPS}
         scene="direct"
-        /* The shorter arm: one conversation. */
-        minutes={7}
+        /* NO `minutes` OVERRIDE (round six). Both covers now read
+           `STAGE_MINUTES.task`, so the two arms quote the same figure on the
+           screen where a participant decides whether to go on. The two arms
+           differing here — 7 against the Proxy cover's 5 — was an exposure
+           difference on the primary contrast, and the two overrides had drifted
+           into contradicting their own comments: this one called Direct "the
+           shorter arm" while quoting the larger number. */
         onStart={() => setPhase("brief")}
       />
     );

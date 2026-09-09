@@ -63,8 +63,31 @@ const BASE_HOURLY_RATE = (
   (Number(STUDY.compensation) / STUDY.estimatedMinutes) * 60
 ).toFixed(2);
 
-/** Derived from STAGE_MINUTES so the promised times cannot drift from the flow. */
+/**
+ * Every stage the participant sits through, with its minutes.
+ *
+ * DERIVED FROM `STAGE_MINUTES` so the promised times cannot drift from the
+ * flow, and COMPLETE so the rows add up to what the stat card above them
+ * says. The list used to start at the background questions and stop at the
+ * final ones, leaving out this consent page and the debriefing — four
+ * minutes of real reading — so the visible rows summed to 37 against a
+ * 41-minute budget. A participant who adds the column and gets a smaller
+ * number than the headline has been given two different answers to the same
+ * question on one screen, and the smaller one is the one that underpays
+ * whoever is slower than the estimate.
+ *
+ * `stepMinutesTotal` below is asserted against `TOTAL_MINUTES` in
+ * tests/study-config.test.mjs, so a stage added to the flow without a row
+ * here fails rather than quietly shrinking the column.
+ */
 const STEPS = [
+  {
+    // The page they are reading. It is not padding: consent is the one stage
+    // whose whole purpose is to be read before deciding.
+    title: "Read this and decide",
+    detail: "What the study involves, what is recorded, and your rights.",
+    minutes: STAGE_MINUTES.consent,
+  },
   {
     title: "A few questions about you",
     detail: "Background and experience. No right answers.",
@@ -76,27 +99,44 @@ const STEPS = [
     minutes: STAGE_MINUTES.instruction,
   },
   {
-    title: "A practice round",
-    detail: "The same controls, on a scenario that does not count.",
-    minutes: STAGE_MINUTES.practice,
+    // Both rounds on one row. They are the same scenario and carry the same
+    // promise that nothing counts, and giving the second its own row would put
+    // a step between the two tasks that reads as a third task.
+    title: "Two short practice rounds",
+    detail: "One before each task, on a scenario that does not count.",
+    minutes: STAGE_MINUTES.practice + STAGE_MINUTES.practice2,
   },
   {
     title: "Two negotiation tasks",
     detail:
-      "Negotiate directly once and use a software representative once. Questions follow each task.",
+      "Negotiate directly once and use an AI Proxy once. Questions follow each task.",
     minutes: 2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward),
   },
   {
     title: "Final questions",
-    detail: "A few about the study as a whole, then the explanation.",
+    // The explanation moved to its own row below, so this no longer promises
+    // it as part of the same three minutes.
+    detail: "A few about the study as a whole.",
     minutes: STAGE_MINUTES.wrapUp,
   },
+  {
+    title: "The full explanation",
+    detail: "What the study was about, and confirming your data may be used.",
+    minutes: STAGE_MINUTES.debrief,
+  },
 ];
+
+/**
+ * What the rows add up to. Exported for the test that pins it against
+ * `TOTAL_MINUTES`; the stat card advertises `STUDY.estimatedMinutes`, which
+ * may round this DOWN by at most a minute (`timingIsHonest`).
+ */
+export const stepMinutesTotal = STEPS.reduce((sum, s) => sum + s.minutes, 0);
 
 const RECORDED = [
   "Your survey answers",
   "Messages, offers, and negotiation transcripts",
-  "The goals and sharing choices you give the software tool",
+  "The goals and sharing choices you give your AI Proxy",
   "Clicks, decisions, and timestamps",
 ];
 
@@ -235,7 +275,30 @@ export default function ConsentPage() {
               subtitle="Before you decide, see what you will do, how long it takes, and how payment works."
             />
 
-            <NavigationNotice className="mb-5" />
+            {/*
+              THE DESKTOP NOTICE COMES FIRST, above the payment tiles.
+              A participant who reads the pay and the time before learning
+              their phone cannot run the study has already decided to take
+              part on a device that will waste their forty minutes.
+            */}
+            <div
+              className={cx(
+                "mb-4 flex items-start gap-3 rounded-2xl border p-3.5 text-sm font-medium shadow-2xs",
+                isNarrow
+                  ? "border-red-300 bg-red-50 text-red-950"
+                  : "border-amber-200 bg-amber-50/80 text-amber-950",
+              )}
+            >
+              <span aria-hidden className="mt-0.5 text-lg">{isNarrow ? "⚠" : "▣"}</span>
+              <p className="min-w-0 flex-1 leading-relaxed">
+                <strong>{isNarrow ? "This screen is too small. " : "Computer required. "}</strong>
+                {isNarrow
+                  ? "Open this link on a desktop or laptop, or widen this window. The chat and your private briefing must fit side by side."
+                  : "The chat and your private briefing sit side by side, so a phone or small tablet cannot run this study."}
+              </p>
+            </div>
+
+            <NavigationNotice className="mb-4" />
 
             <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <StatCard
@@ -269,32 +332,28 @@ export default function ConsentPage() {
               />
             </div>
 
-            <div
-              className={cx(
-                "mb-5 flex items-start gap-3 rounded-2xl border p-3.5 text-sm font-medium shadow-2xs",
-                isNarrow
-                  ? "border-red-300 bg-red-50 text-red-950"
-                  : "border-amber-200 bg-amber-50/80 text-amber-950",
-              )}
-            >
-              <span aria-hidden className="mt-0.5 text-lg">{isNarrow ? "⚠" : "▣"}</span>
-              <p className="min-w-0 flex-1 leading-relaxed">
-                <strong>{isNarrow ? "This screen is too small. " : "Computer required. "}</strong>
-                {isNarrow
-                  ? "Open this link on a desktop or laptop, or widen this window. The live chat and private briefing must fit side by side."
-                  : "Please use a desktop or laptop. The live chat and private briefing are not usable on a phone or small tablet."}
-              </p>
-            </div>
-
             <Card>
-              <CardTitle hint="Your study at a glance">
-                What you will do
-              </CardTitle>
+              <CardTitle>What you will do</CardTitle>
+              {/*
+                "AI PROXY" IS NAMED HERE, ONCE, WITH ITS GLOSS. Every later
+                screen uses the term — guide page 3, the comprehension check,
+                the mandate, the questionnaire — and this page called it "a
+                software tool", so the first place a participant met the name
+                was a question testing them on it.
+
+                Naming it discloses no condition. Both Proxy policies are
+                called "AI Proxy" and Direct has none, so the word says which
+                INTERFACE a task uses and not which of the three arms the
+                participant is in ("Things the participant must never learn"
+                #2). §7 requires the policy be disclosed anyway, on the screen
+                where the mandate is set.
+              */}
               <p className="mb-4 max-w-prose text-sm leading-relaxed text-slate-700 sm:text-base">
-                You will negotiate two workplace arrangements with another
-                participant. In one task you chat directly. In the other, a
-                software tool speaks for you first, then you decide what to do
-                with its proposed agreement.
+                You negotiate two workplace arrangements with another
+                participant. You chat directly in one task. In the other an{" "}
+                <strong>AI Proxy</strong> (a software tool) speaks for you
+                first, and you decide what to do with the agreement it
+                reaches.
               </p>
               <ol className="grid gap-2.5 sm:grid-cols-2">
                 {STEPS.map((step, i) => (
@@ -302,7 +361,12 @@ export default function ConsentPage() {
                     key={step.title}
                     className={cx(
                       "flex items-start gap-3 rounded-xl bg-slate-50 p-3",
-                      i === STEPS.length - 1 && "sm:col-span-2",
+                      // The last row spans both columns only when the count
+                      // is ODD and it would otherwise sit alone. With an even
+                      // count it pairs like every other row.
+                      STEPS.length % 2 === 1 &&
+                        i === STEPS.length - 1 &&
+                        "sm:col-span-2",
                     )}
                   >
                     <span className="tabular flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-border)] bg-white text-xs font-bold text-[var(--accent)]">
@@ -353,10 +417,13 @@ export default function ConsentPage() {
                   Responses are stored under an anonymous research ID. Your
                   Prolific ID is used only to process payment.
                 </p>
-                <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
-                  Please stay anonymous. Do not type your name, your employer,
-                  or any other identifying detail, in the chat or in any text
-                  box.
+                {/* Not a box inside the box. The undertaking is the reader's,
+                    not ours, so it is set apart by weight rather than by a
+                    second surface. */}
+                <p className="mt-3 border-t border-slate-200 pt-3 text-sm leading-relaxed text-slate-900">
+                  <strong>Please stay anonymous.</strong> Do not type your name,
+                  your employer, or any other identifying detail, in the chat
+                  or in any text box.
                 </p>
               </Card>
             </div>
@@ -428,7 +495,7 @@ export default function ConsentPage() {
               <ul className="grid gap-3 text-sm leading-relaxed text-slate-700 sm:grid-cols-2">
                 <li><strong>Time:</strong> about {STUDY.estimatedMinutes} minutes on a desktop or laptop.</li>
                 <li><strong>Payment:</strong> {STUDY.currencySymbol}{STUDY.minTotal}–{STUDY.currencySymbol}{STUDY.maxTotal} in total. Your role decides the amount.</li>
-                <li><strong>Activities:</strong> background questions, practice, two negotiations, and surveys.</li>
+                <li><strong>Activities:</strong> background questions, two practice rounds, two negotiations, and surveys.</li>
                 <li><strong>Your choice:</strong> you can stop at any time without penalty.</li>
                 <li className="sm:col-span-2"><strong>In the chat:</strong> stay anonymous, and never give the other side the numbers from your point sheet.</li>
               </ul>

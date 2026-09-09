@@ -50,7 +50,7 @@ export default function TaskRewardPage({
   const { assignment, participantKey, logEvent } = useParticipant();
   const [amount, setAmount] = useState<number | null>(null);
   const [amountConfirmed, setAmountConfirmed] = useState(false);
-  /** Member: the upward evaluation, then the wait. */
+  /** Member: the upward evaluation (RECV-EVAL), then straight to REMARK. Ver.2.24 §7 has no wait step. */
   const [evalAnswers, setEvalAnswers] = useState<Answers>({});
   const [evalSubmitted, setEvalSubmitted] = useState(false);
   /**

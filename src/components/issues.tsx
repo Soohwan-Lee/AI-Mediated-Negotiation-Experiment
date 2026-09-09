@@ -79,22 +79,28 @@ export function PointsKey({
       ? "both terms"
       : `all ${WORDS[issues.length] ?? issues.length} terms`;
 
+  /* NO CARD AROUND THE TWO PILLS (round six). This was a bordered, tinted,
+     rounded panel wrapping one sentence and two pills, sitting inside the
+     brief page's own private card — a box in a box to say two numbers. The
+     sentence and the pills are rendered straight onto the page instead. The
+     pills keep their own borders, because they are the two ends of the scale
+     and have to be told apart at a glance; nothing else here needs a surface.
+
+     THE SECOND "PRIVATE" PILL WENT WITH IT. Every screen this appears on
+     already carries `PrivateTag` in its own header, so the pill was the same
+     claim twice within one card. */
   return (
     <div
       className={cx(
-        "rounded-2xl border border-[var(--private-line)] bg-gradient-to-br from-[var(--private-soft)] to-amber-50/40 p-4 text-xs sm:text-sm leading-relaxed text-[var(--private-ink)] shadow-2xs",
+        "text-xs leading-relaxed text-[var(--private-ink)] sm:text-sm",
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-2 font-bold text-sm text-[var(--private-strong)] mb-1.5">
-        <span>How your points work</span>
-        <span className="rounded-full border border-[var(--private-line)] bg-white/80 px-2 py-0.5 text-[0.625rem] font-extrabold uppercase tracking-wider">
-          Private
-        </span>
-      </div>
-      <p className="mb-3 text-xs leading-relaxed text-[var(--private-ink)]/90">
-        <strong>More points means a better outcome for you.</strong> The other
-        person never sees your point values.
+      <p className="mb-2.5 text-xs leading-relaxed text-[var(--private-ink)]/90">
+        <strong className="text-[var(--private-strong)]">
+          More points means a better outcome for you.
+        </strong>{" "}
+        These values are private. The other person never sees them.
       </p>
       {/* Label above value, not beside it. These pills live in the ~355px
           briefing rail as well as the wide task column, and as one inline row
@@ -185,24 +191,32 @@ export function PackageValue({
   );
 }
 
+/**
+ * The point sheet as it is READ for the first time, on brief page 3.
+ *
+ * `compact` and `showKey` are gone (round six). They existed for the briefing
+ * rail, which rendered this table at 13px behind a tab; the rail now has its
+ * own `RailPointSheet` written for the job — no description, no key, two
+ * columns at every width — so this component has exactly one caller and both
+ * flags were dead branches that would drift out of step with it. `showPoints`
+ * has no caller either at the moment and is kept because hiding the point
+ * column is a real thing a screen may need to do; it is one boolean, not a
+ * second layout.
+ */
 export function IssueValueTable({
   issues,
   role,
   reservationPoints,
   showPoints = true,
-  showKey = true,
-  compact = false,
 }: {
   issues: Issue[];
   role: Role;
   reservationPoints: number;
   showPoints?: boolean;
-  showKey?: boolean;
-  compact?: boolean;
 }) {
   return (
-    <div className={compact ? "space-y-3" : "space-y-4"}>
-      {showPoints && showKey ? (
+    <div className="space-y-4">
+      {showPoints ? (
         <PointsKey
           issues={issues}
           role={role}
@@ -210,38 +224,22 @@ export function IssueValueTable({
         />
       ) : null}
 
-      {/* ONE LINE SAYING WHAT THE TWO COLUMNS ARE FOR. The two issues sat one
-          under the other in a single column, which made a long scroll read as
-          a list of options rather than as two separate choices — participants
-          asked whether they were picking one option in total. Side by side
-          from `md` up, with this line above them, says it in a glance. */}
-      <p
-        className={cx(
-          "rounded-lg bg-white/70 px-3 py-2 font-semibold text-[var(--private-ink)] border border-[var(--private-line)]",
-          compact ? "text-xs" : "text-xs sm:text-sm",
-        )}
-      >
-        Both of these get negotiated. One option is agreed on each.
-      </p>
-
+      {/* "BOTH OF THESE GET NEGOTIATED. ONE OPTION IS AGREED ON EACH." IS
+          GONE (round six). Brief page 1 already says one agreed option per
+          condition, two pages earlier, and the two headed columns below say
+          the rest by being two columns. It was written when the issues were
+          stacked in one column and participants asked whether they were
+          picking one option in total; side by side, the layout answers it. */}
       {/* Stacked below `md`: two columns at 400px turns each option label into
           a two-word ribbon, and the labels are short phrases that have to be
           read whole. */}
-      <div
-        className={cx(
-          "grid gap-3",
-          compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2",
-        )}
-      >
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {issues.map((issue, index) => {
           const best = Math.max(...issue.options.map((o) => o.points[role]));
           return (
             <div
               key={issue.id}
-              className={cx(
-                "flex flex-col overflow-hidden border border-[var(--private-line)] bg-white shadow-2xs",
-                compact ? "rounded-xl" : "rounded-2xl",
-              )}
+              className="flex flex-col overflow-hidden rounded-2xl border border-[var(--private-line)] bg-white shadow-2xs"
             >
               {/* No badge marks which issue is this role's priority, and none
                   may be added. Design §5 principle 1 is explicit that issue
@@ -260,13 +258,22 @@ export function IssueValueTable({
                 </p>
               </div>
 
-              <div className={cx("flex-1", compact ? "p-2.5" : "p-3")}>
-                <p className="mb-2 text-xs leading-relaxed text-[var(--private-ink)]/80">
+              <div className="flex-1 p-3">
+                {/* THE "WHY IT MATTERS TO YOU" BOX IS GONE (round six). It
+                    restated the role story that was read on the previous
+                    page and, for the participant's own priority term,
+                    restated the sensitive background too — so the brief said
+                    the same thing three pages running and the point sheet
+                    itself, which is what this page is for, was pushed down by
+                    two amber boxes. The issue description stays: it is the
+                    only line here that says what the four options actually
+                    mean.
+
+                    Removing it also removes a box that appeared on ONE of the
+                    two issue cards more forcefully than the other, which is
+                    the kind of asymmetry §5 principle 1 is about. */}
+                <p className="mb-2.5 text-xs leading-relaxed text-[var(--private-ink)]/80">
                   {issue.description}
-                </p>
-                <p className="mb-2.5 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs leading-relaxed font-medium text-[var(--private-ink)]">
-                  <span className="font-bold text-amber-950">Why it matters to you: </span>
-                  {issue.rationale[role]}
                 </p>
 
                 <ul className="space-y-1.5">
@@ -319,6 +326,139 @@ export function IssueValueTable({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The whole point sheet as a cheat sheet, for the briefing rail.
+ *
+ * WHY IT IS A SEPARATE COMPONENT AND NOT A THIRD FLAG ON `IssueValueTable`.
+ * The rail's job is different from the brief page's. On the brief page the
+ * participant is READING the sheet for the first time and needs the issue
+ * description and the sentence saying what the two columns are. In the rail
+ * they are typing a message and need to find one number without leaving the
+ * sentence they are in. Everything that is not a label and a number is
+ * therefore gone: no description, no "why it matters", no key paragraph.
+ *
+ * TWO COLUMNS INSIDE THE RAIL, always, at every width the rail exists at.
+ * Stacked, the two tables ran to about 320px and pushed the reason cards —
+ * the other thing a participant reaches for mid-sentence — below the fold,
+ * which is the complaint this rewrite exists to answer. Side by side they are
+ * about 150px and both boxes stay on screen together. The option labels are
+ * short phrases ("4 days a week", "1 per week") and fit a 180px column at
+ * 11.5px; longer ones wrap rather than truncate.
+ *
+ * NO BADGE MARKS EITHER ISSUE (design §5 principle 1). "Issue 1" and "Issue 2"
+ * are positional, the same two words in the same order for both roles. The
+ * emerald row is the participant's own best option on each term, which is a
+ * fact about their own sheet and says nothing about which term the study is
+ * about — both issues have one.
+ *
+ * THE ANCHORS ARE DERIVED FROM THE TASK, never from the module constants, for
+ * the reason `PointsKey` records: the practice round has its own smaller
+ * numbers and would otherwise quote the real task's.
+ */
+export function RailPointSheet({
+  issues,
+  role,
+  reservationPoints,
+}: {
+  issues: Issue[];
+  role: Role;
+  reservationPoints: number;
+}) {
+  const best = issues.reduce(
+    (sum, issue) => sum + Math.max(...issue.options.map((o) => o.points[role])),
+    0,
+  );
+  return (
+    <div>
+      {/* `items-stretch` and a fixed two-line header. The two issue labels are
+          not the same length — "Days a week in the office" is one line and
+          "Client meetings the Member presents at" is two — so with a header
+          that sizes to its own text the four option rows in the left table sat
+          a line above the four in the right, and a participant scanning across
+          read "4 days" against the wrong row. Both headers are given a box tall
+          enough for the longer of the two labels — 3.625rem fits the eyebrow
+          plus two 12px lines — so the rows line up in all four role x task
+          cells. Measure it again if a task label is ever lengthened. */}
+      <div className="grid grid-cols-2 items-stretch gap-2">
+        {issues.map((issue, index) => {
+          const issueBest = Math.max(...issue.options.map((o) => o.points[role]));
+          return (
+            <div
+              key={issue.id}
+              className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-[var(--private-line)] bg-white"
+            >
+              <div className="flex min-h-[3.625rem] flex-col justify-center border-b border-[var(--private-line)] bg-[var(--private-soft)] px-2 py-1.5">
+                <p className="text-[0.5625rem] font-extrabold uppercase tracking-wider text-[var(--private-strong)]">
+                  Issue {index + 1}
+                </p>
+                <p className="text-[0.75rem] font-bold leading-tight text-[var(--ink)] break-words">
+                  {issue.label}
+                </p>
+              </div>
+              <ul>
+                {issue.options.map((o) => {
+                  const points = o.points[role];
+                  const isBest = points === issueBest;
+                  return (
+                    <li
+                      key={o.id}
+                      className={cx(
+                        "flex items-baseline gap-1.5 border-b border-slate-100 px-2 py-1 text-[0.71875rem] last:border-b-0",
+                        isBest ? "bg-emerald-50" : "",
+                      )}
+                    >
+                      <span
+                        className={cx(
+                          "min-w-0 flex-1 leading-snug break-words",
+                          isBest
+                            ? "font-bold text-emerald-950"
+                            : "font-medium text-[var(--ink-2)]",
+                        )}
+                      >
+                        {o.label}
+                      </span>
+                      <span
+                        className={cx(
+                          "tabular shrink-0 font-extrabold",
+                          isBest ? "text-emerald-800" : "text-[var(--ink-3)]",
+                        )}
+                      >
+                        {points.toLocaleString()}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* The two ends of the participant's OWN scale, on one line. Both are
+          already theirs — §8.1 states the no-agreement figure to everyone and
+          the maximum is the sum of their own best levels — so neither adds
+          anything the design withholds. "both score 0" rather than a bare 0,
+          for the reason `PointsKey` records: unqualified it reads as a
+          penalty aimed at this participant alone. */}
+      <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[0.71875rem] font-semibold text-[var(--private-ink)]">
+        <span className="whitespace-nowrap">
+          <span aria-hidden>🏆</span> Best possible{" "}
+          <strong className="tabular text-emerald-800">
+            {best.toLocaleString()} pts
+          </strong>
+        </span>
+        <span className="whitespace-nowrap">
+          <span aria-hidden>⛔</span> No agreement{" "}
+          <strong className="tabular text-slate-700">
+            {reservationPoints.toLocaleString()} pts
+          </strong>{" "}
+          <span className="font-medium text-[var(--ink-3)]">(both)</span>
+        </span>
+      </p>
     </div>
   );
 }

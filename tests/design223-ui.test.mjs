@@ -38,9 +38,13 @@ test("the role map identifies the participant without relying on colour", () => 
 });
 
 test("payment briefing uses study constants and does not promise an amount reveal", () => {
-  for (const key of ["compensation", "bonusAmount", "bonusPerTask", "totalPaid"]) {
+  for (const key of ["compensation", "bonusAmount", "totalPaid"]) {
     assert.ok(briefing.includes(`STUDY.${key}`), `briefing omits STUDY.${key}`);
   }
+  // The per-task figure is on the SAME guide page, inside the decision
+  // diagram, so the participant still reads it before the tasks. It used to be
+  // repeated in a second card underneath, which is the repeat that went.
+  assert.ok(roleMap.includes("STUDY.bonusPerTask"), "role map omits the per-task bonus");
   assert.match(briefing, /do not reduce your payment/);
   assert.match(briefing, /Bonus amounts are not shown during the tasks/);
   assert.ok(!briefing.includes("You see the amounts after both tasks"));

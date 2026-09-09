@@ -203,3 +203,160 @@ Color palette: warm paper, muted navy, dusty blue, soft ochre, restrained charco
 Text: none.
 Constraints: no words, letters, numbers, logos, readable schedule, marked days, chosen allocation, arrows, checkmarks, points, money, highlighted option, tally marks, readable report text, red marks or corrections on a report, rejection, complaint, worry, overload, handshake, accepted deal, celebration, victory, conflict, distress, private facts, rationale, disclosure/privacy cue, or recommendation. Do not show a preferred number of project days or report weeks, and do not show who will write a report. No manager-subordinate pose, gender/age/race/status stereotype, or power imbalance. Both adults must have the same visual scale and equal participation. No watermark.
 ```
+
+## Task-flow step illustrations (round six)
+
+- Generated: 2026-09-09
+- Generator: `codex exec --skip-git-repo-check` (the Codex CLI's built-in image
+  generator), one generation per call in its own scratch directory
+- Post-processing: resized to the stated width and palette-quantized with
+  `sharp` (`palette: true`, `dither: 0`, `effort: 10`) down to the highest
+  colour count that fits a 400 KB budget. **Dithering is off on purpose** — at
+  the default sharp scatters visible speckle across the flat gouache fields,
+  which is the one thing that makes these read as compressed rather than
+  painted.
+- Manifest: `src/lib/illustrations.ts`. Components: `ProxyFlowSteps` and
+  `DirectFlowSteps` in `src/components/proxy-art.tsx`.
+
+**Both arms get the same number of illustrated cards' worth of care.** The
+Proxy row has four steps and the Direct row three, because the two flows have
+that many steps; they use the same card component, the same grid and the same
+image treatment. A polished row in one condition and a plain one in the other
+would be an exposure difference along the primary contrast.
+
+**`chat.png` is ONE file used by BOTH rows** — step ④ of the Proxy flow and
+step ② of the Direct flow. It is the same activity, so it is the same picture
+(interface rule 10: the art draws the interface, never the condition). Two
+separately generated versions would drift.
+
+### Shared style and constraint block
+
+Every prompt below was suffixed with this block verbatim. It is what holds the
+character design, the robot design and the palette constant across the set.
+
+```text
+Style/medium: simple polished modern flat editorial raster illustration, broad matte gouache-like shapes, soft paper texture, minimal facial detail, clean organic contours, no realistic rendering, no dramatic shading, no vector-icon look, no glossy corporate stock art.
+Composition/framing: clean 3:2 landscape, plain warm ivory background, one clear readable scene, generous quiet margins, legible at small web-card size.
+Color palette: warm ivory, muted navy, dusty blue, soft ochre, restrained charcoal; low saturation.
+Character design (must be exactly this): generic stylized adult professionals, age-neutral, medium skin tone, short softly wavy dark hair, no facial hair, no glasses, no jewelry, minimal simple facial features, neutral attentive relaxed expression. Adult A wears a plain collarless dusty-blue overshirt over an ivory top. Adult B is identical in every way except a plain collarless muted-ochre overshirt over an ivory top. Both adults are exactly the same body size, same visual scale, same seat height, equally dressed.
+Robot design (must be exactly this in every image): one small friendly light-blue robot, about half the height of a seated adult's torso, with a rounded rectangular head, a dark charcoal screen face bearing two simple round light eyes and no mouth, a single short straight antenna with a small round tip, and a simple rounded boxy body. Matte flat shapes, no metallic shine, no limbs waving, no smile, not a toy mascot.
+Text: none.
+Constraints: absolutely no words, letters, numbers, digits, logos, watermarks, readable document contents, signage or labels of any kind. No money, coins, currency, trophies, medals, checkmarks, ticks, crosses, thumbs up, handshakes, high-fives, applause, celebration, victory poses, confetti. No conflict, argument, distress, anger, tension. No secrecy imagery, locks, keys, padlocks, keyholes, shushing gestures, whispering. No arrows, pointers, highlights, glows or emphasis that implies a recommended choice or a correct option. No gender coding, no age hierarchy, no manager-subordinate power pose, no standing over another person, no status-coded clothing, no racial stereotype. Exactly the number of people stated and no extra figures, no crowds, no background people. No photorealism, no detailed room decor.
+```
+
+### Proxy flow ① — briefing your representative
+
+- Asset: `public/illustrations/proxy-step-brief.png`
+- Generator: `codex exec` built-in image generator
+- Dimensions: 1536 × 1024 PNG · 141 KB
+- SHA-256: `59487d7b0878a5629e11a2b249429ea584e5f83c42ff7b37870387c229087ee0`
+- Attempts: 1 generation, accepted first pass.
+
+```text
+Use case: flow-step illustration for a workplace negotiation research study.
+Primary request: Show exactly ONE adult (the dusty-blue overshirt adult) seated at a plain narrow desk with a closed simple laptop beside them, calmly speaking to the small friendly light-blue robot which stands on the desk beside the laptop, facing them and attentive. The person's hand rests open on the desk in a relaxed explaining gesture. This is a person instructing their representative before it goes to work.
+Scene/backdrop: plain warm ivory background, one narrow desk edge only, no room decor.
+Subject count: exactly one adult and exactly one robot.
+<shared style and constraint block, above>
+```
+
+### Proxy flow ② — the two representatives at the table
+
+- Asset: `public/illustrations/proxy-step-negotiate.png`
+- Generator: `codex exec` built-in image generator
+- Dimensions: 1536 × 1024 PNG · 138 KB
+- SHA-256: `a2c73f76449023302f52795c53c10d3bbc3aef4d648eaeb346511cf772cae79b`
+- Attempts: 1 generation, accepted first pass.
+
+```text
+Use case: flow-step illustration for a workplace negotiation research study.
+Primary request: Show TWO identical small friendly light-blue robots facing each other across a small plain low table in the centre foreground, at the same height and the same size, both attentive and calm. Behind and to either side, the two adults sit further back watching calmly with hands in their laps, not speaking, mouths closed, equal size, equal seat height, one in the dusty-blue overshirt and one in the muted-ochre overshirt. The two robots are the focus; the two people are observers.
+Scene/backdrop: plain warm ivory background, one small plain table, no room decor.
+Subject count: exactly two adults and exactly two robots.
+<shared style and constraint block, above>
+```
+
+### Proxy flow ③ — both sides read the same result
+
+- Asset: `public/illustrations/proxy-step-result.png`
+- Generator: `codex exec` built-in image generator
+- Dimensions: 1536 × 1024 PNG · 80 KB
+- SHA-256: `15df3720eef0726e0d0b42cda2e7026fce4714104ae7fd357be464b7b90038f6`
+- Attempts: 1 generation, accepted first pass.
+
+```text
+Use case: flow-step illustration for a workplace negotiation research study.
+Primary request: Show the TWO adults side by side but each at their own separate desk, each looking at their own open laptop screen. On each laptop screen is the SAME simple blank card shape: a plain rounded ivory rectangle with two or three equal muted abstract blocks on it and absolutely nothing written, nothing marked, nothing highlighted. Both people are calm and neutral, neither pleased nor disappointed, both the same size and the same posture. One wears the dusty-blue overshirt, one the muted-ochre overshirt.
+Scene/backdrop: plain warm ivory background, two narrow desk edges, no room decor.
+Subject count: exactly two adults, no robots.
+<shared style and constraint block, above>
+```
+
+### Shared — the two participants talking directly
+
+- Asset: `public/illustrations/chat.png`
+- Generator: `codex exec` built-in image generator
+- Dimensions: 1536 × 1024 PNG · 153 KB
+- SHA-256: `abb895f9aa573deca0a57a6506154cf7b0ec63168f57f42a43ccbaafcdc3653b`
+- Attempts: 1 generation, accepted first pass. Generated as `proxy-step-chat.png` and installed as `chat.png`.
+
+```text
+Use case: flow-step illustration for a workplace negotiation research study.
+Primary request: Show the TWO adults facing each other, each seated at their own narrow desk with their own open laptop, typing to each other. Between them, in the space above the laptops, float two or three simple empty rounded speech bubbles that are completely blank inside: no words, no letters, no dots, no lines, no marks whatsoever. Both people are calm, attentive and equal in size and posture. One wears the dusty-blue overshirt, one the muted-ochre overshirt.
+Scene/backdrop: plain warm ivory background, two narrow desk edges, no room decor.
+Subject count: exactly two adults, absolutely no robots in this image.
+<shared style and constraint block, above>
+```
+
+### Direct flow ① — reading the private briefing
+
+- Asset: `public/illustrations/direct-step-read.png`
+- Generator: `codex exec` built-in image generator
+- Dimensions: 1536 × 1024 PNG · 202 KB
+- SHA-256: `a67d8a92543f65db80c1e7aa1b90732e536677190e9c46797ee8313cebf59226`
+- Attempts: 2 generations. The first was REJECTED: the sheet carried four blocks in four different colours (green, ochre, blue, mauve) -- off-palette, and four distinguishable colour-coded blocks read as four options with one picked out. The payoff table has four options per issue, so that is the "selected/highlighted option" the constraint list forbids. The retry pins every bar to one identical colour and says why.
+
+```text
+Use case: flow-step illustration for a workplace negotiation research study.
+Primary request: Show exactly ONE adult (the dusty-blue overshirt adult) seated at a plain narrow desk, holding and quietly reading a single upright sheet of paper. The person is calm and attentive, reading. Nothing about the pose suggests hiding, shielding or concealing the sheet.
+CRITICAL about the sheet: it carries only three horizontal bars of abstract placeholder texture, ALL THREE EXACTLY THE SAME muted dusty-blue colour, all the same size, evenly spaced. There is absolutely nothing readable on it: no words, no letters, no text lines, no numbers, no marks. Do NOT use several different colours for the blocks and do NOT make any block stand out, brighter, larger or highlighted in any way -- every block must be visually identical to every other block, because a differently coloured block would read as a selected option.
+Scene/backdrop: plain warm ivory background, one narrow desk edge, no room decor.
+Subject count: exactly one adult, no robots.
+<shared style and constraint block, above>
+```
+
+### Direct flow ③ — settling on one package
+
+- Asset: `public/illustrations/direct-step-agree.png`
+- Generator: `codex exec` built-in image generator
+- Dimensions: 1536 × 1024 PNG · 181 KB
+- SHA-256: `0f734acc4b0aec897f93cf5fdc7a6e6986c5ae7323796747b358101dc8e0e65f`
+- Attempts: 2 generations. The first was REJECTED for the same reason as `direct-step-read`: the card's middle bar was saturated ochre between two blues, which reads as the middle option picked out. The retry pins all three bars to one colour.
+
+```text
+Use case: flow-step illustration for a workplace negotiation research study.
+Primary request: Show the TWO adults seated across from each other at ONE plain small table, at exactly the same eye level, both calm and attentive, both looking down at a single plain card lying flat on the table between them. Their hands rest relaxed on the table. There is NO handshake, no touching, no celebration, no smiling triumph, no gesture of agreement. One wears the dusty-blue overshirt, one the muted-ochre overshirt.
+CRITICAL about the card: it is a plain rounded ivory rectangle carrying only three short horizontal bars of abstract placeholder texture, ALL THREE EXACTLY THE SAME muted dusty-blue colour, all the same size, evenly spaced, and nothing else. Absolutely nothing written or marked: no words, no letters, no numbers. Do NOT use several different colours for the bars and do NOT make any bar stand out, brighter, larger or highlighted in any way -- every bar must be visually identical to every other bar, because a differently coloured bar would read as a chosen option.
+Scene/backdrop: plain warm ivory background, one small plain table, no room decor.
+Subject count: exactly two adults, no robots.
+<shared style and constraint block, above>
+```
+
+### The AI Proxy, alone (1:1 avatar)
+
+- Asset: `public/illustrations/ai-proxy-portrait.png`
+- Generator: `codex exec` built-in image generator
+- Dimensions: 512 × 512 PNG · 171 KB
+- SHA-256: `6a98337927838974fb913e289f4d2167f61f18da74dc06d54d75ba3ceb25dc89`
+- Attempts: 1 generation, accepted first pass.
+
+```text
+Use case: small avatar portrait for a workplace negotiation research study.
+Primary request: Show the small friendly light-blue robot ALONE, waist-up, centred, facing forward, calm and attentive, on a plain warm ivory background. Nothing else in the frame: no person, no desk, no table, no props, no shadow decor.
+Composition/framing: square 1:1, centred subject, generous even margins, legible when scaled down to a small circular avatar.
+Robot design (must be exactly this): a small friendly light-blue robot with a rounded rectangular head, a dark charcoal screen face bearing two simple round light eyes and no mouth, a single short straight antenna with a small round tip, and a simple rounded boxy body shown from the waist up. Matte flat gouache-like shapes, no metallic shine, no smile, not a toy mascot.
+Style/medium: simple polished modern flat editorial raster illustration, broad matte gouache-like shapes, soft paper texture, clean organic contours, no realistic rendering, no vector-icon look, no glossy corporate stock art.
+Color palette: warm ivory, muted navy, dusty blue, soft ochre, restrained charcoal; low saturation.
+Text: none.
+Constraints: absolutely no words, letters, numbers, logos, watermarks or labels. No people. No money, trophies, checkmarks, handshakes, celebration, conflict, locks or arrows. No photorealism.
+```

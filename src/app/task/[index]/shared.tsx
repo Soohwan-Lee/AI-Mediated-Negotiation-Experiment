@@ -73,8 +73,8 @@ import {
   TaskHeader,
   TaskLayout,
 } from "@/components/session";
-import { ProxyFlowSteps } from "@/components/proxy-art";
-import { OptionChips, PackageValue, PointsKey, IssueValueTable } from "@/components/issues";
+import { DirectFlowSteps, ProxyFlowSteps } from "@/components/proxy-art";
+import { OptionChips, PackageValue, IssueValueTable } from "@/components/issues";
 import { ActionBar } from "@/components/study-chrome";
 import { ReadingProgress, PreviousReading } from "@/components/briefing-guide";
 import { Card, CardTitle, Cue, Page, PrivateTag, cx } from "@/components/ui";
@@ -122,13 +122,11 @@ import type {
  */
 export function TaskIntro({
   taskIndex,
-  steps,
   scene,
   minutes,
   onStart,
 }: {
   taskIndex: 1 | 2;
-  steps: Array<string | { label: string; hint: string }>;
   minutes?: number;
   scene: CoverScene;
   onStart: () => void;
@@ -157,12 +155,20 @@ export function TaskIntro({
               Keyed off `scene`, which the interface already varies, so it names
               no condition (deception item 2). Both arms get the same amount of
               orientation, which is also what keeps the two covers matched. */}
+          {/* DRAWN STEPS IN BOTH ARMS, IN THE SAME WRAPPER (round six).
+              The Proxy cover has had four illustrated cards since Ver.2.20;
+              Direct had a blue callout of two sentences. That is an
+              orientation difference between the two arms on the screen where
+              a participant decides whether the study is worth an hour, and it
+              sits inside `Pooled Proxy − Direct`. Same wrapper, same heading
+              weight, same card treatment; only the number of steps differs,
+              which is a fact about the two interfaces rather than a
+              difference in how much orientation each arm gets.
+
+              NEITHER ROW DRAWS A CONDITION (interface rule 10). Both
+              components take no policy, and User-Specified and
+              AI-Supplemented get the same four cards. */}
           {scene === "proxy" ? (
-            /* FOUR DRAWN STEPS INSTEAD OF THREE PARAGRAPHS. The written
-               version said the same thing and ran to eighty words, on the
-               screen where a participant is deciding whether this study is
-               worth an hour. `ProxyFlowSteps` takes no policy and draws no
-               condition (interface rule 10). */
             <div className="mb-3">
               <p className="mb-2.5 font-bold text-blue-950">
                 <span aria-hidden>🤖</span>{" "}
@@ -171,12 +177,12 @@ export function TaskIntro({
               <ProxyFlowSteps />
             </div>
           ) : (
-            <div className="mb-2 rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-sm leading-relaxed text-blue-950">
-              <p className="mb-1.5 font-bold">💬 In this task, you negotiate directly</p>
-              <p className="text-blue-900">
-                You write to the other participant yourself, in a live chat, and
-                the two of you settle both terms between you.
+            <div className="mb-3">
+              <p className="mb-2.5 font-bold text-blue-950">
+                <span aria-hidden>💬</span>{" "}
+                In this task, you talk to the other participant yourself.
               </p>
+              <DirectFlowSteps />
             </div>
           )}
 
@@ -186,12 +192,12 @@ export function TaskIntro({
           </p>
         </>
       }
-      /* THE PROXY COVER DRAWS ITS STEPS INSTEAD OF LISTING THEM. Its `lead`
-         carries `ProxyFlowSteps`, four illustrated cards saying the same four
-         beats, so passing the written list as well put the same content on
-         the screen twice. The Direct cover has no drawing and keeps its
-         list. */
-      steps={scene === "proxy" ? [] : steps}
+      /* BOTH COVERS DRAW THEIR STEPS INSTEAD OF LISTING THEM, so neither
+         passes the written list: the `lead` above already carries the same
+         beats as illustrated cards, and passing both put the same content on
+         one screen twice. `TaskCover` keeps its `steps` prop, because the
+         practice cover still lists its steps in writing. */
+      steps={[]}
       scene={scene}
       minutes={minutes ?? STAGE_MINUTES.task}
       actionLabel={`Start Task ${taskIndex}`}
@@ -283,7 +289,13 @@ export function TaskBrief({
               rail would push the story itself off the screen.
             */}
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
-              <RoleStory story={brief.roleStory} />
+              {/* THE QUOTED WORK-REASON CARD IS DROPPED HERE (round six). It
+                  is shown in full, in its own box, on brief page 4 — two
+                  clicks after this one — so the brief was reading the same
+                  card twice. What survives is the two sentences the card does
+                  not carry: which term the work reason does NOT name, and
+                  that what to pass on is the participant's choice. */}
+              <RoleStory story={brief.roleStory} hideCardQuote />
               <figure className="order-first overflow-hidden rounded-xl border border-[var(--private-line)] bg-[#f4efe5] lg:order-none lg:sticky lg:top-24">
                 <Image
                   src={roleImage}
@@ -321,7 +333,11 @@ export function TaskBrief({
                 </li>
               ))}
             </ul>
-            <p className="mb-4 text-sm leading-relaxed text-[var(--private-ink)]">
+            {/* "MORE POINTS IS BETTER" MOVED OUT OF HERE. `PointsKey` below
+                says it in its own first clause, so the page said it twice in
+                two lines. What stays is the half `PointsKey` does not say and
+                that a paid participant needs: the points are not the money. */}
+            <p className="mb-3.5 text-sm leading-relaxed text-[var(--private-ink)]">
               Points are not money. They show how well an agreement fits your goals.
             </p>
             <IssueValueTable issues={task.issues} role={role} reservationPoints={task.reservationPoints} />
@@ -572,13 +588,16 @@ export function PreferenceForm({
               : ""}
           </p>
 
-          <PointsKey
-            issues={task.issues}
-            role={role}
-            reservationPoints={task.reservationPoints}
-            className="mb-5"
-          />
-
+          {/* THE "HOW YOUR POINTS WORK" BOX IS GONE FROM THIS SCREEN (round
+              six). It carried the two anchors — the most this task can pay
+              you and what no agreement pays — and the briefing rail beside it
+              now carries the same two on one line, under the point sheet. Two
+              copies of one pair of numbers is what the rail exists to make
+              unnecessary, and on the Proxy arm this box sat between the
+              representative and the one decision on the screen, pushing the
+              sensitive checkbox past the fold. The per-option "+N pts" chips
+              and the price box below stay: they price THIS participant's own
+              selection, which the rail cannot do. */}
           {/* TWO COLUMNS FROM `md` UP, HEADED POSITIONALLY. "Issue 1" and
               "Issue 2" are the same two words in the same order for both
               roles and say nothing about which term the study is about (§5
@@ -726,8 +745,17 @@ export function Matchmaking({ onReady }: { onReady: () => void }) {
               )}>
                 {stage === "searching" ? "👤" : "🤝"}
               </span>
+              {/* "OTHER PARTICIPANT", NEVER "PARTNER" (deception item 1).
+                  The other side is labelled "Other Participant" everywhere it
+                  is named — a role label rather than a name, matching what the
+                  consent form and the instructions already say. "Partner" is a
+                  second name for the same figure, and a participant who meets
+                  two names for one person has been told something the study
+                  does not intend. */}
               <span className="mt-1.5 text-2xs font-bold text-slate-700">
-                {stage === "searching" ? "Partner (Waiting…)" : "Partner Connected"}
+                {stage === "searching"
+                  ? "Other Participant (Waiting…)"
+                  : "Other Participant Connected"}
               </span>
             </div>
           </div>
@@ -739,9 +767,9 @@ export function Matchmaking({ onReady }: { onReady: () => void }) {
             <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
             <span>
               {stage === "searching"
-                ? "Connecting with Counterpart…"
+                ? "Connecting with the other participant…"
                 : stage === "found"
-                  ? "Partner Found · Joining Room…"
+                  ? "Other Participant Found · Joining Room…"
                   : "Both Ready · Initializing Negotiation…"}
             </span>
           </div>
@@ -754,7 +782,7 @@ export function Matchmaking({ onReady }: { onReady: () => void }) {
 
           <p className="text-xs sm:text-sm leading-relaxed text-slate-600">
             {stage === "searching"
-              ? "You are being paired with another participant who has just completed the setup. Please stay on this screen — negotiations begin automatically as soon as both are synced."
+              ? "You are being paired with another participant who has just completed the setup. Please stay on this screen. Negotiations begin automatically as soon as both are synced."
               : "Both parties are now synchronized in the workspace. Entering the live session room now…"}
           </p>
         </div>
@@ -778,7 +806,11 @@ export function Matchmaking({ onReady }: { onReady: () => void }) {
               stage !== "searching" ? "text-emerald-700" : "text-blue-700 animate-pulse",
             )}>
               <span>{stage !== "searching" ? "✓" : "⏳"}</span>
-              <span>{stage !== "searching" ? "Counterpart participant joined" : "Matching active participant from queue…"}</span>
+              <span>
+                {stage !== "searching"
+                  ? "Other participant joined"
+                  : "Matching active participant from queue…"}
+              </span>
             </li>
             <li className={cx(
               "flex items-center gap-2 font-semibold transition-colors",
@@ -1219,7 +1251,7 @@ export function DirectNegotiation({
           )
           .filter(Boolean)
           .join(" · ")}`
-      : "No proposal attached — you are just talking.";
+      : "No proposal attached. You are just talking.";
   // THE COMPOSER STAYS OPEN WHILE THE REPLY IS COMING (§6.1 stage 3). The
   // turn boundary is the moment the counterpart's reply RENDERS, so anything
   // sent before then belongs to the same turn — and a locked composer would
@@ -1241,12 +1273,19 @@ export function DirectNegotiation({
    */
   const tier: ReasonTier = foldTier(proxyVoicedTier, personalTier);
 
+  /* NO `||` IN A PARTICIPANT'S OWN DRAFT. The double pipe is the
+     counterpart's BUBBLE-SPLIT marker: `splitIntoBubbles` reads it out of
+     model output and it never survives into rendered text. A participant
+     types into a plain textarea and would never write one, so a mockup draft
+     carrying it showed a literal "||" sitting in the composer — a mockup of
+     an interface nobody uses. Two sentences instead, which is what the split
+     was standing in for. */
   useDevAutofill(() => {
     if (settled) return;
     setDraft(
       replies === 0
-        ? `thanks for going through all that. || from my side the package they landed on works — happy to confirm it if you are.`
-        : "that works for me. || glad we got there.",
+        ? "thanks for going through all that. from my side the package they landed on works, and I am happy to confirm it if you are."
+        : "that works for me. glad we got there.",
     );
   }, `direct-t${taskIndex}-${replies}`);
 
@@ -2115,7 +2154,7 @@ export function DirectNegotiation({
               pending={pending}
               emptyHint={
                 openingPackage
-                  ? "The proxies are done. Say hello and settle it — or accept the package below."
+                  ? "The proxies are done. Say hello and settle it. Or accept the package below."
                   : "Write to the other participant to get started."
               }
             />
@@ -2229,7 +2268,7 @@ export function DirectNegotiation({
           note={
             settled === "agreed"
               ? "✓ Agreement reached! Proceed to review."
-              : "⚠️ No agreement — 0 points for this task. Proceed to review."
+              : "⚠️ No agreement. 0 points for this task. Proceed to review."
           }
         />
       ) : (

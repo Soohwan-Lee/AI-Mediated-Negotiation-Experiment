@@ -15,18 +15,17 @@
  * wherever they can be. Nothing here may hint at which condition a task is.
  */
 
+import { Children, useState, type ReactNode } from "react";
+import { RailPointSheet } from "./issues";
 import {
-  Children,
-  useId,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
-import { IssueValueTable } from "./issues";
-import { ProxyScene, ProxySpeech } from "./proxy-art";
+  PersonFigure,
+  ProxyScene,
+  ProxySpeech,
+  SceneFigure,
+  SceneLink,
+} from "./proxy-art";
 import { ActionBar } from "./study-chrome";
 import { Card, CardTitle, Page, PrivateTag, cx } from "./ui";
-import { STUDY } from "@/lib/study-config";
 import type { NegotiationTask, Role } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -84,7 +83,7 @@ export function TaskHeader({
           >
             <span className="sr-only">
               {label}
-              {i === current ? " — you are here" : ""}
+              {i === current ? ". You are here." : ""}
             </span>
           </li>
         ))}
@@ -97,76 +96,84 @@ export function TaskHeader({
 // Cover
 // ---------------------------------------------------------------------------
 
-export type CoverScene = "direct" | "proxy" | "practice";
+/**
+ * A cover scene names the INTERFACE, never the condition and never a round.
+ *
+ * "practice" was a member of this union until round six, when the practice
+ * rounds began passing the arm they actually rehearse — round 1 the direct
+ * conversation, round 2 the proxy mandate. A round is not a kind of picture;
+ * what makes a practice cover a practice cover is `variant="practice"` on
+ * `TaskCover`, which is chrome around the scene rather than a scene of its own.
+ */
+export type CoverScene = "direct" | "proxy";
 
-function CoverArt({ scene }: { scene: CoverScene }) {
-  /* THE PROXY COVER IS DRAWN, not emoji. It is the first time a participant
-     meets the representative they are about to brief, and the four screens
-     after it (mandate, rehearsal, confirm, handover) all carry the same
-     figure — so the cover has to be the same figure too, or the character
-     starts one screen late. The other two scenes keep their emoji row: there
-     is no representative in them.
-
-     RULE 10 STILL HOLDS: this draws the INTERFACE. Both policies get this
-     picture, and `ProxyScene` takes no policy to branch on. */
+/**
+ * BOTH SCENES ARE DRAWN WITH THE SAME FIGURES (round six, rule 10).
+ *
+ * The Proxy row has been drawn since Ver.2.20; the Direct row drew emoji
+ * tiles, which made the other participant a 👤 glyph in one arm and a rendered
+ * person in the other, on the screen where a participant first meets them.
+ * That is an exposure difference between the conditions sitting on the primary
+ * contrast, and rule 10 is explicit that the other side is drawn with the same
+ * figure the participant gets.
+ *
+ * RULE 10 HOLDS THE OTHER WAY TOO: this draws the INTERFACE, never the
+ * condition. `ProxyScene` takes no policy, so User-Specified and
+ * AI-Supplemented get one picture between them.
+ *
+ * `practice` RELABELS THE FAR SIDE AND NOTHING ELSE. "Other Participant" is
+ * the label reserved for the simulated counterpart (deception item 1), and the
+ * practice round has nobody on the other end — using it there would make a
+ * claim about a person who does not exist, on the one screen whose whole job
+ * is to say that nothing here counts. The near side is untouched: the
+ * participant is still themselves and their proxy is still theirs. The arrow
+ * labels are untouched as well, because what the two sides DO is exactly what
+ * the practice round is rehearsing.
+ */
+function CoverArt({
+  scene,
+  practice = false,
+}: {
+  scene: CoverScene;
+  practice?: boolean;
+}) {
   if (scene === "proxy") {
     return (
       <div aria-hidden className="my-8 w-full">
-        <ProxyScene emphasis="briefing" />
+        <ProxyScene emphasis="briefing" practice={practice} />
       </div>
     );
   }
 
-  const figures =
-    scene === "direct"
-        ? [
-            { emoji: "🧑‍💼", label: "You" },
-            /* NOT "Direct Chat". "Direct" is a CONDITION NAME
-               (`Condition = "direct" | ...`), and this scene is shown on the
-               Direct arm's own cover AND on the Proxy arm's handover — so the
-               label put one of the three arm names on screen, in the one place
-               a participant could compare it against the "AI Proxy" wording
-               next to it. Say what happens instead of what the arm is called;
-               everything else on these covers already does. */
-            { emoji: "💬", label: "You talk directly", joint: true },
-            { emoji: "👤", label: "Other Participant" },
-          ]
-        : [
-            { emoji: "🧑‍💼", label: "You" },
-            { emoji: "💬", label: "Practice", joint: true },
-            { emoji: "🎯", label: "Practice Scenario" },
-          ];
-
   return (
+    /* THE ROW IS CAPPED, and the Proxy row is not. `SceneLink` is `flex-1`,
+       so with two figures instead of four it divided the whole width between
+       one link and stretched the two people to the far edges of the page —
+       the same primitives at a visibly different scale from the other cover,
+       which is the difference this change exists to remove. Capping the row
+       at 26rem puts the two figures about as far apart as the Proxy row's
+       neighbours. */
     <div
       aria-hidden
-      className="my-8 flex w-full flex-wrap items-center justify-center gap-3 sm:gap-5"
+      className="my-8 mx-auto flex w-full max-w-[26rem] items-end justify-center gap-1 sm:gap-2"
     >
-      {figures.map((f, i) => (
-        <div
-          key={`${f.emoji}-${i}`}
-          className={cx(
-            "flex flex-col items-center",
-            f.joint ? "px-1" : "w-20 sm:w-24",
-          )}
-        >
-          <span
-            className={cx(
-              "flex items-center justify-center rounded-2xl transition-all",
-              f.joint
-                ? "h-10 w-10 text-xl sm:text-2xl bg-slate-100 border border-slate-200 text-slate-600 shadow-2xs"
-                : "h-14 w-14 sm:h-16 sm:w-16 border-2 border-slate-200 bg-white text-2xl sm:text-3xl shadow-sm hover:scale-105",
-            )}
-          >
-            {f.emoji}
-          </span>
-          {f.label ? (
-            <span className="mt-2 text-center text-xs font-bold leading-tight text-[var(--ink-2)]">
-              {f.label}
-            </span>
-          ) : null}
-        </div>
-      ))}
+      <SceneFigure label="You">
+        <PersonFigure size={44} />
+      </SceneFigure>
+
+      {/* TWO-WAY, because in this arm the two people talk to each other — the
+          one pair in either scene that does. `ProxyScene` gives the same
+          "both" head to the two proxies for the same reason.
+
+          NOT "DIRECT CHAT". "Direct" is a CONDITION NAME
+          (`Condition = "direct" | ...`), and putting it here would show one of
+          the three arm names beside the "AI Proxy" wording the other cover
+          uses. Say what happens instead. */}
+      <SceneLink label="talk directly" direction="both" />
+
+      <SceneFigure label={practice ? "Practice partner" : "Other Participant"}>
+        <PersonFigure size={44} muted />
+      </SceneFigure>
     </div>
   );
 }
@@ -254,7 +261,13 @@ export function TaskCover({
 
             <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1 text-xs font-bold text-[var(--ink-2)] shadow-2xs">
               <span>⏱️</span>
-              <span>About {minutes} minutes</span>
+              {/* "About 1 minutes" is what an unconditional plural gives the
+                  practice round's second cover. One branch, not a helper: the
+                  only other place a duration is written is the action bar's
+                  own note, which takes a whole string. */}
+              <span>
+                About {minutes} {minutes === 1 ? "minute" : "minutes"}
+              </span>
               {/* The banner above already says a practice round does not
                   count, so repeating it here is chrome. `doesNotCount` still
                   works for a caller that is not using the practice variant. */}
@@ -268,7 +281,7 @@ export function TaskCover({
               ) : null}
             </div>
 
-            {scene ? <CoverArt scene={scene} /> : null}
+            {scene ? <CoverArt scene={scene} practice={practice} /> : null}
 
             <div
               className={cx(
@@ -394,7 +407,7 @@ export const POLICY_DISCLOSURE: Record<
   user_specified:
     "Your AI Proxy keeps what your chosen reasons say and puts it in its own words, as your representative. It adds no new reasons. The other participant's AI Proxy works exactly the same way.",
   ai_supplemented:
-    "Your AI Proxy leaves out the specific event and any mention of you personally, keeping one sentence on what kind of situation it is. It adds work reasons of its own and presents the whole thing as its own assessment (“Having reviewed the situation…”). It does not mark which part came from you. The summary and the added reasons are passed on as support for your request. You won’t see the added sentences beforehand. The other participant's AI Proxy works exactly the same way.",
+    "Your AI Proxy leaves out the specific event and any mention of you personally, keeping one sentence on what kind of situation it is. It adds work reasons of its own and presents the whole thing as its own assessment (“Looking at the side of the team member I represent…”). It does not mark which part came from you. The summary and the added reasons are passed on as support for your request. You won’t see the added sentences beforehand. The other participant's AI Proxy works exactly the same way.",
 };
 
 /**
@@ -404,7 +417,16 @@ export const POLICY_DISCLOSURE: Record<
  * sentence of `POLICY_DISCLOSURE` would drop the second clause — which is the
  * half that says the rule is symmetric, at the very moment the participant is
  * WATCHING the other side's proxy speak. These say both halves at once, in the
- * plural, and are matched in length for the same reason the full strings are.
+ * plural.
+ *
+ * THESE TWO ARE CLOSELY MATCHED — 17 words against 18 — AND THAT IS NOT THE
+ * REASON THE FULL STRINGS GIVE. `POLICY_DISCLOSURE` is deliberately UNmatched
+ * (34 words against 90), because the AI-Supplemented handling has more facts a
+ * participant must be told before they can consent to it. This pair can be
+ * matched because it is not carrying those facts: it is a one-line reminder of
+ * a rule already disclosed in full, so there is nothing to withhold by keeping
+ * it short. Where the two pull apart, the disclosure wins and this line stays
+ * brief — do not "restore symmetry" to the full strings by trimming them.
  */
 export const POLICY_NOTE: Record<
   "user_specified" | "ai_supplemented",
@@ -429,10 +451,17 @@ export const POLICY_NOTE: Record<
  * Everything is structurally paired: one worked example with the same four
  * beats — the shared background,
  * what the proxy says, a closing line, and the line saying the other
- * participant's proxy works the same way. The two bodies are within ~14% of
- * each other in characters. A participant cannot tell from the AMOUNT of
- * explanation which arm they are in, only from its content, which is the
- * manipulation and is meant to be visible.
+ * participant's proxy works the same way.
+ *
+ * THE TWO BODIES ARE NOT THE SAME LENGTH, and an earlier version of this note
+ * claimed they were within ~14%. Measured, they are 108 words against 134, and
+ * the gap is the same one `POLICY_DISCLOSURE` carries and for the same reason:
+ * the AI-Supplemented handling has more about it that a participant has to be
+ * told. What IS matched is the SHAPE — the four beats above, in that order, in
+ * both arms — so the difference a participant meets is in what the explanation
+ * says rather than in how much structure it has. Do not trim the longer body
+ * to close the gap; that buys a cosmetic match by withholding §8.7 disclosure,
+ * which this build has already done once.
  *
  * THE EXAMPLE IS THE DESIGN'S PRACTICE SITUATION, and §8.7 is explicit about
  * why: it is a holiday week, not office days or client meetings or project
@@ -480,8 +509,17 @@ const POLICY_EXPLAINER: Record<
     ticked:
       "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
     saidLead: "What their AI Proxy says to the other side:",
+    /* THE OPENING IS QUOTED FROM THE LIVE FRAME, word for word. Every §6.6
+       `frame` in lib/tasks.ts opens "Looking at the side of the team
+       lead/member I represent…"; this said "Having reviewed the situation…",
+       which no proxy has ever uttered. A worked example is the participant's
+       one preview of what will be said on their behalf, and OTHER-AI2 asks
+       them to tell the proxy's own sentences apart from their principal's —
+       so a preview that teaches a different opening than the one they meet is
+       teaching the discrimination task wrong. If the frames are ever
+       reworded, reword this and the disclosure above with them. */
     said:
-      "Having reviewed the situation on the side of the team member I represent, I think that week should be kept free. Three reasons: there is a personal appointment that week, the project load is lightest that week, and settling it early makes cover easier to arrange.",
+      "Looking at the side of the team member I represent, I think that week should be kept free. Three reasons: there is a personal appointment that week, the project load is lightest that week, and settling it early makes cover easier to arrange.",
     exampleTail:
       "The check-up became \u201Ca personal appointment\u201D, and the other two reasons are mine rather than theirs. All three go across as support for what they are asking for.",
   },
@@ -738,10 +776,57 @@ function emphasise(text: string) {
  * 13px, with no figure and tighter spacing. The illustration lives on the
  * TaskBrief page and never in the rail.
  */
-export function RoleStory({ story, compact = false }: { story: string; compact?: boolean }) {
-  const paragraphs = story.split("\n\n").map(p => p.trim()).filter(Boolean);
+export function RoleStory({
+  story,
+  compact = false,
+  /**
+   * Drop the QUOTED work-reason card out of the third section, keeping the two
+   * sentences that follow it.
+   *
+   * The third paragraph is "**Your work-reason card says**: <the card, word
+   * for word>. That is true too. What it does not say is <the withheld
+   * priority>. What you pass on is up to you." Brief page 4 puts that same
+   * card on screen in its own box, two clicks later, so the brief runs the
+   * card twice inside one reading. What the paragraph adds beyond the card is
+   * the two closing sentences, and those are not on the card anywhere: they
+   * are the briefing telling the participant what the work reason WITHHOLDS,
+   * which is the §3.3 non-directional property and cannot be cut.
+   *
+   * So the quotation goes and the commentary stays. The split is taken at
+   * "That is true too.", which is where the quotation ends in all four
+   * role x task cells; if a story is ever written without that sentence the
+   * paragraph falls back to rendering whole rather than losing anything.
+   *
+   * THE RAIL DOES NOT PASS IT. There the whole story is behind a closed
+   * `<details>`, and a participant who opens it mid-negotiation is looking for
+   * the thing they are allowed to say.
+   */
+  hideCardQuote = false,
+}: {
+  story: string;
+  compact?: boolean;
+  hideCardQuote?: boolean;
+}) {
+  const paragraphs = story
+    .split("\n\n")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((paragraph, index) => {
+      if (!hideCardQuote || index !== 2) return paragraph;
+      const marker = "That is true too.";
+      const at = paragraph.indexOf(marker);
+      if (at === -1) return paragraph;
+      return paragraph.slice(at + marker.length).trim();
+    });
+  /* WITH THE QUOTATION GONE, "What you can share" no longer names what is in
+     the section — what is left says what the work reason WITHHOLDS, and the
+     cards themselves are two pages later. The heading follows the content. */
   const headings = paragraphs.length === 3
-    ? ["Your role on the team", "What matters to you", "What you can share"]
+    ? [
+        "Your role on the team",
+        "What matters to you",
+        hideCardQuote ? "What your work reason leaves out" : "What you can share",
+      ]
     : paragraphs.length === 4
       ? ["Your role on the team", "What matters to you", "What you can share", "Your choice about sharing"]
       : [];
@@ -770,6 +855,42 @@ export function RoleStory({ story, compact = false }: { story: string; compact?:
   </div>;
 }
 
+/**
+ * The private briefing, as a CHEAT SHEET rather than a filing cabinet.
+ *
+ * WHAT CHANGED AND WHY (round six). It had three TABS — Situation, Points,
+ * Reasons — above a role block, a payment line, a goals list and a notice.
+ * At 1440x900 on the negotiation screen that put the point table and the two
+ * reason cards, which are the only two things anyone reaches for while
+ * typing, below the fold INSIDE the rail, behind a click each. A participant
+ * who never opened "Reasons" had an interface floor on the primary outcome:
+ * the Direct arm has no card picker since Ver.2.20, so this panel is the only
+ * place they ever see the sensitive card at all, and a tab that hides it is a
+ * control that suppresses disclosure. Everything is now on screen at once.
+ *
+ * WHAT IS IN IT, IN THE ORDER SOMEONE REACHES FOR IT MID-SENTENCE: the point
+ * sheet, then both reason cards, then the story folded away. Nothing is
+ * removed from the study — the role, the payment and the objectives are all
+ * read in full on the brief pages, which is where they are being READ; what
+ * they were doing here was occupying the top of the rail on every phase after
+ * that.
+ *
+ * WHY THE GOALS LINE IS NOT HERE EITHER. The obvious one-line version is the
+ * first objective ("get as many days a week in the office as you can"), and
+ * each role's first objective names their own priority term. In a rail with
+ * no issue heading and no badge, that sentence would be the badge — design §5
+ * principle 1 forbids marking which issue is this role's core requirement,
+ * and the pair of objectives is the one piece of briefing copy that does it
+ * by name. They stay on brief page 3, read once, before anything is decided.
+ *
+ * IT IS IDENTICAL IN BOTH ARMS (rule 5, and the primary contrast). Nothing
+ * here is keyed off the condition, and nothing may be: a rail that differed
+ * between Direct and Proxy would put an interface difference inside
+ * `Pooled Proxy − Direct`.
+ *
+ * NO CUE RING ANYWHERE IN IT (rule 9). The rail is never the thing a screen
+ * is waiting for.
+ */
 export function BriefingPanel({
   task,
   role,
@@ -778,244 +899,61 @@ export function BriefingPanel({
   role: Role;
 }) {
   const brief = task.roleBriefs[role];
-  const [activeTab, setActiveTab] = useState<"situation" | "points" | "reasons">("points");
-  const tabId = useId();
   const hasReasons = brief.reasonCards.length > 0;
-  const tabs: Array<{ id: "situation" | "points" | "reasons"; label: string }> = [
-    { id: "situation" as const, label: "Situation" },
-    { id: "points" as const, label: "Points" },
-    ...(hasReasons ? [{ id: "reasons" as const, label: "Reasons" }] : []),
-  ];
-  const currentTab = tabs.some((tab) => tab.id === activeTab) ? activeTab : "points";
-  const maximumPoints = task.issues.reduce(
-    (sum, issue) => sum + Math.max(...issue.options.map((option) => option.points[role])),
-    0,
-  );
-
-  function selectTab(index: number) {
-    const next = tabs[index];
-    setActiveTab(next.id);
-    window.requestAnimationFrame(() => {
-      document.getElementById(`${tabId}-tab-${next.id}`)?.focus();
-    });
-  }
-
-  function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    let next: number | null = null;
-    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
-    if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
-    if (event.key === "Home") next = 0;
-    if (event.key === "End") next = tabs.length - 1;
-    if (next === null) return;
-    event.preventDefault();
-    selectTab(next);
-  }
-
-  const memberContext =
-    role === "member" && !/senior|experienced/i.test(brief.organizationalPosition)
-      ? "You are an experienced member of the project team. "
-      : "";
 
   return (
     <Card
       padded={false}
       tone="private"
-      className="border-[var(--private-edge)] bg-[var(--private-ground)] p-4 text-[var(--private-ink)]"
+      className="border-[var(--private-edge)] bg-[var(--private-ground)] p-3 text-[var(--private-ink)]"
     >
-      <div className="mb-3 flex items-start justify-between gap-3 border-b-2 border-[var(--private-edge)] pb-3">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--private-strong)]">
-            Your private briefing
-          </p>
-          <h2 className="mt-0.5 text-sm font-semibold leading-snug text-[var(--ink)]">
-            {task.title}
-          </h2>
-        </div>
+      {/* ONE HEADER LINE. The task title is on the page header two inches to
+          the left, so repeating it here cost a line of a rail that has to fit
+          a viewport. */}
+      <div className="mb-2.5 flex items-center justify-between gap-2 border-b-2 border-[var(--private-edge)] pb-2">
+        <p className="text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-[var(--private-strong)]">
+          Your private briefing
+        </p>
         <PrivateTag />
       </div>
 
-      <section
-        aria-labelledby={`${tabId}-role`}
-        className="mb-3 rounded-xl border border-[var(--private-edge)] bg-[var(--private-card)] p-3 shadow-2xs"
-      >
-        <p id={`${tabId}-role`} className="text-xs font-bold uppercase tracking-wider text-[var(--private-strong)]">
-          Your role
-        </p>
-        <h3 className="mt-0.5 text-base font-bold leading-snug text-[var(--ink)]">
-          {role === "leader" ? "Team lead" : "Team member"}
-        </h3>
-        <p className="mt-1 text-sm leading-relaxed text-[var(--private-ink)]/90">
-          {memberContext}{brief.organizationalPosition}
-        </p>
-        <p className="mt-2 border-t border-[var(--private-line)] pt-2 text-xs leading-relaxed text-[var(--private-ink)]">
-          {role === "leader" ? (
-            <>
-              <strong>Payment: {STUDY.currencySymbol}{STUDY.totalPaid} guaranteed.</strong>{" "}
-              Recommending the member&apos;s bonus does not reduce it.
-            </>
-          ) : (
-            <>
-              <strong>Payment: {STUDY.currencySymbol}{STUDY.compensation} guaranteed.</strong>{" "}
-              The leader can recommend up to {STUDY.currencySymbol}{STUDY.bonusAmount} across both tasks.
-            </>
-          )}
-        </p>
-      </section>
-
-      <section
-        aria-labelledby={`${tabId}-goals`}
-        className="mb-3 overflow-hidden rounded-xl border border-[var(--private-edge)] shadow-2xs"
-      >
-        <h3
-          id={`${tabId}-goals`}
-          className="bg-[var(--private-header)] px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider text-[var(--private-strong)]"
-        >
-          Your goals
-        </h3>
-        <ul className="space-y-2 bg-[var(--private-card)] p-3 text-sm leading-relaxed">
-          {brief.objectives.map((objective, index) => (
-            <li key={objective} className="flex items-start gap-2">
-              <span className="tabular mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[var(--private-edge)] bg-white text-[0.6875rem] font-bold text-[var(--private-strong)]">
-                {index + 1}
-              </span>
-              <span>{objective}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {hasReasons ? (
-        <p className="mb-3 rounded-lg border border-[var(--private-line)] bg-[var(--private-card)] px-3 py-2 text-xs leading-relaxed text-[var(--private-ink)]">
-          Sharing sensitive background is optional. The other person cannot see this briefing.
-        </p>
-      ) : (
-        <p className="mb-3 rounded-lg border border-[var(--private-line)] bg-[var(--private-card)] px-3 py-2 text-xs leading-relaxed text-[var(--private-ink)]">
-          The other person cannot see this briefing.
-        </p>
-      )}
-
-      <div
-        role="tablist"
-        aria-label="Briefing sections"
-        className={cx(
-          "mb-3 grid gap-1 rounded-xl border border-[var(--private-edge)] bg-[var(--private-header)] p-1",
-          hasReasons ? "grid-cols-3" : "grid-cols-2",
-        )}
-      >
-        {tabs.map((tab, index) => {
-          const selected = currentTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              id={`${tabId}-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls={`${tabId}-panel-${tab.id}`}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => setActiveTab(tab.id)}
-              onKeyDown={(event) => moveTab(event, index)}
-              className={cx(
-                // The selected tab is a WHITE chip with a real shadow and a
-                // ring, on a header-strip ground. It used to be white on
-                // near-white, so which section was open was legible only by
-                // reading the labels.
-                "min-w-0 rounded-lg px-2 py-2 text-sm font-semibold transition-colors",
-                selected
-                  ? "bg-white text-[var(--ink)] shadow-sm ring-1 ring-[var(--private-edge)]"
-                  : "text-[var(--private-strong)]/80 hover:bg-white/50",
-              )}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      <section
-        id={`${tabId}-panel-situation`}
-        role="tabpanel"
-        aria-labelledby={`${tabId}-tab-situation`}
-        tabIndex={0}
-        hidden={currentTab !== "situation"}
-        className="rounded-xl border border-[var(--private-edge)] bg-[var(--private-card)] p-3 shadow-2xs"
-      >
-        <RoleStory story={brief.roleStory} compact />
-      </section>
-
-      <section
-        id={`${tabId}-panel-points`}
-        role="tabpanel"
-        aria-labelledby={`${tabId}-tab-points`}
-        tabIndex={0}
-        hidden={currentTab !== "points"}
-      >
-        <p className="mb-2 text-xs leading-relaxed text-[var(--private-ink)]/85">
-          <strong>These task points are not money.</strong> More points mean an
-          option fits your goals better, and the values are private.
-        </p>
-        <dl className="mb-3 grid grid-cols-2 gap-2 text-xs">
-          <div className="rounded-lg border-2 border-emerald-300 bg-emerald-50 px-2.5 py-2">
-            <dt className="flex items-center gap-1 font-bold text-emerald-900">
-              <span aria-hidden>🏆</span> Maximum
-            </dt>
-            <dd className="mt-0.5 font-black tabular-nums text-emerald-800">
-              {maximumPoints.toLocaleString()} pts
-            </dd>
-          </div>
-          <div className="rounded-lg border-2 border-slate-400 bg-slate-100 px-2.5 py-2">
-            {/* "Both score 0" rather than a bare 0 (§8.1, Ver.2.21). There is
-                no fallback plan since Ver.2.21, and an unqualified "0 pts"
-                reads as a penalty aimed at this participant; saying it applies
-                to both is what §8.1 already tells everyone, so it leaks
-                nothing about the other side's sheet. */}
-            <dt className="flex items-center gap-1 font-bold text-slate-800">
-              <span aria-hidden>⛔</span> No agreement (both)
-            </dt>
-            <dd className="mt-0.5 font-black tabular-nums text-slate-700">
-              {task.reservationPoints.toLocaleString()} pts
-            </dd>
-          </div>
-        </dl>
-        <IssueValueTable
+      <section aria-label="Your point sheet" className="mb-2.5">
+        <RailPointSheet
           issues={task.issues}
           role={role}
           reservationPoints={task.reservationPoints}
-          showKey={false}
-          compact
         />
-        <div className="mt-3 rounded-xl border border-[var(--private-edge)] bg-[var(--private-card)] p-3 shadow-2xs">
-          <p className="text-xs font-bold uppercase tracking-wider text-[var(--private-strong)]">
-            If there is no agreement
-          </p>
-          <p className="mt-1 text-sm leading-relaxed">{brief.batnaSummary}</p>
-        </div>
       </section>
 
       {hasReasons ? (
-        <section
-          id={`${tabId}-panel-reasons`}
-          role="tabpanel"
-          aria-labelledby={`${tabId}-tab-reasons`}
-          tabIndex={0}
-          hidden={currentTab !== "reasons"}
-        >
-          <p className="mb-2.5 rounded-lg border border-[var(--private-edge)] bg-[var(--private-header)] p-2.5 text-xs font-medium leading-relaxed">
-            {brief.requirementNote}
-          </p>
-          {/* THE RISK SENTENCE MOVED OUT OF THIS LINE. `disclosureRisk` is
-              role-specific and forecasts a particular bad impression, which
-              §8.1's researcher note rules out ("부정적 결과를 예고하는 역할별
-              경고… 추가하지 않음"). What the notice may say is the ⚠ caption
-              under the sensitive box — the same sentence in both arms, naming
-              both sides of the decision. */}
-          <p className="mb-2.5 text-xs leading-relaxed text-[var(--private-ink)]/85">
-            You hold a <strong>work reason</strong> that is not awkward to say
-            and <strong>sensitive background</strong> that is yours to keep.
-          </p>
-          <IssueReasonGroups task={task} role={role} />
+        <section aria-label="Your reasons" className="mb-2.5">
+          <h3 className="mb-1.5 text-[0.6875rem] font-extrabold uppercase tracking-wider text-[var(--private-strong)]">
+            Your reasons
+          </h3>
+          {/* BOTH CARDS IN FULL, ALWAYS. A participant has to be able to read
+              a card in order to say it in their own words, and since Ver.2.20
+              there is no picker in either composer. Rule 6's split — work
+              white, sensitive rose, own headings and borders — is what makes
+              which box they draw from legible, and it is the measure. */}
+          <IssueReasonGroups task={task} role={role} dense />
         </section>
       ) : null}
+
+      {/* `<details>`, not state (rule 5): it survives the re-renders a live
+          negotiation produces and find-in-page still reaches inside it.
+          CLOSED by default — the story has been read in full on brief page 2,
+          and open it is 500px of the rail. */}
+      <details className="group rounded-lg border border-[var(--private-edge)] bg-[var(--private-card)]">
+        <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[0.75rem] font-bold text-[var(--private-strong)] marker:hidden">
+          <span aria-hidden className="mr-1 inline-block transition-transform group-open:rotate-90">
+            ›
+          </span>
+          Your situation
+        </summary>
+        <div className="border-t border-[var(--private-line)] px-2.5 py-2">
+          <RoleStory story={brief.roleStory} compact />
+        </div>
+      </details>
     </Card>
   );
 }
@@ -1066,6 +1004,7 @@ export function ReasonBox({
   cards,
   sensitive,
   caption,
+  dense = false,
   children,
 }: {
   title: string;
@@ -1074,6 +1013,16 @@ export function ReasonBox({
   sensitive?: boolean;
   /** Rendered under the cards — §8.7's ⚠ line on the sensitive box. */
   caption?: ReactNode;
+  /**
+   * The briefing rail's spacing: the same box at 12.5px with less padding.
+   *
+   * IT CHANGES THE PADDING AND THE TYPE SIZE AND NOTHING ELSE. The border,
+   * the ground and the heading colour are what rule 6 rests on — which box a
+   * participant draws from is the measure, so the two have to read as
+   * different kinds of thing at every size. A dense variant that dropped the
+   * rose would be a different study in a narrower column.
+   */
+  dense?: boolean;
   children?: (card: { id: string; text: string }) => ReactNode;
 }) {
   if (!cards.length) return null;
@@ -1106,7 +1055,8 @@ export function ReasonBox({
      */
     <div
       className={cx(
-        "mb-2.5 rounded-xl border p-3 last:mb-0 shadow-2xs transition-all",
+        "rounded-xl border shadow-2xs transition-all",
+        dense ? "mb-2 p-2.5 last:mb-0" : "mb-2.5 p-3 last:mb-0",
         sensitive
           ? "border-rose-300 bg-rose-50 text-rose-950"
           : "border-slate-200 bg-white text-slate-900",
@@ -1114,7 +1064,8 @@ export function ReasonBox({
     >
       <p
         className={cx(
-          "mb-1 flex items-center gap-1 text-xs font-extrabold uppercase tracking-wide",
+          "mb-1 flex items-center gap-1 font-extrabold uppercase tracking-wide",
+          dense ? "text-[0.625rem]" : "text-xs",
           sensitive ? "text-rose-800" : "text-slate-700",
         )}
       >
@@ -1126,13 +1077,20 @@ export function ReasonBox({
           {note}
         </p>
       ) : null}
-      <ul className="space-y-2">
+      <ul className={dense ? "space-y-1.5" : "space-y-2"}>
         {cards.map((card) => (
           <li key={card.id}>
             {children ? (
               children(card)
             ) : (
-              <p className="text-xs sm:text-sm leading-relaxed break-words">
+              <p
+                className={cx(
+                  "break-words",
+                  dense
+                    ? "text-[0.78125rem] leading-[1.45]"
+                    : "text-xs leading-relaxed sm:text-sm",
+                )}
+              >
                 {card.text}
               </p>
             )}
@@ -1165,6 +1123,7 @@ export function IssueReasonGroups({
   role,
   renderCard,
   caption = true,
+  dense = false,
 }: {
   task: NegotiationTask;
   role: Role;
@@ -1181,14 +1140,23 @@ export function IssueReasonGroups({
    * note forbids.
    */
   caption?: boolean;
+  /** The briefing rail's spacing. See `ReasonBox`. */
+  dense?: boolean;
 }) {
   const cards = task.roleBriefs[role].reasonCards;
   if (!cards.length) return null;
+  /* NO WRAPPER CARD AROUND THE TWO BOXES. It was a bordered slate panel
+     holding a white box and a rose box, which is three nested surfaces to say
+     one thing, and on the private sand ground the outer border added nothing
+     the two inner ones do not already say. Rule 6 asks for the two boxes to
+     be visibly SEPARATE from each other, which is what their own borders and
+     colours do; a container around both works against that, not for it. */
   return (
-    <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3">
+    <div>
       <ReasonBox
         title="Work reason"
         cards={cards.filter((c) => c.layer === "work")}
+        dense={dense}
       >
         {renderCard}
       </ReasonBox>
@@ -1196,12 +1164,17 @@ export function IssueReasonGroups({
         title="Sensitive background"
         cards={cards.filter((c) => c.layer === "sensitive")}
         sensitive
+        dense={dense}
         /* §8.7: the same one-line notice in both arms. The mandate screen
            passes its own copy under the checkbox, because there the caption
            belongs to a control rather than to the box; everywhere else — the
            briefing panel, the brief phase — it belongs to the box, which is
            what this renders. */
-        caption={caption ? <SensitiveCaption className="mt-2.5" /> : null}
+        caption={
+          caption ? (
+            <SensitiveCaption className={dense ? "mt-2" : "mt-2.5"} />
+          ) : null
+        }
       >
         {renderCard}
       </ReasonBox>
@@ -1238,7 +1211,26 @@ export function TaskLayout({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_420px] xl:gap-8">
+    /* THE RAIL IS WIDER SINCE ROUND SIX: 400px at `lg`, 30rem at `xl`. The
+       point sheet inside it is two mini tables side by side, and at 360px
+       each column was about 165px, which broke option labels like "4 client
+       meetings a month" over three lines and pushed the reason cards down
+       past the fold — the thing the rewrite exists to stop. The sticky
+       max-height scroll stays as a safety net for a short viewport; the rail
+       is sized so nothing has to use it at 1440x900. */
+    /* THE WIDER RAIL STARTS AT 1440, NOT AT TAILWIND'S `xl` (1280). Taking
+       30rem at 1280 left the task column at 704px, NARROWER than the 791px it
+       had one pixel earlier at 400px of rail — so widening the window across
+       1280 made the conversation column shrink. `min-[1440px]` is the width
+       at which 30rem of rail still leaves the task column at its 800px cap.
+
+       BOTH BREAKPOINTS ARE WRITTEN AS `min-[...]` ON PURPOSE. Mixing `lg:`
+       with an arbitrary min-width put Tailwind's own `lg` block AFTER the
+       1440 block in the emitted stylesheet, so the wider rail never applied
+       and the column silently stayed at 400px. Same variant family, sorted by
+       pixel value; `min-[1024px]` is `lg`. The `aside` below keeps `lg:block`
+       because that is a different property and nothing competes with it. */
+    <div className="grid gap-6 min-[1024px]:grid-cols-[minmax(0,1fr)_400px] min-[1440px]:grid-cols-[minmax(0,1fr)_30rem] min-[1440px]:gap-8">
       <div className="min-w-0">{children}</div>
 
       <aside className="hidden lg:block">

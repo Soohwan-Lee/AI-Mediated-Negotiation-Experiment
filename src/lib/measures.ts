@@ -94,7 +94,7 @@ export const COMPREHENSION_BLOCK: Block = {
     },
     { kind: "choice", id: "COMP2", text: "Can either person make the final decision on both working conditions without the other person agreeing?", columns: 2,
       options: [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }] },
-    { kind: "choice", id: "COMP3", text: "May you disclose the exact figures on your private scorecard to the counterpart?", columns: 2,
+    { kind: "choice", id: "COMP3", text: "May you disclose the exact figures on your private point sheet to the counterpart?", columns: 2,
       options: [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }] },
     {
       kind: "choice", id: "COMP4", text: "Which statement about sharing personal background is correct?",
@@ -110,7 +110,7 @@ export const COMPREHENSION_ANSWERS: Record<string, string> = { COMP1: "leader", 
 export const COMPREHENSION_REMEDIATION: Record<string, string> = {
   COMP1: "The Leader can influence the Member's evaluation, bonus, and future work assignments.",
   COMP2: "Neither side can decide both terms alone. Both sides must agree.",
-  COMP3: "Your scorecard figures are private and must not be disclosed.",
+  COMP3: "Your point sheet figures are private and must not be disclosed.",
   COMP4: "Sharing personal background is optional. Information that is conveyed may be considered in the later bonus or upward evaluation.",
 };
 

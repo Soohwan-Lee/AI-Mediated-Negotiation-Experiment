@@ -1024,14 +1024,41 @@ real row would silently unbalance the design.
 ## The flow
 
 Consent → background (incl. covariates) → instructions + comprehension →
-**one** practice round → **Task 1 → Task 1 questions → Task 1 decision →
-Task 1 REMARK** → **Task 2 → Task 2 questions → Task 2 decision → Task 2
-REMARK** → wrap-up → debriefing.
+**practice round 1 (Task 1's arm)** → **Task 1 → Task 1 questions → Task 1
+decision → Task 1 REMARK** → **practice round 2 (Task 2's arm)** → **Task 2 →
+Task 2 questions → Task 2 decision → Task 2 REMARK** → wrap-up → debriefing.
+
+**There are TWO practice rounds since 2026-09-09, one before each task, and
+each rehearses THAT task's arm.** Through Ver.2.24 there was one practice
+round and it followed Task 1's condition (`sessionPlan(assignment, 1)`), so
+whichever arm came SECOND was met cold: a Proxy-second participant reached the
+mandate, the watched exchange and RATIFY with no rehearsal, while a
+Proxy-first participant had one. That is interface novelty covarying with
+sequence × condition on the primary contrast, and the PI ruled it out. Round 2
+is the same neutral scenario in the other arm, drops the CHK5 check (asked
+once, in round 1), and is budgeted at one minute (`STAGE_MINUTES.practice2`);
+the budget is 41 against an advertised 40, which `timingIsHonest()` permits.
+Routes are `/practice/1` and `/practice/2` (`app/practice/[index]/`), the
+FLOW key `practice-2` sits between `reward-1` and `task-2` so `nextHref`
+carries REMARK 1 into it, `backStep("practice-2")` is null, and the phase
+strip shows both practices as not counting. **The design doc's §7 timing table
+still lists one practice round and needs the row.**
+
+**Ver.2.23 removed the pre-task RISK battery** (design §9.2: pretest only).
+The RISK paragraph further down describes where it sat and why; it no longer
+exists on any screen, and must not be re-added as a per-task measure.
 
 The post-task decision screen is the one screen that differs by role: the
 Leader decides the recommended bonus, the Member writes `RECV-EVAL` and then
 waits while "the manager decides" — shown no number, ever. REMARK comes after
 it, in both roles and both arms.
+
+**Open as of 2026-09-09: there is no wait screen in the code.** `submitEval`
+in `task/[index]/reward/page.tsx` goes to REMARK on the same tick, and
+Ver.2.24 §5 specifies RECV-EVAL and the "forwarded to the director" framing
+but no interstitial. Item 4 under "Things the participant must never learn"
+describes the wait as carrying POWER2; whether to add one is the PI's call,
+not a bug to fix silently.
 
 **M1 is asked where the decision was made, not in one fixed place.** Under
 Proxy it sits on the confirm screen, of non-disclosers only, while the mandate
@@ -1281,8 +1308,8 @@ side's requirement, which is asked rather than coded off the transcript.
 
 **The practice round is a click-by-click TUTORIAL, and the coach never leaves
 it.** `components/tutorial.tsx` exports `Coach`, a speech bubble pointing at
-the one control each step needs; it is imported by `app/practice/page.tsx` and
-nowhere else. Do not reach for it from a task screen and do not "reuse" it to
+the one control each step needs; it is imported by
+`app/practice/[index]/practice-round.tsx` and nowhere else. Do not reach for it from a task screen and do not "reuse" it to
 explain the mandate or the composer in Task 1 or Task 2.
 
 The reason is the measure. What the study observes is which box a participant
@@ -1301,23 +1328,25 @@ pre-selects nothing (rule 2). The one exception to the single ring is
 take a ring — so the bubble renders the button itself and rings that. On those
 steps the page must not also ring a card.
 
-**The end block is ELEVEN items in a fixed order** (§9.5): POWER1, POWER2,
-IMM1, **IMM2**, INCENT1, OE-F1, OE-F2, then the suspicion FUNNEL — SUS0, SUS1,
-SUS2, SUS3 (plus SUS3's optional free-text half). `POWER_BLOCK`,
-`FINAL_OPEN_BLOCK` and `SUSPICION_BLOCK` in that sequence on `/wrap-up`.
+**The end block since Ver.2.23 (§9.0a, §9.5 of the doc): OE-COMP, then
+POWER1, POWER2, IMM2, INCENT1, then CP1–2, then the two-step suspicion
+funnel.** Ver.2.23 DELETED the old SUS1 (who produced the behaviour), the old
+SUS2 (what the study was looking for), IMM1, OE-F1/F2, OWN-AI3 and OTHER-AI3;
+the doc renumbered the survivors as SUS1 (spontaneous "anything unusual?") and
+SUS2 (yes/no "might not be a real person?" plus when/why). **The code keeps the
+ORIGINAL ids** — `SUS0` for the spontaneous question and `SUS3` / `SUS3-WHEN`
+for the identity question — because the doc says deleted and renamed items keep
+their original codes in the export. Do not add the deleted items back to
+"complete the funnel"; the 2026-09-09 audit read the older eleven-item list
+above and flagged exactly that.
 
-**The funnel is the point, and its order is not negotiable.** SUS0 asks whether
-anything struck them as odd, naming nothing. SUS1 asks who or what produced the
-counterpart's behaviour. SUS2 asks what the study was looking for. Only SUS3
-says the quiet part — "did you at any point think the other participant might
-not be a real person?" — and it is last for that reason: a "yes" there, from
-someone who wrote nothing at SUS0, is a much weaker signal than a spontaneous
-mention. Ver.2.21 restored SUS0, without which the probe was a single leading
-question that measures nothing. **IMM2 is restored too**, because pretest 3 is
-a separate sample and the scenario-realism check has to exist in this one.
+**The funnel's order is still the point.** The spontaneous question comes
+first, naming nothing; the identity question is last, because a "yes" there
+from someone who wrote nothing spontaneously is a much weaker signal than a
+mention, and nothing about humanness is asked after the debriefing.
 
-**RISK sits in the same place in both arms, and that position is load-bearing.**
-It asks what the participant *expects* raising their requirement to cost. Asked
+**RISK is GONE since Ver.2.23 (pretest only); the paragraph below is kept as
+the record of why its position mattered while it existed.** It asked what the participant *expects* raising their requirement to cost. Asked
 after the mandate — as an earlier version did in Proxy only — they answer it
 having already decided which sensitive cards to hand over and read the policy
 disclosure, which makes a pre-task measure partly post-treatment in one arm.
@@ -1404,15 +1433,31 @@ compiles.
    the participant's own reason cards, which since Ver.2.20 is where a Direct
    participant reads them, there being no picker in the composer any more.
 
-   **Its sections fold, but nothing is removed.** As one scroll it ran to
-   several screens in the rail and buried the payoff table — the part most
-   often wanted mid-negotiation — under the story. What is open by default is
-   chosen by what a participant reaches for mid-sentence: the numbers, the
-   fallback, and the reason cards (rule 6's decision has to be visible to be
-   made). The situation and objectives fold, because by then they have been
-   read on the brief phase, where `defaultOpen` expands everything. Use
-   `<details>`, not state — a section stays open across the re-renders a live
-   negotiation produces, and find-in-page still reaches closed ones.
+   **It is a CHEAT SHEET, readable without a click (2026-09-09).** The rail
+   once carried the role, the payment, the goals, a notice and three tabs, and
+   the point sheet and the two reason cards — the only things a person needs
+   while typing — sat below the fold behind a tab. The PI's complaint was
+   exactly that: "you have to click it every time, and it is a thin column
+   that does not register." `BriefingPanel` is now, top to bottom: one header
+   line; `RailPointSheet` (the two issues SIDE BY SIDE as mini tables with the
+   best row emerald, one anchor line 🏆 3,600 · ⛔ 0); the two reason cards at
+   full text with the ⚠ caption; and a closed `<details>` "Your situation".
+   Role, payment and goals live on the brief pages, not here. **The whole rail
+   fits inside a 1440×900 viewport in every role × task cell (measured at
+   630px), so nothing needs scrolling; keep it that way** — anything added to
+   it must be measured in all four cells. The rail is 400px from 1024 and
+   30rem from 1440 (`min-[…]` breakpoints, because Tailwind's `lg:` block was
+   emitted after the arbitrary-width one and the wider rail never applied).
+
+   **The goals line is deliberately NOT in the rail.** Each role's first
+   objective names its own priority term ("get as many days a week in the
+   office as you can"); in a rail with no issue heading, that sentence IS the
+   badge design §5 principle 1 forbids. The brief page carries the objectives.
+
+   Always-visible reasons are better for validity than a tab: a Direct
+   participant who never clicked "Reasons" had an interface floor on
+   disclosure. Use `<details>` for the folded story, not state — it stays put
+   across the re-renders a live negotiation produces.
 
    Do not put `.prose-study` inside the panel. It sets `1.0625rem`, so the
    role story rendered half again the size of everything around it and took

@@ -41,7 +41,9 @@
  * well under the weight that would read as a private surface.
  */
 
-import { useId, type ReactNode } from "react";
+import Image from "next/image";
+import type { ReactNode } from "react";
+import { ILLUSTRATIONS, type IllustrationKey } from "@/lib/illustrations";
 import { STUDY } from "@/lib/study-config";
 import type { Role } from "@/lib/types";
 import { cx } from "./ui";
@@ -81,7 +83,6 @@ function FlowArrow({ label }: { label: string }) {
  * for the other.
  */
 export function RoleDecisionFlow({ role }: { role: Role }) {
-  const titleId = useId();
   const isLeader = role === "leader";
   const own =
     "border-blue-300 bg-blue-50 text-blue-950 ring-2 ring-blue-100";
@@ -89,19 +90,17 @@ export function RoleDecisionFlow({ role }: { role: Role }) {
   const node =
     "min-w-0 flex-1 rounded-xl border px-3 py-3 text-center shadow-2xs sm:px-4";
 
+  /* NO OUTER BOX AND NO CAPTION. The figure used to carry its own bordered
+     grey card with a header strip, inside the guide page's own card: a box in
+     a box, with a header that repeated the page subtitle. The four cells and
+     the pill now sit directly on the page; the accessible name moved to
+     `aria-label` so nothing visible carries it. */
   return (
     <figure
-      aria-labelledby={titleId}
-      className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 shadow-2xs"
+      aria-label="Two separate decisions after each negotiation"
+      className="space-y-3"
     >
-      <figcaption
-        id={titleId}
-        className="border-b border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 sm:px-5"
-      >
-        Two separate decisions after each negotiation
-      </figcaption>
-
-      <div className="space-y-3 p-3 sm:p-5">
+      <div className="space-y-3">
         <div className="flex items-stretch" aria-label="Bonus recommendation path">
           <div className={cx(node, isLeader ? own : other)}>
             <span className="block text-[0.625rem] font-extrabold uppercase tracking-wider text-slate-500">
@@ -292,7 +291,7 @@ export function ProxyFigure({
  * the participant. `CoverArt` in components/session.tsx already does that with
  * one emoji for both; this keeps the same rule in the drawn scene.
  */
-function PersonFigure({ size = 56, muted = false }: { size?: number; muted?: boolean }) {
+export function PersonFigure({ size = 56, muted = false }: { size?: number; muted?: boolean }) {
   const line = muted ? "#94a3b8" : "#475569";
   const fill = muted ? "#f1f5f9" : "#e2e8f0";
   return (
@@ -320,7 +319,7 @@ function PersonFigure({ size = 56, muted = false }: { size?: number; muted?: boo
 /**
  * One labelled figure in a scene.
  */
-function SceneFigure({
+export function SceneFigure({
   children,
   label,
   sublabel,
@@ -353,7 +352,7 @@ function SceneFigure({
  * rule said only "these two are related", which left the participant to guess
  * the part the scene exists to show.
  */
-function SceneLink({
+export function SceneLink({
   label,
   direction = "right",
 }: {
@@ -417,9 +416,21 @@ function SceneLink({
 export function ProxyScene({
   emphasis = "briefing",
   className,
+  /**
+   * Relabel the far side for the practice round.
+   *
+   * "Other Participant" is the label reserved for the simulated counterpart
+   * (deception item 1), and the practice round has nobody on the other end.
+   * Using it there would make a claim about a person who does not exist, on
+   * the one screen whose whole job is to say that nothing here counts. The
+   * near side is unchanged: the participant is still themselves, and their
+   * proxy is still theirs.
+   */
+  practice = false,
 }: {
   emphasis?: "briefing" | "table";
   className?: string;
+  practice?: boolean;
 }) {
   return (
     <div
@@ -443,7 +454,7 @@ export function ProxyScene({
       {/* Two ways: this is the only pair that talks to each other. */}
       <SceneLink label="negotiate" direction="both" />
 
-      <SceneFigure label="Their AI Proxy">
+      <SceneFigure label={practice ? "Practice partner's AI Proxy" : "Their AI Proxy"}>
         <ProxyFigure side="theirs" size={emphasis === "table" ? 58 : 52} speaking={emphasis === "table"} />
       </SceneFigure>
 
@@ -451,10 +462,61 @@ export function ProxyScene({
           one-way handover the participant made at the far end of the row. */}
       <SceneLink label="briefs" direction="left" />
 
-      <SceneFigure label="Other Participant">
+      <SceneFigure label={practice ? "Practice partner" : "Other Participant"}>
         <PersonFigure size={44} muted />
       </SceneFigure>
     </div>
+  );
+}
+
+/**
+ * One numbered step of a task flow: a picture, then one line saying what
+ * happens in it.
+ *
+ * BOTH ARMS USE THIS SAME CARD, at the same size and in the same grid, and
+ * that is not a tidiness preference. A Proxy participant meeting four polished
+ * illustrated cards while a Direct participant meets three plain ones would be
+ * an exposure difference between the conditions with no design record behind
+ * it, and `Pooled Proxy − Direct` is the primary contrast. Whatever is spent on
+ * one row is spent on the other.
+ *
+ * The raster is drawn `aria-hidden` and the step's own sentence carries the
+ * meaning. The alt text in the manifest exists for the cases where the image is
+ * shown on its own; here the line beneath it already says the same thing, and
+ * a screen reader should not hear it twice.
+ */
+function FlowStepCard({
+  illustration,
+  index,
+  label,
+}: {
+  illustration: IllustrationKey;
+  index: number;
+  label: string;
+}) {
+  const art = ILLUSTRATIONS[illustration];
+  return (
+    <li className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+      <div aria-hidden className="border-b border-slate-100 bg-[var(--private-soft)]">
+        <Image
+          src={art.src}
+          alt=""
+          width={art.width}
+          height={art.height}
+          sizes="(min-width: 1024px) 20rem, (min-width: 640px) 45vw, 100vw"
+          className="h-auto w-full"
+        />
+      </div>
+      <p className="flex items-start gap-2 p-3 text-[0.8125rem] leading-snug text-[var(--ink-2)]">
+        <span
+          aria-hidden
+          className="tabular mt-px flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[0.625rem] font-black text-indigo-800"
+        >
+          {index + 1}
+        </span>
+        <span className="min-w-0">{label}</span>
+      </p>
+    </li>
   );
 }
 
@@ -467,83 +529,90 @@ export function ProxyScene({
  * scene, is the same information in a fifth of the reading.
  *
  * NO CONDITION NAME, and no policy branch (interface rule 10): every Proxy
- * participant sees this identical row. Step ④ is conditional in the flow and
- * says so in its own words, because a step drawn as unconditional would tell
- * an approver they were about to do something they will not do.
+ * participant sees this identical row, User-Specified and AI-Supplemented
+ * alike. Step ④ is conditional in the flow and says so in its own words,
+ * because a step drawn as unconditional would tell an approver they were about
+ * to do something they will not do.
  */
 export function ProxyFlowSteps({ className }: { className?: string }) {
-  const steps: Array<{ art: ReactNode; label: string }> = [
+  const steps: Array<{ illustration: IllustrationKey; label: string }> = [
     {
-      art: (
-        <>
-          <PersonFigure size={30} />
-          <SceneLink />
-          <ProxyFigure side="mine" size={34} />
-        </>
-      ),
+      illustration: "proxyStepBrief",
       label: "You brief your AI Proxy.",
     },
     {
-      art: (
-        <>
-          <ProxyFigure side="mine" size={34} speaking />
-          <SceneLink direction="both" />
-          <ProxyFigure side="theirs" size={34} speaking />
-        </>
-      ),
+      illustration: "proxyStepNegotiate",
       label: "The two AI Proxies negotiate. You watch.",
     },
     {
-      art: (
-        <>
-          <PersonFigure size={30} />
-          <SceneLink direction="left" />
-          <span aria-hidden className="text-xl">📋</span>
-          <SceneLink />
-          <PersonFigure size={30} muted />
-        </>
-      ),
-      label:
-        "You both see the result. Approve it, ask for a change, or refuse.",
+      illustration: "proxyStepResult",
+      label: "You both see the result and decide.",
     },
     {
-      art: (
-        <>
-          <PersonFigure size={30} />
-          <SceneLink direction="both" />
-          <PersonFigure size={30} muted />
-        </>
-      ),
-      label:
-        "If either of you wants a change, you finish it in a short chat.",
+      /* The SAME file as step ② of the Direct row — see lib/illustrations.ts. */
+      illustration: "chat",
+      label: "If needed, you finish in a short chat.",
     },
   ];
 
   return (
-    <ol
-      className={cx(
-        "grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4",
-        className,
-      )}
-    >
+    <ol className={cx("grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4", className)}>
       {steps.map((step, index) => (
-        <li
+        <FlowStepCard
           key={step.label}
-          className="flex flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-2xs"
-        >
-          <div aria-hidden className="flex h-11 items-center justify-center gap-0.5">
-            {step.art}
-          </div>
-          <p className="mt-2.5 flex items-start gap-2 text-[0.8125rem] leading-snug text-[var(--ink-2)]">
-            <span
-              aria-hidden
-              className="tabular mt-px flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[0.625rem] font-black text-indigo-800"
-            >
-              {index + 1}
-            </span>
-            <span className="min-w-0">{step.label}</span>
-          </p>
-        </li>
+          illustration={step.illustration}
+          index={index}
+          label={step.label}
+        />
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * The three steps of a Direct task, drawn the same way.
+ *
+ * THIS EXISTS SO THE TWO ARMS GET THE SAME TREATMENT. Until now only the Proxy
+ * arm had an illustrated "here is what the next twenty minutes look like" row,
+ * which is the same defect `proxy-task.tsx` had when it opened on `brief` and
+ * only Direct participants ever saw a cover: a whole orientation affordance
+ * present in one condition and absent in the other.
+ *
+ * It draws the INTERFACE and never the condition (interface rule 10). The word
+ * "Direct" does not appear, here or on screen — tasks are labelled "Task 1" and
+ * "Task 2" and the condition name is never disclosed mid-study. Step ② is the
+ * same picture as the Proxy row's step ④, because it is the same activity.
+ *
+ * The third line says "agree on both conditions" and deliberately does not say
+ * how, or that trading one term against the other pays better than splitting
+ * each: finding the logroll is the behaviour being observed (pilot gate 6).
+ */
+export function DirectFlowSteps({ className }: { className?: string }) {
+  const steps: Array<{ illustration: IllustrationKey; label: string }> = [
+    {
+      illustration: "directStepRead",
+      label: "Read your private briefing.",
+    },
+    {
+      /* The SAME file as step ④ of the Proxy row — see lib/illustrations.ts. */
+      illustration: "chat",
+      label: "Chat with the other participant.",
+    },
+    {
+      illustration: "directStepAgree",
+      label: "Agree on both conditions.",
+    },
+  ];
+
+  return (
+    <ol className={cx("grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3", className)}>
+      {steps.map((step, index) => (
+        <FlowStepCard
+          key={step.label}
+          illustration={step.illustration}
+          index={index}
+          label={step.label}
+        />
       ))}
     </ol>
   );

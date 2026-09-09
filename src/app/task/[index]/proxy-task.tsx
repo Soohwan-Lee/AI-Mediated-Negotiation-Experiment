@@ -147,16 +147,12 @@ const STEP_LABELS = [
 ];
 
 /**
- * The cover's version of the step list, with the one-line gloss the practice
- * cover always had. Bare labels were indistinguishable to a first-time reader
- * ("Check and start" vs "Check with it"), and the cover is exactly the place
- * that gap costs something.
+ * THE COVER'S WRITTEN STEP LIST IS GONE (round six). `TaskIntro` now draws
+ * the steps in BOTH arms — `ProxyFlowSteps` here and `DirectFlowSteps` in the
+ * Direct cover — so the list said on the cover exactly what the illustrated
+ * cards below it already said. The phase names above still feed the header's
+ * progress bar; only the cover's glossed copy of them went.
  */
-const COVER_STEPS = [
-  { label: "Prepare", hint: "Read your briefing, then set your goals and sharing choices." },
-  { label: "Watch your AI Proxy", hint: "It speaks to the other participant's AI Proxy while you watch." },
-  { label: "Decide", hint: "Approve the proposed agreement, or request changes/refuse and talk directly for up to 2 minutes." },
-];
 
 /** Readable names for the dev panel's phase jumps. */
 const PHASE_LABELS: Record<Phase, string> = {
@@ -838,10 +834,9 @@ export function ProxyTask({
     return (
       <TaskIntro
         taskIndex={taskIndex}
-        steps={COVER_STEPS}
         scene="proxy"
-        /* The longer arm: two conversations where Direct has one. */
-        minutes={5}
+        /* NO `minutes` OVERRIDE (round six) — see the note on the Direct
+           cover. Both read `STAGE_MINUTES.task`. */
         onStart={() => setPhase("brief")}
       />
     );
@@ -1456,8 +1451,8 @@ export function ProxyTask({
                     grade the one that was taken. */}
                 <p className="mt-0.5 text-sm leading-relaxed text-indigo-950">
                   {refused
-                    ? "That is me done, then. I have stepped back and nothing is agreed. You take it from here — you are speaking for yourself now."
-                    : "That is me done, then. I have stepped back and left the package on the table. You take it from here — you are speaking for yourself now."}
+                    ? "That is me done, then. I have stepped back and nothing is agreed. You take it from here. You are speaking for yourself now."
+                    : "That is me done, then. I have stepped back and left the package on the table. You take it from here. You are speaking for yourself now."}
                 </p>
               </div>
             </div>
@@ -1656,7 +1651,13 @@ function ReasonMandateSection({
           headings — the sensitive one ROSE — because which box a participant
           is willing to draw from is the whole measure, and a single list would
           make that decision illegible. */}
-      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3">
+      {/* NO WRAPPER PANEL AROUND THE TWO BOXES (round six). It was a slate
+          card holding a white box holding a white row, inside this amber card
+          — four nested surfaces to show two reasons. `IssueReasonGroups` lost
+          the same wrapper for the same reason: rule 6 wants the two boxes
+          separate from EACH OTHER, which their own borders and colours do,
+          and a container around both works against that. */}
+      <div>
         <ReasonBox title="Work reason" cards={workCards}>
           {(card) => (
             /* LOCKED AND TICKED, and it says which it is. A disabled checkbox

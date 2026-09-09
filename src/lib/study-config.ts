@@ -64,6 +64,20 @@ export const STAGE_MINUTES = {
   /** §7: common/role briefing and comprehension (5), then practice (2). */
   instruction: 5,
   practice: 2,
+  /**
+   * THE SECOND PRACTICE, added 2026-09-09 on the PI's decision.
+   *
+   * One minute rather than two, and the difference is the whole point of it
+   * existing: the participant has already met the controls and the scenario,
+   * so what is left to teach is the OTHER way of negotiating. The
+   * comprehension item is not repeated either — CHK5 is asked once, in
+   * practice 1 — which is what pays for the shorter budget.
+   *
+   * §7's table in the design doc predates this and still lists one practice
+   * round; the row needs adding there. The code's figure is the summed one and
+   * is deliberately the more conservative of the two.
+   */
+  practice2: 1,
   /** Two-minute preparation plus up to five minutes for the task interaction. */
   task: 7,
   /** §7: most of each task's five-minute post-task block. */
@@ -89,6 +103,7 @@ export const TOTAL_MINUTES =
   STAGE_MINUTES.background +
   STAGE_MINUTES.instruction +
   STAGE_MINUTES.practice +
+  STAGE_MINUTES.practice2 +
   2 * (STAGE_MINUTES.task + STAGE_MINUTES.taskSurvey + STAGE_MINUTES.reward) +
   STAGE_MINUTES.wrapUp +
   STAGE_MINUTES.debrief;
@@ -270,10 +285,25 @@ export const FLOW = [
   { key: "welcome", href: "/", label: "Welcome & Consent" },
   { key: "background", href: "/background", label: "About You" },
   { key: "instruction", href: "/instruction", label: "How This Works" },
-  { key: "practice", href: "/practice", label: "Practice Round" },
+  { key: "practice", href: "/practice/1", label: "Practice for Task 1" },
   { key: "task-1", href: "/task/1", label: "Task 1" },
   { key: "survey-1", href: "/task/1/survey", label: "Task 1 Questions" },
   { key: "reward-1", href: "/task/1/reward", label: "Task 1 Bonus" },
+  /**
+   * A SECOND PRACTICE, BEFORE TASK 2 (PI decision, 2026-09-09).
+   *
+   * Each participant does one Direct task and one Proxy task, so whichever
+   * arm falls SECOND used to be met cold: the single practice round ran
+   * `sessionPlan(assignment, 1)` and therefore always rehearsed Task 1's
+   * condition. That is an interface difference that lands on the primary
+   * contrast — a Proxy-second participant met the mandate, the watched
+   * exchange and RATIFY for the first time inside the task being measured,
+   * while a Proxy-first participant had rehearsed all three.
+   *
+   * It sits between `reward-1` and `task-2` so `nextHref` carries REMARK 1
+   * straight into it with no page needing to know it exists.
+   */
+  { key: "practice-2", href: "/practice/2", label: "Practice for Task 2" },
   { key: "task-2", href: "/task/2", label: "Task 2" },
   { key: "survey-2", href: "/task/2/survey", label: "Task 2 Questions" },
   { key: "reward-2", href: "/task/2/reward", label: "Task 2 Bonus" },
@@ -301,6 +331,14 @@ export const PHASES = [
   { key: "instructions", label: "Instructions" },
   { key: "practice", label: "Practice", doesNotCount: true },
   { key: "task1", label: "Task 1" },
+  /**
+   * The second practice is its own phase rather than a footnote on Task 2,
+   * because the strip is the participant's map of what happens next and a
+   * rehearsal that appears without warning between two tasks is exactly the
+   * kind of thing the strip exists to signpost. It carries `doesNotCount`
+   * for the same reason the first does.
+   */
+  { key: "practice2", label: "Practice", doesNotCount: true },
   { key: "task2", label: "Task 2" },
   { key: "final", label: "Final questions" },
 ] as const;
@@ -360,6 +398,17 @@ export function flowLabel(key: FlowKey): string {
 const BACK_STEPS: Partial<Record<FlowKey, FlowKey>> = {
   instruction: "background",
   practice: "instruction",
+  /**
+   * `practice-2` IS DELIBERATELY ABSENT, not overlooked. The step before it is
+   * Task 1's reward decision and REMARK, and neither may be re-entered: the
+   * bonus is a behavioural response to one task's interaction, and REMARK is
+   * a stimulus that has already been delivered. Going back there from the
+   * second practice would let a participant revise a recorded decision after
+   * seeing the next task's opening.
+   *
+   * A missing key yields `null` from `backStep`, so the practice-2 screens
+   * render no Back control at all.
+   */
 };
 
 export function backStep(
