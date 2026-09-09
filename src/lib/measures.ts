@@ -81,16 +81,6 @@ export const COMPREHENSION_REMEDIATION: Record<string, string> = {
   IC4: "Sharing personal background is optional. Information that is conveyed may be considered in the later bonus or upward evaluation.",
 };
 
-export function practiceReasonItem(role: Role): Item {
-  const leader = role === "leader";
-  return { kind: "choice", id: "PRAC1", text: leader ? "Why is moving next week advantageous to you?" : "Why is the printer beside your desk advantageous to you?", options: [
-    { value: "reason", label: leader ? "It gets done before the quarterly review" : "It is the one spot you can reach without getting up" },
-    { value: "points", label: "Because it is worth the most points" }, { value: "other_side", label: "Because the other side prefers it" },
-    { value: "unsure", label: "No particular reason" },
-  ] };
-}
-export const PRACTICE_REASON_ANSWER = "reason";
-
 export const DIRECT_PRACTICE_CHECK: ChoiceItem = {
   kind: "choice", id: "IC5",
   text: "During direct negotiation, who writes the messages you send to the counterpart?",

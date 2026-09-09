@@ -187,7 +187,7 @@ export default function BackgroundPage() {
     <>
       <Page>
         <PageHeader
-          eyebrow={`Step 1 · Section ${part + 1} of ${BLOCKS.length}`}
+          eyebrow={`Background survey · Section ${part + 1} of ${BLOCKS.length}`}
           title={copy.title}
           subtitle={copy.subtitle}
         />
