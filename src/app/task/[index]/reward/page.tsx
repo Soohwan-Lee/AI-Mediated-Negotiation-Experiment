@@ -1,6 +1,6 @@
 "use client";
 
-/** Ver.2.26 role decision followed by OED1, OEE1, and Proxy-only OEP1. */
+/** Ver.2.27 role decision followed by one combined open-ended page. */
 import { useRouter } from "next/navigation";
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
@@ -13,7 +13,7 @@ import { BR1_ITEM, FE1_BLOCK, blockForTask, dummyAnswer, taskOpenBlocks } from "
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { STUDY, nextHref } from "@/lib/study-config";
-import { answersForIds, explicitlyCompleted, restoredValidPart } from "@/lib/survey-progress";
+import { answersForIds, explicitlyCompleted } from "@/lib/survey-progress";
 
 export default function TaskRewardPage({ params }: { params: Promise<{ index: string }> }) {
   const { index } = use(params);
@@ -28,8 +28,6 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   const [evalAnswers, setEvalAnswers] = useState<Answers>({});
   const [openAnswers, setOpenAnswers] = useState<Answers>({});
   const latestOpenAnswers = useRef<Answers>({});
-  const [openSubmittedParts, setOpenSubmittedParts] = useState(0);
-  const [openPart, setOpenPart] = useState<number | null>(null);
   const [restored, setRestored] = useState(false);
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
@@ -64,9 +62,6 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
       const fe = decision?.[`FE1_t${taskIndex}`];
       if (typeof fe === "number") setEvalAnswers({ [`FE1_t${taskIndex}`]: fe });
       const decisionComplete = decision?._submitted === true;
-      const submittedParts = typeof open?._submitted_parts === "number" ? open._submitted_parts : 0;
-      setOpenSubmittedParts(submittedParts);
-      setOpenPart(restoredValidPart(openBlocks.map((block) => block.items.map((item) => item.id)), filteredOpen, submittedParts));
       if (decisionComplete) setStage("open");
       setRestored(true);
     });
@@ -76,23 +71,26 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   const awarded = amountPercent === null ? null : Number(((amountPercent / 100) * Number(STUDY.bonusPerTask)).toFixed(2));
   const evalMissing = missingIds([evalBlock], evalAnswers);
   const canSubmitDecision = useDevGate(isLeader ? amountPercent !== null && amountConfirmed : evalMissing.length === 0);
-  const activeOpenPart = openPart ?? 0;
-  const openBlock = openBlocks[activeOpenPart] ?? openBlocks[0];
-  const openMissing = activeOpenPart === openBlocks.length - 1
-    ? missingIds(openBlocks, openAnswers)
-    : missingIds([openBlock], openAnswers);
+  const openMissing = missingIds(openBlocks, openAnswers);
   const canSubmitOpen = useDevGate(openMissing.length === 0);
 
   useDevAutofill(() => {
     if (stage === "decision") {
       setAmountPercent(70); setAmountConfirmed(true);
       setEvalAnswers(Object.fromEntries(evalBlock.items.map((item) => [item.id, dummyAnswer(item)])));
-    } else if (openBlock) {
-      const next = { ...latestOpenAnswers.current, ...Object.fromEntries(openBlock.items.map((item) => [item.id, dummyAnswer(item)])) };
+    } else {
+      const next = {
+        ...latestOpenAnswers.current,
+        ...Object.fromEntries(
+          openBlocks.flatMap((block) =>
+            block.items.map((item) => [item.id, dummyAnswer(item)]),
+          ),
+        ),
+      };
       latestOpenAnswers.current = next;
       setOpenAnswers(next);
     }
-  }, `reward-v226-${taskIndex}-${stage}-${activeOpenPart}`);
+  }, `reward-v227-${taskIndex}-${stage}`);
 
   function persistLeaderDraft(percent: number | null, confirmed: boolean) {
     if (!participantKey) return;
@@ -125,7 +123,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
       } : { ...evalAnswers, _instrument_version: "2.26", role: "member", _submitted: true };
       if (participantKey) await getStore().saveResponses(participantKey, decisionBlockName, payload);
       logEvent("reward_decision", { kind: isLeader ? "BR1" : "FE1", value: isLeader ? awarded : evalAnswers[`FE1_t${taskIndex}`], instrumentVersion: "2.26" }, { sessionIndex: taskIndex });
-      setOpenPart(0); setStage("open"); window.scrollTo({ top: 0 });
+      setStage("open"); window.scrollTo({ top: 0 });
     } finally { submitting.current = false; setBusy(false); }
   }
 
@@ -133,30 +131,41 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
     const next = { ...latestOpenAnswers.current, [id]: value };
     latestOpenAnswers.current = next;
     setOpenAnswers(next);
-    if (participantKey) void getStore().saveResponses(participantKey, openBlockName, { ...next, _instrument_version: "2.26", _submitted_parts: openSubmittedParts });
+    if (participantKey) void getStore().saveResponses(participantKey, openBlockName, {
+      ...next,
+      _instrument_version: "2.27",
+      _submitted_parts: 0,
+      _completed: false,
+    });
   }
 
   async function submitOpen() {
     if (!canSubmitOpen || submitting.current) return;
     submitting.current = true; setBusy(true);
     try {
-      const completed = activeOpenPart === openBlocks.length - 1;
-      const submittedParts = activeOpenPart + 1;
-      if (participantKey) await getStore().saveResponses(participantKey, openBlockName, { ...latestOpenAnswers.current, _instrument_version: "2.26", _submitted_parts: submittedParts, _completed: completed });
-      setOpenSubmittedParts(submittedParts);
-      if (!completed) { setOpenPart(activeOpenPart + 1); window.scrollTo({ top: 0 }); return; }
-      logEvent("survey_saved", { block: openBlockName, instrumentVersion: "2.26" }, { sessionIndex: taskIndex });
+      if (participantKey) await getStore().saveResponses(participantKey, openBlockName, {
+        ...latestOpenAnswers.current,
+        _instrument_version: "2.27",
+        _submitted_parts: 1,
+        _completed: true,
+      });
+      logEvent("survey_saved", { block: openBlockName, instrumentVersion: "2.27" }, { sessionIndex: taskIndex });
       router.push(nextHref(flowKey));
     } finally { submitting.current = false; setBusy(false); }
   }
 
   async function previousOpen() {
-    if (activeOpenPart === 0 || submitting.current) return;
+    if (submitting.current) return;
     submitting.current = true; setBusy(true);
     try {
-      if (participantKey) await getStore().saveResponses(participantKey, openBlockName, { ...latestOpenAnswers.current, _instrument_version: "2.26", _submitted_parts: openSubmittedParts });
-      logEvent("survey_back", { block: openBlockName, from: activeOpenPart, to: activeOpenPart - 1 }, { sessionIndex: taskIndex });
-      setOpenPart(activeOpenPart - 1); window.scrollTo({ top: 0 });
+      if (participantKey) await getStore().saveResponses(participantKey, openBlockName, {
+        ...latestOpenAnswers.current,
+        _instrument_version: "2.27",
+        _submitted_parts: 0,
+        _completed: false,
+      });
+      logEvent("survey_back", { block: openBlockName, from: "open", to: "decision" }, { sessionIndex: taskIndex });
+      setStage("decision"); window.scrollTo({ top: 0 });
     } finally { submitting.current = false; setBusy(false); }
   }
 
@@ -164,9 +173,21 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   if (stage === "open") return <>
     <Page>
       <TranscriptReview participantKey={participantKey} taskIndex={taskIndex} />
-      <MeasureBlock block={openBlock} answers={openAnswers} onChange={answerOpen} />
+      <Card className="mb-6 border-indigo-100 bg-indigo-50/30">
+        <p className="text-xs font-extrabold text-indigo-900">Task {taskIndex} · Final reflection</p>
+        <h1 className="mt-2 text-xl font-black tracking-tight text-[var(--ink)] sm:text-2xl">Tell us about this negotiation</h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-700">Please answer in your own words. A brief answer is fine.</p>
+      </Card>
+      {openBlocks.map((block) => (
+        <MeasureBlock
+          key={block.id}
+          block={block}
+          answers={openAnswers}
+          onChange={answerOpen}
+        />
+      ))}
     </Page>
-    <ActionBar label={activeOpenPart < openBlocks.length - 1 ? "Next" : "Submit & Continue"} onClick={submitOpen} busy={busy} disabled={!canSubmitOpen} remaining={openMissing.length} firstUnansweredId={openMissing[0] ?? null} secondary={activeOpenPart > 0 ? <PreviousPart onClick={previousOpen} disabled={busy} /> : null} />
+    <ActionBar label="Submit & Continue" onClick={submitOpen} busy={busy} disabled={!canSubmitOpen} remaining={openMissing.length} firstUnansweredId={openMissing[0] ?? null} secondary={<PreviousPart onClick={previousOpen} disabled={busy} />} />
   </>;
 
   if (!isLeader) return <>

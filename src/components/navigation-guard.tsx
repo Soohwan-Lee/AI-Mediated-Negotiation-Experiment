@@ -26,7 +26,7 @@ import { useDevMode } from "@/lib/dev-mode";
 import { readFurthest, writeFurthest } from "@/lib/flow-position";
 import { FLOW, flowIndex, flowKeyFromPath } from "@/lib/study-config";
 import { useParticipant } from "@/lib/participant-context";
-import { readCheckGate, readStopReason } from "@/lib/check-gates";
+import { readStopReason, taskGateRedirect } from "@/lib/check-gates";
 
 export function NavigationGuard() {
   const pathname = usePathname();
@@ -69,15 +69,12 @@ export function NavigationGuard() {
     if (key === "task-1" || key === "task-2") {
       if (!participantKey) return;
       const taskIndex = key === "task-1" ? 1 : 2;
-      if (readCheckGate(participantKey, "common").status !== "passed") {
-        writeFurthest(flowIndex("instruction"));
-        router.replace("/instruction");
-        return;
-      }
-      if (readCheckGate(participantKey, `task-${taskIndex}`).status !== "passed") {
-        const practiceKey = taskIndex === 1 ? "practice" : "practice-2";
-        writeFurthest(flowIndex(practiceKey));
-        router.replace(`/practice/${taskIndex}`);
+      const redirect = taskGateRedirect(participantKey, taskIndex);
+      if (redirect) {
+        if ("furthestKey" in redirect) {
+          writeFurthest(flowIndex(redirect.furthestKey));
+        }
+        router.replace(redirect.href);
         return;
       }
     }

@@ -19,10 +19,13 @@ export function readCheckGate(participantKey: string, scope: CheckGateScope): Ch
     if (!parsed || !["pending", "passed", "failed"].includes(parsed.status ?? "")) {
       return { status: "pending", attempts: 0 };
     }
-    return {
-      status: parsed.status as CheckGateStatus,
-      attempts: Math.max(0, Number(parsed.attempts) || 0),
-    };
+    const attempts = Math.max(0, Number(parsed.attempts) || 0);
+    if (parsed.status === "failed") {
+      const migrated: CheckGateRecord = { status: "pending", attempts };
+      window.localStorage.setItem(key(participantKey, scope), JSON.stringify(migrated));
+      return migrated;
+    }
+    return { status: parsed.status as CheckGateStatus, attempts };
   } catch {
     return { status: "pending", attempts: 0 };
   }
@@ -37,11 +40,41 @@ export type StopReason = "check" | "withdrawal";
 
 export function readStopReason(participantKey: string): StopReason | null {
   if (typeof window === "undefined") return null;
-  const value = window.localStorage.getItem(`${PREFIX}${participantKey}:stopped`);
-  return value === "check" || value === "withdrawal" ? value : null;
+  const stopKey = `${PREFIX}${participantKey}:stopped`;
+  const value = window.localStorage.getItem(stopKey);
+  if (value === "check") {
+    window.localStorage.removeItem(stopKey);
+    return null;
+  }
+  return value === "withdrawal" ? value : null;
 }
 
 export function writeStopReason(participantKey: string, reason: StopReason): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(`${PREFIX}${participantKey}:stopped`, reason);
+}
+
+export type TaskGateRedirect =
+  | { href: "/study-stop?reason=withdrawal" }
+  | { href: "/instruction"; furthestKey: "instruction" }
+  | { href: `/practice/${1 | 2}`; furthestKey: "practice" | "practice-2" };
+
+/** One gate decision shared by typed-URL navigation and the task route itself. */
+export function taskGateRedirect(
+  participantKey: string,
+  taskIndex: 1 | 2,
+): TaskGateRedirect | null {
+  if (readStopReason(participantKey) === "withdrawal") {
+    return { href: "/study-stop?reason=withdrawal" };
+  }
+  if (readCheckGate(participantKey, "common").status !== "passed") {
+    return { href: "/instruction", furthestKey: "instruction" };
+  }
+  if (readCheckGate(participantKey, `task-${taskIndex}`).status !== "passed") {
+    return {
+      href: `/practice/${taskIndex}`,
+      furthestKey: taskIndex === 1 ? "practice" : "practice-2",
+    };
+  }
+  return null;
 }

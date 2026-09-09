@@ -58,6 +58,41 @@ const SEQUENCES: Record<
 const PROXY_POLICIES: ProxyPolicy[] = ["user_specified", "ai_supplemented"];
 const ROLES: Role[] = ["leader", "member"];
 const SEQUENCE_IDS: SequenceId[] = ["seq1", "seq2", "seq3", "seq4"];
+export const DEV_PARTICIPANT_KEY = "P-devpreview";
+
+export type TaskOrder = "task_a_first" | "task_b_first";
+
+/** Uses one isolated browser key only when no real participant key exists. */
+export function participantKeyForDevSlot(
+  participantKey: string | null,
+  useDevSlot: boolean,
+): string | null {
+  return useDevSlot ? participantKey ?? DEV_PARTICIPANT_KEY : participantKey;
+}
+
+const SEQUENCE_BY_ORDER: Record<SessionOrder, Record<TaskOrder, SequenceId>> = {
+  direct_first: { task_a_first: "seq1", task_b_first: "seq3" },
+  proxy_first: { task_a_first: "seq2", task_b_first: "seq4" },
+};
+
+/** Maps the two independent dev selectors onto the four registered sequences. */
+export function sequenceForOrders(
+  modeOrder: SessionOrder,
+  taskOrder: TaskOrder,
+): SequenceId {
+  return SEQUENCE_BY_ORDER[modeOrder][taskOrder];
+}
+
+export function ordersForSequence(sequenceId: SequenceId): {
+  modeOrder: SessionOrder;
+  taskOrder: TaskOrder;
+} {
+  const modeOrder = SEQUENCES[sequenceId].order;
+  const taskOrder = SEQUENCES[sequenceId].first.task === "task_a"
+    ? "task_a_first"
+    : "task_b_first";
+  return { modeOrder, taskOrder };
+}
 
 /**
  * The full crossed slot list, in the order rows should be seeded into
@@ -134,6 +169,23 @@ export function sessionPlan(
   index: 1 | 2,
 ): SessionPlan {
   return assignment.sessions[index - 1];
+}
+
+/** Stable key for remounting session-local UI when a dev assignment changes. */
+export function sessionFingerprint(
+  assignment: Assignment,
+  index: 1 | 2,
+): string {
+  const plan = sessionPlan(assignment, index);
+  return [
+    assignment.participantKey,
+    assignment.role,
+    assignment.proxyPolicy,
+    assignment.sequenceId,
+    index,
+    plan.condition,
+    plan.taskId,
+  ].join(":");
 }
 
 export function isProxyCondition(condition: Condition): boolean {

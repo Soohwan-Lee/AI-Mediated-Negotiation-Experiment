@@ -15,7 +15,12 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { resolveAssignment } from "@/lib/assignment";
+import {
+  ordersForSequence,
+  resolveAssignment,
+  sequenceForOrders,
+  type TaskOrder,
+} from "@/lib/assignment";
 import {
   DEV_TOOLS_AVAILABLE,
   IS_LIVE_DEPLOYMENT,
@@ -24,11 +29,12 @@ import {
 } from "@/lib/dev-mode";
 import { useParticipant } from "@/lib/participant-context";
 import { FLOW } from "@/lib/study-config";
-import type { ProxyPolicy, Role, SequenceId } from "@/lib/types";
+import type { ProxyPolicy, Role, SessionOrder } from "@/lib/types";
 
 const ROLES: Role[] = ["leader", "member"];
 const POLICIES: ProxyPolicy[] = ["user_specified", "ai_supplemented"];
-const SEQUENCES: SequenceId[] = ["seq1", "seq2", "seq3", "seq4"];
+const MODE_ORDERS: SessionOrder[] = ["direct_first", "proxy_first"];
+const TASK_ORDERS: TaskOrder[] = ["task_a_first", "task_b_first"];
 
 /** Session-index-parameterized routes need a concrete index to link to. */
 const PAGE_LINKS = FLOW.map((s) => ({ key: s.key, href: s.href, label: s.label }));
@@ -60,6 +66,16 @@ export function DevPanel() {
 
   function setSlot(patch: Partial<DevSlot>) {
     dev.update({ slot: { ...dev.slot, ...patch }, slotOverride: true });
+  }
+
+  const orders = ordersForSequence(dev.slot.sequenceId);
+
+  function setModeOrder(modeOrder: SessionOrder) {
+    setSlot({ sequenceId: sequenceForOrders(modeOrder, orders.taskOrder) });
+  }
+
+  function setTaskOrder(taskOrder: TaskOrder) {
+    setSlot({ sequenceId: sequenceForOrders(orders.modeOrder, taskOrder) });
   }
 
   /** Preview of what the current dev slot expands into. */
@@ -224,14 +240,25 @@ export function DevPanel() {
                     </Chip>
                   ))}
                 </SlotRow>
-                <SlotRow label="Seq">
-                  {SEQUENCES.map((s) => (
+                <SlotRow label="Mode">
+                  {MODE_ORDERS.map((order) => (
                     <Chip
-                      key={s}
-                      active={dev.slot.sequenceId === s}
-                      onClick={() => setSlot({ sequenceId: s })}
+                      key={order}
+                      active={orders.modeOrder === order}
+                      onClick={() => setModeOrder(order)}
                     >
-                      {s.replace("seq", "")}
+                      {order === "direct_first" ? "Direct first" : "Proxy first"}
+                    </Chip>
+                  ))}
+                </SlotRow>
+                <SlotRow label="Task">
+                  {TASK_ORDERS.map((order) => (
+                    <Chip
+                      key={order}
+                      active={orders.taskOrder === order}
+                      onClick={() => setTaskOrder(order)}
+                    >
+                      {order === "task_a_first" ? "Task A first" : "Task B first"}
                     </Chip>
                   ))}
                 </SlotRow>

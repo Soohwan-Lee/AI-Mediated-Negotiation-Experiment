@@ -11,6 +11,8 @@
  */
 
 import { use } from "react";
+import { sessionFingerprint } from "@/lib/assignment";
+import { useParticipant } from "@/lib/participant-context";
 import { PracticeRound } from "./practice-round";
 
 export default function PracticePage({
@@ -20,5 +22,9 @@ export default function PracticePage({
 }) {
   const { index } = use(params);
   const taskIndex = (Number(index) === 2 ? 2 : 1) as 1 | 2;
-  return <PracticeRound taskIndex={taskIndex} />;
+  const { assignment } = useParticipant();
+  const fingerprint = assignment
+    ? sessionFingerprint(assignment, taskIndex)
+    : `practice-${taskIndex}-loading`;
+  return <PracticeRound key={fingerprint} taskIndex={taskIndex} />;
 }

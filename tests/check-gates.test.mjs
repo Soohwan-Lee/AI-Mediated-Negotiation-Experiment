@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   readCheckGate,
   readStopReason,
+  taskGateRedirect,
   writeCheckGate,
   writeStopReason,
 } from "../src/lib/check-gates.ts";
@@ -17,6 +18,9 @@ function installStorage(seed = {}) {
       },
       setItem(key, value) {
         entries.set(key, String(value));
+      },
+      removeItem(key) {
+        entries.delete(key);
       },
     },
   };
@@ -42,7 +46,7 @@ test("a participant's attempt count and pending state survive a reload read", ()
   );
 });
 
-test("passed and failed gates remain distinct across task scopes", () => {
+test("legacy failed gates become pending without losing attempt history", () => {
   installStorage();
 
   writeCheckGate("participant-a", "task-1", { status: "passed", attempts: 1 });
@@ -53,23 +57,24 @@ test("passed and failed gates remain distinct across task scopes", () => {
     attempts: 1,
   });
   assert.deepEqual(readCheckGate("participant-a", "task-2"), {
-    status: "failed",
+    status: "pending",
     attempts: 2,
   });
 });
 
-test("check and withdrawal stop reasons persist for the intended participant", () => {
-  installStorage();
+test("legacy check stops are cleared while withdrawal remains terminal", () => {
+  const storage = installStorage();
 
   writeStopReason("participant-a", "check");
   writeStopReason("participant-b", "withdrawal");
 
-  assert.equal(readStopReason("participant-a"), "check");
+  assert.equal(readStopReason("participant-a"), null);
+  assert.equal(storage.has("amne:check-gate:participant-a:stopped"), false);
   assert.equal(readStopReason("participant-b"), "withdrawal");
   assert.equal(readStopReason("participant-c"), null);
 });
 
-test("gate and stop state do not leak between participants", () => {
+test("gate and stop migration does not leak between participants", () => {
   installStorage();
 
   writeCheckGate("participant-a", "common", { status: "failed", attempts: 2 });
@@ -122,5 +127,27 @@ test("server rendering reads neutral state and performs no writes", () => {
   assert.doesNotThrow(() => {
     writeCheckGate("participant-a", "common", { status: "passed", attempts: 1 });
     writeStopReason("participant-a", "check");
+  });
+});
+
+test("task gate routing is shared across common, practice, pass, and withdrawal states", () => {
+  installStorage();
+  assert.deepEqual(taskGateRedirect("participant-a", 1), {
+    href: "/instruction",
+    furthestKey: "instruction",
+  });
+
+  writeCheckGate("participant-a", "common", { status: "passed", attempts: 3 });
+  assert.deepEqual(taskGateRedirect("participant-a", 1), {
+    href: "/practice/1",
+    furthestKey: "practice",
+  });
+
+  writeCheckGate("participant-a", "task-1", { status: "passed", attempts: 4 });
+  assert.equal(taskGateRedirect("participant-a", 1), null);
+
+  writeStopReason("participant-a", "withdrawal");
+  assert.deepEqual(taskGateRedirect("participant-a", 1), {
+    href: "/study-stop?reason=withdrawal",
   });
 });

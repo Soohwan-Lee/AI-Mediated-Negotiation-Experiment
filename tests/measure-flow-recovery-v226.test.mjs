@@ -50,11 +50,15 @@ test("task scale page is one grouped page with draft persistence and explicit su
   assert.doesNotMatch(survey, /setPart|restoredSurveyPart/);
 });
 
-test("reward requires explicit decision and open-answer submission metadata", () => {
+test("reward groups all task open questions behind one explicit submit", () => {
   assert.match(reward, /decision\?\._submitted === true/);
-  assert.match(reward, /_submitted_parts: submittedParts/);
-  assert.match(reward, /_completed: completed/);
-  assert.match(reward, /restoredValidPart\(openBlocks\.map/);
+  assert.match(reward, /openBlocks\.map\(\(block\) =>/);
+  assert.match(reward, /const openMissing = missingIds\(openBlocks, openAnswers\)/);
+  assert.match(reward, /_submitted_parts: 0,[\s\S]*_completed: false/);
+  assert.match(reward, /_submitted_parts: 1,[\s\S]*_completed: true/);
+  assert.match(reward, /_completed: true/);
+  assert.match(reward, /label="Submit & Continue"/);
+  assert.doesNotMatch(reward, /setOpenPart|activeOpenPart/);
   assert.doesNotMatch(reward, /restoredSurveyPart|setShowRemark|RemarkPhase|attr_t/);
 });
 

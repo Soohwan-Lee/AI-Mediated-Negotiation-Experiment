@@ -159,7 +159,11 @@ function getSnapshot(): DevSettings {
           proxyPolicy: LEGACY_POLICY[policy] as DevSettings["slot"]["proxyPolicy"],
         };
       }
-      cached = { ...DEFAULTS, ...parsed };
+      cached = {
+        ...DEFAULTS,
+        ...parsed,
+        slot: { ...DEFAULTS.slot, ...parsed.slot },
+      };
     }
   }
   return cached;

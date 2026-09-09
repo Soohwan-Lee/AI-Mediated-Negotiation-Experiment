@@ -18,7 +18,11 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { resolveAssignment } from "./assignment";
+import {
+  DEV_PARTICIPANT_KEY,
+  participantKeyForDevSlot,
+  resolveAssignment,
+} from "./assignment";
 import { useDevMode } from "./dev-mode";
 import { getStore } from "./store";
 import type {
@@ -54,7 +58,6 @@ const STORAGE_KEY = "amne:session";
  * Stand-in identity and timestamp for a dev-mode assignment. Fixed values, so
  * a synthesized assignment keeps a stable object identity across renders.
  */
-const DEV_PARTICIPANT_KEY = "P-devpreview";
 const DEV_ASSIGNED_AT = "1970-01-01T00:00:00.000Z";
 
 /**
@@ -147,6 +150,11 @@ export function ParticipantProvider({
   const [state, setState] = useState<ParticipantState>(readInitialState);
   const hydrated = useHydrated();
   const dev = useDevMode();
+  const useDevSlot = dev.enabled && (dev.slotOverride || !state.assignment);
+  const effectiveParticipantKey = participantKeyForDevSlot(
+    state.participantKey,
+    useDevSlot,
+  );
 
   // Rehydrate the assignment for a returning participant. This is a genuine
   // external-store read, so it belongs in an effect.
@@ -228,26 +236,26 @@ export function ParticipantProvider({
 
   const logEvent = useCallback<ParticipantContextValue["logEvent"]>(
     (type, payload, extra) => {
-      if (!state.participantKey) return;
+      if (!effectiveParticipantKey) return;
       void getStore().logEvent({
         type,
-        participantKey: state.participantKey,
+        participantKey: effectiveParticipantKey,
         page: extra?.page,
         sessionIndex: extra?.sessionIndex,
         payload,
         clientTimestamp: new Date().toISOString(),
       });
     },
-    [state.participantKey],
+    [effectiveParticipantKey],
   );
 
   const saveResponses = useCallback(
     async (block: string, responses: SurveyResponses) => {
-      if (!state.participantKey) return;
-      await getStore().saveResponses(state.participantKey, block, responses);
+      if (!effectiveParticipantKey) return;
+      await getStore().saveResponses(effectiveParticipantKey, block, responses);
       logEvent("survey_saved", { block });
     },
-    [logEvent, state.participantKey],
+    [effectiveParticipantKey, logEvent],
   );
 
   /**
@@ -256,19 +264,25 @@ export function ParticipantProvider({
    * render, and so both proxy policies and both roles can be previewed without
    * clearing storage. Off in production: `dev.enabled` is a build-time false.
    */
-  const useDevSlot = dev.enabled && (dev.slotOverride || !state.assignment);
   const assignment = useMemo(() => {
     if (!useDevSlot) return state.assignment;
     return resolveAssignment(
-      state.participantKey ?? DEV_PARTICIPANT_KEY,
+      effectiveParticipantKey ?? DEV_PARTICIPANT_KEY,
       dev.slot,
       DEV_ASSIGNED_AT,
     );
-  }, [useDevSlot, state.assignment, state.participantKey, dev.slot]);
+  }, [useDevSlot, state.assignment, effectiveParticipantKey, dev.slot]);
 
   const value = useMemo(
-    () => ({ ...state, assignment, beginStudy, logEvent, saveResponses }),
-    [state, assignment, beginStudy, logEvent, saveResponses],
+    () => ({
+      ...state,
+      participantKey: effectiveParticipantKey,
+      assignment,
+      beginStudy,
+      logEvent,
+      saveResponses,
+    }),
+    [state, effectiveParticipantKey, assignment, beginStudy, logEvent, saveResponses],
   );
 
   // Children need localStorage and URL params, so they wait for the client.
