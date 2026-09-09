@@ -1,5 +1,41 @@
 # Project notes
 
+## CURRENT: Ver.2.26 override (2026-09-09)
+
+The active source is `N - Experimental Design (Ver.2.26).md` in the external
+research vault. Everything below this block is historical where it conflicts
+with Ver.2.26 or [`docs/design-2.26-update.md`](docs/design-2.26-update.md).
+
+- Planned duration is 45 minutes. Direct chat and the optional Proxy direct
+  closing each allow up to five minutes; technical recovery pauses the timer.
+- Payment is £7 base plus £1 additional payment, £8 actual total for completed
+  participants. The role scenario still presents the Leader's £1 as fixed and
+  the Member's £0–£1 as two Leader recommendations of up to £0.50.
+- The ladder remains T1 (1,000 each) for none/WR/priority-only and T2 (3,000
+  each) only after actual SB substance or its authorized abstraction is voiced.
+  A Proxy participant may newly voice SB in direct closing and reach T2 while
+  the original disclosure choice remains false. Impasse is zero.
+- Current participant measures are defined only in `src/lib/measures.ts`:
+  BG1–7, FTS1–3, AIA1–5, IC1–IC6, SCF1–2, SCE1–2, CE1–3, NS1–2,
+  PMP1–4, POP1–4, BR1/FE1, OED1/OEE1/OEP1, RSC1–4, ICC1–3, and OEC1.
+  REMARK, FR, ICC4, ATTR, and the requirement-response self-report are removed.
+- RATIFY remains a behavioral approve/change/decline action and audit field,
+  not a reflective survey item.
+- Storage shapes and current limitations are documented in
+  [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md). Runtime study data and restored
+  assignment are still browser-local, and `/api/assign` still uses the
+  deterministic local rotation rather than an atomic balanced slot claim.
+  Crafted API requests can still supply syntactically valid tier/exchange
+  state. Active negotiation state does not resume after reload. Survey draft
+  recovery is not evidence that a live chat is resumable. The Prolific
+  completion code and failed-check termination/payment policy remain TBD; the
+  current failed-check route is contact-only. Repository payment/duration copy
+  does not update the external Prolific listing. Do not mutate the Supabase
+  schema, environment values, or the canonical vault as part of this
+  alignment.
+- Verified on 2026-09-09 with focused logic/API tests and an approved bounded
+  live smoke. See the Ver.2.26 update document for counts and residual limits.
+
 ## Ver.2.21 alignment override
 
 The design moved to Ver.2.21 (source of truth: `N - Experimental Design
