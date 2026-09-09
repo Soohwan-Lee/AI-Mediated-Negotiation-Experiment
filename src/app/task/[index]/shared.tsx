@@ -1999,6 +1999,7 @@ export function DirectNegotiation({
           },
           {
             signal: controller.signal,
+            onFailure: () => beginRecovery(),
             validate: isCounterpartResponse,
           },
         );
@@ -2070,6 +2071,9 @@ export function DirectNegotiation({
       // the participant or the normal quiet timeout.
       console.error("[nudge]", error);
     } finally {
+      // A retry backoff is a technical pause just like one on a participant
+      // turn. It must not consume their negotiation clock.
+      finishRecovery();
       if (mounted.current && generation === turnGeneration.current) {
         setPending(false);
         activeRequest.current = null;

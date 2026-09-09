@@ -1267,7 +1267,11 @@ export function BaselineTask({
               ...stateForTurn,
             }),
           },
-          { signal: controller.signal, validate: isCounterpartResponse },
+          {
+            signal: controller.signal,
+            onFailure: () => beginRecovery(),
+            validate: isCounterpartResponse,
+          },
         );
         /**
          * WHATEVER COMES BACK IS THE TURN, and this client does not check
@@ -1341,6 +1345,9 @@ export function BaselineTask({
       // the participant or the normal quiet timeout.
       console.error("[nudge]", error);
     } finally {
+      // A retry backoff is a technical pause just like one on a participant
+      // turn. It must not consume their negotiation clock.
+      finishRecovery();
       if (mounted.current && generation === turnGeneration.current) {
         setPending(false);
         activeRequest.current = null;

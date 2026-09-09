@@ -34,6 +34,8 @@ test("both participant-facing chats use the attempt latch without clearing it", 
     )?.[1];
     assert.ok(runNudge, `runNudge not found in ${relative}`);
     assert.match(runNudge, /claimOptionalNudge\(nudgeAttempt\.current\)/);
+    assert.match(runNudge, /onFailure: \(\) => beginRecovery\(\)/);
+    assert.match(runNudge, /finally \{[\s\S]*?finishRecovery\(\)/);
     assert.doesNotMatch(runNudge, /nudgeAttempt\.current\s*=/);
     assert.match(source, /!nudgeAttempt\.current\.attempted/);
 
