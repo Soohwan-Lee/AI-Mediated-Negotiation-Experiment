@@ -51,6 +51,7 @@ import {
   type SbTiming,
 } from "@/lib/negotiation/machine";
 import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
+import { reciprocalAcceptanceText } from "@/lib/negotiation/counterpart-text";
 import {
   INITIAL_EXCHANGE_STATE,
   claimOptionalNudge,
@@ -999,7 +1000,6 @@ export function DirectNegotiation({
   sbFirstChoice,
   messages,
   setMessages,
-  offer,
   setOffer,
   onSettled,
 }: {
@@ -1075,7 +1075,16 @@ export function DirectNegotiation({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [turnError, setTurnError] = useState<string | null>(null);
-  const [stagedTurn, setStagedTurn] = useState<StagedTurn | null>(null);
+  const [stagedTurn, updateStagedTurn] = useState<StagedTurn | null>(null);
+  const stagedTurnRef = useRef<StagedTurn | null>(null);
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  const turnLane = useRef<Promise<void>>(Promise.resolve());
+  const requestedTurn = useRef(0);
+  function setStagedTurn(value: StagedTurn | null) {
+    stagedTurnRef.current = value;
+    updateStagedTurn(value);
+  }
   const [recovering, setRecovering] = useState(false);
   const recoveryStartedAt = useRef<number | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
@@ -1119,7 +1128,7 @@ export function DirectNegotiation({
     // The counterpart disclosed through its own proxy while the participant
     // watched (§6.3). Repeating it in person would give the Proxy arm two
     // disclosures where Direct has one.
-    counterpartSbDisclosed: true,
+    counterpartSbDisclosed: proxyVoicedTier === "sensitive",
   }));
   /** Any participant message so far mentioned score numbers (one-shot pool). */
   const [numbersEver, setNumbersEver] = useState(false);
@@ -1128,7 +1137,7 @@ export function DirectNegotiation({
   /**
    * The rung the standing package was put up at.
    *
-   * "✓ Accept the package on the table" sends that package back through the
+   * "✓ Accept current offer" sends that package back through the
    * machine, and the machine accepts only the CURRENT tier's package. So once
    * a message raises the tier, the package still on screen is superseded: the
    * machine answers `propose_tier` with `accepts: false` and the button does
@@ -1149,8 +1158,6 @@ export function DirectNegotiation({
    * the proxies' package, because that package IS what this conversation is
    * about.
    */
-  const [proposalOpen, setProposalOpen] = useState(Boolean(openingPackage));
-  const openedOnCounterProposal = useRef(Boolean(openingPackage));
 
   /**
    * Every participant message in this task, in order, for the CUMULATIVE
@@ -1162,10 +1169,10 @@ export function DirectNegotiation({
   /** The stored `{text, label, confidence, stance}` log, for gate 19's κ. */
   const classifierLog = useRef<ClassifierLogEntry[]>([]);
   /** When the participant last sent anything, for the client-timed nudge. */
-  const lastParticipantAt = useRef<number>(Date.now());
+  const lastParticipantAt = useRef<number>(0);
+  useEffect(() => { lastParticipantAt.current = Date.now(); }, []);
   const nudgeAttempt = useRef(createOptionalNudgeAttempt());
   /** A message that arrived while a turn was in flight, waiting to be folded. */
-  const queuedText = useRef<string | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -1182,26 +1189,8 @@ export function DirectNegotiation({
   // `Pooled Proxy − Direct` itself. A HALF package is still refused, quietly,
   // for the same reason — it is not a position anyone can answer, and the
   // machine would read it as a lopsided proposal rather than as talk.
-  const chosen = task.issues.filter((i) => offer[i.id]).length;
-  const complete = chosen === task.issues.length;
-  const partial = chosen > 0 && !complete;
-  const attachedSummary = partial
-    ? "Choose both terms, or neither."
-    : complete
-      ? `Attached to your next message: ${task.issues
-          .map(
-            (issue) =>
-              issue.options.find((o) => o.id === offer[issue.id])?.label ?? "",
-          )
-          .filter(Boolean)
-          .join(" · ")}`
-      : "No proposal attached. You are just talking.";
-  // THE COMPOSER STAYS OPEN WHILE THE REPLY IS COMING (§6.1 stage 3). The
-  // turn boundary is the moment the counterpart's reply RENDERS, so anything
-  // sent before then belongs to the same turn — and a locked composer would
-  // make that impossible to do. What arrives during the delay cancels the
-  // pending reply and is folded in.
-  const canSend = useDevGate(!partial) && !settled;
+  // Natural-language terms are resolved without attaching a stale package.
+  const canSend = !settled;
   // One cue on the screen, and it is the composer's (interface rule 9). The
   // package card is not waiting for anything now that a message may be sent
   // without one, so it carries no ring and no pill.
@@ -1362,6 +1351,12 @@ export function DirectNegotiation({
   }
 
   async function runStagedTurn(initialTurn: StagedTurn) {
+    const requestId = ++requestedTurn.current;
+    const previous = turnLane.current;
+    let release!: () => void;
+    turnLane.current = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    if (!mounted.current || requestId !== requestedTurn.current || settledRef.current) { release(); return; }
     const generation = turnGeneration.current + 1;
     turnGeneration.current = generation;
     const controller = new AbortController();
@@ -1430,6 +1425,7 @@ export function DirectNegotiation({
         }
       }
 
+      if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
       const {
         label,
         confidence,
@@ -1530,7 +1526,7 @@ export function DirectNegotiation({
         speaker: "participant",
         text: turn.text,
       };
-      const next = [...messages, own];
+      const next = [...messagesRef.current, own];
       const turnStartedAt = Date.now();
       const stageNow = counterpartStageAfter(replies + DIRECT_STAGE_OFFSET);
       const mentioned = numbersEver || mentionsScoreNumbers(turn.text);
@@ -1540,7 +1536,7 @@ export function DirectNegotiation({
       const stateForTurn: ExchangeState = {
         ...exchange,
         tier: tierNow,
-        disclosurePolicy: "fixed",
+        disclosurePolicy: "reciprocal",
         priorityClaimed: priorityClaimedNow,
         labelConfidence: confidence,
         participantSilent: silentNow,
@@ -1615,6 +1611,14 @@ export function DirectNegotiation({
         reply = decision.accepts
           ? DIRECT_MOCK_REPLIES[1]
           : DIRECT_MOCK_REPLIES[Math.min(replies, DIRECT_MOCK_REPLIES.length - 1)];
+        if (decision.action === "disclose_sb_and_accept" && decision.proposal) {
+          reply = reciprocalAcceptanceText(task, counterpartRole, decision.proposal);
+        } else if (decision.action === "disclose_sb") {
+          reply = `Thanks for telling me. There is something on my side too. || ${cardOfLayer(task, counterpartRole, "sensitive")?.text ?? ""}`;
+        } else if (decision.proposal) {
+          const terms = task.issues.map((issue) => `${issue.options.find((option) => option.id === decision.proposal?.[issue.id])?.label} on ${issue.label.toLowerCase()}`).join(", ");
+          reply = decision.accepts ? `Agreed. ${terms}.` : `How about ${terms}?`;
+        }
       } else {
         const data = await fetchJsonWithRetry<CounterpartResponse>(
           "/api/counterpart",
@@ -1669,7 +1673,7 @@ export function DirectNegotiation({
       // spent. The budget used to apply only to the live branch, so mockup
       // mode replied in 500ms, and it was ADDED to the model's own latency
       // rather than absorbing it.
-      await awaitCounterpartDelay(reply.length, turnStartedAt);
+      await awaitCounterpartDelay(reply.split("||")[0].trim().length, turnStartedAt);
 
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
 
@@ -1708,10 +1712,6 @@ export function DirectNegotiation({
         setLastCounterpartPackage(counterProposal);
         setStandingTier(tierNow);
         setOffer(counterProposal);
-        if (!openedOnCounterProposal.current) {
-          openedOnCounterProposal.current = true;
-          setProposalOpen(true);
-        }
       } else if (tierNow !== standingTier) {
         // Nothing came back to replace it and the rung has moved, so the
         // package on screen can no longer be accepted. Take the button away
@@ -1728,7 +1728,6 @@ export function DirectNegotiation({
       setMessages([...next, counter]);
       setReplies((n) => n + 1);
       setStagedTurn(null);
-      setDraft("");
       setTurnError(null);
 
       classifierLog.current = [
@@ -1827,14 +1826,6 @@ export function DirectNegotiation({
           tier: tierNow,
           selfDisclosed: selfDisclosedNow,
         });
-      } else if (queuedText.current !== null) {
-        // A message arrived while this reply was still on the wire and could
-        // not be folded into it. Send it now rather than dropping it — the
-        // participant pressed send and watched their words disappear
-        // otherwise.
-        const queued = queuedText.current;
-        queuedText.current = null;
-        void send(queued);
       }
     } catch (error) {
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
@@ -1844,6 +1835,7 @@ export function DirectNegotiation({
       setStagedTurn(turn);
       setTurnError("Your message is still here. Select Retry.");
     } finally {
+      release();
       if (mounted.current && generation === turnGeneration.current) {
         setPending(false);
         activeRequest.current = null;
@@ -1870,12 +1862,12 @@ export function DirectNegotiation({
    * One in-flight request at a time, always: a second is queued, never
    * dropped.
    */
-  async function send(text: string, sentOffer: Package = offer) {
+  async function send(text: string, sentOffer: Package = {}) {
     if (settledRef.current) return;
     lastParticipantAt.current = Date.now();
 
-    if (pending || stagedTurn) {
-      const inFlight = stagedTurn;
+    if (activeRequest.current || stagedTurnRef.current || pending) {
+      const inFlight = stagedTurnRef.current;
       // The reply has not rendered yet, so this belongs to the turn in
       // flight. Cancel it and re-run with both messages classified together.
       if (inFlight) {
@@ -1892,23 +1884,26 @@ export function DirectNegotiation({
           sentOffer: { ...sentOffer },
           sentPackage:
             Object.keys(sentOffer).length > 0 ? { ...sentOffer } : null,
-          ownId: `d-p${messages.length + 1}`,
+          ownId: `d-p${participantTexts.current.length}`,
           createdAt: new Date().toISOString(),
           secondsAtSend: secondsRemaining,
         };
-        setMessages((prev) => [
-          ...prev,
-          { id: inFlight.ownId, speaker: "participant", text: inFlight.text },
-        ]);
+        messagesRef.current = [...messagesRef.current, { id: inFlight.ownId, speaker: "participant", text: inFlight.text }];
+        setMessages(messagesRef.current);
+        if (participantKey) void getStore().appendMessage(participantKey, {
+          id: inFlight.ownId, sessionIndex: taskIndex, speaker: "participant",
+          text: inFlight.text, createdAt: inFlight.createdAt,
+        });
         setStagedTurn(merged);
         setDraft("");
         await runStagedTurn(merged);
         return;
       }
       // No staged turn to fold into (a retry is running, say). Queue it.
-      queuedText.current = text;
-      setDraft("");
-      return;
+      // A participant message supersedes an optional nudge immediately.
+      turnGeneration.current += 1;
+      activeRequest.current?.abort();
+      activeRequest.current = null;
     }
 
     participantTexts.current = [...participantTexts.current, text];
@@ -1918,7 +1913,7 @@ export function DirectNegotiation({
       text,
       sentOffer: immutableOffer,
       sentPackage: Object.keys(immutableOffer).length > 0 ? immutableOffer : null,
-      ownId: `d-p${messages.length}`,
+      ownId: `d-p${participantTexts.current.length}`,
       createdAt: new Date().toISOString(),
       secondsAtSend: secondsRemaining,
     };
@@ -1952,7 +1947,7 @@ export function DirectNegotiation({
       const stateForTurn: ExchangeState = {
         ...exchange,
         tier,
-        disclosurePolicy: "fixed",
+        disclosurePolicy: "reciprocal",
         priorityClaimed,
         labelConfidence,
         participantSilent: true,
@@ -2033,10 +2028,6 @@ export function DirectNegotiation({
         setLastCounterpartPackage(proposalNow);
         setStandingTier(tier);
         setOffer(proposalNow);
-        if (!openedOnCounterProposal.current) {
-          openedOnCounterProposal.current = true;
-          setProposalOpen(true);
-        }
       }
       if (participantKey) {
         void getStore().appendMessage(participantKey, {
@@ -2091,7 +2082,7 @@ export function DirectNegotiation({
     if (!lastCounterpartPackage || pending || stagedTurn || settled) return;
     setOffer(lastCounterpartPackage);
     void send(
-      "that works for me — let's go with that.",
+      "I agree to the current offer.",
       lastCounterpartPackage,
     );
   }
@@ -2112,6 +2103,7 @@ export function DirectNegotiation({
 
           <NavigationNotice className="mb-3" />
 
+          {openingPackage ? <Card className="mb-3"><CardTitle>Provisional agreement</CardTitle><TermsList task={task} terms={openingPackage} /><p className="mt-3 text-sm text-slate-600">Confirm or adjust these terms together in the conversation below.</p></Card> : null}
           <ProxyTranscriptPanel transcript={proxyTranscript} />
 
           <div className="sticky top-[calc(var(--header-h)+0.25rem)] z-20 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/95 px-4 py-3 shadow-sm backdrop-blur-md sm:px-5">
@@ -2133,8 +2125,8 @@ export function DirectNegotiation({
                           // adjust — but telling a refuser their proxies "did
                           // not settle" contradicts the screen they just left.
                           refused
-                          ? "You refused what the proxies reached, so nothing is on the table. Talk it through with the other participant, and attach a proposal below when you want to put one up."
-                          : "Your proxies did not settle on a package. Talk it through with the other participant, and attach a proposal below when you want to put one up."}
+                          ? "You refused what the proxies reached, so nothing is on the table. Talk it through with the other participant, and suggest terms in your message."
+                          : "Your proxies did not settle on a package. Talk it through with the other participant, and suggest terms in your message."}
                 </p>
               </div>
               <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -2196,7 +2188,7 @@ export function DirectNegotiation({
 
           <Card className="mb-6 flex flex-col border-slate-200" padded={false}>
             <Transcript
-              messages={messages}
+              messages={stagedTurn ? [...messages, { id: stagedTurn.ownId, speaker: "participant", text: stagedTurn.text }] : messages}
               pending={pending}
               emptyHint={
                 openingPackage
@@ -2205,7 +2197,7 @@ export function DirectNegotiation({
               }
             />
             <MessageComposer
-              value={stagedTurn && pending ? draft : (stagedTurn?.text ?? draft)}
+              value={draft}
               onChange={setDraft}
               onSend={send}
               /* THE COMPOSER STAYS OPEN WHILE THE REPLY IS COMING (§6.1
@@ -2240,68 +2232,14 @@ export function DirectNegotiation({
                 type="button"
                 onClick={acceptStanding}
                 disabled={pending || Boolean(stagedTurn)}
-                className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-2xs transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                className="w-full rounded-xl border-2 border-emerald-700 bg-emerald-600 px-5 py-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
               >
                 ✓ Accept the package on the table
               </button>
             </div>
           ) : null}
 
-          {/* THE PROPOSAL SELECTOR, DEMOTED — identical in copy, position and
-              behaviour to the Direct arm's (baseline-task.tsx). The two must
-              match: these are the two places a participant speaks for
-              themselves, so any difference between them lands on
-              `Pooled Proxy − Direct`, which is the contrast the study is
-              built to make. If you change one, change the other in the same
-              commit. */}
-          <details
-            open={proposalOpen}
-            onToggle={(e) => setProposalOpen(e.currentTarget.open)}
-            className="mb-6 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-sm)]"
-          >
-            <summary className="cursor-pointer list-none rounded-[var(--radius-lg)] px-5 py-4 sm:px-7">
-              <span className="flex items-center justify-between gap-4">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base font-bold leading-snug tracking-tight text-[var(--ink)] sm:text-lg">
-                    📦 Attach a proposal (optional)
-                  </span>
-                  {/* Live, not a static hint — see the Direct arm. */}
-                  <span className="mt-1 block text-sm leading-relaxed text-[var(--ink-3)]">
-                    {attachedSummary}
-                  </span>
-                </span>
-                <span className="shrink-0 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-bold text-[var(--ink-2)]">
-                  {proposalOpen ? "▲ Hide" : "▼ Show"}
-                </span>
-              </span>
-            </summary>
-            <fieldset
-              disabled={pending || Boolean(stagedTurn)}
-              className="space-y-4 px-5 pb-5 disabled:opacity-60 sm:px-7 sm:pb-7"
-            >
-              {task.issues.map((issue) => (
-                <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
-                  <p className="mb-2 text-xs sm:text-sm font-bold text-[var(--ink)]">
-                    {issue.label}
-                  </p>
-                  <OptionChips
-                    issue={issue}
-                    role={role}
-                    name={`direct-${issue.id}`}
-                    value={offer[issue.id] ?? null}
-                    onChange={(v) =>
-                      setOffer((prev) => ({ ...prev, [issue.id]: v }))
-                    }
-                    allowNone
-                    noneLabel="Not specified"
-                  />
-                </div>
-              ))}
-              {/* A half package is the one blocked state, said quietly in the
-                  SUMMARY so it is visible with the drawer shut. No cue ring
-                  and no pill (interface rule 9). */}
-            </fieldset>
-          </details>
+
         </TaskLayout>
       </Page>
 

@@ -401,9 +401,7 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
  * the card at all. Turn count and register stay matched (pilot gate 9).
  *
  * The participant's proxy voices the SB at its FIRST reason opportunity — the
- * §6.5 schedule — and the counterpart proxy keeps the FIXED disclosure schedule
- * rather than Direct's reciprocity rule, so a Proxy participant's receiver
- * experience is the same in every cell.
+ * §6.5 schedule. The counterpart reciprocates only on that disclosure path.
  */
 function proxyScript(
   task: NegotiationTask,
@@ -457,11 +455,7 @@ function proxyScript(
     `Hello, I am the AI Proxy negotiating for ${otherPrincipal} I represent. ${theirWr?.relayed ?? ""} What is the situation on your side?`,
   );
 
-  // Turn 3 is also the same: the counterpart proxy discloses its own SB on the
-  // FIXED schedule (§6.10), which is what Direct's reciprocity rule does not
-  // do — while the participant is watching, the counterpart always discloses,
-  // so a Proxy participant's receiver experience is identical in every cell.
-  // It does NOT depend on the participant's own checkbox.
+  // This reciprocal disclosure is used only on the SB-authorized path.
   const theirDisclosure = m(
     "p4c",
     4,
@@ -510,7 +504,12 @@ function proxyScript(
           }`,
           { reasonCardId: myWr?.id },
         ),
-        theirDisclosure,
+        m(
+          "p4c",
+          5,
+          "counterpart_proxy",
+          "Both terms matter on both sides. Let us work toward a balanced package.",
+        ),
         // Turn 4 — SCRIPT-PROPOSE-T1. Nothing has been said that separates the
         // two terms, so the counterpart splits the difference.
         m(
@@ -545,7 +544,7 @@ function proxyScript(
           { proposal: split },
         ),
         // Turn 7 — the proxy has nothing more it is allowed to say, so it takes
-        // T1 as the tentative package and hands it back for RATIFY.
+        // T1 as the tentative package and hands it back for direct confirmation.
         m(
           "p6p",
           6,
@@ -605,7 +604,7 @@ function proxyScript(
         `Agreed on both terms, then. Each side keeps the one it cannot give up.`,
         { proposal: trade },
       ),
-      // Turn 7 — the package goes back to the participant for RATIFY.
+      // Turn 7 — the package goes back to the participant for direct confirmation.
       m(
         "p6p",
         6,

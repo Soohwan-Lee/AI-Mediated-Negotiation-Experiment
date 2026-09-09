@@ -14,18 +14,15 @@ import type { StageId } from "../types";
  *   1  counterpart proxy  intro + its principal's work reason + the question
  *   2  participant proxy  intro + the reason it is authorized to give
  *                         (the SB, or the §6.6 abstraction, or just the WR)
- *   4  counterpart proxy  its own principal's SB — the fixed schedule, which
- *                         Direct's reciprocity rule does NOT apply to: while
- *                         the participant is watching, the counterpart always
- *                         discloses, so a Proxy participant's receiver
- *                         experience is the same in every cell
+ *   4  counterpart proxy  SB only after participant-side SB; otherwise
+ *                         acknowledge shared work concerns without new facts
  *   5  counterpart proxy  the tier package (T1 with no SB, T2 with one)
  *   5  participant proxy  with an SB: accept. Without one: decline once and
  *                         state the priority — the AI-Supplemented proxy adds
  *                         cover ① here (§6.6 rule b)
  *   5  counterpart proxy  with an SB: confirm. Without one: SCRIPT-ASKWHY and
  *                         the T1 package again
- *   6  participant proxy  accept, and hand the package back for RATIFY
+ *   6  participant proxy  accept, and hand the package back for direct confirmation
  *
  * The priority-claim path costs no points (§3.3, 12th correction) — the proxy
  * declines, states the priority, is asked why, has nothing more to say and

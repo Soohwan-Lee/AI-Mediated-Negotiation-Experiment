@@ -242,7 +242,11 @@ export function Transcript({
   // The newest message, and whether it is one that should arrive bubble by
   // bubble. `flow` is the review screen's static replay of a finished
   // transcript, so nothing staggers there.
-  const last = messages[messages.length - 1];
+  // Participant messages may arrive while an incoming turn is still revealing.
+  // Keep that turn's reveal clock instead of exposing its remaining bubbles.
+  const last = messages.findLast((message) =>
+    message.speaker !== "participant" && message.speaker !== "system",
+  );
   const lastBubbles = splitBubbles(last?.text ?? "");
   const staggerLast =
     !flow &&
@@ -316,9 +320,6 @@ export function Transcript({
             {bubbles.map((bubble, i) => (
               <div
                 key={`${m.id}-${i}`}
-                style={
-                  flow ? undefined : { animationDelay: `${i * 0.45}s` }
-                }
                 className={cx(
                   "max-w-[85%] sm:max-w-[78%] px-4 py-3 text-sm sm:text-[0.9375rem] leading-relaxed shadow-2xs break-words [overflow-wrap:anywhere]",
                   flow ? undefined : "bubble-in",
@@ -339,7 +340,7 @@ export function Transcript({
         );
       })}
 
-      {pending
+      {pending || (staggerLast && shownOfLast < lastBubbles.length)
         ? (() => {
             const p = SPEAKER_CONFIG[pendingSpeaker] ?? SPEAKER_CONFIG.counterpart;
             // A person is "typing"; a proxy is not pretending to be one, so it

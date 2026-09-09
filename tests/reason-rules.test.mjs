@@ -97,6 +97,7 @@ const other = (role) => (role === "leader" ? "member" : "leader");
 /** A plain trade-loop exchange state with everything one-shot already spent. */
 const state = (tier, extra = {}) => ({
   tier,
+  counterpartSbDisclosed: true,
   askedWhy: true,
   askSitUsed: true,
   numbersReminded: true,
@@ -655,7 +656,7 @@ for (const taskId of TASKS) {
     const task = getTask(taskId);
     const counterpart = other(role);
     const direct = (tier, extra = {}) =>
-      state(tier, { disclosurePolicy: "reciprocal", ...extra });
+      state(tier, { disclosurePolicy: "reciprocal", counterpartSbDisclosed: false, ...extra });
 
     for (const tier of ["none", "work"]) {
       test(`${taskId}/${role}/Direct: ${tier} can accept its own rung with no disclosure at all`, () => {
@@ -747,7 +748,7 @@ test("role briefings use the same neutral disclosure notice and £0.50 decision"
   assert.equal(notices.size, 1, "the notice must not vary by role or task");
 });
 
-test("Proxy observation keeps its fixed stage-4 disclosure schedule", () => {
+test("legacy fixed-policy callers also require participant disclosure", () => {
   // The counterpart proxy always discloses while the participant watches, at
   // every tier — so a Proxy participant's receiver experience is the same in
   // every cell, which Direct's reciprocity rule deliberately is not.
@@ -756,8 +757,9 @@ test("Proxy observation keeps its fixed stage-4 disclosure schedule", () => {
     const decision = counterpartStep(task, "member", 4, null, {
       ...state(tier),
       disclosurePolicy: "fixed",
+      counterpartSbDisclosed: false,
     });
-    assert.equal(decision.action, "disclose_sb");
+    assert.equal(decision.action, tier === "sensitive" ? "disclose_sb" : "propose_tier");
   }
 });
 
@@ -1236,7 +1238,7 @@ for (const taskId of TASKS) {
   }
 }
 
-test("the WR-only mockup keeps the counterpart's own disclosure on its fixed schedule", () => {
+test("the WR-only mockup never discloses either side's sensitive background", () => {
   // §6.10: Direct's RECIPROCITY rule does not apply in the Proxy arm. While
   // the participant is watching, the counterpart proxy always discloses, so a
   // Proxy participant's receiver experience is the same in every cell — it
@@ -1248,11 +1250,18 @@ test("the WR-only mockup keeps the counterpart's own disclosure on its fixed sch
         const task = getTask(taskId);
         const script = scriptedTask(task, role, condition, false);
         assert.ok(
-          script.messages.some(
+          !script.messages.some(
             (m) => m.speaker === "counterpart_proxy" && m.stage === 4,
           ),
-          `${taskId}/${role}/${condition}: the counterpart still discloses on the WR-only path`,
+          `${taskId}/${role}/${condition}: no counterpart disclosure on WR-only path`,
         );
+        for (const side of [role, other(role)]) {
+          const sb = cardOfLayer(task, side, "sensitive");
+          for (const message of script.messages) {
+            assert.ok(!message.text.includes(sb.relayed));
+            assert.ok(!message.text.includes(sb.abstract));
+          }
+        }
       }
     }
   }

@@ -277,14 +277,16 @@ function counterpartPrincipalPrompt(ctx: PromptContext): string {
   const brief = ctx.task.roleBriefs[ctx.agentRole];
   return `You are a participant in an online workplace negotiation study.
 Your AI Proxy just negotiated for you while you and the other participant both
-watched. The other participant asked to change or declined the provisional
-deal, and you are now closing it with them directly.
+watched. You are now discussing the provisional terms directly. Both of you
+must confirm the final agreement in this conversation.
 ${HUMAN_CHAT_STYLE}
 - Never state or imply that you are an AI, a model, or part of an experiment.
 - 1-2 bubbles is enough here; the ground was covered by the proxies. A short
   opener is fine ("did you catch all that?").
 - Do not repeat what the proxies already said; refer back to it naturally
   ("like mine said", "given what came up").
+- If the instructed move asks you to disclose new background, say it now.
+  Otherwise do not assume either proxy shared sensitive background.
 - Do not add conditions, reasons, or facts of your own. Acceptance and
   packages are decided by the system, not by you.
 - Do not mirror a disclosure of theirs unless the instructed action explicitly
@@ -338,7 +340,7 @@ function userSpecifiedPrompt(ctx: PromptContext): string {
   return `You are an AI negotiation Proxy for a human principal. Both sides are
 represented by Proxies; both principals watch live. You negotiate without
 turn-by-turn approval. Whatever you reach is tentative: your principal reviews
-it afterwards and decides whether to approve, change or refuse it.
+it together with the other principal in a direct closing conversation.
 
 POLICY (both principals know): a User-Specified Proxy may use only the reasons
 checked by its own principal, and passes them on as they are.
@@ -365,9 +367,8 @@ ${ctx.mandateSummary ?? "(no mandate provided)"}
 REASONS YOU MAY USE (the work reason always; the sensitive one only if checked):
 ${listOrNone(ctx.authorizedReasons, "(none checked)")}
 
-REASONS YOU MUST NEVER SAY (unchecked — they may inform which package you
-choose, and must never appear in your text):
-${listOrNone(ctx.forbiddenReasons, "(none)")}
+Unchecked background is unavailable. Never infer or invent it. Only use the
+reason designated for this turn, and no additional private facts.
 
 SCENARIO:
 ${ctx.task.publicBrief}
@@ -379,17 +380,15 @@ ${SHARED_RULES}
 WHAT YOU MAY AND MAY NOT DO
 - Use only the opening levels and the checked reasons above. You may
   rephrase; you may not add.
-- RELAY: keep EVERY fact in the card — the event, the third party, and the
-  fact that it was not passed on — and re-voice it as their representative
-  ("${principal} I represent tells me that after the last presentation, the
-  client asked them directly that... and they have not raised it since").
+- RELAY: keep EVERY fact in the designated card and re-voice it as their
+  representative. Do not invent an event or a third party.
   Paraphrase is fine. Adding, dropping, softening or exaggerating a fact is
   not.
 - One reason per message; each reason at most once per task. WHICH reason,
   and when, is designated in your instructed move — give that reason and no
   other, and give none when the move names none.
 - YOU CANNOT BIND YOUR PRINCIPAL. Whatever you reach is tentative: they
-  review it afterwards and decide whether to approve, change or refuse it.
+  confirm the final terms directly with the other principal afterwards.
 - Set reasonSourceId to the id of the checked card your message draws on, or
   null when it draws on none.
 - Leave addedReasonSourceId null. Neither policy may add a reason of its own.

@@ -27,6 +27,7 @@ const protocol = await import("../src/lib/negotiation/proxy-protocol.ts");
 const validator = await import("../src/lib/ai/validator.ts");
 
 const TASK_A = tasks.getTask("task_a");
+const { buildSystemPrompt } = await import("../src/lib/ai/prompts.ts");
 
 /**
  * Loads the route with a `generateAction` that records every prompt context it
@@ -259,11 +260,17 @@ test("the counterpart proxy discloses in the SAME policy's form", async () => {
   // counterpart's card whole here would leave that half of the manipulation
   // unrun.
   const theirSb = tasks.cardOfLayer(TASK_A, "leader", "sensitive");
-  const { POST, seen } = await loadRoute();
+  const { POST, seen } = await loadRoute((ctx) => ctx.abstractedSentences?.join(" ") ?? "The position stands.");
+  const voiced = await (await post(POST, {
+    policy: "ai_supplemented",
+    mandate: mandate("member", { sb: true }),
+    turn: 1,
+  })).json();
   await post(POST, {
     policy: "ai_supplemented",
     mandate: mandate("member", { sb: true }),
     turn: 2,
+    reasonsUsed: voiced.reasonTokens,
   });
   const ctx = seen.at(-1);
   assert.equal(ctx.supplementedFrame, theirSb.frame);
@@ -313,10 +320,8 @@ test("an unchecked SB never reaches the prompt as a sayable reason", async () =>
     turn: protocol.PROXY_FIRST_REASON_TURN,
   });
   const ctx = seen.at(-1);
-  assert.ok(
-    ctx.forbiddenReasons.some((r) => r.id === SB_A_MEMBER.id),
-    "the withheld card must be listed as forbidden",
-  );
+  assert.equal(ctx.forbiddenReasons, undefined, "withheld facts must not enter the render prompt");
+  assert.ok(!ctx.authorizedReasons.some((r) => r.id === SB_A_MEMBER.id));
   assert.ok(!ctx.decidedAction.includes(SB_A_MEMBER.text));
   assert.equal(ctx.abstractedSentences, undefined);
 });
@@ -524,4 +529,54 @@ test("the exchange settles at the SB rung when the SB was authorized", async () 
   // simulation.
   assert.ok(settled, "the proxies must always settle (§2.6: no mandate floor)");
   void best;
+});
+
+for (const taskId of ["task_a", "task_b"]) {
+  for (const role of ["leader", "member"]) {
+    for (const policy of ["user_specified", "ai_supplemented"]) {
+      test(`${taskId}/${role}/${policy}: WR-only render prompts and transcript exclude both SBs`, async () => {
+        const task = tasks.getTask(taskId);
+        const mandate = {
+          sessionIndex: 1, revisionCount: 0,
+          issues: task.issues.map((issue) => ({ issueId: issue.id, preferredOptionId: tasks.rankedOptions(task, issue.id, role)[0].id })),
+          authorizedReasonIds: [tasks.cardOfLayer(task, role, "work").id],
+        };
+        const { POST, seen } = await loadRoute((ctx) => ctx.authorizedReasons?.map((reason) => task.roleBriefs[role].reasonCards.find((card) => card.id === reason.id)?.relayed).join(" ") || "Both terms matter. Let us find a balanced package.");
+        let reasonsUsed = [], lastParticipantPackage = null, lastCounterpartPackage = null;
+        const history = [];
+        for (let turn = 0; turn < protocol.PROXY_TOTAL_TURNS; turn++) {
+          const result = await (await post(POST, { taskId, participantRole: role, policy, mandate, turn, reasonsUsed, lastParticipantPackage, lastCounterpartPackage, history })).json();
+          assert.ok(!["disclose_sb", "disclose_sb_and_accept"].includes(result.decidedAction));
+          assert.notEqual(result.voicedTier, "sensitive");
+          history.push(result.message);
+          reasonsUsed.push(...result.reasonTokens);
+          if (result.message.proposal) {
+            if (result.message.speaker === "participant_proxy") lastParticipantPackage = result.message.proposal;
+            else lastCounterpartPackage = result.message.proposal;
+          }
+        }
+        for (const side of ["leader", "member"]) {
+          const sb = tasks.cardOfLayer(task, side, "sensitive");
+          for (const ctx of seen) {
+            const prompt = buildSystemPrompt(policy, ctx);
+            assert.ok(!prompt.includes(sb.text));
+            assert.ok(!prompt.includes(sb.abstract));
+          }
+          for (const message of history) {
+            assert.ok(!message.text.includes(sb.relayed));
+            assert.ok(!message.text.includes(sb.abstract));
+          }
+        }
+        assert.equal(tasks.scorePackage(task, lastParticipantPackage, role), 1000);
+        assert.equal(tasks.scorePackage(task, lastParticipantPackage, role === "leader" ? "member" : "leader"), 1000);
+      });
+    }
+  }
+}
+
+test("authorization without actual participant reason tokens cannot trigger counterpart disclosure", async () => {
+  const { POST, seen } = await loadRoute();
+  const result = await (await post(POST, { policy: "ai_supplemented", mandate: mandate("member", { sb: true }), turn: 2, reasonsUsed: [] })).json();
+  assert.notEqual(result.decidedAction, "disclose_sb");
+  assert.equal(seen.at(-1).abstractedSentences, undefined);
 });

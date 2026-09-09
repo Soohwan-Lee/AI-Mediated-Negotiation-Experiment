@@ -440,7 +440,17 @@ export function mockClassify(
   // CUMULATIVE, like the real route (§6.2a). A confession arrives across two or
   // three messages; judged one at a time none of them is an SB on its own, and
   // that floor is the single easiest way to invalidate the primary contrast.
-  const joined = texts.join(" ");
+  const joined = texts
+    .filter((text) => !/\b(?:hypothetically|what if|imagine|suppose|it's not like|it is not like|never promised|did not promise|didn't promise|did not complain|didn't complain|client never|never criticized)\b/i.test(text))
+    .join(" ");
+  // Recognize common dev paraphrases of the four fixed role events. This is
+  // intentionally task-specific and remains an offline walkthrough aid.
+  const eventMatch: Record<string, boolean> = {
+    a_sb_m: /\bclient\b/i.test(joined) && /\b(?:asked|wanted|prefer|rather)\b/i.test(joined) && /\b(?:you|lead)\b/i.test(joined) && /present/i.test(joined),
+    b_sb_m: /\bclient\b/i.test(joined) && /report/i.test(joined) && /(?:not good|not enough|poor|insufficient|lacking|asked|wanted|prefer)/i.test(joined),
+    a_sb_l: /\b(?:promised|told|committed)\b/i.test(joined) && /\bdirector\b/i.test(joined) && /(?:four|4) days/i.test(joined),
+    b_sb_l: /(?:underestimated|understaff|too few people)/i.test(joined) && /(?:project|staff|people|team)/i.test(joined),
+  };
 
   // THE WORK CARD IS SUBTRACTED WHEN TESTING FOR SB, and it has to be. Both
   // cards argue for the SAME issue (§4), so they share their distinctive
@@ -455,7 +465,7 @@ export function mockClassify(
   ];
 
   const label: ReasonLabel =
-    cards.sensitive && leaks(joined, [cards.sensitive], sbSayable)
+    cards.sensitive && (eventMatch[cards.sensitive.id] || leaks(joined, [cards.sensitive], sbSayable))
       ? "SB"
       : cards.work && leaks(joined, [cards.work], [...cards.sayable])
         ? "WR"
@@ -466,7 +476,7 @@ export function mockClassify(
   // matched on the LATEST message only: agreeing is about what is on the table
   // now, unlike a disclosure, which accumulates.
   const latest = texts[texts.length - 1] ?? "";
-  const stance: ReasonStance = /\b(that works for me|works for me|sounds good|let's go with that|i accept|agreed)\b/i.test(
+  const stance: ReasonStance = /\b(that works for me|works for me|sounds good|let's go with that|i accept|i agree|agreed)\b/i.test(
     latest,
   )
     ? "accept"

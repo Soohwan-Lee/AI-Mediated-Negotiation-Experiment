@@ -86,7 +86,6 @@ import type {
   StageId,
   TaskId,
 } from "@/lib/types";
-import { RatifyPhase, type RatifyChoice } from "./ratify";
 import { ReviewPhase } from "./review";
 import {
   DirectNegotiation,
@@ -105,7 +104,6 @@ type Phase =
   | "confirm"
   | "matchmaking"
   | "watching"
-  | "ratify"
   | "handover"
   | "negotiate"
   | "review";
@@ -117,32 +115,18 @@ const PHASES: Phase[] = [
   "confirm",
   "matchmaking",
   "watching",
-  "ratify",
   "handover",
   "negotiate",
   "review",
 ];
 
-/**
- * The phases the progress bar counts. The cover is not one of them: it is the
- * screen you are on before the task starts, and filling the first segment
- * would make the bar read as part-done before anything had happened.
- */
-/**
- * The phases the progress bar counts.
- *
- * "Your decision" covers both the RATIFY screen and the closing conversation
- * that modify-or-reject leads to, because they are one step from the
- * participant's side — deciding what happens to the package — and an approver
- * never sees the second half. A separate segment for the conversation would
- * make the bar show a step that most participants skip.
- */
+/** Every Proxy session includes a direct closing conversation. */
 const STEP_LABELS = [
   "Your briefing",
   "Your instructions",
   "Check and start",
   "Watch",
-  "Your decision",
+  "Confirm together",
   "Review",
 ];
 
@@ -162,7 +146,6 @@ const PHASE_LABELS: Record<Phase, string> = {
   confirm: "Check and start",
   matchmaking: "Connecting",
   watching: "Watch",
-  ratify: "Your decision",
   handover: "Handover",
   negotiate: "Talk it through",
   review: "Review",
@@ -238,7 +221,6 @@ const STEP_OF: Record<Phase, number> = {
   confirm: 2,
   matchmaking: 3,
   watching: 3,
-  ratify: 4,
   handover: 4,
   negotiate: 4,
   review: 5,
@@ -382,13 +364,7 @@ export function ProxyTask({
    * autofill's updater reads it and a re-render is neither needed nor wanted.
    */
   const sbTouched = useRef(false);
-  /**
-   * RATIFY (§9.3) — recorded on the decision screen, not inferred afterwards.
-   * A participant who asked for a change and then agreed the very same package
-   * is a modifier, and coding them off the final package would call them an
-   * approver.
-   */
-  const [ratify, setRatify] = useState<RatifyChoice | null>(null);
+  const ratify = null; // Legacy audit field: no separate approval was requested.
   /** What the closing conversation produced, for the outcome row (§9.3). */
   const [closing, setClosing] = useState<{ selfDisclosed: boolean } | null>(
     null,
@@ -434,7 +410,6 @@ export function ProxyTask({
         // Only `review` was seeded, which hid it: that screen was the one
         // being checked.
         const needsExchange =
-          p === "ratify" ||
           p === "handover" ||
           p === "negotiate" ||
           p === "review";
@@ -621,7 +596,7 @@ export function ProxyTask({
         },
         { sessionIndex: taskIndex },
       );
-      setPhase("ratify");
+      setPhase("handover");
       return;
     }
 
@@ -819,7 +794,7 @@ export function ProxyTask({
         },
         { sessionIndex: taskIndex },
       );
-      setPhase("ratify");
+      setPhase("handover");
     } catch (e) {
       console.error(e);
       setError(
@@ -1381,49 +1356,12 @@ export function ProxyTask({
     );
   }
 
-  // --- RATIFY: the decision the participant kept (Ver.2.13 §7) ------------
-  if (phase === "ratify") {
-    return (
-      <RatifyPhase
-        taskIndex={taskIndex}
-        task={task}
-        role={role}
-        steps={STEP_LABELS}
-        stepIndex={STEP_OF.ratify}
-        tentative={tentative}
-        proxyTranscript={transcript}
-        onDecide={(choice) => {
-          setRatify(choice);
-          // Design §7: approval finalizes; only modification/refusal opens chat.
-          if (choice === "approved_as_is" && tentative) {
-            setProxyTranscript(transcript);
-            setClosing({ selfDisclosed: false });
-            logEvent("task_outcome_recorded", {
-              sb: sbFirstChoice,
-              sbTiming: proxySbTiming(sbFirstChoice, false),
-              // What the proxy actually got out, recorded BESIDE the choice
-              // rather than instead of it: a divergence between the two is a
-              // guardrail block or an emergency stop, and it has to stay
-              // legible instead of being folded into the primary measure.
-              proxyVoicedTier,
-            }, { sessionIndex: taskIndex });
-            setPhase("review");
-          } else {
-            setPhase("handover");
-          }
-          window.scrollTo({ top: 0 });
-        }}
-      />
-    );
-  }
-
-  // Only modification/refusal leads here (Design §7).
+  // All participants confirm together in a direct closing conversation.
   if (phase === "handover") {
-    const refused = ratify === "rejected";
     return (
       <TaskCover
         eyebrow="Your closing conversation"
-        title={refused ? "Discuss a new package" : "Discuss your changes"}
+        title="Confirm the agreement together"
         /* THE SCENE IS THE DIRECT ONE, and that is the point: from here the
            proxies are done and the two people talk. The representative gets
            one closing line above it — it opened the delegation, so it closes
@@ -1443,46 +1381,33 @@ export function ProxyTask({
                 <p className="text-[0.625rem] font-extrabold uppercase tracking-wider text-indigo-700">
                   Your AI Proxy
                 </p>
-                {/* Fixed wording in both branches apart from the clause naming
-                    what the participant chose, which is their own decision
-                    read back and not an evaluation of it. No thanks, no
-                    apology, no assessment of how it went: RATIFY's three
-                    options carry equal weight and the screen after it may not
-                    grade the one that was taken. */}
                 <p className="mt-0.5 text-sm leading-relaxed text-indigo-950">
-                  {refused
-                    ? "That is me done, then. I have stepped back and nothing is agreed. You take it from here. You are speaking for yourself now."
-                    : "That is me done, then. I have stepped back and left the package on the table. You take it from here. You are speaking for yourself now."}
+                  My part is done. The proposed terms are on the table. Please discuss them directly with the other participant and confirm your agreement together.
                 </p>
               </div>
             </div>
             <p className="text-base leading-relaxed text-slate-700">
-              {refused
-                ? "You refused the proposed package. Nothing is agreed. You will now discuss both conditions with the other participant yourself."
-                : "You asked to change the proposed package. Tell the other participant what you would like to change."}
+              Speak directly with the other participant about the proposed terms and your reasons. Both of you must confirm the final agreement.
             </p>
           </>
         }
         steps={[
           { label: "Review the exchange", hint: "The AI Proxies' conversation stays available above your chat." },
-          { label: "Make your proposal", hint: "Choose one option for each condition and write your message." },
+          { label: "Discuss the terms and reasons", hint: "Write naturally. You can confirm the proposal or suggest different terms." },
           { label: "Agree on both conditions", hint: "If time runs out without agreement, nothing is settled and you both score 0 for this task." },
         ]}
-        minutes={2}
+        minutes={5}
         actionLabel="Start the closing conversation"
         onStart={() => {
           setProxyTranscript(transcript);
           setMessages([]);
-          // A REFUSAL LEAVES NOTHING ON THE TABLE. Carrying the proxies'
-          // package into the composer would put back exactly what the
-          // participant just refused, and the counterpart would read it as
-          // their standing offer.
-          setOffer(refused ? {} : (tentative ?? {}));
+          setOffer(tentative ?? {});
           logEvent(
             "negotiation_started",
             {
               phase: "direct",
               ratify,
+              confirmationMode: "direct_required",
               proxyOutcome: tentative ? "package" : "no_package",
               proxyMessages: transcript.length,
             },
@@ -1508,8 +1433,8 @@ export function ProxyTask({
         // the opening would put back exactly what the participant just
         // refused, and the counterpart would treat it as an offer on the
         // table (Ver.2.13 §7).
-        openingPackage={ratify === "rejected" ? null : tentative}
-        refused={ratify === "rejected"}
+        openingPackage={tentative}
+        refused={false}
         proxyVoicedTier={proxyVoicedTier}
         /* `SB` is the checkbox, decided at DECISION-LOCK — see
            `proxySbFirstChoice`. The closing cannot change it; a confession

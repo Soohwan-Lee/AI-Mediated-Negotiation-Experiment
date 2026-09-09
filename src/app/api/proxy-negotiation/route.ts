@@ -11,12 +11,12 @@
  *
  *   0 counterpart proxy  intro + its principal's work reason + the question
  *   1 participant proxy  intro + the reason it is authorized to give
- *   2 counterpart proxy  its own principal's SB, on the FIXED schedule
+ *   2 counterpart proxy  its own principal's SB only after participant-side SB
  *   3 counterpart proxy  the tier package (T1 with no SB, T2 with one)
  *   4 participant proxy  with an SB: accept. Without: decline once and state
  *                        the priority (AI-Supplemented adds cover ① here)
  *   5 counterpart proxy  with an SB: confirm. Without: ASKWHY and T1 again
- *   6 participant proxy  accept, and hand the package back for RATIFY
+ *   6 participant proxy  accept, and hand the package back for direct mutual confirmation
  *
  * BOTH POLICIES RUN THE SAME TURNS, and that is an exposure control (§7): if
  * one policy simply got more turns to speak in, any difference in what the
@@ -115,9 +115,8 @@ function mandateSummary(mandate: Mandate, taskId: TaskId): string {
 /**
  * The reason cards, split into what the proxy may say and what it may not.
  *
- * Both lists go into the prompt. Design §12 P3 requires the unchecked cards
- * to be present so the proxy can let them inform WHICH PACKAGE it chooses
- * while never putting them into words.
+ * Unchecked facts never enter the rendering prompt. The machine chooses
+ * the package without asking the language model to infer private priorities.
  *
  * THE WORK CARD IS ALWAYS AUTHORIZED (§8.7, Ver.2.21). The mandate screen
  * shows it ticked and locked, so it should always be in `authorizedReasonIds`
@@ -539,7 +538,7 @@ export async function POST(request: Request) {
       body.lastParticipantPackage ?? plan.tradeProposal,
       {
         tier,
-        disclosurePolicy: "fixed",
+        disclosurePolicy: "reciprocal",
         counterpartSbDisclosed: true,
         // The AI-AI exchange spends its one ASKWHY at turn 5 by script, not by
         // the machine's own bookkeeping, so the flag is set here.
@@ -668,7 +667,7 @@ export async function POST(request: Request) {
       // The last participant turn — the close, answering the counterpart's
       // previous decision. The proxy takes what is on the table as the
       // tentative package: there is no mandate floor it could fail (§2.6), and
-      // the participant's control is the checkbox before and RATIFY after.
+      // the participant confirms the final terms directly afterwards.
       const decision = evaluate();
       const settle = decision.proposal ?? plan.tentative;
       proposal = settle;
@@ -682,7 +681,7 @@ export async function POST(request: Request) {
     if (turn === 0) {
       const decision = counterpartStep(task, counterpartRole, 1, null, {
         tier,
-        disclosurePolicy: "fixed",
+        disclosurePolicy: "reciprocal",
         askedWhy: true,
         numbersReminded: true,
       });
@@ -692,11 +691,13 @@ export async function POST(request: Request) {
       // BOTH terms — and the question. No package and no priority of its own.
       const openWr = cardOfLayer(task, counterpartRole, "work");
       decidedAction = `Open the exchange. Introduce yourself as the AI Proxy negotiating for the ${counterpartRole === "leader" ? "team lead" : "team member"} you represent. Give their reason by conveying exactly this and nothing more: "${openWr?.text ?? ""}". Do NOT say which of the two terms matters most to them. Then ask what the situation is on the other side. Propose no levels this turn.`;
+    } else if (turn === 2 && tier !== "sensitive") {
+      // No participant SB was actually voiced. Keep this matched turn WR-only.
+      counterpartAction = "acknowledge_work";
+      effectiveStage = 5;
+      decidedAction = "Acknowledge that both terms matter on both sides. Say you can work toward a balanced package. Give no new reason, background, priority, or private fact, and attach no package yet.";
     } else if (turn === 2) {
-      // THE FIXED SB DISCLOSURE (§6.3). While the participant is WATCHING, the
-      // counterpart proxy always discloses — Direct's reciprocity rule does
-      // NOT apply here — so a Proxy participant's receiver experience is the
-      // same in every cell.
+      // Participant-side SB was actually voiced, so reciprocate once.
       const sb = cardOfLayer(task, counterpartRole, "sensitive");
       designatedCard = sb ?? null;
       counterpartAction = "disclose_sb";
@@ -725,7 +726,7 @@ export async function POST(request: Request) {
       // the maximum and negotiation skill cannot separate outcomes.
       const decision = counterpartStep(task, counterpartRole, 5, null, {
         tier,
-        disclosurePolicy: "fixed",
+        disclosurePolicy: "reciprocal",
         counterpartSbDisclosed: true,
         askedWhy: true,
         numbersReminded: true,
@@ -791,11 +792,13 @@ export async function POST(request: Request) {
             ? mandateSummary(body.mandate, body.taskId)
             : undefined,
           authorizedReasons: isParticipantSide
-            ? mandateReasons?.authorized
+            ? mandateReasons?.authorized.filter((reason) =>
+                reason.id === designatedCard?.id &&
+                !(body.policy === "ai_supplemented" && reason.sensitive),
+              )
             : undefined,
-          forbiddenReasons: isParticipantSide
-            ? mandateReasons?.forbidden
-            : undefined,
+          // Unchecked facts never enter a language-generation prompt.
+          forbiddenReasons: undefined,
           // THE §6.6 FRAME AND SENTENCES, WHEN THIS TURN RENDERS THEM. Handed
           // over already shuffled: the abstraction's POSITION must carry no
           // information, or a receiver could sort the principal's own
@@ -877,6 +880,15 @@ export async function POST(request: Request) {
         // Logged, not raised: the first attempt is still a valid message.
         console.warn("[proxy-negotiation] card retry failed", retryError);
       }
+    }
+
+    // A missed clause cannot be credited as a disclosure. After the bounded
+    // retry, use the task's approved wording so the actual text and tier agree.
+    if (requiredText && !mentionsCard(action.rationale, requiredText)) {
+      const reasonText = abstractedSentences
+        ? `${supplementedFrame ?? ""} ${abstractedSentences.join(" ")}`
+        : designatedCard?.relayed ?? supplementalReason ?? "";
+      action = { ...action, rationale: reasonText };
     }
 
     // On the participant side the SCHEDULE is the record, not the model's

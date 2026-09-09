@@ -392,8 +392,7 @@ export async function POST(request: Request) {
 
   const state: ExchangeState = {
     tier: body.tier ?? "none",
-    disclosurePolicy:
-      body.disclosurePolicy ?? (body.afterProxy ? "fixed" : "reciprocal"),
+    disclosurePolicy: "reciprocal",
     counterpartSbDisclosed: body.counterpartSbDisclosed ?? false,
     priorityClaimed: body.priorityClaimed ?? false,
     askedWhy: body.askedWhy ?? false,

@@ -333,8 +333,7 @@ export interface CounterpartDecision {
 export interface ExchangeState {
   tier: ReasonTier;
   /**
-   * Direct gates the counterpart's sensitive background on reciprocity.
-   * Proxy observation keeps the fixed disclosure schedule.
+   * Legacy wire field. Every value now uses reciprocity (Ver.2.27).
    */
   disclosurePolicy?: "reciprocal" | "fixed";
   /** Has the counterpart already voiced its sensitive background? */
@@ -429,7 +428,8 @@ export function counterpartStep(
 
   const base = { stage, impasse: false };
 
-  const reciprocal = state.disclosurePolicy === "reciprocal";
+  // Ver.2.27: reciprocity applies in every mode, including legacy callers.
+  const reciprocal = true;
   const expired =
     state.secondsRemaining !== undefined && state.secondsRemaining <= 0;
   const needsNumberReminder =
@@ -900,7 +900,7 @@ export function proxyAccepts(
     return true;
   }
   // Nothing left to say: take what is on the table as the tentative package
-  // (§8.6). The participant decides at RATIFY.
+  // (§8.6). The participants confirm directly after the proxy exchange.
   return reasonsRemaining <= 0;
 }
 

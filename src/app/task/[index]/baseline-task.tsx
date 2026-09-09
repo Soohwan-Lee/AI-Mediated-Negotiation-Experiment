@@ -21,7 +21,6 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { OptionChips } from "@/components/issues";
 import { NavigationNotice } from "@/components/navigation-notice";
 import {
   CountdownTimer,
@@ -35,7 +34,6 @@ import { Card, Cue, Page } from "@/components/ui";
 import {
   useDevActions,
   useDevAutofill,
-  useDevGate,
   useDevMockAi,
 } from "@/lib/dev-mode";
 import {
@@ -61,6 +59,7 @@ import {
   resolveCounterTerms,
   disclosureChoiceAtLock,
   storedLabel,
+  mockClassify,
   takeExchangeState,
   type ClassificationResponse,
   type ClassifierLogEntry,
@@ -72,6 +71,7 @@ import {
   seededOpeningText,
 } from "@/lib/negotiation/counterpart-text";
 import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
+import { leaksForbiddenReason } from "@/lib/ai/reason-leak";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
@@ -302,14 +302,23 @@ export function BaselineTask({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [turnError, setTurnError] = useState<string | null>(null);
-  const [stagedTurn, setStagedTurn] = useState<StagedTurn | null>(null);
+  const [stagedTurn, updateStagedTurn] = useState<StagedTurn | null>(null);
+  const stagedTurnRef = useRef<StagedTurn | null>(null);
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  const turnLane = useRef<Promise<void>>(Promise.resolve());
+  const requestedTurn = useRef(0);
+  function setStagedTurn(value: StagedTurn | null) {
+    stagedTurnRef.current = value;
+    updateStagedTurn(value);
+  }
   const [recovering, setRecovering] = useState(false);
   const recoveryStartedAt = useRef<number | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
   const turnGeneration = useRef(0);
   const mounted = useRef(true);
   const expiryPending = useRef(false);
-  const [offer, setOffer] = useState<Package>({});
+  const [, setOffer] = useState<Package>({});
   const [tentative, setTentative] = useState<Package | null>(null);
   const [prefs, setPrefs] = useState<Preferences | null>(null);
   /**
@@ -382,7 +391,6 @@ export function BaselineTask({
   const lastParticipantAt = useRef<number>(Date.now());
   const nudgeAttempt = useRef(createOptionalNudgeAttempt());
   /** A message that arrived while a turn was in flight, waiting to be folded. */
-  const queuedText = useRef<string | null>(null);
 
 
   const [lastCounterpartPackage, setLastCounterpartPackage] =
@@ -390,7 +398,7 @@ export function BaselineTask({
   /**
    * The rung the standing package was put up at.
    *
-   * "✓ Accept the package on the table" sends that package back through the
+   * "✓ Accept current offer" sends that package back through the
    * machine, which accepts only the CURRENT tier's package. Once a message
    * raises the tier the package still on screen is superseded: the machine
    * answers `propose_tier` with `accepts: false` and the button silently does
@@ -414,8 +422,6 @@ export function BaselineTask({
    * selector back at the centre of the screen, which is what this change
    * exists to undo.
    */
-  const [proposalOpen, setProposalOpen] = useState(false);
-  const openedOnCounterProposal = useRef(false);
 
   const mockAi = useDevMockAi();
 
@@ -437,38 +443,8 @@ export function BaselineTask({
   //
   // Computed here rather than beside the composer because the phase branches
   // below return early, and a hook cannot sit behind that.
-  const chosen = task.issues.filter((i) => offer[i.id]).length;
-  const complete = chosen === task.issues.length;
-  const partial = chosen > 0 && !complete;
-  /**
-   * WHAT WILL TRAVEL WITH THE NEXT MESSAGE, said on the closed drawer.
-   *
-   * Collapsing the selector without this makes the attachment INVISIBLE: the
-   * levels are pre-filled from the preference screen, so a participant who
-   * never opens the drawer would send a package they had not seen attached.
-   * That is a worse fault than the prominence this change exists to fix — a
-   * prominent control at least tells you what it is about to do.
-   *
-   * Read in `task.issues` order and off each issue's own options, which is
-   * exactly what `OptionChips` renders below, so the sentence and the chips
-   * can never name the levels in a different order.
-   */
-  const attachedSummary = partial
-    ? "Choose both terms, or neither."
-    : complete
-      ? `Attached to your next message: ${task.issues
-          .map(
-            (issue) =>
-              issue.options.find((o) => o.id === offer[issue.id])?.label ?? "",
-          )
-          .filter(Boolean)
-          .join(" · ")}`
-      : "No proposal attached — you are just talking.";
-  // `settled` is OUTSIDE the dev gate on purpose. `useDevGate` exists to let a
-  // walkthrough past an unfilled form, but "the conversation is over" is not a
-  // validation to skip — bypassing it let the send loop keep firing after the
-  // counterpart had accepted, which logged the same ending five times.
-  const canSend = useDevGate(!partial) && !settled;
+  // Natural-language terms are resolved without attaching a stale package.
+  const canSend = !settled;
 
   // ONE CUE ON THE SCREEN, AND IT IS THE COMPOSER'S (interface rule 9).
   //
@@ -502,6 +478,9 @@ export function BaselineTask({
       label: PHASE_LABELS[p],
       active: phase === p,
       run: () => {
+        if (p === "negotiate" && messages.length === 0) {
+          setMessages([{ id: "opening", speaker: "counterpart", text: openingLine(task, counterpartRole) }]);
+        }
         // Jumping straight to the review needs something to review, so the
         // scripted exchange is played in without waiting for it.
         if (p === "review" && messages.length === 0) {
@@ -566,6 +545,12 @@ export function BaselineTask({
   }
 
   async function runStagedTurn(initialTurn: StagedTurn) {
+    const requestId = ++requestedTurn.current;
+    const previous = turnLane.current;
+    let release!: () => void;
+    turnLane.current = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    if (!mounted.current || requestId !== requestedTurn.current || settledRef.current) { release(); return; }
     const generation = turnGeneration.current + 1;
     turnGeneration.current = generation;
     const controller = new AbortController();
@@ -585,17 +570,11 @@ export function BaselineTask({
       let classification = turn.classification;
       if (!classification) {
         if (mockAi) {
-          let label: ClassificationResponse["label"] = "none";
-          const mockedReason = script.messages.find(
-            (message) => message.speaker === "participant" &&
-              message.text === turn.text && message.reasonCardId,
-          );
-          if (mockedReason?.reasonCardId) {
-            label = cardOfLayer(task, role, "sensitive")?.id === mockedReason.reasonCardId
-              ? "SB"
-              : "WR";
-          }
-          classification = { label, stance: "none" };
+          classification = mockClassify(turn.texts, {
+            sensitive: cardOfLayer(task, role, "sensitive"),
+            work: cardOfLayer(task, role, "work"),
+            sayable: [task.publicBrief, ...task.issues.flatMap((issue) => [issue.label, issue.description])],
+          }, leaksForbiddenReason);
         } else {
           classification = await fetchJsonWithRetry<ClassificationResponse>(
             "/api/classify-reason",
@@ -618,6 +597,7 @@ export function BaselineTask({
         }
       }
 
+      if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
       const {
         label,
         confidence,
@@ -716,7 +696,7 @@ export function BaselineTask({
         speaker: "participant",
         text: turn.text,
       };
-      const next = [...messages, own];
+      const next = [...messagesRef.current, own];
       const turnStartedAt = Date.now();
       let reply: string;
       let counterProposal: Package | null = null;
@@ -829,12 +809,13 @@ export function BaselineTask({
                 .join(", ")
             : "that package";
           reply = `that works for me. || let's go with ${levels}.`;
+        } else if (decision.proposal) {
+          const terms = task.issues.map((issue) => `${issue.options.find((option) => option.id === decision.proposal?.[issue.id])?.label} on ${issue.label.toLowerCase()}`).join(", ");
+          reply = `How about ${terms}?`;
         } else {
-          const scripted = script.messages.find(
-            (m) =>
-              m.stage === decision.stage && m.speaker === "counterpart",
-          );
-          reply = scripted?.text ?? "let's keep working through the terms.";
+          reply = decision.action === "nonum"
+            ? "Please keep your point values private. Tell me about the working conditions instead."
+            : "Could you tell me a little more about your situation?";
         }
       } else {
         const data = await fetchJsonWithRetry<CounterpartResponse>(
@@ -894,7 +875,7 @@ export function BaselineTask({
       // place: it used to sit inside the live branch only, which left mockup
       // mode — the default off-production, and so the thing anyone walking a
       // preview actually sees — answering in 400ms.
-      await awaitCounterpartDelay(reply.length, turnStartedAt);
+      await awaitCounterpartDelay(reply.split("||")[0].trim().length, turnStartedAt);
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
 
       // Commit the staged turn only after both requests and the visible delay
@@ -982,10 +963,6 @@ export function BaselineTask({
         // The drawer opens itself the FIRST time a package arrives, so
         // countering it is one click away rather than something to go
         // looking for. Once only — see `openedOnCounterProposal`.
-        if (!openedOnCounterProposal.current) {
-          openedOnCounterProposal.current = true;
-          setProposalOpen(true);
-        }
       } else if (tierNow !== standingTier) {
         // See `standingTier`: nothing came back to replace it and the rung has
         // moved, so what is on screen can no longer be accepted. Take the
@@ -1002,7 +979,6 @@ export function BaselineTask({
       setMessages([...next, counter]);
       setReplies((n) => n + 1);
       setStagedTurn(null);
-      setDraft("");
       setTurnError(null);
 
       classifierLog.current = [
@@ -1108,14 +1084,6 @@ export function BaselineTask({
           sbEverVoiced: sbEverNow,
           priorityClaimed: priorityClaimedNow,
         });
-      } else if (queuedText.current !== null) {
-        // A message arrived while this reply was still on the wire and could
-        // not be folded into it. Send it now rather than dropping it — the
-        // participant pressed send and watched their words disappear
-        // otherwise.
-        const queued = queuedText.current;
-        queuedText.current = null;
-        void send(queued);
       }
     } catch (error) {
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
@@ -1125,6 +1093,7 @@ export function BaselineTask({
       setStagedTurn(turn);
       setTurnError("Your message is still here. Select Retry.");
     } finally {
+      release();
       if (mounted.current && generation === turnGeneration.current) {
         setPending(false);
         activeRequest.current = null;
@@ -1308,10 +1277,6 @@ export function BaselineTask({
         setLastCounterpartPackage(proposalNow);
         setStandingTier(tier);
         setOffer(proposalNow);
-        if (!openedOnCounterProposal.current) {
-          openedOnCounterProposal.current = true;
-          setProposalOpen(true);
-        }
       }
       if (participantKey) {
         void getStore().appendMessage(participantKey, {
@@ -1372,12 +1337,12 @@ export function BaselineTask({
    * One in-flight request at a time, always: a second is queued, never
    * dropped. Identical to the Proxy arm's closing.
    */
-  async function send(text: string, sentOffer: Package = offer) {
+  async function send(text: string, sentOffer: Package = {}) {
     if (settledRef.current) return;
     lastParticipantAt.current = Date.now();
 
-    if (pending || stagedTurn) {
-      const inFlight = stagedTurn;
+    if (activeRequest.current || stagedTurnRef.current || pending) {
+      const inFlight = stagedTurnRef.current;
       if (inFlight) {
         turnGeneration.current += 1;
         activeRequest.current?.abort();
@@ -1389,24 +1354,27 @@ export function BaselineTask({
           sentOffer: { ...sentOffer },
           sentPackage:
             Object.keys(sentOffer).length > 0 ? { ...sentOffer } : null,
-          ownId: `p${messages.length + 1}`,
+          ownId: `p${participantTexts.current.length}`,
           createdAt: new Date().toISOString(),
           secondsAtSend: secondsRemaining,
         };
         // The first message's bubble goes up now; it was never committed,
         // because its own turn had not finished.
-        setMessages((prev) => [
-          ...prev,
-          { id: inFlight.ownId, speaker: "participant", text: inFlight.text },
-        ]);
+        messagesRef.current = [...messagesRef.current, { id: inFlight.ownId, speaker: "participant", text: inFlight.text }];
+        setMessages(messagesRef.current);
+        if (participantKey) void getStore().appendMessage(participantKey, {
+          id: inFlight.ownId, sessionIndex: taskIndex, speaker: "participant",
+          text: inFlight.text, createdAt: inFlight.createdAt,
+        });
         setStagedTurn(merged);
         setDraft("");
         await runStagedTurn(merged);
         return;
       }
-      queuedText.current = text;
-      setDraft("");
-      return;
+      // A participant message supersedes an optional nudge immediately.
+      turnGeneration.current += 1;
+      activeRequest.current?.abort();
+      activeRequest.current = null;
     }
 
     participantTexts.current = [...participantTexts.current, text];
@@ -1416,7 +1384,7 @@ export function BaselineTask({
       text,
       sentOffer: immutableOffer,
       sentPackage: Object.keys(immutableOffer).length > 0 ? immutableOffer : null,
-      ownId: `p${messages.length}`,
+      ownId: `p${participantTexts.current.length}`,
       createdAt: new Date().toISOString(),
       secondsAtSend: secondsRemaining,
     };
@@ -1435,7 +1403,7 @@ export function BaselineTask({
     if (!lastCounterpartPackage || pending || stagedTurn || settled) return;
     setOffer(lastCounterpartPackage);
     void send(
-      "that works for me — let's go with that.",
+      "I agree to the current offer.",
       lastCounterpartPackage,
     );
   }
@@ -1679,13 +1647,13 @@ export function BaselineTask({
 
           <Card className="mb-6 flex flex-col border-slate-200" padded={false}>
             <Transcript
-              messages={messages}
+              messages={stagedTurn ? [...messages, { id: stagedTurn.ownId, speaker: "participant", text: stagedTurn.text }] : messages}
               pending={pending}
               emptyHint="The other side opens first. Your reply will start the live exchange."
             />
 
             <MessageComposer
-              value={stagedTurn && pending ? draft : (stagedTurn?.text ?? draft)}
+              value={draft}
               onChange={setDraft}
               onSend={send}
               /* THE COMPOSER STAYS OPEN WHILE THE REPLY IS COMING (§6.1
@@ -1713,84 +1681,15 @@ export function BaselineTask({
                 type="button"
                 onClick={acceptStanding}
                 disabled={pending || Boolean(stagedTurn)}
-                className="rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-900 shadow-2xs transition-colors hover:bg-emerald-100 disabled:opacity-50"
+                className="w-full rounded-xl border-2 border-emerald-700 bg-emerald-600 px-5 py-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
               >
-                ✓ Accept their latest proposal as it stands
+                ✓ Accept current offer
+                <span className="mt-1 block text-sm font-normal">{task.issues.map((issue) => `${issue.label}: ${issue.options.find((o) => o.id === lastCounterpartPackage[issue.id])?.label ?? ""}`).join(" · ")}</span>
               </button>
             </div>
           ) : null}
 
-          {/* THE PROPOSAL SELECTOR, DEMOTED (Ver.2.20 round two).
 
-              It sits BELOW the composer and starts collapsed, because the
-              conversation is the task and a chip grid above the transcript
-              read as the thing being asked for. It cannot be REMOVED: it is
-              the only channel by which the participant's package reaches
-              `machine.ts`, and reading a package out of their prose would
-              hand a negotiation decision to a model (§6.7).
-
-              It is `<details>` rather than state for the same reason the
-              briefing panel's sections are: a live negotiation re-renders on
-              every tick and every bubble, find-in-page still reaches a closed
-              section, and the open/closed state survives without a hook.
-              `open` is controlled here only so the drawer can open itself
-              once when a package first arrives. */}
-          <details
-            open={proposalOpen}
-            onToggle={(e) => setProposalOpen(e.currentTarget.open)}
-            className="mb-6 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-sm)]"
-          >
-            <summary className="cursor-pointer list-none rounded-[var(--radius-lg)] px-5 py-4 sm:px-7">
-              <span className="flex items-center justify-between gap-4">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base font-bold leading-snug tracking-tight text-[var(--ink)] sm:text-lg">
-                    📦 Attach a proposal (optional)
-                  </span>
-                  {/* LIVE, not a static hint: this is the only place a
-                      participant with the drawer shut can see what their next
-                      message will carry. */}
-                  <span className="mt-1 block text-sm leading-relaxed text-[var(--ink-3)]">
-                    {attachedSummary}
-                  </span>
-                </span>
-                <span className="shrink-0 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-bold text-[var(--ink-2)]">
-                  {proposalOpen ? "▲ Hide" : "▼ Show"}
-                </span>
-              </span>
-            </summary>
-            <fieldset
-              disabled={pending || Boolean(stagedTurn)}
-              className="space-y-4 px-5 pb-5 disabled:opacity-60 sm:px-7 sm:pb-7"
-            >
-              {task.issues.map((issue) => (
-                <div key={issue.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
-                  <div className="mb-2">
-                    <p className="text-xs sm:text-sm font-bold text-[var(--ink)]">
-                      {issue.label}
-                    </p>
-                  </div>
-                  <OptionChips
-                    issue={issue}
-                    role={role}
-                    name={`offer-${issue.id}`}
-                    value={offer[issue.id] ?? null}
-                    onChange={(v) =>
-                      setOffer((prev) => ({ ...prev, [issue.id]: v }))
-                    }
-                    allowNone
-                    noneLabel="Not specified"
-                  />
-                </div>
-              ))}
-              {/* A HALF PACKAGE IS THE ONE BLOCKED STATE, and it is said
-                  quietly — in the SUMMARY, which is visible whether the
-                  drawer is open or shut, rather than here where a participant
-                  with it closed would never see why their composer had gone
-                  quiet. No cue ring and no pill: a cue names the thing the
-                  screen is waiting for, and the screen is waiting for a
-                  message, not for a second chip (interface rule 9). */}
-            </fieldset>
-          </details>
         </TaskLayout>
       </Page>
 
