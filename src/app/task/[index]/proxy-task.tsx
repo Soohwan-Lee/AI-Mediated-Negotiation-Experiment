@@ -441,6 +441,10 @@ export function ProxyTask({
               : "work",
           );
         }
+        if (p === "negotiate") {
+          setProxyTranscript(transcript.length ? transcript : script.messages.map((message) => ({ id: message.id, speaker: message.speaker, text: message.text })));
+          setOffer(tentative ?? script.tentative);
+        }
         setPhase(p);
       },
     })),

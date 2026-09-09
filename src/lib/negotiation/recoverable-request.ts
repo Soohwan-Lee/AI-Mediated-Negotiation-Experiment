@@ -33,7 +33,8 @@ function abortError() {
   return new DOMException("Request aborted", "AbortError");
 }
 
-async function wait(ms: number, signal?: AbortSignal) {
+/** Typing/backoff delay that releases a superseded turn immediately. */
+export async function waitForDelay(ms: number, signal?: AbortSignal) {
   if (ms <= 0) return;
   await new Promise<void>((resolve, reject) => {
     const finish = () => {
@@ -92,7 +93,7 @@ export async function fetchJsonWithRetry<T>(
     }
 
     if (attempt < attempts) {
-      await wait(backoffMs * attempt, options.signal);
+      await waitForDelay(backoffMs * attempt, options.signal);
     }
   }
 

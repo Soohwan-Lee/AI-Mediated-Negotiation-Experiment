@@ -4,8 +4,24 @@ import test from "node:test";
 import {
   fetchJsonWithRetry,
   nextCountdownValue,
+  waitForDelay,
   RECOVERABLE_REQUEST_ATTEMPTS,
 } from "../src/lib/negotiation/recoverable-request.ts";
+
+test("superseding a typing delay releases the serialized next turn immediately", async () => {
+  const controller = new AbortController();
+  const started = Date.now();
+  const waiting = waitForDelay(10_000, controller.signal);
+  controller.abort();
+  await assert.rejects(waiting, { name: "AbortError" });
+  assert.ok(Date.now() - started < 1000);
+});
+
+test("an already-aborted delay cannot hold the next turn", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(waitForDelay(10_000, controller.signal), { name: "AbortError" });
+});
 
 test("a recoverable request stops after three attempts", async () => {
   const originalFetch = globalThis.fetch;

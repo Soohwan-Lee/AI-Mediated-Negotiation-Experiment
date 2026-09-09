@@ -50,7 +50,7 @@ import {
   type ReasonTier,
   type SbTiming,
 } from "@/lib/negotiation/machine";
-import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
+import { fetchJsonWithRetry, waitForDelay } from "@/lib/negotiation/recoverable-request";
 import { reciprocalAcceptanceText } from "@/lib/negotiation/counterpart-text";
 import {
   INITIAL_EXCHANGE_STATE,
@@ -89,7 +89,7 @@ import { useParticipant } from "@/lib/participant-context";
 import {
   NEGOTIATION,
   STAGE_MINUTES,
-  awaitCounterpartDelay,
+  counterpartDelayMs,
   pauseMs,
 } from "@/lib/study-config";
 import { getStore } from "@/lib/store";
@@ -1673,7 +1673,10 @@ export function DirectNegotiation({
       // spent. The budget used to apply only to the live branch, so mockup
       // mode replied in 500ms, and it was ADDED to the model's own latency
       // rather than absorbing it.
-      await awaitCounterpartDelay(reply.split("||")[0].trim().length, turnStartedAt);
+      await waitForDelay(
+        counterpartDelayMs(reply.split("||")[0].trim().length) - (Date.now() - turnStartedAt),
+        controller.signal,
+      );
 
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
 
@@ -2234,7 +2237,8 @@ export function DirectNegotiation({
                 disabled={pending || Boolean(stagedTurn)}
                 className="w-full rounded-xl border-2 border-emerald-700 bg-emerald-600 px-5 py-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
               >
-                ✓ Accept the package on the table
+                ✓ Accept current offer
+                <span className="mt-1 block text-sm font-normal">{task.issues.map((issue) => `${issue.label}: ${issue.options.find((o) => o.id === lastCounterpartPackage[issue.id])?.label ?? ""}`).join(" · ")}</span>
               </button>
             </div>
           ) : null}

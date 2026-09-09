@@ -70,13 +70,13 @@ import {
   reciprocalAcceptanceText,
   seededOpeningText,
 } from "@/lib/negotiation/counterpart-text";
-import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
+import { fetchJsonWithRetry, waitForDelay } from "@/lib/negotiation/recoverable-request";
 import { leaksForbiddenReason } from "@/lib/ai/reason-leak";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { writeStopReason } from "@/lib/check-gates";
-import { awaitCounterpartDelay, nextHref } from "@/lib/study-config";
+import { counterpartDelayMs, nextHref } from "@/lib/study-config";
 import { cardOfLayer, getTask, requirementIssue } from "@/lib/tasks";
 import type { NegotiationTask, Package, Role, TaskId } from "@/lib/types";
 import { ReviewPhase } from "./review";
@@ -875,7 +875,10 @@ export function BaselineTask({
       // place: it used to sit inside the live branch only, which left mockup
       // mode — the default off-production, and so the thing anyone walking a
       // preview actually sees — answering in 400ms.
-      await awaitCounterpartDelay(reply.split("||")[0].trim().length, turnStartedAt);
+      await waitForDelay(
+        counterpartDelayMs(reply.split("||")[0].trim().length) - (Date.now() - turnStartedAt),
+        controller.signal,
+      );
       if (!mounted.current || generation !== turnGeneration.current || settledRef.current) return;
 
       // Commit the staged turn only after both requests and the visible delay

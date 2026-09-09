@@ -750,14 +750,13 @@ export function counterpartStageAfter(repliesMade: number): StageId {
 
 /**
  * How many script positions the counterpart has already spent when the direct
- * closing of a Proxy task starts: through its own proxy it has opened, given
- * its work reason and disclosed its SB — so its first direct reply is the trade
- * loop, never a re-run of the disclosure the participant just watched.
+ * closing of a Proxy task starts: the work exchange is complete, so the first
+ * direct reply enters the trade loop. That loop can still reciprocate a new SB.
  *
- * The closing must therefore be started with `counterpartSbDisclosed: true`
- * even though the counterpart has said nothing in person: the disclosure
- * happened on screen, through its proxy, and repeating it would give the Proxy
- * arm two disclosures where Direct has one.
+ * The closing inherits whether the counterpart actually disclosed through its
+ * proxy. On a WR-only path the flag starts false; a later participant SB earns
+ * one reciprocal disclosure in person. On the SB path it starts true, avoiding
+ * a repeated disclosure.
  */
 export const DIRECT_STAGE_OFFSET = 3;
 
