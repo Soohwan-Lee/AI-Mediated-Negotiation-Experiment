@@ -106,7 +106,7 @@ export function RoleDecisionFlow({ role }: { role: Role }) {
             <span className="block text-[0.625rem] font-extrabold uppercase tracking-wider text-slate-500">
               Team lead {isLeader ? <span className="ml-1 rounded-full bg-blue-700 px-1.5 py-0.5 text-white">You</span> : null}
             </span>
-            <strong className="mt-1 block text-sm">Recommends the member&apos;s bonus</strong>
+            <strong className="mt-1 block text-sm">Decides the member&apos;s bonus</strong>
           </div>
           <FlowArrow label="after each task" />
           <div className={cx(node, !isLeader ? own : other)}>
@@ -124,7 +124,7 @@ export function RoleDecisionFlow({ role }: { role: Role }) {
             <span className="block text-[0.625rem] font-extrabold uppercase tracking-wider text-slate-500">
               Team member {!isLeader ? <span className="ml-1 rounded-full bg-blue-700 px-1.5 py-0.5 text-white">You</span> : null}
             </span>
-            <strong className="mt-1 block text-sm">Evaluates the team lead</strong>
+            <strong className="mt-1 block text-sm">Writes an evaluation of the team lead</strong>
           </div>
           <FlowArrow label="sent to" />
           <div className={cx(node, other)}>
@@ -530,9 +530,7 @@ function FlowStepCard({
  *
  * NO CONDITION NAME, and no policy branch (interface rule 10): every Proxy
  * participant sees this identical row, User-Specified and AI-Supplemented
- * alike. Step ④ is conditional in the flow and says so in its own words,
- * because a step drawn as unconditional would tell an approver they were about
- * to do something they will not do.
+ * alike. The short person-to-person confirmation is required for everyone.
  */
 export function ProxyFlowSteps({ className }: { className?: string }) {
   const steps: Array<{ illustration: IllustrationKey; label: string }> = [
@@ -546,12 +544,12 @@ export function ProxyFlowSteps({ className }: { className?: string }) {
     },
     {
       illustration: "proxyStepResult",
-      label: "You both see the result and decide.",
+      label: "You review the Proxy transcript and proposed terms.",
     },
     {
       /* The SAME file as step ② of the Direct row — see lib/illustrations.ts. */
       illustration: "chat",
-      label: "If needed, you finish in a short chat.",
+      label: "You finish in a short chat and both confirm the result.",
     },
   ];
 

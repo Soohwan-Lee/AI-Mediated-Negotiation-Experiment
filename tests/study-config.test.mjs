@@ -129,7 +129,7 @@ test("both pre-task notices reach the participant before the practice round", ()
     new URL("../src/components/briefing-guide.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(guide, /Never give the other side the numbers/);
+  assert.match(guide, /Do not tell the other side your scores, your payoff table, or how many points any option gives you/);
   assert.match(guide, /Stay anonymous in the chat/);
   // Named, not merely implied: "stay anonymous" alone is a slogan, and the
   // employer is the detail a participant is most likely to type without

@@ -27,8 +27,8 @@ const ROADMAP: Array<{ label: string; detail?: string; keys: FlowKey[] }> = [
   { label: "Welcome", keys: ["welcome"] },
   { label: "Background", keys: ["background"] },
   { label: "Instructions", keys: ["instruction"] },
-  { label: "Task 1", detail: "Practice · Main · Questions", keys: ["practice", "task-1", "survey-1", "reward-1"] },
-  { label: "Task 2", detail: "Practice · Main · Questions", keys: ["practice-2", "task-2", "survey-2", "reward-2"] },
+  { label: "Task 1", keys: ["practice", "task-1", "survey-1", "reward-1"] },
+  { label: "Task 2", keys: ["practice-2", "task-2", "survey-2", "reward-2"] },
   { label: "Finish", keys: ["wrap-up", "debriefing", "complete"] },
 ];
 
@@ -42,6 +42,13 @@ export function StudyChrome({ children }: { children: ReactNode }) {
   const roadmapIndex = key
     ? ROADMAP.findIndex((phase) => phase.keys.includes(key))
     : -1;
+  const activeTaskStage = key === "practice" || key === "practice-2"
+    ? "Practice"
+    : key === "task-1" || key === "task-2"
+      ? "Main session"
+      : key === "survey-1" || key === "survey-2" || key === "reward-1" || key === "reward-2"
+        ? "Questions"
+        : null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -77,7 +84,11 @@ export function StudyChrome({ children }: { children: ReactNode }) {
                     )}
                   >
                     <span className="block text-xs">{phase.label}</span>
-                    {phase.detail ? <span className="hidden text-[0.625rem] font-medium min-[1180px]:block">{phase.detail}</span> : null}
+                    {index === roadmapIndex && activeTaskStage ? (
+                      <span className="block text-[0.625rem] font-extrabold">
+                        {activeTaskStage}
+                      </span>
+                    ) : null}
                   </span>
                   {index < ROADMAP.length - 1 ? <span aria-hidden className="text-slate-300">›</span> : null}
                 </li>

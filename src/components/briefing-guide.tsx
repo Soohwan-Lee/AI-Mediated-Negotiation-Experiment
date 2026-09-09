@@ -164,8 +164,8 @@ export function StudyOrientation({
               <Card tone="private">
                 <CardTitle>{isLeader ? "Team lead" : "Team member"}</CardTitle>
                 <p className="mt-2 text-base leading-relaxed">{isLeader
-                  ? "You lead the project and answer to the director. You recommend the member's bonus after each negotiation."
-                  : "You work directly with the client. The team lead recommends your bonus after each negotiation."}</p>
+                  ? "You lead the project. After each negotiation, you alone decide the member's bonus."
+                  : "You work directly with the client. After each negotiation, the team lead alone decides your bonus."}</p>
               </Card>
 
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-950 shadow-2xs">
@@ -186,7 +186,7 @@ export function StudyOrientation({
                       <span className="text-sm font-semibold">for your role</span>
                     </div>
                     <p className="mt-2 text-sm leading-relaxed">
-                      <strong>{STUDY.currencySymbol}{STUDY.totalPaid}</strong> in total, guaranteed from now. Your recommendations for the member <strong>do not reduce your payment</strong>.
+                      <strong>{STUDY.currencySymbol}{STUDY.totalPaid}</strong> in total, guaranteed from now. The member&apos;s bonus <strong>does not reduce your payment</strong>.
                     </p>
                   </>
                 ) : (
@@ -225,7 +225,10 @@ export function StudyOrientation({
             <RoleDecisionFlow role={role} />
             <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4">
               <p className="text-sm leading-relaxed text-slate-900">
-                <strong>Both people are told the same thing:</strong> consider not just the result, but the negotiation as a whole and whether you would want to work with this person again.
+                <strong>These are separate decisions.</strong> The team lead alone decides the member&apos;s bonus. The team member writes an evaluation of the lead, which is sent to the project director.
+              </p>
+              <p className="mt-2.5 text-sm leading-relaxed text-slate-600">
+                Each person is asked to consider the negotiation as a whole and whether they would want to work with the other person again.
               </p>
               <p className="mt-2.5 text-sm leading-relaxed text-slate-600">
                 Negotiation points are not money. They show how well the conditions fit your goals.
@@ -264,8 +267,8 @@ export function StudyOrientation({
                 pins; "your employer" is what makes the anonymity half
                 actionable rather than a slogan, so it stays named.
               */}
-              <Rule icon="🔒" title="Keep your point sheet to yourself">
-                Never give the other side the numbers on it. Stay anonymous in the chat too: no name, no employer.
+              <Rule icon="🔒" title="Never share your point values">
+                Do not tell the other side your scores, your payoff table, or how many points any option gives you. Discuss the work terms and your reasons instead. Stay anonymous in the chat too: no name, no employer.
               </Rule>
             </ul>
 
@@ -278,7 +281,7 @@ export function StudyOrientation({
             */}
             <p className="rounded-2xl border border-rose-200 bg-rose-50/50 px-5 py-3.5 text-sm leading-relaxed text-rose-950">
               <span aria-hidden className="mr-1.5">⚠</span>
-              <strong>Sharing personal background is your choice.</strong> If you or your AI Proxy shares it, the other person may weigh it in their later bonus recommendation or upward evaluation.
+              <strong>Stay in your assigned role.</strong> The sensitive background is private context belonging to this fictional role, not a request for your real personal history. You decide whether to convey it. If conveyed, it may shape how the other person sees your role and may be considered in the later bonus or upward evaluation.
             </p>
 
             {/*
@@ -289,8 +292,8 @@ export function StudyOrientation({
             */}
             <details className="rounded-2xl border border-slate-200 bg-white p-4">
               <summary className="cursor-pointer text-sm font-bold text-slate-900">More detail on the two tasks</summary>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">In the direct task you chat with the other participant for up to 5 minutes, in your own words. You can finish sooner once you agree.</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">In the AI Proxy task you choose what your representative may share, watch the exchange, then approve it, ask for a change, or refuse it. That task explains its policy before you choose.</p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">In the direct task you chat with the other participant for up to 5 minutes, in your own words. Discuss both the options you want and the reasons behind them. You can finish sooner once you both confirm the same agreement.</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">In the AI Proxy task you choose what your representative may share and watch the exchange. You then talk with the other participant to confirm whether you both agree to the result. That task explains its policy before you choose.</p>
             </details>
           </div>
         )}

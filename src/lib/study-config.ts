@@ -1,7 +1,7 @@
 /**
  * Single source of truth for study-level constants.
  *
- * Values follow Experimental Design Ver.2.26 §7. Change them here, not in
+ * Values follow Experimental Design Ver.2.27 §7. Change them here, not in
  * page components.
  */
 

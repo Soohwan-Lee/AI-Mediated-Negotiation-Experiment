@@ -868,8 +868,9 @@ export function RoleStory({
  * place they ever see the sensitive card at all, and a tab that hides it is a
  * control that suppresses disclosure. Everything is now on screen at once.
  *
- * WHAT IS IN IT, IN THE ORDER SOMEONE REACHES FOR IT MID-SENTENCE: the point
- * sheet, then both reason cards, then the story folded away. Nothing is
+ * WHAT IS IN IT, IN THE ORDER SOMEONE REACHES FOR IT MID-SENTENCE: the
+ * situation stays open first, followed by the point sheet and both reason
+ * cards. Nothing is
  * removed from the study — the role, the payment and the objectives are all
  * read in full on the brief pages, which is where they are being READ; what
  * they were doing here was occupying the top of the rail on every phase after
@@ -921,6 +922,20 @@ export function BriefingPanel({
         {role === "leader" ? "Team Leader" : `Team Member · ${brief.title}`}
       </p>
 
+      {/* The full setting and stakes stay open at the top of the rail so a
+          participant can reread them while composing a message. */}
+      <details open className="group mb-2.5 rounded-lg border border-[var(--private-edge)] bg-[var(--private-card)]">
+        <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[0.75rem] font-bold text-[var(--private-strong)] marker:hidden">
+          <span aria-hidden className="mr-1 inline-block transition-transform group-open:rotate-90">
+            ›
+          </span>
+          Your situation
+        </summary>
+        <div className="border-t border-[var(--private-line)] px-2.5 py-2">
+          <RoleStory story={brief.roleStory} compact />
+        </div>
+      </details>
+
       <section aria-label="Your point sheet" className="mb-2.5">
         <RailPointSheet
           issues={task.issues}
@@ -943,21 +958,6 @@ export function BriefingPanel({
         </section>
       ) : null}
 
-      {/* `<details>`, not state (rule 5): it survives the re-renders a live
-          negotiation produces and find-in-page still reaches inside it.
-          CLOSED by default — the story has been read in full on brief page 2,
-          and open it is 500px of the rail. */}
-      <details className="group rounded-lg border border-[var(--private-edge)] bg-[var(--private-card)]">
-        <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[0.75rem] font-bold text-[var(--private-strong)] marker:hidden">
-          <span aria-hidden className="mr-1 inline-block transition-transform group-open:rotate-90">
-            ›
-          </span>
-          Your situation
-        </summary>
-        <div className="border-t border-[var(--private-line)] px-2.5 py-2">
-          <RoleStory story={brief.roleStory} compact />
-        </div>
-      </details>
     </Card>
   );
 }
@@ -983,7 +983,7 @@ export function BriefingPanel({
  * It is exported from ONE place so the two arms cannot drift a word apart.
  */
 export const SB_CAPTION =
-  "Sharing this can help the other side understand what you're asking for. It can also shape how they see you, and it may be weighed in the bonus or evaluation afterwards.";
+  "This is sensitive private context for your assigned role. If conveyed, it may shape how the other side sees your judgement or actions and may be considered in the later bonus or evaluation.";
 
 /** The caption as it renders — one ⚠ line, no ring, no animation (rule 9). */
 export function SensitiveCaption({ className }: { className?: string }) {

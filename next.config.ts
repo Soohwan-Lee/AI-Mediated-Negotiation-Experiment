@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     localPatterns: [
       { pathname: "/illustrations/workplace-story.png" },
       { pathname: "/illustrations/**", search: "?v=20260907b" },
+      { pathname: "/illustrations/**", search: "?v=20260910" },
     ],
   },
 };

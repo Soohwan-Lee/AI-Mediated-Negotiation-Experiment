@@ -243,6 +243,16 @@ export function TaskBrief({
         ? "taskBLeader"
         : "taskBMember"
   ];
+  const publicIssueLabels = task.id === "task_a"
+    ? ["Issue 1 · Office days per week", "Issue 2 · Member-led client presentations"]
+    : ["Issue 1 · Days on the new project", "Issue 2 · Member-written weekly client reports"];
+  const privateSceneCaption = task.id === "task_a"
+    ? role === "leader"
+      ? "You · Team Leader: You told the Director that four office days were possible before discussing it with the team. The Director reported that answer upward, and the team has not been told."
+      : "You · Team Member and Client: After your presentation, the Client asked if the Leader could present next time. You have not told the Leader."
+    : role === "leader"
+      ? "You · Team Leader: You submitted a plan with fewer people than the project needs. It now depends on the Member working four days a week, and the team does not know about the mistake."
+      : "You · Team Member and Client: The Client said your last report needed more detail and asked if the Leader could write it next time. You have not told the Leader.";
   const labels = ["Situation", "Your reasons", "Points"];
   function move(next: number) {
     logEvent("page_complete", { briefingPage: page + 1 }, { sessionIndex: taskIndex });
@@ -273,8 +283,8 @@ export function TaskBrief({
                     className="h-[clamp(11rem,24vw,14rem)] w-full object-contain"
                   />
                   <figcaption className="grid grid-cols-2 border-t border-slate-200 bg-white/95 text-xs font-semibold leading-relaxed text-slate-700">
-                    <span className="border-r border-slate-200 px-3 py-2.5 text-center">{task.issues[0].label}</span>
-                    <span className="px-3 py-2.5 text-center">{task.issues[1].label}</span>
+                    <span className="border-r border-slate-200 px-3 py-2.5 text-center">{publicIssueLabels[0]}</span>
+                    <span className="px-3 py-2.5 text-center">{publicIssueLabels[1]}</span>
                   </figcaption>
                 </figure>
               </div>
@@ -299,19 +309,17 @@ export function TaskBrief({
                 height={roleImage.height}
                 sizes="(min-width: 1024px) 52rem, 100vw"
                 alt={roleImage.alt}
-                className="h-[clamp(11rem,24vw,14rem)] w-full object-contain"
+                className="h-[clamp(13rem,30vw,20rem)] w-full object-contain"
               />
               <figcaption className="border-t border-[var(--private-line)] bg-white px-3 py-2 text-center text-xs font-semibold text-[var(--private-strong)]">
-                {role === "leader"
-                  ? "You, Team Leader, and the decision already shared with the Director"
-                  : "Client contact (left) → You, Team Member (right). The Team Leader has not been told."}
+                {privateSceneCaption}
               </figcaption>
             </figure>
             <RoleStory story={brief.roleStory} hideCardQuote />
             <p className="my-4 text-sm leading-relaxed">{brief.requirementNote}</p>
             <IssueReasonGroups task={task} role={role} caption={false} />
             <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50/70 p-3 text-sm leading-relaxed text-rose-950">
-              <strong>Sharing is optional.</strong> It can help the other person understand your request, and it may also be considered in the later bonus or evaluation. You can negotiate and agree without sharing it.
+              <strong>This is sensitive private context for your assigned role.</strong> You decide whether to convey it. If conveyed, it may shape how the other person sees your judgement or actions and may be considered in the later bonus or evaluation. You can negotiate and agree without conveying it.
             </p>
           </Card>
         ) : (
@@ -528,7 +536,7 @@ export function PreferenceForm({
             </strong>{" "}
             The other side never sees this.
             {isProxy
-              ? " Your AI Proxy aims for what you pick, and at the end you approve what it reached, ask for a change, or refuse it."
+              ? " Your AI Proxy aims for what you pick. After it finishes, you talk with the other participant and both confirm the final agreement."
               : ""}
           </p>
 

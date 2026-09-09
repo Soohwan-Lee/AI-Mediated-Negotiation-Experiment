@@ -52,7 +52,7 @@ import {
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { useRestoreAnswers } from "@/lib/saved-answers";
 import { nextHref, STUDY } from "@/lib/study-config";
-import { readCheckGate, writeCheckGate, writeStopReason } from "@/lib/check-gates";
+import { readCheckGate, writeCheckGate } from "@/lib/check-gates";
 
 /**
  * The three comprehension items (Design §9.1.3). Wording, correct answers and
@@ -90,7 +90,6 @@ export default function InstructionPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [attempt, setAttempt] = useState(1);
-  const [failed, setFailed] = useState(false);
 
 
   const wrong = useMemo(
@@ -114,8 +113,7 @@ export default function InstructionPage() {
         setAnswers(Object.fromEntries(CHECKS.map((check) => [check.id, check.correct])));
         setSubmitted(true);
       } else {
-        setAttempt(Math.min(gate.attempts + 1, 2));
-        if (gate.status === "failed") router.replace("/study-stop?reason=check");
+        setAttempt(gate.attempts + 1);
       }
     }, 0);
     return () => window.clearTimeout(id);
@@ -142,10 +140,6 @@ export default function InstructionPage() {
     void saveResponses("instruction_check", answers);
     if (wrong.length === 0) {
       if (participantKey) writeCheckGate(participantKey, "common", { status: "passed", attempts: attempt });
-    } else if (attempt >= 2) {
-      if (participantKey) writeCheckGate(participantKey, "common", { status: "failed", attempts: attempt });
-      if (participantKey) writeStopReason(participantKey, "check");
-      setFailed(true);
     } else {
       if (participantKey) writeCheckGate(participantKey, "common", { status: "pending", attempts: attempt });
     }
@@ -158,7 +152,7 @@ export default function InstructionPage() {
       return next;
     });
     setSubmitted(false);
-    setAttempt(2);
+    setAttempt((current) => current + 1);
   }
 
   function goNext() {
@@ -190,20 +184,20 @@ export default function InstructionPage() {
         <PageHeader
           eyebrow="Study guide · Quick check"
           title={`${CHECKS.length} questions before practice`}
-          subtitle="Check your understanding of the setup. If an answer is wrong, read the note and try once more."
+          subtitle="Check your understanding of the setup. If an answer is wrong, read the note and try again."
         />
 
         <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-950">
           {assignment?.role === "leader" ? (
             <p>
               <strong>Your role: Team Leader · £{STUDY.totalPaid} guaranteed.</strong>{" "}
-              You recommend up to £{STUDY.bonusPerTask} per task for the Team Member;
+              You alone decide up to £{STUDY.bonusPerTask} per task for the Team Member;
               this does not reduce your payment. The Team Member writes an evaluation of you.
             </p>
           ) : (
             <p>
               <strong>Your role: Team Member · £{STUDY.compensation} guaranteed + up to £{STUDY.bonusPerTask} per task.</strong>{" "}
-              The Team Leader recommends each amount, up to £{STUDY.totalPaid} total.
+              The Team Leader alone decides each amount, up to £{STUDY.totalPaid} total.
             </p>
           )}
         </div>
@@ -261,14 +255,12 @@ export default function InstructionPage() {
       </Page>
 
       <ActionBar
-        label={canContinue ? "Next: the practice round" : failed ? "Contact the research team" : submitted ? "Try the missed ones again" : "Check answers"}
-        onClick={canContinue ? goNext : failed ? () => router.push("/study-stop?reason=check") : submitted ? retry : check}
+        label={canContinue ? "Next: the practice round" : submitted ? "Try the missed ones again" : "Check answers"}
+        onClick={canContinue ? goNext : submitted ? retry : check}
         disabled={!canContinue && !submitted && !allAnswered}
         note={
-          failed
-            ? "This check was not passed after two attempts."
-            : submitted && !allCorrect
-            ? `${wrong.length} to look at again · one retry allowed`
+          submitted && !allCorrect
+            ? `${wrong.length} to look at again · retry until you have them right`
             : submitted && allCorrect
               ? "All correct. Next is a 1-minute practice round. Nothing in it counts."
               : ""

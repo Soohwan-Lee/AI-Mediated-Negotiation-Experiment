@@ -33,7 +33,7 @@ test("the main-study task flow renders neither RISK nor M1", () => {
 test("the role map identifies the participant without relying on colour", () => {
   assert.match(roleMap, /Team lead \{isLeader \? <span[^>]*>You<\/span>/);
   assert.match(roleMap, /Team member \{!isLeader \? <span[^>]*>You<\/span>/);
-  assert.match(roleMap, /Evaluates the team lead/);
+  assert.match(roleMap, /Writes an evaluation of the team lead/);
   assert.match(roleMap, /Receives that evaluation/);
 });
 
@@ -45,7 +45,7 @@ test("payment briefing uses study constants and does not promise an amount revea
   // diagram, so the participant still reads it before the tasks. It used to be
   // repeated in a second card underneath, which is the repeat that went.
   assert.ok(roleMap.includes("STUDY.bonusPerTask"), "role map omits the per-task bonus");
-  assert.match(briefing, /do not reduce your payment/);
+  assert.match(briefing, /does not reduce your payment/);
   assert.match(briefing, /Bonus amounts are not shown during the tasks/);
   assert.ok(!briefing.includes("You see the amounts after both tasks"));
   assert.ok(!briefing.includes("up to 10 minutes"));

@@ -13,7 +13,7 @@
  * wrong is worth keeping: the single round ran `sessionPlan(assignment, 1)`,
  * so it always rehearsed TASK 1's condition. Since every participant does one
  * Direct task and one Proxy task, whichever arm fell second was met cold —
- * a Proxy-second participant saw the mandate, the watched exchange and RATIFY
+ * a Proxy-second participant saw the mandate, watched exchange and closing chat
  * for the first time inside the task being measured, while a Proxy-first
  * participant had rehearsed all three. That is an interface difference sitting
  * on `Pooled Proxy − Direct`, which is the contrast the whole study makes.
@@ -77,7 +77,7 @@ import {
   PRACTICE_CHECK_REMEDIATION,
   PROXY_PRACTICE_CHECK,
 } from "@/lib/measures";
-import { readCheckGate, writeCheckGate, writeStopReason } from "@/lib/check-gates";
+import { readCheckGate, writeCheckGate } from "@/lib/check-gates";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { STAGE_MINUTES, nextHref, type FlowKey } from "@/lib/study-config";
 import { PRACTICE_TASK } from "@/lib/tasks";
@@ -100,6 +100,9 @@ import { bestWish } from "@/app/task/[index]/shared";
  */
 const PRACTICE_DRAFT =
   "Hi! Here's my opening thought on the arrangement. What matters most on your side?";
+
+const PROXY_CONFIRM_DRAFT =
+  "The two terms shown above work for me. Do you confirm the same agreement?";
 
 /**
  * The two practice reasons, one per box.
@@ -181,7 +184,7 @@ const PROXY_WATCH_SCRIPT: ReadonlyArray<{
  * arriving finishes `wait`, which then hands straight to the check. The feel
  * to aim for is "have a quick look at what you'll do", not a lesson.
  */
-const DIRECT_STEPS = ["read", "pick", "send", "wait", "check"] as const;
+const DIRECT_STEPS = ["read", "pick", "send", "wait", "accept", "check"] as const;
 
 /**
  * THE REHEARSAL STEP IS GONE. Ver.2.24 removes the "ask your proxy a question
@@ -195,7 +198,7 @@ const PROXY_STEPS = [
   "read",
   "pick",
   "watch",
-  "decide",
+  "confirm",
   "check",
 ] as const;
 
@@ -224,8 +227,9 @@ const STEP_STAGE: Record<Step, 1 | 2 | 3 | 4> = {
   pick: 2,
   send: 3,
   wait: 3,
+  accept: 3,
   watch: 3,
-  decide: 3,
+  confirm: 3,
   check: 4,
 };
 
@@ -262,13 +266,15 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   // would be teaching disclosure as the completed answer.
   const [proxyWatchMessages, setProxyWatchMessages] = useState<DisplayMessage[]>([]);
   const [proxyWatchPending, setProxyWatchPending] = useState(false);
-  const [proxyDecision, setProxyDecision] = useState<string | null>(null);
+  const [proxyConfirmMessages, setProxyConfirmMessages] = useState<DisplayMessage[]>([]);
+  const [proxyConfirmPending, setProxyConfirmPending] = useState(false);
+  const [proxyConfirmDraft, setProxyConfirmDraft] = useState(PROXY_CONFIRM_DRAFT);
+  const [acceptedOffer, setAcceptedOffer] = useState(false);
 
   // Comprehension check states
   const [reasonAnswer, setReasonAnswer] = useState("");
   const [reasonSubmitted, setReasonSubmitted] = useState(false);
   const [checkAttempt, setCheckAttempt] = useState(1);
-  const [checkFailed, setCheckFailed] = useState(false);
   const bypass = useDevBypass();
 
   const role = assignment?.role ?? "leader";
@@ -310,7 +316,8 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     // The goals fill themselves now: both terms are derived from `bestWish`
     // and only edits are stored, so there is nothing here to pre-answer.
     setDraft(PRACTICE_DRAFT);
-    setProxyDecision((cur) => cur ?? "approve");
+    setProxyConfirmDraft(PROXY_CONFIRM_DRAFT);
+    setAcceptedOffer(false);
     setReasonAnswer(PRACTICE_CHECK_ANSWERS[practiceCheck.id]);
     // The key carries the micro-step, not just the phase: the whole tutorial
     // is one component, so without it the filler runs once and every later
@@ -321,10 +328,8 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     if (!participantKey) return;
     const gate = readCheckGate(participantKey, `task-${taskIndex}`);
     const id = window.setTimeout(() => {
-      setCheckAttempt(Math.min(gate.attempts + 1, 2));
-      if (gate.status === "failed") {
-        router.replace("/study-stop?reason=check");
-      } else if (gate.status === "passed") {
+      setCheckAttempt(gate.attempts + 1);
+      if (gate.status === "passed") {
         setReasonAnswer(PRACTICE_CHECK_ANSWERS[practiceCheck.id]);
         setReasonSubmitted(true);
       }
@@ -357,6 +362,8 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   const replyArrived = messages.some((m) => m.speaker === "counterpart");
   /** The watched exchange has run to its end. */
   const proxiesFinished = proxyWatchMessages.length >= PROXY_WATCH_SCRIPT.length;
+  const proxyParticipantSpoke = proxyConfirmMessages.some((m) => m.speaker === "participant");
+  const proxyCounterpartConfirmed = proxyConfirmMessages.some((m) => m.speaker === "counterpart");
 
   const stepDone: Record<Step, boolean> = {
     read: false, // reading has no action; its bubble carries the button
@@ -377,10 +384,8 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     wait: replyArrived,
     // Watching is not an action, so the step ends when the exchange does.
     watch: proxiesFinished,
-    // Any of the three decisions finishes it, and the tutorial must not prefer
-    // one: which of approve / change / refuse a participant picks is `RATIFY`,
-    // a confirmatory measure (§9.3).
-    decide: proxyDecision !== null,
+    accept: acceptedOffer,
+    confirm: acceptedOffer,
     check: false, // ends on Check My Answer / Start Task 1
   };
 
@@ -519,6 +524,25 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     setPending(false);
   }
 
+  async function sendProxyConfirmation(text: string) {
+    if (proxyConfirmPending || proxyCounterpartConfirmed) return;
+    setProxyConfirmMessages((current) => [
+      ...current,
+      { id: `pc${current.length}`, speaker: "participant", text },
+    ]);
+    setProxyConfirmPending(true);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    setProxyConfirmMessages((current) => [
+      ...current,
+      {
+        id: `cc${current.length}`,
+        speaker: "counterpart",
+        text: "Yes. I confirm those same two terms as our practice agreement.",
+      },
+    ]);
+    setProxyConfirmPending(false);
+  }
+
   /**
    * THE SINGLE RING (interface rule 9).
    *
@@ -559,8 +583,10 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
         // Nothing to press while the two proxies talk, exactly as in the real
         // task. The bubble's button appears only once they have finished.
         return proxiesFinished ? "coach" : null;
-      case "decide":
+      case "accept":
         return "decision";
+      case "confirm":
+        return proxyCounterpartConfirmed ? "decision" : "composer";
       case "check":
         // Before an answer is chosen the question card is what is waiting;
         // after it, the button that checks it. Never both.
@@ -593,12 +619,8 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   if (phase === "intro") {
     return (
       <TaskCover
-        eyebrow={isSecond ? "Practice round 2" : "Practice round"}
-        title={
-          isSecond
-            ? "The same practice, the other way round"
-            : "A quick look at what you'll do"
-        }
+        eyebrow={`Task ${taskIndex} · Practice session`}
+        title={`Task ${taskIndex} Practice Session`}
         doesNotCount
         /*
           EACH ROUND DRAWS THE ARM IT REHEARSES. One shared `practice` scene
@@ -631,11 +653,11 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                 Same practice scenario as before, and it still does not count.
                 Task {taskIndex} works the other way:{" "}
                 {isProxy
-                  ? "an AI Proxy negotiates from your instructions, and the decision comes back to you."
+                  ? "an AI Proxy negotiates from your instructions. You then talk with the other participant to confirm the final agreement."
                   : "you chat with the other participant yourself."}
               </>
             ) : isProxy ? (
-              "In Task 1 an AI Proxy negotiates from your instructions, and the decision comes back to you. Here is a short run through those controls."
+              "In Task 1 an AI Proxy negotiates from your instructions. You then talk with the other participant to confirm the final agreement. Here is a short run through those controls."
             ) : (
               "In Task 1 you chat with the other participant yourself. Here is a short run through those controls."
             )}
@@ -647,7 +669,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                 { label: "Read the situation", hint: "Your private briefing is on the right" },
                 { label: "Set two goals", hint: "Both terms start at your best option" },
                 { label: "Watch the two proxies", hint: "Yours and the other side's" },
-                { label: "Make the decision", hint: "Approve, ask for a change, or refuse" },
+                { label: "Confirm the final agreement", hint: "Talk briefly, then both confirm the same result" },
                 { label: "One quick check", hint: "About the Proxy controls" },
               ]
             : [
@@ -691,7 +713,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     // and may be changed. "Build proposal" named the mid-negotiation offer
     // composer instead, which is a different screen with a different rule.
     "Set goals",
-    isProxy ? "Watch and decide" : "Try chat",
+    isProxy ? "Proxy exchange and chat" : "Try chat",
     "Quick check",
   ];
 
@@ -732,9 +754,15 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
       nextLabel: "Continue",
       onNext: proxiesFinished ? advance : undefined,
     },
-    decide: {
-      title: "Last, the decision is yours",
-      body: "Approve what they reached, ask for a change, or refuse it.",
+    accept: {
+      title: "Finish with a clear agreement",
+      body: "When you and the other person agree on both terms, use the prominent Accept current offer button.",
+    },
+    confirm: {
+      title: proxyCounterpartConfirmed ? "Accept the shared result" : "Talk with the other participant",
+      body: proxyCounterpartConfirmed
+        ? "The other participant confirmed the same two terms. Now use Accept current offer."
+        : "Send the short confirmation message. In the real task, you can discuss the result before both of you confirm it.",
     },
     wait: {
       title: isProxy ? "Your Proxy is replying…" : "The other side is replying…",
@@ -754,9 +782,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     step === "check"
       ? canContinue
         ? `Start Task ${taskIndex} (Real Session) →`
-        : checkFailed
-          ? "Contact the research team"
-          : reasonSubmitted
+        : reasonSubmitted
             ? "Try once more"
             : "Check My Answer"
       : "Continue";
@@ -773,10 +799,9 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
    *
    * `read` and `pick` end on the bubble's own button rather than on an action,
    * so the bar is live on them too and does the same thing. Every other step
-   * stays disabled until its own condition is met — including `decide`, which
-   * was skippable for a moment: the bar was enabled before any of the three
-   * decisions had been taken, so a participant could Continue past the one
-   * control the step exists to show them.
+   * stays disabled until its own condition is met. In the Proxy closing step,
+   * this means the participant has sent a message, received confirmation and
+   * accepted the same two terms.
    */
   const endsOnItsOwnButton = step === "read" || step === "pick";
 
@@ -797,8 +822,16 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
       case "read":
       case "pick":
         return "Nothing here affects your points or your payment.";
-      case "decide":
-        return "Either way is fine in practice.";
+      case "accept":
+        return acceptedOffer ? "Practice agreement confirmed." : "Confirm only when both terms match what you agreed.";
+      case "confirm":
+        return acceptedOffer
+          ? "Practice agreement confirmed."
+          : proxyCounterpartConfirmed
+            ? "Both sides confirmed the same terms. Accept the current offer."
+            : proxyParticipantSpoke
+              ? "Waiting for the other participant's confirmation…"
+              : "Send the confirmation message before accepting the offer.";
       case "send":
         return "";
       case "watch":
@@ -823,24 +856,17 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
         finish();
         return;
       }
-      if (checkFailed) {
-        router.push("/study-stop?reason=check");
-        return;
-      }
       if (reasonSubmitted) {
         setReasonAnswer("");
         setReasonSubmitted(false);
-        setCheckAttempt(2);
+        setCheckAttempt((current) => current + 1);
         return;
       }
       if (!reasonCorrect && participantKey) {
-        const failed = checkAttempt >= 2;
         writeCheckGate(participantKey, `task-${taskIndex}`, {
-          status: failed ? "failed" : "pending",
+          status: "pending",
           attempts: checkAttempt,
         });
-        if (failed) writeStopReason(participantKey, "check");
-        setCheckFailed(failed);
       }
       setReasonSubmitted(true);
       return;
@@ -908,8 +934,8 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
               is the phase they are IN while reading this. */}
           <PhaseStrip current={isSecond ? "practice2" : "practice"} />
           <PageHeader
-            eyebrow="Practice · Does not count"
-            title="Try the controls"
+            eyebrow={`Task ${taskIndex} · Practice session · Does not count`}
+            title={`Task ${taskIndex} Practice`}
           />
 
           <ol
@@ -1156,7 +1182,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                 />
               </Card>
 
-              {step === "decide" ? (
+              {step === "confirm" ? (
                 <>
                   <CoachAnchor>{coachBubble("down", true)}</CoachAnchor>
                   <Card
@@ -1166,43 +1192,53 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                     )}
                     padded={false}
                   >
-                    <CardTitle>Review the proposed agreement</CardTitle>
+                    <CardTitle>Confirm the practice agreement together</CardTitle>
                     <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                      Nothing is settled until you choose.
+                      In the real task, the Proxy exchange stays visible while you briefly talk with the other participant. The task ends only after both of you confirm the same two terms.
                     </p>
-                    {/* THE THREE CARRY EQUAL WEIGHT (§7). None is
-                        pre-selected, none is styled as the recommended one,
-                        and the copy suggests nothing — the distribution
-                        across the three is `RATIFY`, a confirmatory
-                        measure. */}
-                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                      {[
-                        ["approve", "Approve it"],
-                        ["change", "Ask for a change"],
-                        ["refuse", "Refuse it"],
-                      ].map(([value, label]) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => setProxyDecision(value)}
-                          className={cx(
-                            "rounded-xl border px-3 py-2.5 text-sm font-bold transition-colors",
-                            proxyDecision === value
-                              ? "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                              : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
-                          )}
-                        >
-                          {label}
-                        </button>
-                      ))}
+                    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div className="border-b border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                        <p className="text-sm font-bold text-slate-900">Talk with the other participant</p>
+                        <p className="mt-0.5 text-xs text-slate-600">The Proxy transcript above stays available while you confirm the result.</p>
+                      </div>
+                      <Transcript
+                        messages={proxyConfirmMessages}
+                        pending={proxyConfirmPending}
+                        emptyHint="Send the prepared message to begin the final confirmation."
+                      />
+                      <MessageComposer
+                        value={proxyConfirmDraft}
+                        onChange={setProxyConfirmDraft}
+                        onSend={(text) => {
+                          setProxyConfirmDraft("");
+                          void sendProxyConfirmation(text);
+                        }}
+                        disabled={proxyConfirmPending || proxyCounterpartConfirmed}
+                        placeholder="Confirm the two terms with the other participant…"
+                        cueSend={cueTarget === "composer"}
+                      />
                     </div>
-                    {proxyDecision ? (
-                      <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                        In the real task, approving finishes it. Asking for a
-                        change or refusing opens a short chat with the other
-                        participant.
-                      </p>
-                    ) : null}
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Current offer</p>
+                      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {task.issues.map((issue) => (
+                          <div key={issue.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                            <dt className="text-xs font-semibold text-slate-500">{issue.label}</dt>
+                            <dd className="mt-0.5 text-sm font-bold text-slate-900">
+                              {issue.options.find((option) => option.id === proxyPreferred[issue.id])?.label}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAcceptedOffer(true)}
+                      disabled={!proxyCounterpartConfirmed || acceptedOffer}
+                      className="mt-4 w-full rounded-xl border-2 border-emerald-700 bg-emerald-600 px-4 py-3.5 text-base font-extrabold text-white shadow-md transition hover:bg-emerald-700 disabled:cursor-default disabled:border-emerald-300 disabled:bg-emerald-100 disabled:text-emerald-800"
+                    >
+                      {acceptedOffer ? "✓ Practice offer accepted" : "Accept current offer"}
+                    </button>
                   </Card>
                 </>
               ) : null}
@@ -1247,6 +1283,32 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                 placeholder="Type a practice message…"
                 cueSend={cueTarget === "composer"}
               />
+              {step === "accept" ? (
+                <div className="border-t border-slate-200 bg-slate-50 p-4">
+                  <CoachAnchor>{coachBubble("down", true)}</CoachAnchor>
+                  <div className={cx("mt-3 rounded-xl border bg-white p-3", cueTarget === "decision" ? "cue-ring" : "border-slate-200")}>
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Current offer</p>
+                    <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {task.issues.map((issue) => (
+                        <div key={issue.id}>
+                          <dt className="text-xs font-semibold text-slate-500">{issue.label}</dt>
+                          <dd className="text-sm font-bold text-slate-900">
+                            {issue.options.find((option) => option.id === offer[issue.id])?.label}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <button
+                      type="button"
+                      onClick={() => setAcceptedOffer(true)}
+                      disabled={acceptedOffer}
+                      className="mt-4 w-full rounded-xl border-2 border-emerald-700 bg-emerald-600 px-4 py-3.5 text-base font-extrabold text-white shadow-md transition hover:bg-emerald-700 disabled:cursor-default disabled:border-emerald-300 disabled:bg-emerald-100 disabled:text-emerald-800"
+                    >
+                      {acceptedOffer ? "✓ Practice offer accepted" : "Accept current offer"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </Card>
           ) : null}
 
@@ -1286,9 +1348,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                       {PRACTICE_CHECK_REMEDIATION[practiceCheck.id]}
                     </p>
                     <p className="mt-1 text-xs sm:text-sm">
-                      {checkFailed
-                        ? "This check was not passed after two attempts."
-                        : "Read the explanation, then try once more."}
+                      Read the explanation, then try again. You can keep trying until you answer correctly.
                     </p>
                   </Callout>
                 </div>

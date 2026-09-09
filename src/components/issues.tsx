@@ -100,7 +100,7 @@ export function PointsKey({
         <strong className="text-[var(--private-strong)]">
           More points means a better outcome for you.
         </strong>{" "}
-        These values are private. The other person never sees them.
+        These values are private. Never tell the other person your point values, option scores, or payoff table.
       </p>
       {/* Label above value, not beside it. These pills live in the ~355px
           briefing rail as well as the wide task column, and as one inline row

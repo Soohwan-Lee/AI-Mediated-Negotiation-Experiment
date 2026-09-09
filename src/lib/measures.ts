@@ -89,19 +89,20 @@ export const DIRECT_PRACTICE_CHECK: ChoiceItem = {
 };
 export const PROXY_PRACTICE_CHECK: ChoiceItem = {
   kind: "choice", id: "IC6",
-  text: "What can you do if you do not want to accept your Proxy's provisional agreement as it stands?",
+  text: "After the two AI Proxies finish, what happens before the task ends?",
   options: [
-    { value: "must_accept", label: "You must accept it." },
-    { value: "change_or_decline", label: "You can request changes or decline it." },
+    { value: "mutual_confirmation", label: "You talk with the other participant and both confirm the final agreement." },
+    { value: "automatic", label: "The Proxy result becomes final automatically." },
+    { value: "solo_review", label: "You review it alone and approve or reject it." },
   ],
 };
 export const PRACTICE_CHECK_ANSWERS: Record<string, string> = {
   IC5: "you",
-  IC6: "change_or_decline",
+  IC6: "mutual_confirmation",
 };
 export const PRACTICE_CHECK_REMEDIATION: Record<string, string> = {
   IC5: "You write the messages you send during direct negotiation.",
-  IC6: "You can request changes to the provisional agreement or decline it.",
+  IC6: "You talk with the other participant after the Proxy exchange, and the task ends only after both of you confirm the same final agreement.",
 };
 
 export function experienceBlocks(role: Role, isProxy = false): Block[] {

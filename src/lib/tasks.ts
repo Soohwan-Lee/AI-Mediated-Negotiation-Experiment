@@ -1,5 +1,5 @@
 /**
- * The two negotiation scenarios, from Experimental Design Ver.2.26 §3, §8.
+ * The two negotiation scenarios, from Experimental Design Ver.2.27 §3, §8.
  *
  * Both tasks share one latent payoff structure and differ only on the surface,
  * so Task A and Task B are interchangeable within a participant. Two issues,
@@ -139,7 +139,7 @@ const REQUIREMENT_THRESHOLD_INDEX = 1;
 
 /** The same neutral pre-disclosure notice is used for every role and arm (§8.1). */
 const COMMON_DISCLOSURE_NOTICE =
-  "Sharing this background can help the other person understand your request. It can also shape their impression of your judgement or actions, and what is shared may be weighed in the later bonus or upward evaluation. Whether to share is your choice. You can negotiate and reach agreement without sharing it.";
+  "This is sensitive private context belonging to your assigned role. You decide whether to convey it. If conveyed, it may shape how the other person sees your judgement or actions and may be considered in the later bonus or upward evaluation. You can negotiate and reach agreement without conveying it.";
 
 /**
  * A working-reason card — NON-DIRECTIONAL since Ver.2.21 (§3.2, §4).
@@ -312,7 +312,7 @@ const TASK_A: NegotiationTask = {
     leader: {
       title: "Team Lead",
       organizationalPosition:
-        "You lead this project team. After the negotiation you recommend the Member's study bonus payment (up to £0.50), and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You lead this project team. After the negotiation, you alone decide the Member's bonus (up to £0.50). It is not taken from your £8 payment. The Member separately writes an upward evaluation of you, which is sent to the project director.",
       roleStory:
         "You lead this team. The director and your team know you as someone whose judgement is sound and who keeps commitments. Now you and a senior member of the team have to settle next quarter's working arrangements, twelve weeks of them.\n\nWhat matters most to you is **getting the team into the office as many days a week as you can**. **There is something only you know.** Four days a week is a number you told the director was doable before you had asked the team, and the director has already passed that answer upward. Your team does not know this.\n\n**Your work-reason card says**: this project has high expectations from the client, so execution in the first few weeks matters. Having the team together makes coordination faster, and who presents to the client shapes the early impression. So both the office days and the client presentations are on your mind. That is true too. What it does not say is which term matters more to you or that you already gave the director an answer. What you pass on is up to you.",
       objectives: [
@@ -350,7 +350,7 @@ const TASK_A: NegotiationTask = {
     member: {
       title: "Senior Team Member",
       organizationalPosition:
-        "You are a senior member of this team, the one the lead puts in front of the client alone. After the negotiation the lead recommends your study bonus payment (up to £0.50), and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You are a senior member of this team, the one the lead puts in front of the client alone. After the negotiation, the Team Leader alone decides your bonus (up to £0.50). You separately write an upward evaluation of the Leader, which is sent to the project director.",
       roleStory:
         "You are a senior member of this team. The lead knows you as the person who can be put in front of a client on your own. Now you and the lead have to settle next quarter's working arrangements, twelve weeks of them.\n\nWhat matters most to you is **presenting at as few of the client meetings as you can**. **There is something the lead does not know.** After the last presentation, the client contact told you privately that they would prefer the team lead to present from now on. You did not tell the lead.\n\n**Your work-reason card says**: your analysis scope is wide this quarter, so the workload is heavy. On office days, commuting and meetings reduce your analysis time, and preparing a presentation takes several days. So both the office days and the presentations are a burden. That is true too. What it does not say is which term matters more to you or what the client said. What you pass on is up to you.",
       objectives: [
@@ -465,9 +465,9 @@ const TASK_B: NegotiationTask = {
     leader: {
       title: "Team Lead",
       organizationalPosition:
-        "You lead this project team. After the negotiation you recommend the Member's study bonus payment (up to £0.50), and the Member writes an upward evaluation of you that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You lead this project team. After the negotiation, you alone decide the Member's bonus (up to £0.50). It is not taken from your £8 payment. The Member separately writes an upward evaluation of you, which is sent to the project director.",
       roleStory:
-        "You are the team lead setting the terms for the first four weeks of a new project.\n\nWhat matters most to you is **having the other person on the new project as many days a week as possible**. **There is something only you know.** When you submitted the plan, you mistakenly estimated fewer people than the project actually needs. The plan only works if this person is assigned four days a week, and asking for more people now would show the director that the estimate was wrong. Your team does not know this.\n\n**Your work-reason card says**: a new project's direction is set in the first four weeks. Having people assigned keeps the early work moving, and consistent client reporting builds trust. So both the project staffing and the client reporting need attention. That is true too. What it does not say is which term matters more to you or that you underestimated the staffing need. What you pass on is up to you.",
+        "You lead the same project team. You and a senior team member are now setting two conditions for the first four weeks of a new project: how many days a week the Member works on it, and how many of the four weekly client reports the Member writes. You must agree on one option for each condition.\n\nWhat matters most to you is **having the other person on the new project as many days a week as possible**. **There is something only you know.** When you submitted the plan, you mistakenly estimated fewer people than the project actually needs. The plan only works if this person is assigned four days a week, and asking for more people now would show the director that the estimate was wrong. Your team does not know this.\n\n**Your work-reason card says**: a new project's direction is set in the first four weeks. Having people assigned keeps the early work moving, and consistent client reporting builds trust. So both the project staffing and the client reporting need attention. That is true too. What it does not say is which term matters more to you or that you underestimated the staffing need. What you pass on is up to you.",
       objectives: [
         "Get as many days a week on the new project as you can.",
         "The weekly reports count too. The point sheet shows what each option is worth to you.",
@@ -503,9 +503,9 @@ const TASK_B: NegotiationTask = {
     member: {
       title: "Senior Team Member",
       organizationalPosition:
-        "You are a senior member of this team, the one the lead counts on to keep the client informed. After the negotiation the lead recommends your study bonus payment (up to £0.50), and you write an upward evaluation of the lead that goes to the director. Each of you knows the other has been asked to weigh what they learned during the negotiation.",
+        "You are a senior member of this team, the one the lead counts on to keep the client informed. After the negotiation, the Team Leader alone decides your bonus (up to £0.50). You separately write an upward evaluation of the Leader, which is sent to the project director.",
       roleStory:
-        "You are the senior team member setting the terms for the first four weeks of a new project.\n\nWhat matters most to you is **writing as few of the weekly client reports as you can**. **There is something the lead does not know.** Last month the client contact told you directly that your weekly report was lacking and that they would prefer the team lead to prepare it from now on. You did not tell the lead.\n\n**Your work-reason card says**: two of your current projects have deadlines that overlap this month. Taking on the new project would delay your existing work, and each weekly report requires separate time to prepare. So both the new project and the reports are difficult to fit in. That is true too. What it does not say is which term matters more to you or what the client said. What you pass on is up to you.",
+        "You are a senior member of the same project team. You and the Team Leader are now setting two conditions for the first four weeks of a new project: how many days a week you work on it, and how many of the four weekly client reports you write. You must agree on one option for each condition.\n\nWhat matters most to you is **writing as few of the weekly client reports as you can**. **There is something the lead does not know.** Last month the client contact told you directly that your weekly report was lacking and that they would prefer the team lead to prepare it from now on. You did not tell the lead.\n\n**Your work-reason card says**: two of your current projects have deadlines that overlap this month. Taking on the new project would delay your existing work, and each weekly report requires separate time to prepare. So both the new project and the reports are difficult to fit in. That is true too. What it does not say is which term matters more to you or what the client said. What you pass on is up to you.",
       objectives: [
         "Get the number of weekly client reports you write down as far as you can.",
         "The days on the new project count too. The point sheet shows what each option is worth to you.",

@@ -178,7 +178,7 @@ export default function ConsentPage() {
   const { beginStudy, prolific } = useParticipant();
   const [infoPage, setInfoPage] = useState(0);
   const [agreed, setAgreed] = useState(false);
-  const [isAdult, setIsAdult] = useState(false);
+  const [isEligible, setIsEligible] = useState(false);
   const [busy, setBusy] = useState(false);
   /**
    * Set when the deployment cannot actually run a participant.
@@ -199,11 +199,11 @@ export default function ConsentPage() {
   const isNarrow = useIsNarrow();
 
   useDevAutofill(() => {
-    setIsAdult(true);
+    setIsEligible(true);
     setAgreed(true);
   });
 
-  const canProceed = useDevGate(agreed && isAdult);
+  const canProceed = useDevGate(agreed && isEligible);
 
   function moveInfo(next: number) {
     setInfoPage(next);
@@ -346,8 +346,8 @@ export default function ConsentPage() {
                 You negotiate two workplace arrangements with another
                 participant. You chat directly in one task. In the other an{" "}
                 <strong>AI Proxy</strong> (a software tool) speaks for you
-                first, and you decide what to do with the agreement it
-                reaches.
+                first. You then talk with the other participant to confirm the
+                final agreement.
               </p>
               <ol className="grid gap-2.5 sm:grid-cols-2">
                 {STEPS.map((step, i) => (
@@ -500,9 +500,10 @@ export default function ConsentPage() {
                 Your informed consent
               </CardTitle>
               <div className="mt-3 space-y-3">
-                <Checkbox checked={isAdult} onChange={setIsAdult}>
-                  <strong className="font-bold text-[var(--ink)]">Age and location: </strong>
-                  I am at least 18 years old and currently reside in the United States.
+                <Checkbox checked={isEligible} onChange={setIsEligible}>
+                  <strong className="font-bold text-[var(--ink)]">Eligibility: </strong>
+                  I am at least 18 years old, can read and write English comfortably,
+                  and have at least one year of work experience.
                 </Checkbox>
                 <Checkbox checked={agreed} onChange={setAgreed}>
                   <strong className="font-bold text-[var(--ink)]">Voluntary consent: </strong>

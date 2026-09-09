@@ -16,10 +16,9 @@
  * never learn" #2); a screen reader is a screen, and alt text is copy.
  *
  * THE `?v=` SUFFIX IS NOT DECORATION. `next.config.ts` allowlists local images
- * as `{ pathname: "/illustrations/**", search: "?v=20260907b" }`, so a bare
- * path is REFUSED by the image optimizer at runtime. Keep the query on every
- * src here, and if the version string ever changes, change it in the config
- * first.
+ * with explicit cache-version queries, so a bare path is REFUSED by the image
+ * optimizer at runtime. The Ver.2.27 task set uses `?v=20260910`; older shared
+ * interface art keeps its prior version.
  *
  * The declared width/height are the generator's own pixel dimensions. They set
  * the aspect ratio `next/image` reserves space with; getting them wrong makes
@@ -98,38 +97,38 @@ export const ILLUSTRATIONS: Record<IllustrationKey, Illustration> = {
     height: 512,
   },
   taskA: {
-    src: "/illustrations/design226-task-a.png?v=20260907b",
-    alt: "Alternative office schedules beside two colleagues preparing a client presentation together.",
+    src: "/illustrations/design227-task-a.png?v=20260910",
+    alt: "Two panels show days at the office and client presentations as separate working conditions.",
     width: 1672,
     height: 941,
   },
   taskB: {
-    src: "/illustrations/design226-task-b.png?v=20260907b",
-    alt: "Two colleagues review a project staffing board and four client report folders.",
-    width: 1536,
-    height: 1024,
+    src: "/illustrations/design227-task-b.png?v=20260910",
+    alt: "Two panels show days assigned to a new project and responsibility for weekly client reports.",
+    width: 1672,
+    height: 941,
   },
   taskALeader: {
-    src: "/illustrations/design226-task-a-leader.png?v=20260907b",
-    alt: "A team leader reviews four recurring calendar blocks after a video call with the director.",
+    src: "/illustrations/design227-task-a-leader.png?v=20260910",
+    alt: "A team leader recalls telling the director that four office days were possible before consulting the team.",
     width: 1672,
     height: 941,
   },
   taskAMember: {
-    src: "/illustrations/design226-task-a-member.png?v=20260907b",
-    alt: "A client contact gives a team member private feedback after a presentation while the team leader's office is empty.",
+    src: "/illustrations/design227-task-a-member.png?v=20260910",
+    alt: "After a presentation, a client privately asks the team member if the team leader could present next time.",
     width: 1672,
     height: 941,
   },
   taskBLeader: {
-    src: "/illustrations/design226-task-b-leader.png?v=20260907b",
-    alt: "A team leader privately reviews an understaffed plan across four project days.",
+    src: "/illustrations/design227-task-b-leader.png?v=20260910",
+    alt: "A team leader realizes that a submitted staffing plan underestimated the people needed for the new project.",
     width: 1672,
     height: 941,
   },
   taskBMember: {
-    src: "/illustrations/design226-task-b-member.png?v=20260907b",
-    alt: "A client contact privately points out sparse sections in a report to a team member while the team leader's desk is empty.",
+    src: "/illustrations/design227-task-b-member.png?v=20260910",
+    alt: "A client privately tells the team member that a previous report needed more detail and asks if the leader could write it.",
     width: 1672,
     height: 941,
   },
