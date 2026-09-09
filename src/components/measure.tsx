@@ -250,3 +250,41 @@ export function answeredNote(blocks: Block[], answers: Answers): string {
   const done = total - missingIds(blocks, answers).length;
   return done === total ? "All answered." : `${done} of ${total} answered`;
 }
+
+/**
+ * "Previous" for a paginated questionnaire.
+ *
+ * It pages WITHIN one route only: the part index is component state, so
+ * stepping back re-renders an earlier part of the same battery and never
+ * leaves the URL the progress bar is derived from (interface rule 3). Crossing
+ * a route boundary is `BACK_STEPS` and `BackButton`, which is a different
+ * control with different rules.
+ *
+ * It renders as the action bar's `secondary` slot and is deliberately quieter
+ * than the primary action: going on is the expected move, revising is
+ * available. It carries no `.cue-ring` — nothing is waiting on it
+ * (interface rule 9).
+ *
+ * The caller must not render it on the first part. There is nothing behind
+ * part 0 inside the route, and a dead control that looks live is worse than
+ * no control.
+ */
+export function PreviousPart({
+  onClick,
+  disabled = false,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-1.5 rounded-[var(--radius)] border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-[var(--ink-2)] transition-all hover:bg-slate-50 hover:text-[var(--ink)] shadow-2xs cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <span aria-hidden>←</span>
+      <span>Previous</span>
+    </button>
+  );
+}

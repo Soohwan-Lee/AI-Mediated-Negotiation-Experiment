@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import {
   MeasureBlock,
+  PreviousPart,
   answeredNote,
   missingIds,
   type Answers,
@@ -56,10 +57,19 @@ export default function BackgroundPage() {
   // Reachable again via Back from the instructions. Resume at the first
   // unfinished section; if all three were saved, show the final section so a
   // participant can review it without replaying the earlier pages.
+  //
+  // The landing section is chosen ONCE. The restore is a store read, so it can
+  // resolve after the participant has already pressed Previous — and picking
+  // the section again at that point would drag them forward out of the one
+  // they had just asked to go back to. Answers still merge whenever the read
+  // lands, with local edits winning.
+  const landed = useRef(false);
   useRestoreAnswers("background", (saved) => {
     const merged = { ...saved, ...latestAnswers.current };
     latestAnswers.current = merged;
     setAnswers(merged);
+    if (landed.current) return;
+    landed.current = true;
     const firstIncomplete = BLOCKS.findIndex((block) =>
       missingIds([block], merged).length > 0,
     );
@@ -136,6 +146,32 @@ export default function BackgroundPage() {
     }
   }
 
+  /**
+   * Steps back one section, within this route only. Leaving the route entirely
+   * is `BACK_STEPS` and `BackButton`, which this does not touch.
+   *
+   * The section order is fixed; Previous only pages. Answers are written
+   * first, so nothing typed on the current section is lost, and an earlier
+   * section re-renders from `answers` with its values in place and editable.
+   * The flag set is cleared because it marks what was missing on the section
+   * being left, not on the one being returned to.
+   */
+  async function handlePrevious() {
+    if (part === 0 || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      await saveResponses("background", answers);
+      logEvent("survey_back", { block: "background", from: part, to: part - 1 }, { page: "background" });
+      setPart(part - 1);
+      setFlagged(new Set());
+      window.scrollTo({ top: 0 });
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <Page>
@@ -160,6 +196,7 @@ export default function BackgroundPage() {
         remaining={flagged.size > 0 ? missing.length : 0}
         firstUnansweredId={missing[0] ?? null}
         note={answeredNote([currentBlock], answers)}
+        secondary={part > 0 ? <PreviousPart onClick={handlePrevious} disabled={busy} /> : null}
       />
     </>
   );

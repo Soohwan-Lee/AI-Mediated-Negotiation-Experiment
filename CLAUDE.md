@@ -1068,13 +1068,30 @@ split is the free-text one, three questions to a page.** A rating block is one
 instrument with one response scale and one hint row, so cutting it separates a
 scale from its anchors; a written-answer block has neither, and seven essay
 boxes on one page is precisely the screen the pagination exists to prevent.
-There is no Previous, for the same reason the order is fixed — the AI-Proxy
-blocks come last so they cannot colour the answers about the other side, and
-paging back to revise would undo that. It is still ONE route, so the progress
-bar comes from the URL alone (rule 3); the part index is component state. Two
-things it needs and would be silently broken without: `useRestoreAnswers` (Back
-from the bonus screen is in `BACK_STEPS`) and an autofill key carrying the PART
-index.
+**There IS a Previous, and it pages within the route only.** Every part after
+the first carries one in the action bar's `secondary` slot (`PreviousPart` in
+`components/measure.tsx`); it steps back one part, re-renders the saved answers
+editable, and writes the current part before moving so a revision cannot be
+lost. It never reshuffles: the block order is still the fixed §9.4 / §9.5
+sequence and the only writes to the part index are +1 and −1.
+
+**What the old forward-only rule was guarding is not solved, only accepted and
+made visible.** The AI-Proxy blocks come last so they cannot colour the answers
+about the other side, and the suspicion funnel runs SUS0 → SUS3 for the same
+reason; paging back lets a participant revise an earlier answer after seeing a
+later block, which is exactly what that ordering exists to prevent. So the move
+is recorded — `survey_back`, with the part stepped from and to — and an answer
+revised after a later part was on screen is a fact the analysis can find rather
+than one it has to infer.
+
+It is still ONE route, so the progress bar comes from the URL alone (rule 3);
+the part index is component state. Three things it needs and would be silently
+broken without: `useRestoreAnswers` (Back from the bonus screen is in
+`BACK_STEPS`, and is a different control from this one), an autofill key
+carrying the PART index, and a landing section chosen ONCE — the background
+page's restore is an async store read, and re-picking the section every time it
+resolves would drag a participant forward out of the part they just went back
+to.
 
 Inside a Direct task: cover → brief → **RISK** → what you want → "waiting for
 the other participant" → negotiate → review.

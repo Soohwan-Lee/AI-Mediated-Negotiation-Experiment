@@ -590,6 +590,15 @@ export type EventType =
   | "negotiation_ended"
   | "task_outcome_recorded"
   | "survey_saved"
+  /**
+   * The participant paged BACK inside one questionnaire, with the part index
+   * they came from and the one they went to. The §9.4 / §9.5 block order is
+   * fixed and later blocks are placed where they cannot colour earlier ones —
+   * the AI-Proxy blocks last, the suspicion funnel's SUS3 last — so an answer
+   * revised after a later part was on screen is a fact the analysis has to be
+   * able to find rather than infer.
+   */
+  | "survey_back"
   | "reward_decision"
   | "debriefing_acknowledged"
   | "study_completed";

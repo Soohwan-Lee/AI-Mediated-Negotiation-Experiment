@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { MeasureBlock, type Answers } from "@/components/measure";
+import { MeasureBlock, PreviousPart, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { Card, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
@@ -108,6 +108,35 @@ export default function WrapUpPage() {
     }
   }
 
+  /**
+   * Steps back one section of the end block, within this route only.
+   *
+   * The section order is §9.5's and does not change: Previous pages, it never
+   * reshuffles. The suspicion funnel is the reason this matters here — SUS0
+   * asks what struck the participant as odd while naming nothing, and SUS3
+   * finally says the quiet part. Paging back after SUS3 lets someone revise
+   * SUS0 in light of it, which is exactly what the funnel's order is built to
+   * keep apart, so the move is logged with the section it came from.
+   *
+   * Answers survive because `answers` holds the whole block and is written
+   * before the move; an earlier section re-renders from it, filled and
+   * editable.
+   */
+  async function goBack() {
+    if (part === 0 || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      if (participantKey) await getStore().saveResponses(participantKey, "wrap_up", answers);
+      logEvent("survey_back", { block: "wrap_up", from: part, to: part - 1 });
+      setPart(part - 1);
+      window.scrollTo({ top: 0 });
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
   if (!restored) {
     return <Page><p className="text-sm text-[var(--ink-2)]">Loading final questions…</p></Page>;
   }
@@ -137,6 +166,7 @@ export default function WrapUpPage() {
         disabled={!canContinue}
         remaining={missing.length}
         firstUnansweredId={missing[0] ?? null}
+        secondary={part > 0 ? <PreviousPart onClick={goBack} disabled={busy} /> : null}
       />
     </>
   );

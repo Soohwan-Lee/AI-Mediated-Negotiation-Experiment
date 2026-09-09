@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
-import { MeasureBlock, type Answers } from "@/components/measure";
+import { MeasureBlock, PreviousPart, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { TranscriptReview } from "@/components/transcript-review";
 import { Card, Page } from "@/components/ui";
@@ -103,6 +103,41 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
     }
   }
 
+  /**
+   * Steps back one part, within this route only.
+   *
+   * The answers on screen are written before the move, so a revision that is
+   * only in component state cannot be lost if the participant leaves from the
+   * earlier part. Answers already given come back because `answers` is one
+   * object for the whole battery and `MeasureBlock` renders from it — an
+   * earlier part re-renders filled, editable, and a change overwrites the
+   * stored value in place under the same block name.
+   *
+   * Logged so the audit can see a revision happened and on which part: the
+   * §9.4 order is fixed and the AI-Proxy blocks come last, so an answer edited
+   * after a later part was seen is a fact the analysis has to be able to find.
+   */
+  async function goBack() {
+    if (activePart === 0 || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    try {
+      if (participantKey) {
+        await getStore().saveResponses(participantKey, `post_task_t${taskIndex}`, answers);
+      }
+      logEvent(
+        "survey_back",
+        { block: `post_task_t${taskIndex}`, from: activePart, to: activePart - 1 },
+        { sessionIndex: taskIndex },
+      );
+      setPart(activePart - 1);
+      window.scrollTo({ top: 0 });
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+
   if (!assignment || !plan || !restoreReady) {
     return <Page><p className="text-sm text-[var(--ink-2)]">Loading survey questions…</p></Page>;
   }
@@ -145,6 +180,7 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
         remaining={missing.length}
         firstUnansweredId={missing[0] ?? null}
         note={missing.length === 0 ? "Ready to continue" : ""}
+        secondary={activePart > 0 ? <PreviousPart onClick={goBack} disabled={busy} /> : null}
       />
     </>
   );
