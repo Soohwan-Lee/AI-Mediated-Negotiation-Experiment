@@ -495,44 +495,6 @@ has no participant messages at all, so without this the trajectory would jump
 from what was entrusted straight to the final package and the two middle
 transitions would not exist for half the design.
 
-### `rehearsal_messages`
-
-The participant questioning their own AI Proxy about the mandate, before it
-negotiates. Proxy tasks only.
-
-```sql
-create table rehearsal_messages (
-  id              bigserial primary key,
-  participant_key text not null references participants,
-  task_index      smallint not null,
-  turn_index      integer not null,
-  speaker         text not null check (speaker in ('participant','proxy')),
-  text            text not null,
-  -- The guardrail replaced the model's wording because it reproduced a reason
-  -- card the participant had not authorized. Recorded rather than silently
-  -- swapped: the rate is a pilot audit number.
-  blocked         boolean not null default false,
-  -- How many times the mandate had been edited when this turn was taken, so
-  -- "asked, then changed their instructions" is recoverable.
-  revision_count  integer not null default 0,
-  created_at      timestamptz not null default now()
-);
-
-create index on rehearsal_messages (participant_key, task_index, turn_index);
-```
-
-**A separate table from `messages`, deliberately.** A rehearsal turn was never
-part of a negotiation: no stage, no package, and nothing reached the
-counterpart. Per-stage message counts and the message trajectory are reported
-measures (§9.3.2), so putting these rows in `messages` would put turns that
-were never in an exchange into the transcript the analysis reads.
-
-It is still behavioural data worth having. Whether a participant interrogates a
-delegate before trusting it with a socially costly argument — and whether they
-revise the mandate afterwards — is the same delegation decision `REASON-SCOPE`
-measures, approached from a different side. The turn count also lands in
-`events` as `rehearsal_finished`.
-
 ### `guardrail_events`
 
 Every validator block and regeneration. Needed for pilot gate 9 (rationale

@@ -307,3 +307,90 @@ export interface ClassifierLogEntry {
 export function storedLabel(label: ReasonLabel): "none" | "WR" | "SB" {
   return label === "PRI" ? "WR" : label;
 }
+
+// ---------------------------------------------------------------------------
+// Mockup mode's offline classifier
+// ---------------------------------------------------------------------------
+
+/**
+ * MOCK ONLY. Never reached in a real session, and never a substitute for P5.
+ *
+ * WHY IT EXISTS. Mockup mode has no route, so the classification used to be
+ * the constant `{ label: "none" }`. That recorded a typed confession as
+ * `label: "none", confidence: null, SB-TIMING: "never"` and let the
+ * counterpart accept T1 instead of reciprocating — a Proxy participant who
+ * disclosed in the closing conversation was scored as never having disclosed,
+ * at 1,000 instead of 3,000, on the confirmatory outcome.
+ *
+ * That is the SECOND mockup-mode bug of exactly this shape. The first was the
+ * Proxy script voicing the sensitive card whatever the mandate said. Both
+ * produced a plausible screen and a forbidden outcome, and mockup mode is how
+ * the flow is READ — so what it shows is what a reviewer believes the study
+ * does. A constant that cannot be right is worse than an approximation that
+ * usually is.
+ *
+ * HOW IT DECIDES, and it deliberately reuses the guardrail matcher rather than
+ * inventing a second one: `leaksForbiddenReason` asks "could these words only
+ * have come from this card", subtracting the vocabulary shared with the issue
+ * and the other cards first. That is the same question the tier needs answered,
+ * so the SB card is tested first and the WR card second, and anything matching
+ * neither is `none`. Ties go DOWNWARD exactly as §6.2 requires of the real
+ * classifier.
+ *
+ * WHAT IT IS NOT. It reads vocabulary, not meaning, so it would score a DENIAL
+ * ("it's not like the client complained about me") as a disclosure — a case
+ * the live P5 prompt is written to catch and the simulation probes directly.
+ * Never use this for anything a result depends on; gate 19's κ is computed off
+ * the real route's log.
+ */
+export function mockClassify(
+  texts: readonly string[],
+  cards: {
+    sensitive?: { id: string; text: string };
+    work?: { id: string; text: string };
+    /** Vocabulary the cards share with the task, subtracted before matching. */
+    sayable: readonly string[];
+  },
+  leaks: (
+    text: string,
+    forbidden: Array<{ id: string; text: string }>,
+    sayable: string[],
+  ) => boolean,
+): ClassificationResponse {
+  // CUMULATIVE, like the real route (§6.2a). A confession arrives across two or
+  // three messages; judged one at a time none of them is an SB on its own, and
+  // that floor is the single easiest way to invalidate the primary contrast.
+  const joined = texts.join(" ");
+
+  // THE WORK CARD IS SUBTRACTED WHEN TESTING FOR SB, and it has to be. Both
+  // cards argue for the SAME issue (§4), so they share their distinctive
+  // vocabulary — Task B's leader cards share "project" and "people", the
+  // member's share "weekly" and "report". Without this the safe reason scored
+  // as a confession in two cells of four, which is the error that matters
+  // most: it would credit a participant with a disclosure they never made.
+  // The counterpart route subtracts the work card the same way.
+  const sbSayable = [
+    ...cards.sayable,
+    ...(cards.work ? [cards.work.text] : []),
+  ];
+
+  const label: ReasonLabel =
+    cards.sensitive && leaks(joined, [cards.sensitive], sbSayable)
+      ? "SB"
+      : cards.work && leaks(joined, [cards.work], [...cards.sayable])
+        ? "WR"
+        : "none";
+
+  // Acceptance is matched on the mock replies' own phrasing, so a scripted
+  // "that works for me" settles the exchange the way it reads on screen. It is
+  // matched on the LATEST message only: agreeing is about what is on the table
+  // now, unlike a disclosure, which accumulates.
+  const latest = texts[texts.length - 1] ?? "";
+  const stance: ReasonStance = /\b(that works for me|works for me|sounds good|let's go with that|i accept|agreed)\b/i.test(
+    latest,
+  )
+    ? "accept"
+    : "none";
+
+  return { label, confidence: 1, priority_claim: false, stance };
+}

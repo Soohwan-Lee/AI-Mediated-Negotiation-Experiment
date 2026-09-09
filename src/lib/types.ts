@@ -352,18 +352,16 @@ export interface Mandate {
    * Not the deleted post-hoc revision. That one let a Proxy participant re-run
    * a negotiation that had already finished — a bite Direct never had, which
    * is why it is gone (CLAUDE.md, "There is no 'ask for one change'"). This
-   * counts edits made while nothing has been said to anyone: from the
-   * rehearsal screen ("Change my instructions") and from the confirm screen
-   * ("Change something"). Both are the ordinary act of writing a mandate, and
-   * Direct's equivalent is that a Direct participant can change their mind
-   * freely before they type.
+   * counts edits made while nothing has been said to anyone, which since
+   * Ver.2.24 means the confirm screen's "Change something" — the rehearsal
+   * screen that was the other source is gone. It is the ordinary act of
+   * writing a mandate, and Direct's equivalent is that a Direct participant
+   * can change their mind freely before they type.
    *
-   * It is behavioural data rather than bookkeeping: whether someone
-   * interrogates a delegate and then revises what they entrusted is the same
-   * delegation decision REASON-SCOPE measures, seen from another side. Each
-   * increment also lands in `events` as `mandate_revised`, and
-   * `rehearsal_messages.revision_count` stamps which revision a given question
-   * was asked under.
+   * It is behavioural data rather than bookkeeping: whether someone revises
+   * what they entrusted is the same delegation decision REASON-SCOPE measures,
+   * seen from another side. Each increment also lands in `events` as
+   * `mandate_revised`.
    */
   revisionCount: number;
 }
@@ -489,36 +487,6 @@ export interface TranscriptMessage {
   decidedAction?: string;
 }
 
-/**
- * One turn of the rehearsal — the participant questioning their own AI Proxy
- * about its mandate, before it negotiates anything.
- *
- * Kept apart from `TranscriptMessage` on purpose. A rehearsal turn is not part
- * of any negotiation: it has no stage, carries no package, and nothing in it
- * reaches the counterpart. Storing it in the same table as negotiation messages
- * would put turns that were never part of an exchange into the transcript the
- * analysis reads, and the message count per stage is a reported measure.
- *
- * It is still worth recording: which participants interrogated their proxy,
- * what they asked, and whether they revised the mandate afterwards is
- * delegation behaviour of exactly the kind REASON-SCOPE is trying to capture.
- */
-export interface RehearsalMessage {
-  id: string;
-  sessionIndex: 1 | 2;
-  /** "participant" asks; "proxy" is their own AI Proxy answering. */
-  speaker: "participant" | "proxy";
-  text: string;
-  createdAt: string;
-  /**
-   * True when the guardrail replaced the model's wording because it reproduced
-   * a reason card the participant had not authorized. Recorded rather than
-   * silently swapped, because the rate is a pilot audit number.
-   */
-  blocked?: boolean;
-  /** How many times the mandate had been edited when this turn was taken. */
-  revisionCount?: number;
-}
 
 // ---------------------------------------------------------------------------
 // Agreement
@@ -577,13 +545,6 @@ export type EventType =
    * SB disclosure.
    */
   | "decision_locked"
-  /**
-   * The participant finished questioning their own AI Proxy about the mandate
-   * before it ran. The turn count is delegation behaviour worth having beside
-   * REASON-SCOPE: whether someone interrogates a delegate before trusting it
-   * with an argument is the same decision measured a different way.
-   */
-  | "rehearsal_finished"
   | "message_sent"
   | "technical_pause"
   | "negotiation_started"

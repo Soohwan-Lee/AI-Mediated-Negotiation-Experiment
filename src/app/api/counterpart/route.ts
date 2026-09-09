@@ -39,6 +39,7 @@ import { counterpartLine, packageLevels } from "@/lib/negotiation/script";
 import {
   reciprocalAcceptanceText,
   splitIntoBubbles,
+  splitWorkReason,
 } from "@/lib/negotiation/counterpart-text";
 import {
   cardOfLayer,
@@ -145,7 +146,22 @@ function fallbackText(
 ): string {
   const levels = proposal ? packageLevels(task, proposal) : undefined;
   const ctx = {
-    workReason: cardOfLayer(task, counterpartRole, "work")?.text,
+    // BUBBLED AT SENTENCE SEAMS, NOT PASTED WHOLE (§12 P1).
+    //
+    // SCRIPT-OPEN interpolates this card as the counterpart's first words, and
+    // the four Ver.2.21 work cards run 225-277 characters. Pasted whole they
+    // arrived as ONE bubble of that length, which is not how a person types in
+    // a work chat — it is how a system emits a paragraph, in the very first
+    // message from someone the participant has been told is another
+    // participant. That is the one thing this arm cannot survive, and the
+    // simulation's P1 voice check (170 chars a bubble) failed on it in every
+    // Direct scenario.
+    //
+    // `compactChatBubbles` downstream cannot fix it: it MERGES bubbles down to
+    // three and never splits an over-long one, so the split has to happen here,
+    // before interpolation. The cards themselves are left alone — their wording
+    // is the non-directional manipulation (§3.3, §4) and is not ours to shorten.
+    workReason: splitWorkReason(cardOfLayer(task, counterpartRole, "work")?.text),
     levels,
     participantCoreLabel: requirementIssue(
       task,
@@ -343,7 +359,12 @@ export async function POST(request: Request) {
         // its priority is what leaves the participant to start without knowing
         // which term the other side needs (§3.3).
         const wr = cardOfLayer(task, counterpartRole, "work");
-        return `Start the conversation. Give your own reason by conveying exactly this and nothing more: "${wr?.text ?? ""}". Do NOT say which of the two terms matters most to you. Then ask what their situation is — you would like to hear it before deciding anything. Propose no levels and no package this turn.`;
+        // ASKED FOR IN BUBBLES TOO. The card is long enough that a model told
+        // to "convey exactly this" returns it as one paragraph, so the
+        // instruction names the shape as well as the content. The fallback
+        // splits it deterministically; this is the same requirement put to the
+        // model, and `compactChatBubbles` merges back down if it overshoots.
+        return `Start the conversation. Give your own reason by conveying exactly this and nothing more, SPLIT ACROSS TWO OR THREE SHORT BUBBLES separated by "||", each bubble one sentence and under 170 characters: "${wr?.text ?? ""}". Do NOT say which of the two terms matters most to you. Then ask what their situation is, as its own final bubble — you would like to hear it before deciding anything. Propose no levels and no package this turn.`;
       }
       case "ask_sit":
         // SCRIPT-ASKSIT (§6.1 stage 2, §6.9 #7). Their first message carried no

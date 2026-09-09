@@ -1063,6 +1063,145 @@ for (const taskId of TASKS) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 4b. THE PROXY SCRIPT FOLLOWS THE MANDATE
+// ---------------------------------------------------------------------------
+//
+// The mockup exchange used to voice the sensitive card in every Proxy cell
+// whatever the participant had authorized. So a participant who left the
+// sensitive box unticked — the WR-only mandate, which the ladder pays 1,000 —
+// still watched their proxy confess and still settled at 3,000/3,000, the SB
+// rung. That is the confirmatory outcome reading the wrong value in the arm
+// the whole study is about, and mockup mode is how the flow is read, so it is
+// what a PI walking the study sees.
+//
+// `scriptedTask(..., sbAuthorized)` is the fix and these are its pins: with
+// the box off the exchange lands on the T1 package the ladder actually pays,
+// and the sensitive card is never voiced anywhere in it.
+for (const taskId of TASKS) {
+  for (const role of ROLES) {
+    for (const condition of ["user_specified", "ai_supplemented"]) {
+      test(`${taskId}/${role}/${condition}: the WR-only mockup settles at 1,000 / 1,000 and never voices the SB`, () => {
+        const task = getTask(taskId);
+        const counterpart = other(role);
+        const script = scriptedTask(task, role, condition, false);
+
+        // THE T1 RUNG, from the machine rather than from a number written here:
+        // the script and the ladder have drifted apart twice before.
+        assert.deepEqual(script.tentative, tierPackage(task, role, "work"));
+        assert.equal(scorePackage(task, script.tentative, role), 1000);
+        assert.equal(scorePackage(task, script.tentative, counterpart), 1000);
+
+        // The sensitive card is never voiced — not as a reason token, and not
+        // as its text anywhere in the transcript.
+        const sb = cardOfLayer(task, role, "sensitive");
+        for (const message of script.messages) {
+          assert.notEqual(
+            message.reasonCardId,
+            sb.id,
+            "the WR-only script must not designate the sensitive card",
+          );
+          assert.ok(
+            !message.text.includes(sb.text.slice(0, 40)),
+            `the withheld card's text leaked: ${message.text.slice(0, 120)}`,
+          );
+        }
+
+        // The participant side still voices its WORK reason: it is a fixed
+        // utterance the proxy always says (§8.7), so the WR-only path is
+        // "one reason", never "no reason at all".
+        const wr = cardOfLayer(task, role, "work");
+        assert.ok(
+          script.messages.some(
+            (m) =>
+              m.speaker === "participant_proxy" && m.reasonCardId === wr.id,
+          ),
+          "the WR is voiced at the first reason opportunity",
+        );
+
+        // BOTH POLICIES RUN THE SAME NUMBER OF TURNS (§7's exposure control).
+        // A WR-only path that were shorter would confound the policy contrast
+        // with how much was said.
+        assert.equal(
+          script.messages.length,
+          scriptedTask(task, role, condition, true).messages.length,
+        );
+
+        // And the machine agrees the counterpart accepts exactly this package
+        // at exactly this tier.
+        const d = counterpartStep(
+          task,
+          counterpart,
+          5,
+          script.tentative,
+          state("work"),
+        );
+        assert.equal(d.accepts, true);
+      });
+    }
+  }
+}
+
+test("the WR-only mockup keeps the counterpart's own disclosure on its fixed schedule", () => {
+  // §6.10: Direct's RECIPROCITY rule does not apply in the Proxy arm. While
+  // the participant is watching, the counterpart proxy always discloses, so a
+  // Proxy participant's receiver experience is the same in every cell — it
+  // must NOT become conditional on the participant's own checkbox, which would
+  // make the stimulus covary with the primary outcome.
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      for (const condition of ["user_specified", "ai_supplemented"]) {
+        const task = getTask(taskId);
+        const script = scriptedTask(task, role, condition, false);
+        assert.ok(
+          script.messages.some(
+            (m) => m.speaker === "counterpart_proxy" && m.stage === 4,
+          ),
+          `${taskId}/${role}/${condition}: the counterpart still discloses on the WR-only path`,
+        );
+      }
+    }
+  }
+});
+
+test("cover ① rides the AI-Supplemented decline turn, and cover ② stays out of it", () => {
+  // §6.6 rule (b), and it is the ONLY place the policy difference is visible
+  // when the participant has authorized nothing sensitive. Without it a
+  // participant who ticked nothing would experience the two policies
+  // identically, and `AI-Supplemented − User-Specified` would be estimated
+  // only among disclosers.
+  //
+  // Cover ② is SB-GRADE and must not appear: its job is to sit beside the
+  // abstraction and make it unclear which of three sentences is the
+  // principal's, and on a path with no abstraction it would just be a second
+  // reason.
+  for (const taskId of TASKS) {
+    for (const role of ROLES) {
+      const task = getTask(taskId);
+      const sb = cardOfLayer(task, role, "sensitive");
+      const supp = scriptedTask(task, role, "ai_supplemented", false);
+      const user = scriptedTask(task, role, "user_specified", false);
+      const suppText = supp.messages.map((m) => m.text).join(" ");
+      const userText = user.messages.map((m) => m.text).join(" ");
+
+      assert.ok(
+        suppText.includes(sb.cover[0].slice(1, 40)),
+        `${taskId}/${role}: cover ① is missing from the AI-Supplemented WR-only path`,
+      );
+      assert.ok(
+        !suppText.includes(sb.cover[1].slice(0, 40)),
+        `${taskId}/${role}: cover ② must not appear on the WR-only path`,
+      );
+      // And User-Specified adds nothing of its own: it relays what it was
+      // given and no more.
+      assert.ok(
+        !userText.includes(sb.cover[0].slice(1, 40)),
+        `${taskId}/${role}: User-Specified must not carry a cover sentence`,
+      );
+    }
+  }
+});
+
 test("a scripted proxy never speaks as its principal", () => {
   // §6.5, Ver.2.19. The proxy refers to "the team lead I represent" and never
   // claims the confession as its own — on screen a first-person proxy is

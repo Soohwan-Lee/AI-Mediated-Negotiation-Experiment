@@ -54,7 +54,7 @@ import {
 } from "@/components/session";
 import { ProxyFigure } from "@/components/proxy-art";
 import { ActionBar } from "@/components/study-chrome";
-import { Callout, Card, CardTitle, Page, cx } from "@/components/ui";
+import { Callout, Card, Page, cx } from "@/components/ui";
 import {
   useDevActions,
   useDevAutofill,
@@ -92,7 +92,6 @@ import {
   DirectNegotiation,
   Matchmaking,
   PreferenceForm,
-  RehearsalChat,
   TaskBrief,
   TaskIntro,
   type Preferences,
@@ -103,7 +102,6 @@ type Phase =
   | "intro"
   | "brief"
   | "mandate"
-  | "rehearsal"
   | "confirm"
   | "matchmaking"
   | "watching"
@@ -116,7 +114,6 @@ const PHASES: Phase[] = [
   "intro",
   "brief",
   "mandate",
-  "rehearsal",
   "confirm",
   "matchmaking",
   "watching",
@@ -143,7 +140,6 @@ const PHASES: Phase[] = [
 const STEP_LABELS = [
   "Your briefing",
   "Your instructions",
-  "Check with it",
   "Check and start",
   "Watch",
   "Your decision",
@@ -158,7 +154,7 @@ const STEP_LABELS = [
  */
 const COVER_STEPS = [
   { label: "Prepare", hint: "Read your briefing, then set your goals and sharing choices." },
-  { label: "Watch your AI Proxy", hint: "You can ask it questions before it speaks to the other Proxy." },
+  { label: "Watch your AI Proxy", hint: "It speaks to the other participant's AI Proxy while you watch." },
   { label: "Decide", hint: "Approve the proposed agreement, or request changes/refuse and talk directly for up to 2 minutes." },
 ];
 
@@ -167,7 +163,6 @@ const PHASE_LABELS: Record<Phase, string> = {
   intro: "Start screen",
   brief: "Your briefing",
   mandate: "Your instructions",
-  rehearsal: "Check with it",
   confirm: "Check and start",
   matchmaking: "Connecting",
   watching: "Watch",
@@ -244,14 +239,13 @@ const STEP_OF: Record<Phase, number> = {
   intro: 0,
   brief: 0,
   mandate: 1,
-  rehearsal: 2,
-  confirm: 3,
-  matchmaking: 4,
-  watching: 4,
-  ratify: 5,
-  handover: 5,
-  negotiate: 5,
-  review: 6,
+  confirm: 2,
+  matchmaking: 3,
+  watching: 3,
+  ratify: 4,
+  handover: 4,
+  negotiate: 4,
+  review: 5,
 };
 
 /**
@@ -264,8 +258,8 @@ const STEP_OF: Record<Phase, number> = {
 
 /**
  * The policy disclosure (Design §7) lives with `ProxyIdentity` in
- * components/session.tsx, because the mandate, the rehearsal and the confirm
- * screen all show it inside that block. It is the ONE sentence that differs
+ * components/session.tsx, because both the mandate and the confirm screen
+ * show it inside that block. It is the ONE sentence that differs
  * between the two policies; the CONDITION NAME never appears anywhere.
  */
 
@@ -379,6 +373,20 @@ export function ProxyTask({
   const stopped = useRef(false);
   const [showStopped, setShowStopped] = useState(false);
   /**
+   * Whether the participant has used the sensitive checkbox themselves.
+   *
+   * DEV-MODE BOOKKEEPING ONLY, and deliberately a ref outside the mandate:
+   * nothing in the ladder, the outcome row, the route or the export reads it,
+   * and `authorizedReasonIds` remains the single thing that decides what the
+   * proxy may say. Its whole job is to stop mockup mode's autofill from
+   * re-ticking a box the participant has deliberately cleared — the panel's
+   * "Fill this page" button re-runs that filler on demand, and before this
+   * flag it silently restored the SB, so an unticked mandate still played the
+   * confession and still settled at 3,000. A ref rather than state because the
+   * autofill's updater reads it and a re-render is neither needed nor wanted.
+   */
+  const sbTouched = useRef(false);
+  /**
    * RATIFY (§9.3) — recorded on the decision screen, not inferred afterwards.
    * A participant who asked for a change and then agreed the very same package
    * is a modifier, and coding them off the final package would call them an
@@ -391,8 +399,19 @@ export function ProxyTask({
   );
 
   const mockAi = useDevMockAi();
-  const script = scriptedTask(task, role, policy);
-
+  /**
+   * THE MOCKUP EXCHANGE FOLLOWS THE MANDATE, and this argument is the whole of
+   * that. `scriptedTask` used to be called without it, so every Proxy cell
+   * played the SB exchange whatever the participant had authorized: unticking
+   * the sensitive box changed the mandate screen and nothing after it — the
+   * proxy still confessed on screen and the task still settled at the SB rung,
+   * 3,000/3,000, out of a WR-only mandate. That is RQ1's confirmatory outcome
+   * reading the wrong value, in the arm the study is about.
+   *
+   * It is derived from `sbFirstChoice` — the same checkbox the outcome row
+   * records — so the transcript, the tier and `SB` cannot disagree about what
+   * the participant authorized.
+   */
   /**
    * `SB` — the participant's first disclosure choice, which in this arm is the
    * mandate checkbox (§6.3, §9.3). Sealed at DECISION-LOCK and read from the
@@ -402,6 +421,7 @@ export function ProxyTask({
     mandate.authorizedReasonIds,
     reasonCards,
   );
+  const script = scriptedTask(task, role, policy, sbFirstChoice);
 
   useDevActions(
     `task-${taskIndex}`,
@@ -431,9 +451,13 @@ export function ProxyTask({
             })),
           );
           setTentative(script.tentative);
-          // The scripted exchange voices the SB at the first reason
-          // opportunity, so the tier the closing inherits is the SB rung —
-          // the same value `runNegotiation` derives when it plays the script.
+          // The tier the closing inherits is READ OFF THE SCRIPT THAT ACTUALLY
+          // PLAYED, never assumed to be the SB rung. The script now follows the
+          // mandate, so a jump taken from a WR-only mandate seeds `work` and
+          // the T1 package together — the same pair `runNegotiation` derives
+          // when it plays the same script. Assuming `sensitive` here would put
+          // the closing conversation a rung above the exchange the participant
+          // just watched, which is the wire CLAUDE.md records breaking twice.
           setProxyVoicedTier(
             script.messages.some(
               (m) =>
@@ -465,17 +489,31 @@ export function ProxyTask({
   useDevAutofill(() => {
     setMandate((m) => ({
       ...m,
-      // The mockup walks the SB rung of the ladder: the scripted exchange
-      // voices the sensitive card, so the mandate must authorize it or the
-      // mockup would show a disclosure the mandate forbids.
-      authorizedReasonIds: [
-        ...new Set([
-          ...m.authorizedReasonIds,
-          ...reasonCards
-            .filter((c) => c.layer === "sensitive")
-            .map((c) => c.id),
-        ]),
-      ],
+      // THE SB TICK IS A DEFAULT HERE, NEVER AN OVERRIDE — and the difference
+      // is the validity of the arm.
+      //
+      // Mockup mode walks the SB rung by default, because that is the ideal
+      // trajectory the scripts are for. But this used to union the sensitive
+      // card in every time it ran, and the dev panel's "Fill this page" button
+      // re-runs it on demand: a participant (or a PI reading the flow) who
+      // unticked the box and then filled the screen again had it silently
+      // ticked back, watched their proxy confess, and settled at 3,000 out of
+      // a WR-only mandate.
+      //
+      // `sbTouched` records that the checkbox has been used at all, so the
+      // default applies only while the participant has not decided. Once they
+      // have, their decision stands — and `scriptedTask` now plays the WR-only
+      // exchange for it, which settles at T1 where the ladder says it should.
+      authorizedReasonIds: sbTouched.current
+        ? m.authorizedReasonIds
+        : [
+            ...new Set([
+              ...m.authorizedReasonIds,
+              ...reasonCards
+                .filter((c) => c.layer === "sensitive")
+                .map((c) => c.id),
+            ]),
+          ],
       issues: m.issues.map((im) => {
         const issue = task.issues.find((i) => i.id === im.issueId)!;
         const best = [...issue.options].sort(
@@ -490,6 +528,9 @@ export function ProxyTask({
   }, `mandate-t${taskIndex}`);
 
   function toggleReason(cardId: string) {
+    // The participant has now decided the checkbox themselves, so the dev
+    // autofill's default must not be reapplied over the top of it.
+    sbTouched.current = true;
     setMandate((m) => ({
       ...m,
       authorizedReasonIds: m.authorizedReasonIds.includes(cardId)
@@ -861,41 +902,28 @@ export function ProxyTask({
                read, and the decision on those screens is a different one. */
             explainerOpen
             status="Waiting for your instructions"
+            /* ONE SENTENCE. This ran to three paragraphs restating what the
+               two sections below already say, on a screen whose length was
+               itself the problem: the decision is two controls, and the copy
+               above them was longer than both. What it still has to do is name
+               the two things being asked for, because a participant who is not
+               told the work reason always goes would read the single checkbox
+               as the whole of what gets said. It names them and stops, and it
+               says nothing about which answer to give. */
             speech={
-              <>
-                <p>
-                  I&rsquo;ll be sitting down with the other participant&rsquo;s
-                  AI Proxy shortly, and I&rsquo;ll be speaking for you the whole
-                  time — you won&rsquo;t need to say anything while we talk.
-                </p>
-                {/* THE WORK REASON IS NOT A CHOICE ANY MORE (§8.7). This asked
-                    for "which of your reasons I'm allowed to say out loud",
-                    which described a screen with two checkboxes; there is one
-                    now. It also has to say what the proxy does WITHOUT being
-                    asked — the work reason and the priority — because that is
-                    the fixed part of the mandate and a participant who is not
-                    told it would read the single checkbox as the whole of
-                    what gets said. */}
-                <p className="mt-2">
-                  I&rsquo;ll always pass on what you&rsquo;re hoping for, your
-                  work reason, and which condition matters more to you. So tell
-                  me two things before I go in:{" "}
-                  <strong className="font-semibold">
-                    where to aim on each condition
-                  </strong>
-                  , and{" "}
-                  <strong className="font-semibold">
-                    whether I may pass on your sensitive background
-                  </strong>
-                  . If you leave that unticked, I never say it.
-                </p>
-              </>
+              <p>
+                I will speak for you. Pick your goal on each issue and tell me
+                whether I may share your sensitive background.
+              </p>
             }
-            footnote="After this: you can question me, then you watch the whole exchange, then you decide what happens to whatever we reach."
+            /* Ver.2.24 removed the rehearsal screen, and this line promised
+               it: "you can question me" named a step the participant will
+               never reach. What is left is the sequence that actually runs. */
+            footnote="After this: you watch the whole exchange, then you decide what happens to whatever we reach."
           />
         }
         reasonsComplete={true}
-        /* Levels already entrusted, so returning here from the rehearsal
+        /* Levels already entrusted, so returning here from the confirm screen
            restores them (interface rule 4). The mandate is the parent's state
            and survives the remount; `PreferenceForm`'s own state does not. */
         initial={{
@@ -919,32 +947,6 @@ export function ProxyTask({
               preferredOptionId: p.preferred[im.issueId] ?? null,
             })),
           }));
-          setPhase("rehearsal");
-          window.scrollTo({ top: 0 });
-        }}
-      />
-    );
-  }
-
-  /* Questioning your own proxy before it runs. Optional, and before anything
-     has been said to anyone — see `RehearsalChat`. */
-  if (phase === "rehearsal") {
-    return (
-      <RehearsalChat
-        taskIndex={taskIndex}
-        task={task}
-        role={role}
-        policy={policy}
-        mandate={mandate}
-        steps={STEP_LABELS}
-        stepIndex={STEP_OF.rehearsal}
-        onBackToMandate={() => {
-          setMandate((m) => ({ ...m, revisionCount: m.revisionCount + 1 }));
-          logEvent("mandate_revised", undefined, { sessionIndex: taskIndex });
-          setPhase("mandate");
-          window.scrollTo({ top: 0 });
-        }}
-        onContinue={() => {
           setPhase("confirm");
           window.scrollTo({ top: 0 });
         }}
@@ -979,7 +981,7 @@ export function ProxyTask({
             />
 
             {/* THE REPRESENTATIVE READS THE BRIEF BACK. Same figure as the
-                mandate and the rehearsal, now acknowledging what it was given.
+                mandate screen, now acknowledging what it was given.
                 The sheet below is the same acknowledgement itemised, so a
                 participant can check the summary against the detail.
 
@@ -1635,20 +1637,19 @@ function ReasonMandateSection({
 
   return (
     <Card tone="private" className="border-amber-300 bg-amber-50/50 text-[var(--private-ink)]">
-      <CardTitle hint="Your work reason always goes across. The sensitive background only goes if you tick it.">
-        What your proxy may say for you
-      </CardTitle>
+      {/* ONE LINE, AND NO HEADING. This carried a section heading plus a
+          four-line paragraph saying what the two labelled boxes below it
+          already say for themselves. The mandate screen's length was the
+          complaint, and this was most of it.
 
-      {/* §8.7's opening, in plain words. It states the mechanism — always,
-          only-if-ticked, never-otherwise — and stops there. "There's one thing
-          to decide here" is the honest description of a screen with one
-          control; it is not encouragement in either direction. */}
+          WHAT SURVIVES IS THE MECHANISM: always, only-if-ticked. That much
+          cannot go, because a participant not told the work reason always
+          goes would read the one checkbox as the whole of what gets said. It
+          is symmetric between the two answers and recommends neither, which
+          is what §8.1 requires of any copy near this control. */}
       <p className="mb-4 text-xs sm:text-sm leading-relaxed text-amber-950 font-medium">
-        Your AI Proxy always passes on what you&rsquo;re hoping for and your
-        work reason, and says which condition matters more to you. There&rsquo;s
-        one thing to decide here: tick the sensitive background and your Proxy
-        will pass it on in the way described below. Leave it unticked and it
-        never comes up, in any form.
+        Your work reason always goes across. The sensitive background only goes
+        if you tick it.
       </p>
 
       {/* THE SPLIT STAYS (interface rule 6). Two boxes, two colours, two

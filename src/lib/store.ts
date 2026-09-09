@@ -17,7 +17,6 @@ import type {
   ExperimentEvent,
   Mandate,
   ProlificContext,
-  RehearsalMessage,
   SurveyResponses,
   TranscriptMessage,
 } from "./types";
@@ -58,23 +57,6 @@ export interface Store {
     participantKey: string,
     sessionIndex: 1 | 2,
   ): Promise<TranscriptMessage[]>;
-
-  /**
-   * One turn of the rehearsal conversation (participant ↔ their own proxy).
-   *
-   * Deliberately NOT `appendMessage`. A rehearsal turn was never part of a
-   * negotiation — no stage, no package, nothing sent to the counterpart — and
-   * per-stage message counts are a reported measure, so mixing the two would
-   * corrupt the transcript the analysis reads.
-   */
-  appendRehearsalMessage(
-    participantKey: string,
-    message: RehearsalMessage,
-  ): Promise<void>;
-  loadRehearsalMessages(
-    participantKey: string,
-    sessionIndex: 1 | 2,
-  ): Promise<RehearsalMessage[]>;
 
   saveAgreement(
     participantKey: string,
@@ -202,23 +184,6 @@ class LocalStore implements Store {
 
   async loadMessages(participantKey: string, sessionIndex: 1 | 2) {
     return read<TranscriptMessage[]>(key("messages", participantKey, sessionIndex)) ?? [];
-  }
-
-  async appendRehearsalMessage(
-    participantKey: string,
-    message: RehearsalMessage,
-  ) {
-    const k = key("rehearsal", participantKey, message.sessionIndex);
-    const existing = read<RehearsalMessage[]>(k) ?? [];
-    existing.push(message);
-    write(k, existing);
-  }
-
-  async loadRehearsalMessages(participantKey: string, sessionIndex: 1 | 2) {
-    return (
-      read<RehearsalMessage[]>(key("rehearsal", participantKey, sessionIndex)) ??
-      []
-    );
   }
 
   async saveAgreement(participantKey: string, agreement: CandidateAgreement) {

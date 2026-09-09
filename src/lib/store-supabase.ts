@@ -39,7 +39,6 @@ import type {
   ExperimentEvent,
   Mandate,
   ProlificContext,
-  RehearsalMessage,
   SurveyResponses,
   TranscriptMessage,
 } from "./types";
@@ -302,22 +301,6 @@ export class SupabaseStore implements Store {
   async loadMessages(participantKey: string, sessionIndex: 1 | 2) {
     return (
       (await this.get<TranscriptMessage[]>("loadMessages", {
-        participantKey,
-        sessionIndex,
-      })) ?? []
-    );
-  }
-
-  async appendRehearsalMessage(
-    participantKey: string,
-    message: RehearsalMessage,
-  ) {
-    this.queue.push("appendRehearsalMessage", { participantKey, message });
-  }
-
-  async loadRehearsalMessages(participantKey: string, sessionIndex: 1 | 2) {
-    return (
-      (await this.get<RehearsalMessage[]>("loadRehearsalMessages", {
         participantKey,
         sessionIndex,
       })) ?? []

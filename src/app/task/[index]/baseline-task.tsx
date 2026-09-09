@@ -64,7 +64,10 @@ import {
   type CounterpartResponse,
   type HeldExchangeState,
 } from "./turn-contract";
-import { reciprocalAcceptanceText } from "@/lib/negotiation/counterpart-text";
+import {
+  reciprocalAcceptanceText,
+  seededOpeningText,
+} from "@/lib/negotiation/counterpart-text";
 import { fetchJsonWithRetry } from "@/lib/negotiation/recoverable-request";
 import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
@@ -114,8 +117,15 @@ function openingLine(
   // and it made a high-FTS participant competitive by a route that has nothing
   // to do with disclosure. The first package the participant ever sees is now
   // the symmetric tier package, where both sides move equally.
+  //
+  // BUBBLED THROUGH THE SHARED HELPER (§12 P1). This pasted the work reason
+  // card in whole, and the four cards run 225-277 characters, so the very
+  // first message a Direct participant ever saw was one paragraph of that
+  // length from someone they have been told is another participant. The route,
+  // the mockup and the simulation each had their own copy of this line; three
+  // were fixed before this one, which is exactly why it is one function now.
   const wr = cardOfLayer(task, counterpartRole, "work");
-  return `hi! good to be sorting this out. || ${wr?.text ?? ""} || what's the situation on your side?`;
+  return seededOpeningText(wr?.text, "what's the situation on your side?");
 }
 
 /**

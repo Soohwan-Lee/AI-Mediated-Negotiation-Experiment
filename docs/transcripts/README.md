@@ -8,12 +8,19 @@ in `simulation-report.json` answer "did the assertions pass" and these answer
 Each speaker is labelled the way the interface labels them. The counterpart is
 never given a name.
 
-**Ver.2.21 is what these show**: the two-rung ladder (T1 1,000 each, T2 3,000
+**Ver.2.24 is what these show**: the two-rung ladder (T1 1,000 each, T2 3,000
 each, impasse 0), the non-directional work reason, reciprocal disclosure in
 Direct, the cumulative P5 classifier, and the AI-Supplemented proxy speaking as
 itself. A file describing a four-rung ladder, a misread offer, an added-argument
-pool, or Task B's urgent-call duty is from an older study and should not be in
+pool, Task B's urgent-call duty, or a rehearsal conversation between the
+participant and their own proxy is from an older study and should not be in
 this directory.
+
+**There are THIRTEEN scenarios.** Ver.2.24 removed the pre-negotiation
+rehearsal screen, so `rehearsal-leak` went with it. The guardrail it exercised
+still exists and still has a test (`tests/reason-leak.test.mjs`): the Direct
+counterpart route uses the same check to keep its own sensitive card from
+arriving before the reciprocity rule allows it.
 
 ## What to look for
 
@@ -31,7 +38,6 @@ this directory.
 | `proxy-supp-sb.md` | AI-Supplemented with the SB ticked: the proxy's own frame plus all three sentences, shuffled, with no attribution and no event. Read it beside `proxy-user-sb.md` — the policy contrast is this pair. |
 | `proxy-supp-wr.md` | AI-Supplemented WR-only: 1,000/1,000, with cover ① on the decline turn. The only place the policy difference shows on this path. |
 | `closing-self-disclose.md` | **The ladder moving mid-closing.** After a WR-only proxy run the participant confesses in person; the counterpart answers by proposing best↔best itself and the deal lands at the maximum. `SB-TIMING = wrap_up`. |
-| `rehearsal-leak.md` | The rehearsal proxy refuses to read back an unticked sensitive card. |
 | `classifier-probe.md` | The classifier asked directly. The denial and the vague hint must both land below `SB`, and a real counter-offer must resolve into levels. |
 
 ## The annotated visualisation

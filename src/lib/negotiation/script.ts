@@ -10,11 +10,22 @@
  *
  * THE MOCKUP EXCHANGES ARE THE IDEAL TRAJECTORIES (§6.10): the participant
  * side's SB comes out at the first reason opportunity, the counterpart
- * reciprocates, the best↔best trade lands, and it is accepted. Every cell
+ * reciprocates, the best↔best trade lands, and it is accepted. That cell
  * settles at 3,000 for the speaker and 3,000 for the other side — exactly what
  * `counterpartStep` produces for the same moves, and the two must never drift
  * apart (this pair has diverged twice before; check both after touching
  * either).
+ *
+ * BUT THE PROXY SCRIPT FOLLOWS THE MANDATE, and that is not a refinement of
+ * the ideal path — it is the difference between mocking THIS study and mocking
+ * a different one. `scriptedTask` takes `sbAuthorized`, and with the sensitive
+ * box unticked it plays the WR-ONLY exchange and settles at T1, 1,000/1,000.
+ * Before that flag existed every Proxy cell voiced the sensitive card whatever
+ * the participant had authorized, so unticking it changed the mandate screen
+ * and nothing else: the proxy still confessed on screen and the task still
+ * paid the SB rung. A mockup that shows a disclosure the mandate forbids is a
+ * mockup of a study nobody is running, and here it landed on the confirmatory
+ * outcome.
  *
  * THE COUNTERPART OPENS WITHOUT A PACKAGE AND WITHOUT A PRIORITY (§6.1). Its
  * stage-1 move is its work reason — which names BOTH terms — plus the question.
@@ -38,6 +49,7 @@ import {
   requirementIssue,
 } from "../tasks";
 import { tierPackage, type ReasonTier } from "./machine";
+import { seededOpeningText } from "./counterpart-text";
 import type {
   NegotiationTask,
   Package,
@@ -85,7 +97,15 @@ export const SCRIPT_LINES = {
    * priority of its own.
    */
   open: (ctx: ScriptLineContext) =>
-    `${ctx.workReason ?? "there's a lot on at the moment."} || what's your situation on your side? || I'd rather hear it before we settle anything.`,
+    // ONE QUESTION BUBBLE, NOT TWO. The question and "I'd rather hear it
+    // before we settle anything" were separate bubbles, which was fine while
+    // the work reason arrived as a single (over-long) paragraph. Now that the
+    // reason is split at sentence seams it needs bubbles of its own, and
+    // `compactChatBubbles` merges the turn down to three from the shortest
+    // seam — which swallowed the question into the reason. Joining the two
+    // question clauses here keeps the ASK as its own final bubble, which is
+    // what §6.1 stage 1 is: the situation, then the question back.
+    `${ctx.workReason ?? "there's a lot on at the moment."} || what's your situation on your side? I'd rather hear it before we settle anything.`,
 
   /** SCRIPT-ASKSIT. The first message carried no reason at all. Once. */
   ask_sit: () =>
@@ -296,7 +316,12 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
         "b1c",
         1,
         "counterpart",
-        `hi! good to be sorting this out. || ${theirWr ? lowerFirst(theirWr.text) : "there's a bit of pressure on my side this quarter."} || what's your situation on your side? I'd rather hear it before we settle anything.`,
+        // ONE COPY OF THE SEED, shared with the route, the simulation and
+        // baseline-task.tsx. See `seededOpeningText`.
+        seededOpeningText(
+          theirWr ? lowerFirst(theirWr.text) : undefined,
+          "what's your situation on your side? I'd rather hear it before we settle anything.",
+        ),
       ),
       // The participant's first reason turn, and they use it on the SB — in
       // their own words, not the card's, which is what the classifier has to
@@ -362,9 +387,10 @@ function proxyScript(
   task: NegotiationTask,
   role: Role,
   policy: "user_specified" | "ai_supplemented",
+  sbAuthorized: boolean,
 ): ScriptedTask {
   const other: Role = role === "leader" ? "member" : "leader";
-  const { trade } = trajectory(task, role);
+  const { split, trade } = trajectory(task, role);
   const mine = requirementIssue(task, role);
   const theirs = counterRequirementIssue(task, role);
   const mySb = cardOfLayer(task, role, "sensitive");
@@ -397,18 +423,126 @@ function proxyScript(
   ) =>
     `${rendered.frame} ${rendered.cover[0]} ${rendered.abstract} ${rendered.cover[1]}`;
 
+  const myWr = cardOfLayer(task, role, "work");
+
+  // Turn 1 is the same on both paths: the counterpart proxy introduces itself,
+  // gives its principal's WORK reason and asks about the other side (§6.1 —
+  // no package and no priority of its own).
+  const open = m(
+    "p1c",
+    1,
+    "counterpart_proxy",
+    `Hello, I am the AI Proxy negotiating for ${otherPrincipal} I represent. ${theirWr?.relayed ?? ""} What is the situation on your side?`,
+  );
+
+  // Turn 3 is also the same: the counterpart proxy discloses its own SB on the
+  // FIXED schedule (§6.10), which is what Direct's reciprocity rule does not
+  // do — while the participant is watching, the counterpart always discloses,
+  // so a Proxy participant's receiver experience is identical in every cell.
+  // It does NOT depend on the participant's own checkbox.
+  const theirDisclosure = m(
+    "p4c",
+    4,
+    "counterpart_proxy",
+    policy === "ai_supplemented" && theirAbstracted
+      ? supplemented(theirAbstracted)
+      : theirSb?.relayed
+        ? `On their side as well. ${theirSb.relayed}`
+        : `The constraint on ${theirs.label.toLowerCase()} for ${otherPrincipal} I represent is a firm one.`,
+  );
+
+  // -------------------------------------------------------------------------
+  // THE WR-ONLY PATH — the participant left the sensitive box unticked.
+  // -------------------------------------------------------------------------
+  //
+  // It settles at T1, 1,000/1,000, and that is the whole point of having it.
+  // Mockup mode used to play the SB exchange whatever the mandate said, so a
+  // participant who withheld the sensitive card still watched their proxy
+  // confess and still reached 3,000 — the SB rung out of a WR-only mandate,
+  // which is the primary outcome reading the wrong value in the arm the study
+  // is about.
+  //
+  // The turn table is PROXY_TURN_ORDER's, unchanged: both policies run the
+  // same seven turns whether or not the SB is authorized (§7's exposure
+  // control), and they differ in exactly one place — cover ① rides the decline
+  // turn under AI-Supplemented (§6.6 rule b), which is the only place the
+  // policy difference is visible on this path.
+  if (!sbAuthorized) {
+    const cover1 = mySb?.cover?.[0] ?? null;
+    return {
+      agreed: true,
+      tentative: split,
+      messages: [
+        open,
+        // Turn 2 — the first reason opportunity spends the WORK reason, which
+        // is the fixed utterance the proxy always says (§8.7). It is
+        // NON-DIRECTIONAL: it says both terms are on the principal's mind and
+        // withholds which one cannot move (§3.3, §4).
+        m(
+          "p2p",
+          2,
+          "participant_proxy",
+          `I am the AI Proxy for ${principal} I represent. ${
+            myWr?.relayed ??
+            `Both terms are under pressure for ${principal} I represent this quarter.`
+          }`,
+          { reasonCardId: myWr?.id },
+        ),
+        theirDisclosure,
+        // Turn 4 — SCRIPT-PROPOSE-T1. Nothing has been said that separates the
+        // two terms, so the counterpart splits the difference.
+        m(
+          "p5c",
+          5,
+          "counterpart_proxy",
+          `If both of them matter to ${principal} you represent as well, let us each move halfway. How about ${L(split, mine.id)} on ${mine.label.toLowerCase()} and ${L(split, theirs.id)} on ${theirs.label.toLowerCase()}?`,
+          { proposal: split },
+        ),
+        // Turn 5 — the proxy DECLINES ONCE and states the priority. It buys
+        // nothing (§3.3): a claim the counterpart cannot repeat upward is
+        // cheap talk. Under AI-Supplemented cover ① is appended here as the
+        // proxy's OWN view — WR-grade role generality, so it moves no tier,
+        // and cover ② stays out of it because there is no abstraction here for
+        // it to hide beside.
+        m(
+          "p5p",
+          5,
+          "participant_proxy",
+          `That is not what ${principal} I represent was hoping for. ${mine.label} matters more to them than ${theirs.label.toLowerCase()} does.${
+            policy === "ai_supplemented" && cover1 ? ` And in my view, ${lowerFirst(cover1)}` : ""
+          }`,
+          { proposal: trade },
+        ),
+        // Turn 6 — SCRIPT-ASKWHY, then the same T1 package again. The claim
+        // bought exactly one question and nothing else.
+        m(
+          "p5c2",
+          5,
+          "counterpart_proxy",
+          `${otherPrincipal} I represent would like to hear why — they have to be able to explain it upstairs. Until then, ${L(split, mine.id)} on ${mine.label.toLowerCase()} and ${L(split, theirs.id)} on ${theirs.label.toLowerCase()} is what they can agree to.`,
+          { proposal: split },
+        ),
+        // Turn 7 — the proxy has nothing more it is allowed to say, so it takes
+        // T1 as the tentative package and hands it back for RATIFY.
+        m(
+          "p6p",
+          6,
+          "participant_proxy",
+          `There is nothing further I am authorized to say, so this is the package to take back: ${L(split, mine.id)} on ${mine.label.toLowerCase()}, and ${L(split, theirs.id)} on ${theirs.label.toLowerCase()}. Nothing is settled until ${principal} I represent confirms it.`,
+          { proposal: split },
+        ),
+      ],
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // THE SB PATH — the sensitive card was authorized. T2, 3,000/3,000.
+  // -------------------------------------------------------------------------
   return {
     agreed: true,
     tentative: trade,
     messages: [
-      // Turn 1 — the counterpart proxy introduces itself, gives its
-      // principal's work reason and asks about the other side.
-      m(
-        "p1c",
-        1,
-        "counterpart_proxy",
-        `Hello, I am the AI Proxy negotiating for ${otherPrincipal} I represent. ${theirWr?.relayed ?? ""} What is the situation on your side?`,
-      ),
+      open,
       // Turn 2 — the participant proxy's first reason opportunity. This is the
       // one turn the two policies say differently.
       m(
@@ -423,17 +557,7 @@ function proxyScript(
           internalProvenance: "principal_reason",
         },
       ),
-      // Turn 3 — the counterpart proxy's own SB, on the fixed schedule.
-      m(
-        "p4c",
-        4,
-        "counterpart_proxy",
-        policy === "ai_supplemented" && theirAbstracted
-          ? supplemented(theirAbstracted)
-          : theirSb?.relayed
-            ? `On their side as well. ${theirSb.relayed}`
-            : `The constraint on ${theirs.label.toLowerCase()} for ${otherPrincipal} I represent is a firm one.`,
-      ),
+      theirDisclosure,
       // Turn 4 — SCRIPT-PROPOSE-T2, in the representative's third person.
       m(
         "p5c",
@@ -499,15 +623,30 @@ function sbRelayed(
 // Lookup
 // ---------------------------------------------------------------------------
 
+/**
+ * The mockup exchange for a cell.
+ *
+ * `sbAuthorized` IS THE MANDATE, AND IT IS NOT COSMETIC. The Proxy scripts
+ * used to voice the sensitive card unconditionally, so a participant who
+ * unticked it on the mandate screen still watched their proxy confess and
+ * still settled at 3,000/3,000 — the SB rung, from a WR-only mandate. That is
+ * the primary outcome reading the wrong value in the arm the study is about,
+ * so mockup mode now plays the WR-only exchange when the checkbox is off, and
+ * it lands on the T1 package the ladder actually pays.
+ *
+ * Direct ignores the flag: that arm has no mandate, and its scripted
+ * participant discloses in their own words.
+ */
 export function scriptedTask(
   task: NegotiationTask,
   role: Role,
   condition: "direct" | "user_specified" | "ai_supplemented",
+  sbAuthorized = true,
 ): ScriptedTask {
   if (task.id === ("practice" as ScenarioId)) {
     return { messages: [], tentative: {}, agreed: false };
   }
   return condition === "direct"
     ? baselineScript(task, role)
-    : proxyScript(task, role, condition);
+    : proxyScript(task, role, condition, sbAuthorized);
 }

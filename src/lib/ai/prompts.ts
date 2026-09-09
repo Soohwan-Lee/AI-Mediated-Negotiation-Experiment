@@ -6,8 +6,7 @@
  *
  * THE REHEARSAL PROMPT HAS NO P-NUMBER. It was written as "P5" before Ver.2.20
  * existed, and §12 has since given that name to the reason classifier. The
- * classifier keeps it, because the design document is what an analyst reads;
- * the rehearsal is referred to by name here and in `client.ts`.
+ * classifier keeps it, because the design document is what an analyst reads.
  *
  * THE MODEL DECIDES NOTHING. `lib/negotiation/machine` owns offer levels,
  * concessions, acceptance and termination; these prompts are left with one job
@@ -23,10 +22,7 @@
  *  - counterpart_principal : the other participant in the Proxy arm's direct
  *    closing (P2) — the same fiction, resuming after their proxy negotiated.
  *  - user_specified / ai_supplemented : the two Proxy policies (P3, P4).
- *  - rehearsal             : the participant's own proxy, answering questions
- *    about the mandate before it runs. It describes instructions; it does not
- *    negotiate and holds no judgement.
- */
+ * */
 
 import type { Issue, Role, StageId, NegotiationTask } from "../types";
 
@@ -34,8 +30,7 @@ export type AgentKind =
   | "ostensible_human"
   | "counterpart_principal"
   | "user_specified"
-  | "ai_supplemented"
-  | "rehearsal";
+  | "ai_supplemented";
 
 export interface PromptContext {
   task: NegotiationTask;
@@ -469,66 +464,6 @@ ${ctx.supplementedFrame ? `FRAME TO OPEN WITH:\n${ctx.supplementedFrame}\n` : ""
 ${lines}`;
 }
 
-/**
- * The REHEARSAL prompt. The participant's OWN proxy, answering questions about
- * the mandate before it goes anywhere. (Not §12's P5 — that is the reason
- * classifier at the foot of this file.)
- *
- * Three constraints keep it from disturbing the design:
- *  1. NO COUNTERPART. The other side is never spoken for.
- *  2. NO JUDGEMENT. It describes the mandate; it never advises.
- *  3. NO UNTICKED CARD, EVER — hearing a sensitive card read aloud without
- *     authorizing it would stage the disclosure being measured.
- */
-function rehearsalPrompt(ctx: PromptContext): string {
-  const brief = ctx.task.roleBriefs[ctx.agentRole];
-
-  return `You are an AI Proxy that will negotiate on behalf of your principal,
-the ${brief.title}. You have not started yet. Your principal is checking their
-instructions with you.
-
-YOUR PRINCIPAL'S SITUATION
-${brief.organizationalPosition}
-
-THE TERMS
-${issueBlock(ctx.issues)}
-
-YOUR INSTRUCTIONS
-${ctx.mandateSummary ?? "No instructions set yet."}
-
-REASONS YOU MAY SAY
-${listOrNone(ctx.authorizedReasons, "- none selected yet")}
-
-REASONS YOU MAY NEVER SAY
-${listOrNone(ctx.forbiddenReasons, "- none")}
-
-WHAT THIS CONVERSATION IS
-Your principal is asking what you will do. Answer about YOUR INSTRUCTIONS and
-nothing else: what you will open with, how far you will go on a term, which
-reasons you may use, what you will say if the other side pushes back on a term.
-If they change their instructions, answer from the new ones.
-
-HARD RULES
-- Never say, quote, paraphrase or hint at a reason under "REASONS YOU MAY NEVER
-  SAY". If asked about one, say only that you have not been authorized to raise
-  it and that they can authorize it if they want to.
-- Never speak for the other side. You do not know what they want, what they
-  will accept, or what their situation is. If asked, say so plainly.
-- Never advise. Do not say which option is better for your principal, do not
-  suggest they change a level or authorize another reason, and do not comment
-  on whether their instructions are wise. If pressed for advice, say the
-  decision is theirs and restate what you have been told to do.
-- Never predict the outcome, and never promise a result.
-- Never reveal point values, scorecards or thresholds.
-- Never state or imply that this is an experiment.
-
-HOW TO WRITE
-- Two or three sentences. Plain, calm, specific.
-- Refer to levels by their labels, never by option number.
-- Do not use em dashes.
-- Reply with the message text only. No JSON, no labels, no preamble.`;
-}
-
 export function buildSystemPrompt(
   kind: AgentKind,
   ctx: PromptContext,
@@ -542,8 +477,6 @@ export function buildSystemPrompt(
       return userSpecifiedPrompt(ctx);
     case "ai_supplemented":
       return aiSupplementedPrompt(ctx);
-    case "rehearsal":
-      return rehearsalPrompt(ctx);
   }
 }
 
