@@ -53,3 +53,24 @@ This repository update also tracks newer implementation decisions for English el
 - Development persistence: consent-free previews use the isolated `P-devpreview` key. An existing real participant key remains unchanged even when a slot override is active.
 - Reciprocal-disclosure review: WR-only route tests exclude both sensitive cards and settle at T1; an authorized and actually voiced participant SB permits one policy-matched counterpart SB and T2; a later direct-confirmation SB can raise a WR-only Proxy session to T2 with `SB-TIMING = wrap_up`. `reasonLabel` is cumulative across messages, while the latest acceptance stance remains separate, so an acceptance record carrying `SB` does not mean that the acceptance message itself disclosed it.
 - Canonical source: baseline SHA-256 `f46848c70159ad02f7b1ec99721625a77ad70689d05d34a0fd36c0c6ad42a293`, mtime `2026-09-10 01:25:53 +0900`, size 290,528 bytes. The narrow active-flow patch changed 37 lines in place and aligned IC6 exactly with the implemented instrument; vault Git retains the original. No vault commit or push was made.
+
+## Integrated verification
+
+- Implementation commits: `bbf1e2e` (reciprocal disclosure and direct confirmation), `efcdccc` (superseded typing waits), `2dcf377` (gates, dev routing, and combined task reflection), and `bfe86c1` (participant-facing Ver.2.27 UI and practice).
+- The integrated tree passed 409/409 unit tests, `npx tsc --noEmit`, and the production build. Global ESLint reported zero errors and one pre-existing unused-code warning.
+- Production preflight on port 3104 returned `ready: true`. A fresh production browser session had no hydration or page errors; the only console error was the existing missing `favicon.ico` request.
+- Production Task 2 main-entry coverage checked both modes: `seq1` (User-Specified, Team Leader) reached the Proxy cover and Task B briefing, then switching to Proxy-first `seq2` remounted Task 2 as Direct and reached the same Task B briefing without an instruction bounce. Public and private images loaded, including the private-comic evidence at `output/playwright/design227-production-private.png`, with no horizontal overflow at 1280 px.
+- Browser coverage remains narrower than the assignment tests: all 16 combinations were checked through Task 1 practice, Task 1 entry, and Task A/B briefing. Task 2 received the two representative main-entry checks above; this is not a claim that all 16 Task 2 routes or 32 complete task flows were exercised in a browser.
+- At 1280 × 720, the scrolled production chat kept the timer visible and the expanded “Your Situation” panel usable. At 1024 × 768, Task 2 kept its current-task label visible, allowed the details panel to open, and had no horizontal overflow.
+- A production AI-Supplemented, Proxy-first practice run used mock AI with autofill on and validation skipping off. Send produced the counterpart reply, Accept unlocked at the intended point, three wrong IC6 attempts each showed inline correction without stopping the study, and the fourth correct attempt advanced to the Task 1 main screen.
+- The 16 live classifier fixtures returned the expected labels without retry. This is a bounded implementation smoke check, not evidence of classifier accuracy or the planned validation threshold.
+- Browser negotiation evidence covered WR-only settlement at 1,000 points, late direct-confirmation SB settlement at 3,000 points with `SB: false` and `SB-TIMING: wrap_up`, and rapid input handling that preserved the first-reason boundary. The cumulative `reasonLabel` records everything conveyed so far; the latest message stance is stored separately.
+
+## Launch limits
+
+- Response, event, and assignment persistence still uses the browser-local store. It is not durable recruitment storage and does not support recovery on another browser or device.
+- Atomic Supabase assignment claiming is designed but not wired. The current local assignment fallback is suitable for development verification, not balanced live recruitment.
+- The final Prolific completion-code, withdrawal, and payment operations remain pending the approved launch configuration. The platform must not infer or promise those outcomes.
+- Developer tools are intentionally compiled into the present deployment for user testing. They must be compiled out or otherwise made unavailable before participant recruitment.
+- Completed development responses are keyed by task index and can be reused after changing the dev slot. Use the existing Reset control before an independent full-cell run. Do not silently clear a real participant session or treat slot switching as fresh persisted data.
+- These limits mean the current build is ready for controlled researcher and user testing, not recruitment launch.

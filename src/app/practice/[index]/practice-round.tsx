@@ -1006,7 +1006,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
               </div>
               <p className="text-sm leading-relaxed text-[var(--private-ink)]">
                 Your Proxy starts from these goals. Any package it reaches later
-                comes back to you for a decision.
+                comes back to you for a final confirmation.
               </p>
               <div className="mt-4 space-y-4">
                 {task.issues.map((issue) => (

@@ -39,6 +39,8 @@ test("the situation stays expanded in the negotiation briefing rail", () => {
 test("practice teaches the prominent mutual-confirmation acceptance control", () => {
   assert.match(practice, /Accept current offer/);
   assert.match(practice, /both of you confirm the same two terms/);
+  assert.match(practice, /comes back to you for a final confirmation/);
+  assert.doesNotMatch(practice, /comes back to you for a decision/);
   assert.match(practice, /sendProxyConfirmation/);
   assert.match(practice, /disabled=\{!proxyCounterpartConfirmed \|\| acceptedOffer\}/);
   assert.doesNotMatch(practice, /setProxyDecision/);
