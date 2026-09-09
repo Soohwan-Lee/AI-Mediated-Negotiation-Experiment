@@ -1,3 +1,8 @@
+> [!warning] STALE — not a Ver.2.21 transcript.
+> Pre-Ver.2.18 naming (“Explorer”) and the deleted argument pool. Superseded by proxy-supp-wr.md. Kept only as a historical artefact of an
+> earlier design; do not read it as current behaviour, and do not
+> cite its numbers. `npm run simulate` no longer regenerates it.
+
 # proxy-explorer-wr
 
 Model: gpt-5.6-terra · task: task_b · participant role: member · policy: ai_supplemented

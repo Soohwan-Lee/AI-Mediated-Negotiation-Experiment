@@ -1,3 +1,8 @@
+> [!warning] STALE — not a Ver.2.21 transcript.
+> Ver.2.20 Direct WR-only run with the decoy and the misread. Superseded by direct-wr-only.md. Kept only as a historical artefact of an
+> earlier design; do not read it as current behaviour, and do not
+> cite its numbers. `npm run simulate` no longer regenerates it.
+
 # baseline-wr
 
 Model: gpt-5.6-terra · task: task_b · participant role: leader

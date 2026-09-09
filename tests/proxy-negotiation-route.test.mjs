@@ -173,6 +173,65 @@ test("the three sentences are shuffled, so position carries no signal", async ()
   assert.ok(orders.size > 1, "the sentence order never varied across 40 runs");
 });
 
+test("a dropped frame is put back by the route, not left to the model", async () => {
+  // MEASURED LIVE, THE MODEL DROPPED IT 3 TIMES IN 8. The turn already asks
+  // the proxy to introduce itself, and the frame competed with that
+  // instruction and lost — the same way the Ver.2.14 pool clause failed, and
+  // the same fix: the route places it rather than requesting it.
+  //
+  // It is not cosmetic. The frame is what makes the three sentences read as
+  // the PROXY'S OWN assessment rather than a relay, and whether responsibility
+  // still lands on the principal is what OTHER-AI4 and ATTR2 measure.
+  const { POST } = await loadRoute(
+    () =>
+      "I am the AI Proxy for the team member I represent.||On the presentations, there has been feedback from the client side.",
+  );
+  const body = await (
+    await post(POST, {
+      policy: "ai_supplemented",
+      mandate: mandate("member", { sb: true }),
+      turn: protocol.PROXY_FIRST_REASON_TURN,
+    })
+  ).json();
+  const text = body.message.text;
+  assert.ok(
+    /three reasons/i.test(text),
+    `the frame must be restored: ${text}`,
+  );
+  // And it lands AFTER the self-introduction, so the message still opens the
+  // way a representative would.
+  const bubbles = text.split("||").map((b) => b.trim());
+  assert.ok(/Proxy/i.test(bubbles[0]), `intro must stay first: ${text}`);
+});
+
+test("a frame the model already wrote is not duplicated", async () => {
+  const { POST } = await loadRoute(
+    (ctx) =>
+      `${ctx.supplementedFrame}||On the presentations, there has been feedback from the client side.`,
+  );
+  const body = await (
+    await post(POST, {
+      policy: "ai_supplemented",
+      mandate: mandate("member", { sb: true }),
+      turn: protocol.PROXY_FIRST_REASON_TURN,
+    })
+  ).json();
+  const hits = body.message.text.match(/three reasons/gi) ?? [];
+  assert.equal(hits.length, 1, `frame appears ${hits.length} times`);
+});
+
+test("User-Specified is never given a frame to insert", async () => {
+  const { POST } = await loadRoute(() => "They tell me the client asked.");
+  const body = await (
+    await post(POST, {
+      policy: "user_specified",
+      mandate: mandate("member", { sb: true }),
+      turn: protocol.PROXY_FIRST_REASON_TURN,
+    })
+  ).json();
+  assert.ok(!/three reasons/i.test(body.message.text));
+});
+
 test("the frame is never shuffled into the three", async () => {
   for (let i = 0; i < 20; i += 1) {
     const { POST, seen } = await loadRoute();

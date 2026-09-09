@@ -266,6 +266,45 @@ function mentionsCard(message: string, cardText: string): boolean {
 }
 
 /**
+ * Did this message already carry the §6.6 frame?
+ *
+ * NOT `mentionsCard`, AND THE DIFFERENCE MATTERS. That function asks whether a
+ * FACT survived, at a deliberately lenient third of its distinctive words. The
+ * frame shares most of its vocabulary with any correct message on this turn —
+ * "member", "represent", "presentations" — so it scored exactly 0.33 against a
+ * message that did not contain it at all, and the insertion never fired.
+ *
+ * The frame's job is to present the sentences as a COUNTED set of reasons the
+ * proxy is giving on its own account, so that is what is tested for: the count
+ * phrase, plus a recommendation about the term. Both halves, because either
+ * alone appears in messages that are not framed.
+ */
+function carriesFrame(message: string, frame: string): boolean {
+  const counted = /\b(three|3)\s+reasons\b|\breasons are\b|\bfor three\b/i;
+  if (!counted.test(message)) return false;
+  // The recommendation: the model may paraphrase "I think the office days
+  // should stay at four" freely, so this looks for the shape rather than the
+  // wording, and falls back to the frame's own distinctive words.
+  const recommends =
+    /\bI think\b|\bshould (stay|come down|be|remain)\b|\blooking at\b|\bhaving (looked|reviewed)\b|\breviewed\b/i;
+  if (recommends.test(message)) return true;
+  const words = (t: string) =>
+    new Set(
+      t
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 5),
+    );
+  const want = words(frame);
+  if (want.size === 0) return true;
+  const have = words(message);
+  let hits = 0;
+  for (const w of want) if (have.has(w)) hits += 1;
+  return hits / want.size >= 0.6;
+}
+
+/**
  * Order the §6.6 sentences so their POSITION carries nothing.
  *
  * If the abstraction always came first (or last), a receiver could sort the
@@ -798,12 +837,55 @@ export async function POST(request: Request) {
           ]
         : [designatedCard?.text ?? null, supplementalReason];
 
+    /**
+     * THE FRAME IS PLACED, NOT REQUESTED — the same lesson as the §6.6
+     * sentences themselves.
+     *
+     * Measured live it went missing in 3 of 8 generations: the turn already
+     * asks the proxy to introduce itself, and the frame competed with that
+     * instruction and lost. That is exactly how the Ver.2.14 pool clause
+     * failed, and the fix there was the same one — the route places it.
+     *
+     * IT IS NOT COSMETIC. The frame is what makes the three sentences read as
+     * the PROXY'S OWN ASSESSMENT rather than a relay ("Looking at the side of
+     * the team lead I represent, I think the office days should stay at four.
+     * Three reasons —"). Without it the abstraction arrives as a bare
+     * statement among two others with no speaker attached, and §6.6's whole
+     * point is that an AI is recommending this on its own account. Whether
+     * responsibility still lands on the principal is what OTHER-AI4 and ATTR2
+     * measure, so a message missing the frame is measuring something else.
+     *
+     * Prepended only when the model did not produce it, matched by overlap
+     * because the proxy paraphrases. It goes AFTER any self-introduction, so
+     * the message still opens the way a representative would.
+     */
+    const framed = (rendered: string): string => {
+      if (!supplementedFrame || blocked) return rendered;
+      if (carriesFrame(rendered, supplementedFrame)) return rendered;
+      const bubbles = rendered
+        .split("||")
+        .map((b) => b.trim())
+        .filter(Boolean);
+      const intro = bubbles[0] && /\bProxy\b/i.test(bubbles[0]) ? 1 : 0;
+      bubbles.splice(intro, 0, supplementedFrame);
+      return bubbles.join(" || ");
+    };
+
     const text = capMessageLength(
       blocked
         ? fallbackText(task, proposal, isParticipantSide)
-        : action.rationale,
+        : framed(action.rationale),
       NEGOTIATION.maxMessageChars,
-      protectedClauses,
+      // THE FRAME IS PROTECTED LAST, BEHIND THE ABSTRACTION AND THE COVERS.
+      // Order here is priority, and the abstraction is what the ladder is
+      // driven off — putting the frame ahead of it would let the cap drop the
+      // participant's own disclosure while the schedule recorded it as voiced,
+      // which is the precise inversion this list exists to prevent. A message
+      // that keeps all three sentences and loses the frame is a worse message;
+      // one that keeps the frame and loses the abstraction is wrong data.
+      supplementedFrame && protectedClauses
+        ? [...protectedClauses, supplementedFrame]
+        : protectedClauses,
     );
 
     const message: TranscriptMessage = {

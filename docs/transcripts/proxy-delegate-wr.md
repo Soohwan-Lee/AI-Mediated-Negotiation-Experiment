@@ -1,3 +1,8 @@
+> [!warning] STALE — not a Ver.2.21 transcript.
+> Pre-Ver.2.18 naming (“Delegate”). Superseded by proxy-user-wr.md. Kept only as a historical artefact of an
+> earlier design; do not read it as current behaviour, and do not
+> cite its numbers. `npm run simulate` no longer regenerates it.
+
 # proxy-delegate-wr
 
 Model: gpt-5.6-terra · task: task_a · participant role: member · policy: user_specified

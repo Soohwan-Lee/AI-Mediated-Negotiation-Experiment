@@ -199,9 +199,43 @@ tamper-resistant record.
 
 One row per block per participant. Blocks: `background`, `instruction_check`,
 `practice`, `preferences_t{1,2}`, `risk_t{1,2}`, `m1_t{1,2}` (Proxy only —
-Direct answers M1 inside `post_task_t{n}`), `post_task_t{1,2}`,
-`task_outcome_t{1,2}`, `recv_eval_t{1,2}` (Member only), `reward_t{1,2}`,
-`attr_t{1,2}`, `wrap_up`, `debriefing`.
+Direct answers M1 inside `post_task_t{n}`), `negotiation_t{1,2}`,
+`ratify_t{1,2}` (Proxy only), `post_task_t{1,2}`, `task_outcome_t{1,2}`,
+`recv_eval_t{1,2}` (Member only), `reward_t{1,2}`, `attr_t{1,2}`, `wrap_up`,
+`debriefing`.
+
+**`negotiation_t{n}` is Ver.2.21's addition** and it is written by the
+negotiation screen itself, at the moment the exchange ends, in both arms. It
+carries what the tier machinery knew that the outcome row does not:
+
+| Key | Meaning |
+|---|---|
+| `taskId` · `role` · `phase` | which task, which role, and `direct` or the Proxy closing |
+| `tier` | the folded `ReasonTier` the exchange settled at — `none` / `work` / `sensitive` |
+| `SB_t{n}` | the participant side's first-disclosure choice, duplicated here beside the log that produced it |
+| `SB-TIMING_t{n}` | the timing category, same values as the outcome row |
+| `priorityClaimed` | did the classifier ever see a bare priority claim (§6.2) |
+| `classifierLog` | **JSON string**: every `{text, label, confidence}` the P5 classifier returned, in order |
+| `outcome` | **JSON string**: the full `codeOutcome` result |
+| `participantPoints` · `jointPoints` | the two scores, flat, so the export can read them without parsing |
+
+Two of those are JSON strings on purpose. `ResponseValue` is deliberately flat —
+one row per item id is what makes the export a table — so the two structured
+records travel as text and are parsed by the analysis rather than exploding the
+schema.
+
+**`classifierLog` is what gate 19's κ is computed against.** Every Direct
+transcript is re-coded by hand and the analysis reports κ between the human
+codes and this log, plus a sensitivity analysis excluding disagreements. Below
+κ = .90 the study switches to Wizard-of-Oz tagging (§13-24). Without this
+column there is nothing to compute κ from, so it is not optional storage.
+
+**`ratify_t{n}` holds `RATIFY_t{n}` alone**, written on the RATIFY screen at
+the moment the decision is taken (`ratify.tsx`), never inferred later. The
+survey route reads it back to decide whether to show CP1–2: those items ask
+about the other PERSON, so they are shown in Direct always and in a Proxy task
+only when RATIFY was `modified` or `rejected` — an approver never spoke to the
+counterpart at all.
 
 `attr_t{n}` is Ver.2.14's addition (§6.8, §9.4.9): after the post-negotiation
 decision the counterpart leaves one fixed line, and the participant answers
@@ -228,6 +262,16 @@ decisive — a floor could not change the outcome, only manufacture an impasse
 and mix mandate-setting skill into a result meant to turn on disclosure. The
 review screen sets the hoped-for package beside what was agreed.
 
+**Ver.2.21 pre-selects the best option on both terms and adds
+`WISH-DEV_t{n}`** (§8.6). It is a boolean: did the participant move off the
+default. It is an AUDIT FLAG, not a measure — nothing in §9 reports it. Two
+things depend on the default. The wish is the proxy's target and its acceptance
+line (`proxyAccepts`), so a modest wish changes how far the proxy pushes for
+reasons unrelated to disclosure. And REMARK's fixed line presupposes the
+participant asked for a lot, which a modest wish makes factually wrong for that
+person. §13-25 switches REMARK to demand-free wording if `WISH-DEV` clears 20%
+at pilot, which is the only thing this flag is for.
+
 `risk_t{n}` holds the two RISK items, asked immediately before the negotiation
 because they ask what the participant EXPECTS raising their requirement to
 cost.
@@ -240,33 +284,33 @@ and the four behavioural measures of Ver.2.13 §9.3:
 |---|---|
 | `POINTS` · `JOINT` | own total, and both totals summed |
 | `SB` | the participant side's SB was out BEFORE the counterpart's fixed disclosure — **RQ1's confirmatory outcome**. Proxy: the mandate checkbox, since a checked card is voiced at the proxy's first reason turn (stage 2, always before the counterpart's stage 4). Direct: the P5 classifier's verdict on the participant's own messages (§6.2a), confirmed against post-hoc human coding |
-| `SB-TIMING` | WHEN it came out: `none` / `before_counterpart` / `after_counterpart` (Direct only) / `wrap_up` (Proxy only) |
+| `SB-TIMING` | WHEN it came out: `none` / `before_counterpart` / `after_counterpart` (Direct only) / `wrap_up` (Proxy only). **Ver.2.21 changed what category ③ MEANS** — see below |
 | `RATIFY` | what the participant decided about the proxies' package (`approved_as_is` / `modified` / `rejected`) — **confirmatory for RQ3**; `null` in Direct, which has nothing to ratify |
 
 **Ver.2.13 cut this from nine measures to four, and the cut is not tidying.**
 
 `UNLOCK`, `CONCEAL-PREMIUM`, `MAX-JOINT` and `outcome` are gone because the
-symmetric package rule (§3.3) makes `JOINT` take exactly four values — 3,200 /
-4,600 / 6,000 / 1,200, one per rung of the credibility ladder plus impasse. So
-`JOINT` alone already says which rung was reached, whether the best package
-opened (6,000), what concealment cost (the gap between rungs) and whether there
-was an agreement (1,200 = none). Four indicators computed off one number are
-four chances for them to disagree with it, not four measures.
+symmetric package rule (§3.3) makes `JOINT` take a value per rung. **Under
+Ver.2.21's two-rung ladder that is three values: 2,000 (T1) / 6,000 (T2) / 0
+(impasse).** So `JOINT` alone already says which rung was reached, whether the
+best package opened (6,000), what concealment cost (the 4,000 gap) and whether
+there was an agreement at all (0 = none). Four indicators computed off one
+number are four chances for them to disagree with it, not four measures.
 
-**Ver.2.16 added a fifth value, and it is not a rung.** A participant who gives
-only the safe work reason may be offered — and may accept — the MISREAD
-package, which pays them 600 and the counterpart 1,900, so `JOINT` = 2,500.
-That is below the unargued rung and level with impasse for the participant, and
-it is a real behaviour rather than a coding artefact: the counterpart sincerely
-offered the obvious remedy for the interest it was given, and the participant
-took it. §13-19 flags the acceptance rate for the pilot; if it clears gate 7
-the script softens from an offer to a question.
+**Ver.2.16's fifth value is gone with the branch that produced it.** The
+misread package paid 600/1,900 for `JOINT` = 2,500; Ver.2.21 deleted the
+misread entirely, because a non-directional work reason gives the counterpart
+nothing to sincerely misread. **Ver.2.21 also removed the fallback**: impasse
+now pays 0 rather than 600, so every agreement including the unargued one beats
+walking away.
 
-**`JOINT` also stopped separating `none` from `work`.** Under the decoy design
-the work reason buys nothing — 3,200 either way — because the participant's
-core term is not that interest's obvious remedy. The rung reached is therefore
-`none-or-WR` / `PRI` / `SB`, and which of the first two a session was is
-recovered from the classifier log below, not from the outcome row.
+**`JOINT` does not separate `none` from `work`, and it no longer separates a
+priority claim either.** All three land at 2,000 (§3.3): a non-directional work
+reason tells the counterpart both terms matter, which is the same information
+as silence for the purpose of deciding where to land, and an unbacked priority
+claim is cheap talk the counterpart cannot justify upward. Which of the three a
+session was is recovered from `negotiation_t{n}` — `tier` and `priorityClaimed`
+for the summary, `classifierLog` for the detail — never from the outcome row.
 
 `PRE-RECIP-SB`, `POST-RECIP-SB`, `MUTUAL-SB`, `SELF-DISCLOSE` and `SB-VOICED`
 are gone because they coded ONE nominal event five times. `SB` inherits
@@ -275,6 +319,27 @@ categories, and "voiced at all" is categories 2+3+4. Categories 3 and 4 are
 structurally exclusive by arm — Direct has no closing stage, and a Proxy
 participant's only free speech after the disclosure IS the closing — which
 §9.8-5 flags for the χ²'s unit, not for the coding.
+
+**Ver.2.21 changed what category ③ means in Direct, and the old label no longer
+describes it.** Under the fixed schedule, `after_counterpart` meant "the
+participant disclosed after hearing the counterpart's confession", because that
+confession arrived on a schedule no participant could influence. Under
+reciprocal disclosure (§6.3) the counterpart discloses only AFTER the
+participant does, so in Direct there is no such thing as an SB voiced after
+hearing one. **Category ③ now means an SB voiced at a LATER turn than the
+participant's first reason opportunity** — later than the LOCK, not later than
+the counterpart's confession. Both are "a disclosure that was not the first
+move", but they are not the same event and the two cannot be pooled across
+versions.
+
+Two consequences for the analysis. Any stored `after_counterpart` from a
+pre-Ver.2.21 run means the older thing and must be re-coded from the raw
+`classifierLog` and turn order rather than read as-is. And a WR-only Direct
+session never hears the counterpart's SB at all (§6.3), so the PCR items about
+the other side's disclosure apply only on the path where the participant
+disclosed first — a path selected by the primary outcome. §6.3 says explicitly
+that this analysis set and the old PRE/POST framing have to be pre-specified
+before the study runs.
 
 **RATIFY is back, and it is recorded where the decision is taken.** Ver.2.12
 deleted a ratification screen because both arms then ended with the participant
@@ -356,13 +421,14 @@ create table messages (
   participant_key     text not null references participants,
   task_index          smallint not null,
   turn_index          integer not null,
-  stage               smallint,       -- 1..5, the fixed progression stage
+  stage               smallint,       -- 1..6, the fixed progression stage
   speaker             text not null,
   text                text not null,
   proposal            jsonb,          -- the package on the table, if any
   reason_card_id      text,           -- Proxy: which card the proxy voiced
-  reason_label        text,           -- Direct: P5's verdict, none|WR|PRI|SB
+  reason_label        text,           -- Direct: P5's verdict, none|WR|SB
   reason_confidence   real,           -- Direct: P5's own confidence, 0-1
+  reason_priority_claim boolean,      -- Direct: P5's priority_claim flag
   decided_action      text,           -- what the state machine chose this turn
   structured_action   jsonb,          -- NegotiationAction
   internal_provenance text,           -- 'principal_reason'
@@ -394,12 +460,25 @@ nothing can disagree with it.
 
 In Direct and the Proxy closing there are no longer any buttons (Ver.2.20). The
 participant simply talks, and a separate single-purpose classifier — P5, which
-writes nothing anyone sees and never speaks for either party — reads each
-message into `none / WR / PRI / SB`. That label sets the tier. It is a
+writes nothing anyone sees and never speaks for either party — reads the
+conversation into `none / WR / SB`. That label sets the tier. It is a
 MEASUREMENT rather than a record, so its confidence is kept beside it and the
 whole Direct transcript is re-coded by hand afterwards: the analysis reports κ
 between the two and a sensitivity analysis excluding disagreements. Gate 19
 requires κ ≥ .90; below it the study switches to Wizard-of-Oz tagging (§13-24).
+
+**Ver.2.21 dropped `PRI` from the label set and made the judgement CUMULATIVE.**
+A bare priority claim now travels as `reason_priority_claim` beside the label,
+because it says something real about the conversation without buying a rung
+(§3.3, 12th correction). And the classifier is called with EVERY participant
+message in the task, returning the highest label reached across all of them —
+never a verdict on the newest message alone. People do not confess in one
+message; judged one at a time, with the ties-downward rule applied to each, a
+confession spread over three turns is scored as never having happened. That is
+a systematic floor on Direct disclosure specifically, and it would be read as
+the Proxy arm's protective effect. The per-row label here is the classifier's
+running verdict AT that turn, and the full ordered log lives in
+`negotiation_t{n}.classifierLog`.
 
 This is what resolved §9.8-4, which had been open since Ver.2.13: the Direct
 operational definition of `SB` is the classifier's verdict, with the post-hoc

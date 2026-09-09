@@ -1,3 +1,8 @@
+> [!warning] STALE — written for Ver.2.17 or earlier.
+> 이 문서는 Delegate/Explorer 이름, 세 개 이슈, 삭제된 논거 pool,
+> 그리고 지금은 쓰지 않는 점수표를 기준으로 쓰였음. Ver.2.21의 동작이 아니므로
+> 현재 설계의 근거로 인용하지 말 것. 영문 `README.md`가 현행 문서임.
+
 # 시뮬레이션 결과 (한국어)
 
 `npm run simulate`로 **실제 API 라우트 + 실제 모델**을 돌려 나온 기록임. 손으로 쓴 예시가 아니며, 참가자가 보게 될 화면과 같은 경로를 그대로 통과한 결과임.

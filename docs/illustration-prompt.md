@@ -93,8 +93,8 @@ Constraints: no people, words, letters, numbers, logos, marked days, chosen sche
 ```text
 Use case: scientific-educational
 Asset type: 3:2 landscape task-orientation raster for a workplace negotiation research study
-Primary request: Clearly explain the two undecided issues in “Starting the New Project”: days per week the team member works on the new project and times per month the team member is on urgent-call duty.
-Scene/backdrop: a clean split editorial composition. One half shows a new-project launch board with a small sprouting project motif and a generic weekly allocation grid whose cells are all equal and unmarked. The other half shows an unmistakable client urgent-call setup with a desk phone, headset, and a neutral monthly rota grid with every slot equal and unmarked; the phone is idle.
+Primary request: Clearly explain the two undecided issues in “Starting the New Project”: days per week the team member works on the new project and how many of the four weekly client reports the team member writes.
+Scene/backdrop: a clean split editorial composition. One half shows a new-project launch board with a small sprouting project motif and a generic weekly allocation grid whose cells are all equal and unmarked. The other half shows an unmistakable weekly client report setup with a plain report folder, an outgoing-mail tray, and a neutral four-week rota grid with every slot equal and unmarked; nothing is filled in or sent.
 Subject: objects and spaces only, no people.
 Style/medium: simple but polished modern flat editorial illustration, softly textured gouache-like raster shapes, crisp organic contours, refined educational magazine art, not generic icons, not photorealistic.
 Composition/framing: clean 3:2 landscape, two distinct balanced issue scenes separated by whitespace, highly legible at web-card size.
@@ -193,7 +193,7 @@ Constraints: no words, letters, numbers, logos, readable calendar content, marke
 Use case: illustration-story
 Asset type: 3:2 landscape task-orientation illustration for a workplace negotiation research study
 Input images: Image 1 is a style reference only. Match its warm paper texture, muted palette, pencil and dry-brush editorial quality, but create a new scene.
-Primary request: Explain the public task “Starting the New Project” visually, showing two separate undecided topics: time assigned to a new project and client urgent-call coverage.
+Primary request: Explain the public task “Starting the New Project” visually, showing two separate undecided topics: time assigned to a new project and who writes the weekly client report.
 Scene/backdrop: calm contemporary office with two softly connected simultaneous vignettes, not a before-and-after sequence.
 Subject: the same two equal-sized, non-stereotyped adults at equal eye level. In one vignette they jointly review a new-project launch board made only of blank abstract blocks; no schedule amount is marked or selected. In the other they calmly look over an unused desk headset and ordinary phone beside a blank rota sheet; the phone is not ringing and neither person is assigned to answer it. Their expressions are thoughtful and neutral.
 Style/medium: human hand-drawn editorial illustration, visible colored-pencil and dry-brush texture, organic imperfect lines, restrained printmaking feel, sophisticated magazine illustration, not vector icons and not glossy stock art.
@@ -201,5 +201,5 @@ Composition/framing: clean 3:2 landscape, balanced connected vignettes with gene
 Lighting/mood: warm soft daylight, approachable, calm, neutral, no urgency.
 Color palette: warm paper, muted navy, dusty blue, soft ochre, restrained charcoal, low saturation.
 Text: none.
-Constraints: no words, letters, numbers, logos, readable schedule, marked days, chosen allocation, arrows, checkmarks, points, money, highlighted option, tally marks, ringing or glowing phone, emergency, missed call, complaint, worry, overload, handshake, accepted deal, celebration, victory, conflict, distress, private facts, rationale, disclosure/privacy cue, or recommendation. Do not show a preferred number of project days or urgent-call duties, and do not show who will take a call. No manager-subordinate pose, gender/age/race/status stereotype, or power imbalance. Both adults must have the same visual scale and equal participation. No watermark.
+Constraints: no words, letters, numbers, logos, readable schedule, marked days, chosen allocation, arrows, checkmarks, points, money, highlighted option, tally marks, readable report text, red marks or corrections on a report, rejection, complaint, worry, overload, handshake, accepted deal, celebration, victory, conflict, distress, private facts, rationale, disclosure/privacy cue, or recommendation. Do not show a preferred number of project days or report weeks, and do not show who will write a report. No manager-subordinate pose, gender/age/race/status stereotype, or power imbalance. Both adults must have the same visual scale and equal participation. No watermark.
 ```

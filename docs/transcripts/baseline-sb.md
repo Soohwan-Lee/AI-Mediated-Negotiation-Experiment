@@ -1,3 +1,8 @@
+> [!warning] STALE — not a Ver.2.21 transcript.
+> Ver.2.20 Direct SB run, four-rung ladder. Superseded by direct-sb-own-words.md. Kept only as a historical artefact of an
+> earlier design; do not read it as current behaviour, and do not
+> cite its numbers. `npm run simulate` no longer regenerates it.
+
 # baseline-sb
 
 Model: gpt-5.6-terra · task: task_b · participant role: member

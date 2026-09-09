@@ -6,23 +6,33 @@ in `simulation-report.json` answer "did the assertions pass" and these answer
 "does it read like a negotiation", which is the part no assertion covers.
 
 Each speaker is labelled the way the interface labels them. The counterpart is
-never given a name. Ver.2.12: the six-stage walk, the credibility ladder, the
-counterpart's fixed SB disclosure, and the direct closing.
+never given a name.
+
+**Ver.2.21 is what these show**: the two-rung ladder (T1 1,000 each, T2 3,000
+each, impasse 0), the non-directional work reason, reciprocal disclosure in
+Direct, the cumulative P5 classifier, and the AI-Supplemented proxy speaking as
+itself. A file describing a four-rung ladder, a misread offer, an added-argument
+pool, or Task B's urgent-call duty is from an older study and should not be in
+this directory.
 
 ## What to look for
 
 | File | What it demonstrates |
 |---|---|
-| `proxy-delegate-sb.md` | The SB rung: the principal checked the sensitive card, the proxy voices it at its first reason opportunity (before the counterpart's disclosure — PRE-RECIP), and the exchange settles at best↔best, 3,000/3,000. |
-| `proxy-delegate-wr.md` | The WR rung: nothing sensitive authorized, the counterpart holds at the second option, and the proxies note the partial agreement (2,000) for the principals to close. The unchecked SB is never voiced. |
-| `proxy-explorer-sb.md` | The same SB path under Explorer. Turn 3 carries the pool's core-support clause and turn 5 the exchange clause, inside the scheduled messages, unlabelled, in the same voice. |
-| `proxy-explorer-floor.md` | A mandate whose minimum sits above what the voiced reasons earn: the proxies cannot settle, and the principals are told they must close it directly. |
-| `direct-after-sb.md` | The 3-minute closing after the SB path: the participant confirms, the P2 counterpart accepts in the work-chat register. |
-| `direct-self-disclose.md` | **The ladder moving mid-closing.** The participant tags their SB in person (SELF-DISCLOSE); the counterpart answers the confession by proposing best↔best itself (SCRIPT-PROPOSE-MAX), and the deal lands at the maximum. |
-| `baseline-sb.md` | The tiki-taka run: a second model instance plays a participant who ends up confessing. Check the counterpart's walk — its WR + the reason question, then its own SB disclosed once and unconditionally, then acceptance by the ladder. |
-| `baseline-wr.md` | A participant who never discloses: one counter at the work tier (SCRIPT-LIMIT shape), partial agreement at 2,000. |
-| `baseline-nonum.md` | Score talk gets exactly one reminder (SCRIPT-NONUM), then the exchange moves on. |
+| `direct-wr-only.md` | The work reason alone lands T1, 1,000/1,000 — **and the counterpart's own SB never appears.** That second half is the reciprocity rule: a WR-only path must not hear a confession. |
+| `direct-priority.md` | A bare priority claim draws exactly one SCRIPT-ASKWHY and then T1 again. The claim buys nothing. |
+| `direct-sb-own-words.md` | The confession in the participant's own words, not the card's. The counterpart reciprocates and T2 lands. |
+| `direct-sb-split.md` | **The same fact split over three messages, none of which is an SB alone.** The cumulative classifier reaches `SB` anyway. This is the run that guards against a floor on Direct disclosure. |
+| `direct-asksit.md` | A first message with no reason at all draws exactly one SCRIPT-ASKSIT. |
+| `direct-clarify.md` | A hedge the classifier is unsure about draws exactly one SCRIPT-CLARIFY, rather than a silent miss. |
+| `direct-nonum.md` | Score talk draws exactly one SCRIPT-NONUM, then the exchange moves on. |
+| `proxy-user-sb.md` | User-Specified with the SB ticked: the card relayed in the third person, every fact intact, settling at 3,000/3,000. |
+| `proxy-user-wr.md` | User-Specified with nothing sensitive authorized: 1,000/1,000, and the unchecked card never voiced. |
+| `proxy-supp-sb.md` | AI-Supplemented with the SB ticked: the proxy's own frame plus all three sentences, shuffled, with no attribution and no event. Read it beside `proxy-user-sb.md` — the policy contrast is this pair. |
+| `proxy-supp-wr.md` | AI-Supplemented WR-only: 1,000/1,000, with cover ① on the decline turn. The only place the policy difference shows on this path. |
+| `closing-self-disclose.md` | **The ladder moving mid-closing.** After a WR-only proxy run the participant confesses in person; the counterpart answers by proposing best↔best itself and the deal lands at the maximum. `SB-TIMING = wrap_up`. |
 | `rehearsal-leak.md` | The rehearsal proxy refuses to read back an unticked sensitive card. |
+| `classifier-probe.md` | The classifier asked directly. The denial and the vague hint must both land below `SB`, and a real counter-offer must resolve into levels. |
 
 ## The annotated visualisation
 

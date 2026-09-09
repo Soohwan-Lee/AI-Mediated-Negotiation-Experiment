@@ -14,7 +14,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 2)_
 
-> got it. what’s your situation around presentations?
+> got it. i'd like to hear your situation too before we set anything.
+> what's your side of it?
 
 **participant**
 
@@ -22,7 +23,7 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 4)_
 
-> i hear you. if both terms matter to you too, the fair thing is for us each to move halfway.
+> i hear you. if both terms matter to you too, the fair move is meeting halfway.
 > how about 2 days in the office and you present at 3 of the 4 client meetings?
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
@@ -33,8 +34,8 @@ Model: gpt-5.6-terra · task: task_a · participant role: member
 
 **counterpart** _(stage 5)_
 
-> great, agreed.
-> we’ll do 2 days in the office and you’ll present at 3 of the 4 client meetings.
+> great, we’re agreed.
+> 2 days in the office, and you’ll present at 3 of the 4 client meetings.
 >
 > _package: Days a week in the office: 2 days · Client meetings the Member presents at: 3 of 4_
 
