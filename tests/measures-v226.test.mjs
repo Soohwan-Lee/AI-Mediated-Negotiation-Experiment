@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   BACKGROUND_BLOCKS, BR1_ITEM, END_CHECK_BLOCKS, FE1_BLOCK, OEC1_BLOCK,
   blockForTask, dummyAnswer, experienceBlocks, proxyExperienceBlocks,
-  requiredIds, responsibilityOrder, taskOpenBlocks,
+  requiredIds, responsibilityOrder, taskOpenBlocks, legacyTaskOpenBlocks, OPEN_INSTRUMENT_VERSION,
 } from "../src/lib/measures.ts";
 
 const ids = (blocks) => blocks.flatMap((block) => block.items.map((item) => item.id));
@@ -39,10 +39,22 @@ test("responsibility order is stable, varies by participant, and preserves fixed
   }
 });
 
-test("open-ended sequence is shared OED1, OEE1, then Proxy-only OEP1", () => {
-  assert.deepEqual(ids(taskOpenBlocks(false)), ["OED1", "OEE1", "OET1"]);
-  assert.deepEqual(ids(taskOpenBlocks(true)), ["OED1", "OEE1", "OEP1", "OET1"]);
+test("legacy open-ended sequence and wording remain available by version", () => {
+  assert.deepEqual(ids(legacyTaskOpenBlocks(false)), ["OED1", "OEE1", "OET1"]);
+  assert.deepEqual(ids(legacyTaskOpenBlocks(true)), ["OED1", "OEE1", "OEP1", "OET1"]);
+  assert.deepEqual(taskOpenBlocks(true, { version: "2.27" }), legacyTaskOpenBlocks(true));
+  assert.match(legacyTaskOpenBlocks(true)[2].items[0].text, /initially expect/);
+});
+
+test("open-v2 has six common and four Proxy questions, comparison only in Task 2, optional comment last", () => {
+  assert.equal(OPEN_INSTRUMENT_VERSION, "2.27-open-v2");
+  const common = ["OED1", "OEI1", "OEF1", "OEE1", "OEN1", "OER1"];
+  assert.deepEqual(ids(taskOpenBlocks(false)), [...common, "OET1"]);
+  assert.deepEqual(ids(taskOpenBlocks(true)), [...common, "OEP1", "OEP2", "OEP3", "OEP4", "OET1"]);
   for (const isProxy of [false, true]) {
+    const second = taskOpenBlocks(isProxy, { taskIndex: 2, role: "member" });
+    assert.deepEqual(ids(second).slice(-2), ["OEC1", "OET1"]);
+    assert.equal(second.flatMap(requiredIds).length, isProxy ? 11 : 7);
     const optional = blockForTask(taskOpenBlocks(isProxy).at(-1), 2);
     assert.deepEqual(requiredIds(optional), []);
     assert.equal(optional.items[0].id, "OET1_t2");
@@ -50,6 +62,22 @@ test("open-ended sequence is shared OED1, OEE1, then Proxy-only OEP1", () => {
   assert.equal(taskOpenBlocks(false)[0].items[0].text, taskOpenBlocks(true)[0].items[0].text);
   assert.equal(taskOpenBlocks(false)[1].items[0].text, taskOpenBlocks(true)[1].items[0].text);
   assert.deepEqual(ids([OEC1_BLOCK]), ["OEC1"]);
+});
+
+test("open-v2 probes remain optional, role-aware, neutral and free of word minima", () => {
+  const blocks = taskOpenBlocks(true, { role: "leader", taskIndex: 2 });
+  const items = blocks.flatMap(block => block.items);
+  assert.match(items.find(item => item.id === "OEE1").hint, /bonus recommendation/);
+  assert.match(taskOpenBlocks(false, { role: "member" })[1].items[0].hint, /evaluation of the Leader/);
+  assert.match(items.find(item => item.id === "OEP2").text, /if at all/);
+  assert.match(items.find(item => item.id === "OEP3").hint, /both, or neither/);
+  assert.match(items.find(item => item.id === "OEP4").hint, /any AI contribution/);
+  for (const item of items) {
+    assert.equal(item.kind, "text");
+    assert.equal(item.minWords, undefined);
+    assert.equal(item.minLength, undefined);
+    assert.doesNotMatch(item.text + " " + item.hint, /people.*real|simulated counterpart|User-Specified|AI-Supplemented/);
+  }
 });
 
 test("role decisions and end checks use Ver.2.26 ids only", () => {
@@ -61,9 +89,9 @@ test("role decisions and end checks use Ver.2.26 ids only", () => {
 
 test("per-task suffixes and dummy answers preserve canonical code meaning", () => {
   const suffixed = blockForTask(taskOpenBlocks(true)[0], 2);
-  assert.deepEqual(suffixed.items.map((item) => item.id), ["OED1_t2"]);
+  assert.deepEqual(suffixed.items.map((item) => item.id), ["OED1_t2", "OEI1_t2", "OEF1_t2"]);
   assert.ok(String(dummyAnswer(suffixed.items[0])).length > 20);
-  assert.deepEqual(requiredIds(suffixed), ["OED1_t2"]);
+  assert.deepEqual(requiredIds(suffixed), ["OED1_t2", "OEI1_t2", "OEF1_t2"]);
 });
 
 test("quantitative response totals are 40 for Leaders and 42 for Members", () => {

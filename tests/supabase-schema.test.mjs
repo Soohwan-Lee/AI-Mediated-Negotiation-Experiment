@@ -233,7 +233,11 @@ test("exact task-mode migration preserves closed records and restores every writ
     for (const file of files.slice(files.indexOf(pending))) await db.exec(readFileSync(new URL(file,directory),"utf8"));
     for (const table of ["self_reports","task_metrics","chat_messages"]) {
       const after=(await db.query(`select * from public.${table} order by participant_key,task_index`)).rows;
-      assert.deepEqual(after,before[table].map(row=>({...row,task_mode:row.task_mode==="proxy"?row.proxy_policy:"direct"})), `${table}: only mode changed`);
+      const oldColumns = Object.keys(before[table][0]);
+      assert.deepEqual(after.map(row=>Object.fromEntries(oldColumns.map(key=>[key,row[key]]))),before[table].map(row=>({...row,task_mode:row.task_mode==="proxy"?row.proxy_policy:"direct"})), `${table}: existing data unchanged except mode`);
+      if (table === "self_reports") for (const row of after) {
+        for (const field of ["oei1","oef1","oen1","oer1","oep2","oep3","oep4","oec1","open_instrument_version"]) assert.equal(row[field], null, "additive reflection fields do not promote old attempts");
+      }
       for (const key of attempts) await assert.rejects(db.query(`update public.${table} set task_mode='direct' where participant_key=$1`,[key]),/no longer writable/);
     }
     assert.deepEqual((await db.query("select * from public.assignment_slots order by participant_id")).rows,slotsBefore);

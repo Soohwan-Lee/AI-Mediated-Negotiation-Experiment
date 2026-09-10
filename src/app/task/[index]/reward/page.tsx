@@ -11,7 +11,7 @@ import { MeasureBlock, PreviousPart, missingIds, type Answers } from "@/componen
 import { sessionPlan } from "@/lib/assignment";
 import { bonusAmountFromPercent } from "@/lib/bonus";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
-import { BR1_ITEM, FE1_BLOCK, blockForTask, dummyAnswer, taskOpenBlocks } from "@/lib/measures";
+import { BR1_ITEM, FE1_BLOCK, blockForTask, dummyAnswer, taskOpenBlocks, OPEN_INSTRUMENT_VERSION } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { STUDY, nextHref } from "@/lib/study-config";
@@ -29,6 +29,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   const [amountConfirmed, setAmountConfirmed] = useState(false);
   const [evalAnswers, setEvalAnswers] = useState<Answers>({});
   const [openAnswers, setOpenAnswers] = useState<Answers>({});
+  const [openVersion, setOpenVersion] = useState<string>(OPEN_INSTRUMENT_VERSION);
   const latestOpenAnswers = useRef<Answers>({});
   const [restored, setRestored] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -42,8 +43,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   const decisionBlockName = `v226_task_decision_t${taskIndex}`;
   const openBlockName = `v226_task_open_t${taskIndex}`;
   const evalBlock = useMemo(() => blockForTask(FE1_BLOCK, taskIndex), [taskIndex]);
-  const openBlocks = useMemo(() => taskOpenBlocks(isProxy).map((block) => blockForTask(block, taskIndex)), [isProxy, taskIndex]);
-  const openIds = useMemo(() => openBlocks.flatMap((block) => block.items.map((item) => item.id)), [openBlocks]);
+  const openBlocks = useMemo(() => taskOpenBlocks(isProxy, { role: assignment?.role, taskIndex, version: openVersion }).map((block) => blockForTask(block, taskIndex)), [assignment?.role, isProxy, taskIndex, openVersion]);
 
   useEffect(() => {
     if (!participantKey || !assignment) return;
@@ -53,7 +53,10 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
       getStore().loadResponses(participantKey, openBlockName),
     ]).then(([decision, open]) => {
       if (!active) return;
-      const filteredOpen = { ...answersForIds(open ?? {}, openIds), ...latestOpenAnswers.current };
+      const version = open && Object.keys(open).length ? (open._instrument_version === OPEN_INSTRUMENT_VERSION ? OPEN_INSTRUMENT_VERSION : "2.27") : OPEN_INSTRUMENT_VERSION;
+      setOpenVersion(version);
+      const restoredIds = taskOpenBlocks(isProxy, { role: assignment.role, taskIndex, version }).flatMap(block => block.items.map(item => `${item.id}_t${taskIndex}`));
+      const filteredOpen = { ...answersForIds(open ?? {}, restoredIds), ...latestOpenAnswers.current };
       setOpenAnswers(filteredOpen);
       if (explicitlyCompleted(open ?? {})) {
         router.replace(nextHref(flowKey));
@@ -70,7 +73,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
       setRestored(true);
     }).catch(() => { if (active) setLoadFailed(true); });
     return () => { active = false; };
-  }, [assignment, decisionBlockName, flowKey, isLeader, openBlockName, openBlocks, openIds, participantKey, router, taskIndex, loadAttempt]);
+  }, [assignment, decisionBlockName, flowKey, isLeader, isProxy, openBlockName, participantKey, router, taskIndex, loadAttempt]);
 
   const awarded = amountPercent === null ? null : bonusAmountFromPercent(amountPercent);
   const evalMissing = missingIds([evalBlock], evalAnswers);
@@ -137,7 +140,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
     setOpenAnswers(next);
     if (participantKey) void getStore().saveResponses(participantKey, openBlockName, {
       ...next,
-      _instrument_version: "2.27",
+      _instrument_version: openVersion,
       _submitted_parts: 0,
       _completed: false,
     });
@@ -149,11 +152,11 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
     try {
       if (participantKey) await getStore().saveResponses(participantKey, openBlockName, {
         ...latestOpenAnswers.current,
-        _instrument_version: "2.27",
+        _instrument_version: openVersion,
         _submitted_parts: 1,
         _completed: true,
       });
-      logEvent("survey_saved", { block: openBlockName, instrumentVersion: "2.27" }, { sessionIndex: taskIndex });
+      logEvent("survey_saved", { block: openBlockName, instrumentVersion: openVersion }, { sessionIndex: taskIndex });
       router.push(nextHref(flowKey));
     } finally { submitting.current = false; setBusy(false); }
   }
@@ -164,7 +167,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
     try {
       if (participantKey) await getStore().saveResponses(participantKey, openBlockName, {
         ...latestOpenAnswers.current,
-        _instrument_version: "2.27",
+        _instrument_version: openVersion,
         _submitted_parts: 0,
         _completed: false,
       });

@@ -66,7 +66,8 @@ function databaseFetch(db) {
   };
 }
 
-test("all 16 assignments persist real frontend-shaped records and complete in SQL", {
+for (const versions of [["2.27", "2.27"], ["2.27-open-v2", "2.27-open-v2"], ["2.27", "2.27-open-v2"], ["2.27-open-v2", "2.27"]]) {
+test(`all 16 assignments persist and complete with task instruments ${versions.join("/")}`, {
   skip: !process.env.PGLITE_MODULE_PATH,
 }, async () => {
   const { PGlite } = await import(process.env.PGLITE_MODULE_PATH);
@@ -150,11 +151,14 @@ test("all 16 assignments persist real frontend-shaped records and complete in SQ
           ? { [`BR1_t${index}`]: 0, [`BR1_PERCENT_t${index}`]: 0, [`BR1_CONFIRMED_t${index}`]: true, _submitted: true }
           : { [`FE1_t${index}`]: 5, _submitted: true });
         const openAnswers = {
-          ...Object.fromEntries(taskOpenBlocks(isProxy).flatMap((block) => block.items).filter(item => item.id !== "OET1").map((item) => [`${item.id}_t${index}`, dummyAnswer(item)])),
+          ...Object.fromEntries(taskOpenBlocks(isProxy, { role: row.role, taskIndex: index, version: versions[index - 1] }).flatMap((block) => block.items).filter(item => item.id !== "OET1").map((item) => [`${item.id}_t${index}`, dummyAnswer(item)])),
           ...(condition % 3 === 1 ? { [`OET1_t${index}`]: "" } : condition % 3 === 2 ? { [`OET1_t${index}`]: `Comment for ${plan.taskId}/${plan.condition}` } : {}),
-          _instrument_version: "2.27", _submitted_parts: 1, _completed: true,
+          _instrument_version: versions[index - 1], _submitted_parts: 1, _completed: true,
         };
         await responses(`v226_task_open_t${index}`, openAnswers);
+        if (!isProxy) await responses(`v226_task_open_t${index}`, { ...openAnswers,
+          [`OEP1_t${index}`]: "Unasked injected answer", [`OEP2_t${index}`]: "Unasked injected answer",
+          [`OEP3_t${index}`]: "Unasked injected answer", [`OEP4_t${index}`]: "Unasked injected answer" });
         assert.deepEqual(await send("loadResponses", { block: `v226_task_open_t${index}` }), openAnswers);
         for (const attempt of [1, 2]) await db.query("select public.merge_task_audit($1,$2::smallint,'classifier:p1',$3::jsonb)", [key,index,JSON.stringify({ attemptId: `attempt-${attempt}`, offTopic: false, conditionalAcceptance: true })]);
         const clientRead = await send("loadResponses", { block: `task_outcome_t${index}` });
@@ -183,6 +187,13 @@ test("all 16 assignments persist real frontend-shaped records and complete in SQ
         assert.equal(report.proxy_policy, row.proxy_policy);
         assert.equal(report.role, row.role);
         assert.equal(report.open_submitted, true);
+        assert.equal(report.open_instrument_version, versions[index - 1]);
+        if (!isProxy) for (const field of ["oep1", "oep2", "oep3", "oep4"]) assert.equal(report[field], null);
+        if (versions[index - 1] === "2.27-open-v2") {
+          for (const field of ["oei1", "oef1", "oen1", "oer1", ...(isProxy ? ["oep2", "oep3", "oep4"] : []), ...(index === 2 ? ["oec1"] : [])]) assert.ok(report[field]);
+          await assert.rejects(responses(`v226_task_open_t${index}`, { ...openAnswers, _instrument_version: "2.27" }), /instrument_version_conflict/);
+          await assert.rejects(db.query("update public.self_reports set open_instrument_version='2.27' where participant_key=$1 and task_index=$2", [key,index]), /cannot be downgraded/);
+        }
         assert.ok(report.oed1 && report.oee1);
         assert.equal(report.oep1 === null, !isProxy);
         assert.equal(report.oet1, condition % 3 === 2 ? `Comment for ${plan.taskId}/${plan.condition}` : null);
@@ -195,7 +206,7 @@ test("all 16 assignments persist real frontend-shaped records and complete in SQ
         }
       }
       await responses("v226_wrap_up", {
-        ...Object.fromEntries([...END_CHECK_BLOCKS.flatMap((block) => block.items), ...OEC1_BLOCK.items].map((item) => [item.id, dummyAnswer(item)])),
+        ...Object.fromEntries([...END_CHECK_BLOCKS.flatMap((block) => block.items), ...(versions[1] === "2.27" ? OEC1_BLOCK.items : [])].map((item) => [item.id, dummyAnswer(item)])),
         _instrument_version: "2.26", _checks_submitted: true, _completed: true,
       });
       await assert.rejects(db.query("select public.complete_study_participation($1)", [key]), /incomplete/);
@@ -206,6 +217,16 @@ test("all 16 assignments persist real frontend-shaped records and complete in SQ
         await db.query(`update public.self_reports set ${required}=null where participant_key=$1 and task_index=$2`,[key,proxyIndex]);
         await assert.rejects(db.query("select public.complete_study_participation($1)",[key]), /Required task responses are incomplete/, `${row.proxy_policy} must require ${required}`);
         await db.query(`update public.self_reports set ${required}=$3 where participant_key=$1 and task_index=$2`,[key,proxyIndex,original]);
+      }
+      for (const plan of assignment.sessions) {
+        if (versions[plan.index - 1] !== "2.27-open-v2") continue;
+        const fields = ["oei1", "oef1", "oen1", "oer1", ...(plan.condition !== "direct" ? ["oep2", "oep3", "oep4"] : []), ...(plan.index === 2 ? ["oec1"] : [])];
+        for (const field of fields) {
+          const original = (await db.query(`select ${field} from public.self_reports where participant_key=$1 and task_index=$2`, [key,plan.index])).rows[0][field];
+          await db.query(`update public.self_reports set ${field}=' ' where participant_key=$1 and task_index=$2`, [key,plan.index]);
+          await assert.rejects(db.query("select public.complete_study_participation($1)", [key]), /Required expanded task responses are incomplete/, field);
+          await db.query(`update public.self_reports set ${field}=$3 where participant_key=$1 and task_index=$2`, [key,plan.index,original]);
+        }
       }
       assert.equal((await db.query("select public.complete_study_participation($1) as result", [key])).rows[0].result.status, "completed");
       assert.equal((await current()).status, "completed");
@@ -221,3 +242,4 @@ test("all 16 assignments persist real frontend-shaped records and complete in SQ
     await db.close();
   }
 });
+}

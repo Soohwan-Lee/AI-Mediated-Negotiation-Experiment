@@ -1,6 +1,6 @@
 "use client";
 
-/** Ver.2.26 end flow: one checks page, then the final comparison. */
+/** End checks; legacy Task 2 instruments retain their final comparison here. */
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MeasureBlock, PreviousPart, missingIds, type Answers } from "@/components/measure";
@@ -8,14 +8,15 @@ import { ActionBar } from "@/components/study-chrome";
 import { LoadRetry } from "@/components/load-retry";
 import { Card, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
-import { END_CHECK_BLOCKS, OEC1_BLOCK, dummyAnswer } from "@/lib/measures";
+import { END_CHECK_BLOCKS, OEC1_BLOCK, OPEN_INSTRUMENT_VERSION, dummyAnswer } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { nextHref } from "@/lib/study-config";
 import { answersForIds, explicitlyCompleted, restoredValidPart } from "@/lib/survey-progress";
 
 const RESPONSE_BLOCK = "v226_wrap_up";
-const PARTS = [END_CHECK_BLOCKS, [OEC1_BLOCK]];
+const LEGACY_PARTS = [END_CHECK_BLOCKS, [OEC1_BLOCK]];
+const ALL_IDS = LEGACY_PARTS.flatMap(blocks => blocks.flatMap(block => block.items.map(item => item.id)));
 
 export default function WrapUpPage() {
   usePageEnter("wrap-up");
@@ -29,16 +30,22 @@ export default function WrapUpPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [comparisonInTask, setComparisonInTask] = useState(false);
   const submitting = useRef(false);
-  const pageIds = useMemo(() => PARTS.map((blocks) => blocks.flatMap((block) => block.items.map((item) => item.id))), []);
-  const allIds = useMemo(() => pageIds.flat(), [pageIds]);
+  const PARTS = useMemo(() => comparisonInTask ? [END_CHECK_BLOCKS] : LEGACY_PARTS, [comparisonInTask]);
 
   useEffect(() => {
     if (!participantKey) return;
     let active = true;
-    void getStore().loadResponses(participantKey, RESPONSE_BLOCK).then((saved) => {
+    void Promise.all([
+      getStore().loadResponses(participantKey, RESPONSE_BLOCK),
+      getStore().loadResponses(participantKey, "v226_task_open_t2"),
+    ]).then(([saved, taskOpen]) => {
       if (!active) return;
-      const filtered = { ...answersForIds(saved ?? {}, allIds), ...latestAnswers.current };
+      const inTask = taskOpen?._instrument_version === OPEN_INSTRUMENT_VERSION;
+      setComparisonInTask(inTask);
+      const pageIds = (inTask ? [END_CHECK_BLOCKS] : LEGACY_PARTS).map(blocks => blocks.flatMap(block => block.items.map(item => item.id)));
+      const filtered = { ...answersForIds(saved ?? {}, ALL_IDS), ...latestAnswers.current };
       if (explicitlyCompleted(saved ?? {})) { router.replace(nextHref("wrap-up")); return; }
       const submittedChecks = saved?._checks_submitted === true;
       setChecksSubmitted(submittedChecks);
@@ -48,7 +55,7 @@ export default function WrapUpPage() {
       setRestored(true);
     }).catch(() => { if (active) setLoadFailed(true); });
     return () => { active = false; };
-  }, [allIds, pageIds, participantKey, router, loadAttempt]);
+  }, [participantKey, router, loadAttempt]);
 
   const activePart = part ?? 0;
   const blocks = PARTS[activePart] ?? PARTS[0];

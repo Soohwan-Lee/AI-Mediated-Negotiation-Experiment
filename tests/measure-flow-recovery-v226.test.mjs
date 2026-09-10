@@ -70,7 +70,9 @@ test("bonus zero is intentional, confirmed, and BR1 stores actual pounds", () =>
 });
 
 test("wrap-up keeps checks together and does not skip a filled draft", () => {
-  assert.match(wrapUp, /const PARTS = \[END_CHECK_BLOCKS, \[OEC1_BLOCK\]\]/);
+  assert.match(wrapUp, /const LEGACY_PARTS = \[END_CHECK_BLOCKS, \[OEC1_BLOCK\]\]/);
+  assert.match(wrapUp, /comparisonInTask \? \[END_CHECK_BLOCKS\] : LEGACY_PARTS/);
+  assert.match(wrapUp, /taskOpen\?\._instrument_version === OPEN_INSTRUMENT_VERSION/);
   assert.match(wrapUp, /saved\?\._checks_submitted === true/);
   assert.match(wrapUp, /explicitlyCompleted/);
   assert.doesNotMatch(wrapUp, /SUS|ICC4|FR1|FR2/);
