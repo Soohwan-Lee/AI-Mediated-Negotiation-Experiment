@@ -6,7 +6,7 @@ import * as db from "../src/lib/server/study-db.ts";
 import * as records from "../src/lib/server/study-records.ts";
 import { getTask, reasonCards } from "../src/lib/tasks.ts";
 import { tierPackage } from "../src/lib/negotiation/machine.ts";
-import { STUDY } from "../src/lib/study-config.ts";
+import { STUDY, completionSettings } from "../src/lib/study-config.ts";
 
 const key = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const otherKey = "bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee";
@@ -62,7 +62,7 @@ async function route(name) {
   const source = await readFile(new URL(`../src/app/api/${name}/route.ts`, import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const loaded = { exports: {} };
-  const dependencies = { "@/lib/server/study-db": db, "@/lib/server/study-records": records, "@/lib/study-config": { STUDY } };
+  const dependencies = { "@/lib/server/study-db": db, "@/lib/server/study-records": records, "@/lib/study-config": { STUDY, completionSettings } };
   new Function("require", "module", "exports", compiled)(name => {
     assert.ok(dependencies[name], name); return dependencies[name];
   }, loaded, loaded.exports);

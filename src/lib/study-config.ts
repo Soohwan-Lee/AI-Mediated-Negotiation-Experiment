@@ -47,11 +47,20 @@ export const STUDY = {
     principalInvestigator: "Soohwan Lee",
     researcherEmail: "soohwanlee@unist.ac.kr",
   },
-  /** Issued on the completion page. Replace with the real Prolific code. */
-  prolificCompletionCode: "TBD-COMPLETION-CODE",
+  /** Temporary dry-run sentinel. Replace with the real code before recruitment. */
+  prolificCompletionCode: "TESTONLY",
   prolificCompletionUrl:
-    "https://app.prolific.com/submissions/complete?cc=TBD-COMPLETION-CODE",
+    "https://app.prolific.com/submissions/complete?cc=TESTONLY",
 } as const;
+
+/** Test admission is not recruitment readiness or a Prolific submission. */
+export function completionSettings(code: string = STUDY.prolificCompletionCode) {
+  const testOnly = code === "TESTONLY";
+  const entryReady = code.trim().length > 0 && !code.startsWith("TBD");
+  return { testOnly, entryReady, recruitmentReady: entryReady && !testOnly,
+    submissionUrl: entryReady && !testOnly
+      ? `https://app.prolific.com/submissions/complete?cc=${encodeURIComponent(code)}` : null };
+}
 
 /**
  * Minutes per stage, apportioned from Design Ver.2.26 §7's 45-minute flow.

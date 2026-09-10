@@ -30,7 +30,7 @@
 
 import { NextResponse } from "next/server";
 import { AI_CONFIG, modelReadiness } from "@/lib/ai/config";
-import { STUDY, timingIsHonest, TOTAL_MINUTES } from "@/lib/study-config";
+import { STUDY, completionSettings, timingIsHonest, TOTAL_MINUTES } from "@/lib/study-config";
 import { storageReady } from "@/lib/server/study-db";
 
 export const runtime = "nodejs";
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
   if (url.searchParams.get("gate") === "1") {
     const ready = readiness.ready && (!readiness.live || (
       process.env.NEXT_PUBLIC_DEV_TOOLS === "off"
-      && !STUDY.prolificCompletionCode.startsWith("TBD")
+      && completionSettings().entryReady
       && timingIsHonest()
       && await storageReady()
     ));
@@ -109,8 +109,10 @@ export async function GET(request: Request) {
     },
     {
       name: "completion_code_set",
-      pass: !STUDY.prolificCompletionCode.startsWith("TBD"),
-      detail: STUDY.prolificCompletionCode.startsWith("TBD")
+      pass: completionSettings().recruitmentReady,
+      detail: completionSettings().testOnly
+        ? "TESTONLY permits a dry run, not recruitment or Prolific payment. Replace it with the real completion code before recruiting."
+        : STUDY.prolificCompletionCode.startsWith("TBD")
         ? "Prolific completion code is still a placeholder — participants could not be credited."
         : "Completion code is set.",
     },

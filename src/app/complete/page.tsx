@@ -13,7 +13,7 @@ import { readStopReason } from "@/lib/check-gates";
 import { useDevMode } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
-import { STUDY } from "@/lib/study-config";
+import { STUDY, completionSettings } from "@/lib/study-config";
 import { readTaskRun } from "@/lib/task-run";
 
 type CompletionStatus = "checking" | "failed" | "ready" | "stopped";
@@ -26,6 +26,7 @@ export default function CompletePage() {
   const [status, setStatus] = useState<CompletionStatus>("checking");
   const started = useRef(false);
   const store = getStore();
+  const completion = completionSettings();
 
   const confirmCompletion = useCallback(async () => {
     setStatus("checking");
@@ -80,6 +81,7 @@ export default function CompletePage() {
   }, [confirmCompletion]);
 
   async function copyCode() {
+    if (completion.testOnly) return;
     await navigator.clipboard.writeText(STUDY.prolificCompletionCode);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
@@ -88,8 +90,8 @@ export default function CompletePage() {
   return (
     <Page>
       <PageHeader
-        eyebrow={status === "ready" ? "Study Completed · 100%" : "Saving your study"}
-        title={status === "ready" ? "🎉 You're All Done!" : "One last check"}
+        eyebrow={status === "ready" ? completion.testOnly ? "Test complete" : "Study Completed · 100%" : "Saving your study"}
+        title={status === "ready" ? completion.testOnly ? "Test complete" : "🎉 You're All Done!" : "One last check"}
         subtitle={
           status === "ready"
             ? "Thank you very much for your time and contribution to this research study."
@@ -131,6 +133,12 @@ export default function CompletePage() {
 
       {status === "ready" ? (
         <>
+          {completion.testOnly ? (
+            <Card className="mb-6 border-amber-300 bg-amber-50">
+              <CardTitle>Test complete</CardTitle>
+              <p className="mt-2 text-sm">This was a dry run using a temporary completion code. It does not register a Prolific submission or payment. Do not use this deployment for recruitment until the real completion code is configured.</p>
+            </Card>
+          ) : <>
           <Card className="mb-6 border-indigo-200 bg-gradient-to-br from-indigo-50/60 via-white to-blue-50/40 text-center p-6 sm:p-8">
             <p className="text-xs font-extrabold uppercase tracking-widest text-[var(--accent)] mb-2">
               Your Prolific Completion Code
@@ -169,13 +177,16 @@ export default function CompletePage() {
         </div>
           </Card>
 
+          </>}
           <Card tone="muted" className="border-slate-200">
         <CardTitle>Research Contact & Questions</CardTitle>
         <p className="text-xs sm:text-sm leading-relaxed text-slate-600 mt-2">
           For questions about the study, findings, or your participation, contact principal investigator {STUDY.irb.principalInvestigator} at <span className="font-semibold text-slate-800">{STUDY.irb.researcherEmail}</span>. {STUDY.irb.institution} IRB determined this study exempt (#{STUDY.irb.exemptionNumber}).
         </p>
         <p className="mt-3 text-xs font-semibold text-slate-500">
-          {store.persistenceKind === "remote"
+          {completion.testOnly
+            ? store.persistenceKind === "remote" ? "Your test data was saved to the research server." : "Your test data was saved in this browser only."
+            : store.persistenceKind === "remote"
             ? "✓ Your study data was saved to the research server. You may close this tab after registering completion on Prolific."
             : "✓ Your study data was saved in this browser. It has not been submitted to a research server. Keep this tab open until you have registered completion on Prolific."}
         </p>

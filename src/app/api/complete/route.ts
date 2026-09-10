@@ -1,5 +1,5 @@
 import { database, failure, participantFor, readBody, StudyError } from "@/lib/server/study-db";
-import { STUDY } from "@/lib/study-config";
+import { STUDY, completionSettings } from "@/lib/study-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +14,9 @@ export async function POST(request: Request) {
       p_participant_key: row.participant_key,
     });
     if (result.status !== "completed") throw new StudyError(409, "study_incomplete");
-    return Response.json({ complete: true, completionCode: STUDY.prolificCompletionCode,
-      completionUrl: STUDY.prolificCompletionUrl }, { headers: { "Cache-Control": "no-store" } });
+    const completion = completionSettings();
+    return Response.json({ complete: true, testOnly: completion.testOnly,
+      completionCode: completion.testOnly ? null : STUDY.prolificCompletionCode,
+      completionUrl: completion.submissionUrl }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return failure(error); }
 }
