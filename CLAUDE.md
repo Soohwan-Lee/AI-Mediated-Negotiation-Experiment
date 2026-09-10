@@ -1,6 +1,32 @@
 # Project notes
 
-## CURRENT: Ver.2.26 override (2026-09-09)
+## CURRENT: implementation and user-policy override (2026-09-10)
+
+This block supersedes conflicting historical notes below. Current storage and
+verification details are in [`docs/SUPABASE_SETUP.md`](docs/SUPABASE_SETUP.md).
+
+- Both Proxies use the same assigned policy and relay the full selected,
+  authorized reasons. AI-supplemented uses that same base plus two additional
+  task-grounded work benefits; it cannot invent or disclose unauthorized SB.
+  SB disclosure remains the participant's voluntary choice.
+- Human closing is mandatory after the Proxy exchange. Transcript review or
+  approval does not skip it; Direct and human closing retain the five-minute
+  limit. Ratification is a behavioral record, not a questionnaire item.
+- Production admission uses an atomic ascending first-free Supabase claim,
+  with frozen assignment and signed session identity, not local rotation.
+  Five private tables preserve immutable attempts and their analysis records.
+  Child `task_mode` is the exact experienced condition: `direct`,
+  `user_specified`, or `ai_supplemented`; `proxy_policy` remains the assigned
+  between-subject factor, and message phase is separate.
+- Task-open answers belong to `self_reports`, including optional OET1 after
+  each task; end-study answers and optional debrief comments remain in
+  `study_participants`. Server-only model audit is never returned to clients.
+  Reload recovery of survey answers still does not imply live-chat resume.
+- Applied database changes do not themselves deploy the app or authorize
+  recruitment. Check the current deployment and verification snapshot in the
+  setup guide before participant entry; do not treat older checks as current.
+
+## Historical: Ver.2.26 override (2026-09-09)
 
 The active source is `N - Experimental Design (Ver.2.26).md` in the external
 research vault. Everything below this block is historical where it conflicts

@@ -1,5 +1,10 @@
 # Data model (planned)
 
+> Superseded design, retained for historical context. Do not apply the schema below.
+> The implemented five-table schema and setup instructions are in
+> [SUPABASE_SETUP.md](SUPABASE_SETUP.md) and the canonical
+> [research-storage migration](../supabase/migrations/20260910041518_compact_research_storage.sql).
+
 Not yet implemented. `lib/store.ts` is a localStorage stand-in behind an
 interface shaped like these tables — implementing `SupabaseStore` against this
 schema should require no page changes.
