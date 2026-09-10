@@ -11,7 +11,7 @@ import { MeasureBlock, PreviousPart, missingIds, type Answers } from "@/componen
 import { sessionPlan } from "@/lib/assignment";
 import { bonusAmountFromPercent } from "@/lib/bonus";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
-import { BR1_ITEM, FE1_BLOCK, blockForTask, dummyAnswer, taskOpenBlocks, OPEN_INSTRUMENT_VERSION } from "@/lib/measures";
+import { BR1_ITEM, FE1_BLOCK, blockForTask, dummyAnswer, taskOpenBlocks, OPEN_INSTRUMENT_VERSION, OPEN_INSTRUMENT_V2 } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { STUDY, nextHref } from "@/lib/study-config";
@@ -53,9 +53,10 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
       getStore().loadResponses(participantKey, openBlockName),
     ]).then(([decision, open]) => {
       if (!active) return;
-      const version = open && Object.keys(open).length ? (open._instrument_version === OPEN_INSTRUMENT_VERSION ? OPEN_INSTRUMENT_VERSION : "2.27") : OPEN_INSTRUMENT_VERSION;
-      setOpenVersion(version);
-      const restoredIds = taskOpenBlocks(isProxy, { role: assignment.role, taskIndex, version }).flatMap(block => block.items.map(item => `${item.id}_t${taskIndex}`));
+      const version = open && Object.keys(open).length ? (open._instrument_version ?? "2.27") : OPEN_INSTRUMENT_VERSION;
+      if (!["2.27", OPEN_INSTRUMENT_V2, OPEN_INSTRUMENT_VERSION].includes(String(version))) throw new Error("Unknown task reflection instrument");
+      setOpenVersion(String(version));
+      const restoredIds = taskOpenBlocks(isProxy, { role: assignment.role, taskIndex, version: String(version) }).flatMap(block => block.items.map(item => `${item.id}_t${taskIndex}`));
       const filteredOpen = { ...answersForIds(open ?? {}, restoredIds), ...latestOpenAnswers.current };
       setOpenAnswers(filteredOpen);
       if (explicitlyCompleted(open ?? {})) {

@@ -66,7 +66,8 @@ function databaseFetch(db) {
   };
 }
 
-for (const versions of [["2.27", "2.27"], ["2.27-open-v2", "2.27-open-v2"], ["2.27", "2.27-open-v2"], ["2.27-open-v2", "2.27"]]) {
+const OPEN_VERSIONS = ["2.27", "2.27-open-v2", "2.27-open-v3"];
+for (const versions of OPEN_VERSIONS.flatMap(first => OPEN_VERSIONS.map(second => [first, second]))) {
 test(`all 16 assignments persist and complete with task instruments ${versions.join("/")}`, {
   skip: !process.env.PGLITE_MODULE_PATH,
 }, async () => {
@@ -158,7 +159,14 @@ test(`all 16 assignments persist and complete with task instruments ${versions.j
         await responses(`v226_task_open_t${index}`, openAnswers);
         if (!isProxy) await responses(`v226_task_open_t${index}`, { ...openAnswers,
           [`OEP1_t${index}`]: "Unasked injected answer", [`OEP2_t${index}`]: "Unasked injected answer",
-          [`OEP3_t${index}`]: "Unasked injected answer", [`OEP4_t${index}`]: "Unasked injected answer" });
+          [`OEP3_t${index}`]: "Unasked injected answer", [`OEP4_t${index}`]: "Unasked injected answer", [`OEP5_t${index}`]: "Unasked injected answer" });
+        if (versions[index - 1] === "2.27-open-v3") await responses(`v226_task_open_t${index}`, { ...openAnswers, [`OEP2_t${index}`]: "Unasked historical item" });
+        await assert.rejects(responses(`v226_task_open_t${index}`, { ...openAnswers, _instrument_version: "unknown" }), /invalid_instrument_version/);
+        await assert.rejects(db.query("update public.self_reports set open_instrument_version='unknown' where participant_key=$1 and task_index=$2", [key,index]), /check constraint|immutable once started/);
+        for (const otherVersion of OPEN_VERSIONS.filter(version => version !== versions[index - 1])) {
+          await assert.rejects(responses(`v226_task_open_t${index}`, { ...openAnswers, _instrument_version: otherVersion }), /instrument_version_conflict/);
+          await assert.rejects(db.query("update public.self_reports set open_instrument_version=$3 where participant_key=$1 and task_index=$2", [key,index,otherVersion]), /immutable once started/);
+        }
         assert.deepEqual(await send("loadResponses", { block: `v226_task_open_t${index}` }), openAnswers);
         for (const attempt of [1, 2]) await db.query("select public.merge_task_audit($1,$2::smallint,'classifier:p1',$3::jsonb)", [key,index,JSON.stringify({ attemptId: `attempt-${attempt}`, offTopic: false, conditionalAcceptance: true })]);
         const clientRead = await send("loadResponses", { block: `task_outcome_t${index}` });
@@ -181,18 +189,32 @@ test(`all 16 assignments persist and complete with task instruments ${versions.j
         assert.equal(report.fe1, row.role === "member" ? 5 : null);
         assert.equal(report.task_id, plan.taskId);
         assert.equal(report.task_mode, plan.condition);
-        const chats = (await db.query("select task_mode,proxy_policy from public.chat_messages where participant_key=$1 and task_index=$2",[key,index])).rows;
+        const chats = (await db.query("select * from public.chat_messages where participant_key=$1 and task_index=$2",[key,index])).rows;
         assert.ok(chats.length > 0);
         assert.ok(chats.every(chat => chat.task_mode === plan.condition && chat.proxy_policy === row.proxy_policy));
+        for (const saved of [metrics, report, ...chats]) {
+          assert.equal(saved.participant_key, key);
+          assert.equal(saved.participant_id, condition + 1);
+          assert.equal(saved.task_index, index);
+          assert.equal(saved.task_id, plan.taskId);
+          assert.equal(saved.task_mode, plan.condition);
+          for (const field of ["role", "proxy_policy", "task_order", "mode_order"]) assert.equal(saved[field], row[field]);
+        }
         assert.equal(report.proxy_policy, row.proxy_policy);
         assert.equal(report.role, row.role);
         assert.equal(report.open_submitted, true);
         assert.equal(report.open_instrument_version, versions[index - 1]);
-        if (!isProxy) for (const field of ["oep1", "oep2", "oep3", "oep4"]) assert.equal(report[field], null);
-        if (versions[index - 1] === "2.27-open-v2") {
-          for (const field of ["oei1", "oef1", "oen1", "oer1", ...(isProxy ? ["oep2", "oep3", "oep4"] : []), ...(index === 2 ? ["oec1"] : [])]) assert.ok(report[field]);
+        if (!isProxy) for (const field of ["oep1", "oep2", "oep3", "oep4", "oep5"]) assert.equal(report[field], null);
+        const isV3 = versions[index - 1] === "2.27-open-v3";
+        assert.equal(report[isV3 ? "oep2" : "oep5"], null);
+        if (versions[index - 1] !== "2.27") {
+          for (const field of ["oei1", "oef1", "oen1", "oer1", ...(isProxy ? [isV3 ? "oep5" : "oep2", "oep3", "oep4"] : []), ...(index === 2 ? ["oec1"] : [])]) assert.ok(report[field]);
           await assert.rejects(responses(`v226_task_open_t${index}`, { ...openAnswers, _instrument_version: "2.27" }), /instrument_version_conflict/);
-          await assert.rejects(db.query("update public.self_reports set open_instrument_version='2.27' where participant_key=$1 and task_index=$2", [key,index]), /cannot be downgraded/);
+          await assert.rejects(db.query("update public.self_reports set open_instrument_version='2.27' where participant_key=$1 and task_index=$2", [key,index]), /immutable once started/);
+          if (isV3) {
+            await assert.rejects(responses(`v226_task_open_t${index}`, { ...openAnswers, _instrument_version: "2.27-open-v2" }), /instrument_version_conflict/);
+            await assert.rejects(db.query("update public.self_reports set open_instrument_version='2.27-open-v2' where participant_key=$1 and task_index=$2", [key,index]), /immutable once started/);
+          }
         }
         assert.ok(report.oed1 && report.oee1);
         assert.equal(report.oep1 === null, !isProxy);
@@ -210,6 +232,8 @@ test(`all 16 assignments persist and complete with task instruments ${versions.j
         _instrument_version: "2.26", _checks_submitted: true, _completed: true,
       });
       await assert.rejects(db.query("select public.complete_study_participation($1)", [key]), /incomplete/);
+      assert.equal((await current()).status, "active", "negotiation completion is not study completion");
+      assert.equal((await db.query("select completed from public.assignment_slots where participant_id=$1", [condition + 1])).rows[0].completed, false);
       await responses("debriefing", { acknowledged: true, comments: "" });
       const proxyIndex = row.mode_order === "proxyFirst" ? 1 : 2;
       for (const required of ["oep1", "pmp1", "pop1"]) {
@@ -219,8 +243,8 @@ test(`all 16 assignments persist and complete with task instruments ${versions.j
         await db.query(`update public.self_reports set ${required}=$3 where participant_key=$1 and task_index=$2`,[key,proxyIndex,original]);
       }
       for (const plan of assignment.sessions) {
-        if (versions[plan.index - 1] !== "2.27-open-v2") continue;
-        const fields = ["oei1", "oef1", "oen1", "oer1", ...(plan.condition !== "direct" ? ["oep2", "oep3", "oep4"] : []), ...(plan.index === 2 ? ["oec1"] : [])];
+        if (versions[plan.index - 1] === "2.27") continue;
+        const fields = ["oei1", "oef1", "oen1", "oer1", ...(plan.condition !== "direct" ? [versions[plan.index - 1] === "2.27-open-v3" ? "oep5" : "oep2", "oep3", "oep4"] : []), ...(plan.index === 2 ? ["oec1"] : [])];
         for (const field of fields) {
           const original = (await db.query(`select ${field} from public.self_reports where participant_key=$1 and task_index=$2`, [key,plan.index])).rows[0][field];
           await db.query(`update public.self_reports set ${field}=' ' where participant_key=$1 and task_index=$2`, [key,plan.index]);
@@ -230,6 +254,7 @@ test(`all 16 assignments persist and complete with task instruments ${versions.j
       }
       assert.equal((await db.query("select public.complete_study_participation($1) as result", [key])).rows[0].result.status, "completed");
       assert.equal((await current()).status, "completed");
+      assert.equal((await db.query("select completed from public.assignment_slots where participant_id=$1", [condition + 1])).rows[0].completed, true);
       assert.ok(!JSON.stringify(await current()).includes('"IC1"'));
     }
     assert.equal(combinations.size, 16);

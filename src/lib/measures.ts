@@ -188,15 +188,22 @@ export function legacyTaskOpenBlocks(isProxy: boolean): Block[] {
   return blocks;
 }
 
-export const OPEN_INSTRUMENT_VERSION = "2.27-open-v2";
+export const OPEN_INSTRUMENT_VERSION = "2.27-open-v3";
+export const OPEN_INSTRUMENT_V2 = "2.27-open-v2";
 
-export function taskOpenBlocks(
+export function isExpandedOpenInstrument(version: unknown): boolean {
+  return version === OPEN_INSTRUMENT_VERSION || version === OPEN_INSTRUMENT_V2;
+}
+
+type ExpandedOpenInstrumentVersion =
+  | typeof OPEN_INSTRUMENT_VERSION
+  | typeof OPEN_INSTRUMENT_V2;
+
+function expandedTaskOpenBlocks(
   isProxy: boolean,
-  options: { role?: Role; taskIndex?: 1 | 2; version?: string } = {},
+  options: { role?: Role; taskIndex?: 1 | 2 },
+  version: ExpandedOpenInstrumentVersion,
 ): Block[] {
-  if (options.version !== undefined && options.version !== OPEN_INSTRUMENT_VERSION) {
-    return legacyTaskOpenBlocks(isProxy);
-  }
   const text = (id: string, question: string, probe: string): Item => ({
     kind: "text", id, text: question, hint: `Optional prompt: ${probe}`,
     placeholder: "A brief answer is fine.", rows: 3,
@@ -215,19 +222,47 @@ export function taskOpenBlocks(
       text("OER1", "In a real workplace, would you share different information if you negotiated in the same way? Why or why not?", "Consider ongoing working relationships, workplace expectations, or consequences beyond this study."),
     ] },
   ];
-  if (isProxy) blocks.push(
-    { id: "open_proxy_voice_control", title: "Your voice and control", items: [
-      text("OEP1", "How well did your Proxy express what you wanted to say, and why?", "What matched or differed from your intended meaning or way of speaking?"),
-      text("OEP2", "How, if at all, did using a Proxy affect your sense of control over the negotiation, and why?", "Consider choosing its instructions, watching the exchange, and discussing the terms yourself afterward."),
-    ] },
-    { id: "open_proxy_reasons", title: "Understanding the reasons", items: [
-      text("OEP3", "Who, if anyone, do you see as responsible for the reasons your Proxy conveyed, and why?", "You may discuss yourself, the AI, both, or neither; their responsibilities need not be the same."),
-      text("OEP4", "How did you understand where the reasons conveyed by the other Proxy came from, and why?", "What could you tell, or not tell, about the person's input and any AI contribution? How did that shape your interpretation?"),
-    ] },
-  );
+  if (isProxy) {
+    if (version === OPEN_INSTRUMENT_V2) {
+      blocks.push(
+        { id: "open_proxy_voice_control", title: "Your voice and control", items: [
+          text("OEP1", "How well did your Proxy express what you wanted to say, and why?", "What matched or differed from your intended meaning or way of speaking?"),
+          text("OEP2", "How, if at all, did using a Proxy affect your sense of control over the negotiation, and why?", "Consider choosing its instructions, watching the exchange, and discussing the terms yourself afterward."),
+        ] },
+        { id: "open_proxy_reasons", title: "Understanding the reasons", items: [
+          text("OEP3", "Who, if anyone, do you see as responsible for the reasons your Proxy conveyed, and why?", "You may discuss yourself, the AI, both, or neither; their responsibilities need not be the same."),
+          text("OEP4", "How did you understand where the reasons conveyed by the other Proxy came from, and why?", "What could you tell, or not tell, about the person's input and any AI contribution? How did that shape your interpretation?"),
+        ] },
+      );
+    } else {
+      blocks.push(
+        { id: "open_proxy_mine", title: "Your Proxy", items: [
+          text("OEP1", "How did you feel about the way your Proxy represented you and how much say you had in the negotiation, and why?", "Consider what matched or differed from your intentions and any moments when you wanted more or less involvement."),
+          text("OEP3", "Who, if anyone, do you see as responsible for the reasons your Proxy conveyed, and why?", "You may discuss yourself, the AI, both, or neither; their responsibilities need not be the same."),
+        ] },
+        { id: "open_proxy_other", title: "The other Proxy", items: [
+          text("OEP4", "How did you understand where the reasons conveyed by the other Proxy came from, and why?", "What could you tell, or not tell, about the person's input and any AI contribution? How did that shape your interpretation?"),
+          text("OEP5", "Who, if anyone, do you see as responsible for the reasons the other Proxy conveyed, and why?", "You may discuss the person it represented, the AI, both, or neither; their responsibilities need not be the same."),
+        ] },
+      );
+    }
+  }
   if (options.taskIndex === 2) blocks.push(OEC1_BLOCK);
   blocks.push(legacyTaskOpenBlocks(false).find((block) => block.id === "open_task_comment")!);
   return blocks;
+}
+
+export function taskOpenBlocks(
+  isProxy: boolean,
+  options: { role?: Role; taskIndex?: 1 | 2; version?: string } = {},
+): Block[] {
+  if (options.version === undefined || options.version === OPEN_INSTRUMENT_VERSION) {
+    return expandedTaskOpenBlocks(isProxy, options, OPEN_INSTRUMENT_VERSION);
+  }
+  if (options.version === OPEN_INSTRUMENT_V2) {
+    return expandedTaskOpenBlocks(isProxy, options, OPEN_INSTRUMENT_V2);
+  }
+  return legacyTaskOpenBlocks(isProxy);
 }
 
 export const BR1_ITEM: Item = {

@@ -8,7 +8,7 @@ import { ActionBar } from "@/components/study-chrome";
 import { LoadRetry } from "@/components/load-retry";
 import { Card, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
-import { END_CHECK_BLOCKS, OEC1_BLOCK, OPEN_INSTRUMENT_VERSION, dummyAnswer } from "@/lib/measures";
+import { END_CHECK_BLOCKS, OEC1_BLOCK, isExpandedOpenInstrument, dummyAnswer } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { nextHref } from "@/lib/study-config";
@@ -42,7 +42,7 @@ export default function WrapUpPage() {
       getStore().loadResponses(participantKey, "v226_task_open_t2"),
     ]).then(([saved, taskOpen]) => {
       if (!active) return;
-      const inTask = taskOpen?._instrument_version === OPEN_INSTRUMENT_VERSION;
+      const inTask = isExpandedOpenInstrument(taskOpen?._instrument_version);
       setComparisonInTask(inTask);
       const pageIds = (inTask ? [END_CHECK_BLOCKS] : LEGACY_PARTS).map(blocks => blocks.flatMap(block => block.items.map(item => item.id)));
       const filtered = { ...answersForIds(saved ?? {}, ALL_IDS), ...latestAnswers.current };

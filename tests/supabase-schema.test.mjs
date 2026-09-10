@@ -69,6 +69,12 @@ test("database allocation, isolation, expiry, transcript metrics and completion"
     assert.equal(same.participant_id, first.participant_id);
     const second = await claim("participant-b");
     assert.notEqual(second.participant_id, first.participant_id);
+    await db.query("insert into public.self_reports(participant_key,task_index,oed1) values($1,1,'Historical draft')", [second.participant_key]);
+    await assert.rejects(db.query("update public.self_reports set open_instrument_version='2.27-open-v3' where participant_key=$1 and task_index=1", [second.participant_key]), /immutable once started/);
+    await db.query("update public.self_reports set open_instrument_version='2.27' where participant_key=$1 and task_index=1", [second.participant_key]);
+    await db.query("insert into public.self_reports(participant_key,task_index) values($1,2)", [second.participant_key]);
+    await db.query("update public.self_reports set open_instrument_version='2.27-open-v3' where participant_key=$1 and task_index=2", [second.participant_key]);
+    await assert.rejects(db.query("update public.self_reports set open_instrument_version='unknown' where participant_key=$1 and task_index=2", [second.participant_key]), /immutable once started/);
     await assert.rejects(db.query("update public.study_participants set role='leader' where participant_key=$1", [first.participant_key]), /immutable/);
     await assert.rejects(db.query("select public.complete_study_participation($1)", [first.participant_key]), /incomplete/);
 
@@ -236,7 +242,7 @@ test("exact task-mode migration preserves closed records and restores every writ
       const oldColumns = Object.keys(before[table][0]);
       assert.deepEqual(after.map(row=>Object.fromEntries(oldColumns.map(key=>[key,row[key]]))),before[table].map(row=>({...row,task_mode:row.task_mode==="proxy"?row.proxy_policy:"direct"})), `${table}: existing data unchanged except mode`);
       if (table === "self_reports") for (const row of after) {
-        for (const field of ["oei1","oef1","oen1","oer1","oep2","oep3","oep4","oec1","open_instrument_version"]) assert.equal(row[field], null, "additive reflection fields do not promote old attempts");
+        for (const field of ["oei1","oef1","oen1","oer1","oep2","oep3","oep4","oep5","oec1","open_instrument_version"]) assert.equal(row[field], null, "additive reflection fields do not promote old attempts");
       }
       for (const key of attempts) await assert.rejects(db.query(`update public.${table} set task_mode='direct' where participant_key=$1`,[key]),/no longer writable/);
     }

@@ -1,6 +1,6 @@
 import {
   BACKGROUND_BLOCKS, END_CHECK_BLOCKS, OEC1_BLOCK, experienceBlocks,
-  proxyExperienceBlocks, taskOpenBlocks, OPEN_INSTRUMENT_VERSION, type Item,
+  proxyExperienceBlocks, taskOpenBlocks, OPEN_INSTRUMENT_VERSION, OPEN_INSTRUMENT_V2, isExpandedOpenInstrument, type Item,
 } from "../measures";
 import { getTask, reasonCards } from "../tasks";
 import { codeOutcome } from "../negotiation/machine";
@@ -138,19 +138,24 @@ async function saveResponses(row: ParticipantRow, block: string, answers: Row): 
   }
   if (block === `v226_task_open_t${index}`) {
     const previous = await child(row, "self_reports", index);
-    const version = answers._instrument_version === OPEN_INSTRUMENT_VERSION ? OPEN_INSTRUMENT_VERSION : "2.27";
-    if (previous.open_instrument_version === OPEN_INSTRUMENT_VERSION && version !== OPEN_INSTRUMENT_VERSION) {
+    const version = answers._instrument_version ?? "2.27";
+    const versions: unknown[] = ["2.27", OPEN_INSTRUMENT_V2, OPEN_INSTRUMENT_VERSION];
+    if (!versions.includes(version)) throw new StudyError(400, "invalid_instrument_version");
+    const previousVersion = previous.open_instrument_version ?? (
+      Object.hasOwn(object(previous.responses), block) || previous.open_submitted === true
+      || ["oed1", "oee1", "oep1", "oet1"].some(field => previous[field] != null) ? "2.27" : null);
+    if (previousVersion !== null && version !== previousVersion) {
       throw new StudyError(409, "instrument_version_conflict");
     }
     const { coded, clean } = codedAnswers(answers,
-      taskOpenBlocks(isProxy, { role: row.role, taskIndex: index, version }).flatMap(b => b.items), `_t${index}`);
+      taskOpenBlocks(isProxy, { role: row.role, taskIndex: index, version: String(version) }).flatMap(b => b.items), `_t${index}`);
     await upsert(row, "self_reports", index, {
       ...coded, open_instrument_version: version, open_submitted: answers._completed === true,
       responses: { ...object(previous.responses), [block]: clean },
     });
     // Keep the historical comparison column available without rewriting any
     // operational flags from this request's earlier participant snapshot.
-    if (index === 2 && version === OPEN_INSTRUMENT_VERSION && Object.hasOwn(coded, "oec1")) {
+    if (index === 2 && isExpandedOpenInstrument(version) && Object.hasOwn(coded, "oec1")) {
       await participantPatch(row, { oec1: coded.oec1 });
     }
     return;
