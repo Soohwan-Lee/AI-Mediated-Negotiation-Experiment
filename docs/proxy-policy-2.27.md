@@ -11,7 +11,7 @@
 
 Unchanged: conditions, assignments, original cards, eight shared factual bases, four SB1 arguments, task points, reciprocal SB gate, seven-turn protocol, direct confirmation, quantitative measures, timers, and payment. The eight WR arguments and qualitative instrument are updated below. This local update does not deploy the application or authorize recruitment.
 
-## Task reflection instrument: 2.27-open-v2
+## Task reflection instrument: 2.27-open-v3
 
 ### Revised fixed WR arguments
 
@@ -22,15 +22,15 @@ Unchanged: conditions, assignments, original cards, eight shared factual bases, 
 | task_b / leader | Knowing the project-day allocation could help the team set realistic weekly milestones. | Clear reporting responsibilities could also help turn project progress into timely client updates. |
 | task_b / member | Knowing the project-day commitment could help the Member reserve time for existing deadlines. | Clear reporting responsibilities could also help the Member fit report preparation around other work. |
 
-Each task's reflection follows its experience ratings and BR1/FE1 decision, on one page. Six common required questions are grouped into choices/reactions, impressions/outcome, and workplace reflection. Four further required questions in the Proxy task cover voice/control and reason interpretation. Both Proxy policies receive identical questions. OEC1 follows Task 2's questions on that same page, before optional OET1; it is not repeated in the final checks. ICC3 remains with study-wide checks, and existing post-debrief comments are unchanged.
+Each task's reflection follows its experience ratings and BR1/FE1 decision, on one page. Six common required questions are grouped into choices/reactions, impressions/outcome, and workplace reflection. Four further required questions in the Proxy task cover representation and involvement, responsibility for one's own Proxy's reasons, the perceived sources of the other Proxy's reasons, and responsibility for those other-side reasons. Both Proxy policies receive identical questions. OEC1 follows Task 2's questions on that same page, before optional OET1; it is not repeated in the final checks. ICC3 remains with study-wide checks, and existing post-debrief comments are unchanged.
 
-The instrument requires 17 task-reflection responses across the study (six in Direct, ten in Proxy, and one comparison), plus two optional OET1 entries. Required means nonempty, not a word minimum. Probes are optional and need no separate answer. Legacy records retain their earlier instrument and wording; the data identifier is `2.27-open-v2`, not a new design-document version.
+The instrument requires 17 task-reflection responses across the study (six in Direct, ten in Proxy, and one comparison), plus two optional OET1 entries. Required means nonempty, not a word minimum. Probes are optional and need no separate answer. The data identifier is `2.27-open-v3`, not a new design-document version. Records started under `2.27-open-v2` retain that version's separate OEP1 representation and OEP2 control questions and do not receive OEP5; earlier records retain their original instrument and wording.
 
 These self-constructed questions seek explanations, concrete experiences, and contrary or no-difference accounts. They do not presume disclosure, counterpart SB, harm, lost control, AI authorship, or a protective result. Qualitative accounts contextualize quantitative findings; they do not turn nonsignificance into evidence of an effect. This is a written open-ended survey, not an interactive interview or a claim of thematic saturation. Pilot timing must check the expanded burden before recruitment; the current time and payment settings are not changed here.
 
 ### Current question catalog
 
-English is participant-facing; Korean is a researcher translation. OED1/OEI1/OEF1/OEE1/OEN1/OER1 are asked after each task; OEP1–4 only after the Proxy task; OEC1 only after Task 2. OET1 is optional after each task.
+English is participant-facing; Korean is a researcher translation. OED1/OEI1/OEF1/OEE1/OEN1/OER1 are asked after each task; OEP1/OEP3/OEP4/OEP5 only after the Proxy task; OEC1 only after Task 2. OET1 is optional after each task.
 
 **OED1**
 
@@ -70,15 +70,9 @@ English is participant-facing; Korean is a researcher translation. OED1/OEI1/OEF
 
 **OEP1**
 
-- EN: How well did your Proxy express what you wanted to say, and why?
-- KO: 내 Proxy는 내가 하고 싶었던 말을 얼마나 잘 표현했으며, 왜 그렇게 느꼈습니까?
-- Optional prompt: What matched or differed from your intended meaning or way of speaking?
-
-**OEP2**
-
-- EN: How, if at all, did using a Proxy affect your sense of control over the negotiation, and why?
-- KO: Proxy 사용은 협상에 대한 내 통제감에 어떤 영향을 주었으며, 왜 그랬습니까?
-- Optional prompt: Consider choosing its instructions, watching the exchange, and discussing the terms yourself afterward.
+- EN: How did you feel about the way your Proxy represented you and how much say you had in the negotiation, and why?
+- KO: 내 Proxy가 나를 대변한 방식과 협상에 내 의견을 반영할 수 있었던 정도에 대해 어떻게 느꼈으며, 왜 그렇게 느꼈습니까?
+- Optional prompt: Consider what matched or differed from your intentions and any moments when you wanted more or less involvement.
 
 **OEP3**
 
@@ -91,6 +85,14 @@ English is participant-facing; Korean is a researcher translation. OED1/OEI1/OEF
 - EN: How did you understand where the reasons conveyed by the other Proxy came from, and why?
 - KO: 상대 Proxy가 전달한 이유가 어디에서 왔다고 이해했으며, 왜 그렇게 생각합니까?
 - Optional prompt: What could you tell, or not tell, about the person's input and any AI contribution? How did that shape your interpretation?
+
+**OEP5**
+
+- EN: Who, if anyone, do you see as responsible for the reasons the other Proxy conveyed, and why?
+- KO: 상대 Proxy가 전달한 이유에 대해 누구에게 책임이 있다고 보며, 왜 그렇게 생각합니까?
+- Optional prompt: You may discuss the person it represented, the AI, both, or neither; their responsibilities need not be the same.
+
+Under legacy `2.27-open-v2`, OEP1 asked how well the Proxy expressed what the participant wanted to say, and OEP2 separately asked how Proxy use affected the participant's sense of control. Those identifiers and exact participant-facing strings remain available only for records already using that version.
 
 **OEC1**
 
