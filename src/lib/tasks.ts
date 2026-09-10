@@ -787,25 +787,25 @@ export const PROXY_WORK_BENEFITS: Readonly<
 > = {
   task_a: {
     leader: {
-      wr1: "Planning office attendance alongside presentation duties could help coordinate work around client meetings.",
-      wr2: "Reviewing both arrangements early could reduce last-minute scheduling changes during the project's first weeks.",
+      wr1: "Knowing the office schedule could help the team plan joint reviews of materials before client meetings.",
+      wr2: "Clear presentation responsibilities could also help the team prepare consistent messages for the client.",
       sb1: "Having more days together in the office could help resolve short coordination questions without arranging separate meetings.",
     },
     member: {
-      wr1: "Planning office days and presentation duties together could leave longer blocks of time for analysis.",
-      wr2: "Setting both arrangements in advance could reduce clashes between meetings and presentation preparation.",
+      wr1: "Knowing the office schedule could help the Member plan analysis work around commuting and meetings.",
+      wr2: "Clear presentation responsibilities could also help the Member set aside preparation time without disrupting other work.",
       sb1: "Having the Leader handle more presentations could reduce the Member's need to switch between analysis and presentation preparation.",
     },
   },
   task_b: {
     leader: {
-      wr1: "Planning project days alongside reporting duties could help align project work with client updates.",
-      wr2: "Reviewing both arrangements early could make handoffs easier to schedule during the first four weeks.",
+      wr1: "Knowing the project-day allocation could help the team set realistic weekly milestones.",
+      wr2: "Clear reporting responsibilities could also help turn project progress into timely client updates.",
       sb1: "Having the Member on the project more days could reduce interruptions between successive stages of the work.",
     },
     member: {
-      wr1: "Planning project days and report preparation together could help distribute work around existing deadlines.",
-      wr2: "Setting both arrangements in advance could reduce clashes between current tasks and new-project work.",
+      wr1: "Knowing the project-day commitment could help the Member reserve time for existing deadlines.",
+      wr2: "Clear reporting responsibilities could also help the Member fit report preparation around other work.",
       sb1: "Having the Leader prepare more weekly reports could free the Member's report-checking time for other deadlines.",
     },
   },

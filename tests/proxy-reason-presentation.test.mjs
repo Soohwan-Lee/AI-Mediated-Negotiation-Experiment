@@ -17,6 +17,19 @@ const ROLES = ["leader", "member"];
 const POLICIES = ["user_specified", "ai_supplemented"];
 const other = (role) => (role === "leader" ? "member" : "leader");
 
+test("WR pairs explain distinct issue benefits without a requested direction", () => {
+  assert.deepEqual([PROXY_WORK_BENEFITS.task_a.leader.wr1, PROXY_WORK_BENEFITS.task_a.leader.wr2], ["Knowing the office schedule could help the team plan joint reviews of materials before client meetings.","Clear presentation responsibilities could also help the team prepare consistent messages for the client."]);
+  assert.deepEqual([PROXY_WORK_BENEFITS.task_a.member.wr1, PROXY_WORK_BENEFITS.task_a.member.wr2], ["Knowing the office schedule could help the Member plan analysis work around commuting and meetings.","Clear presentation responsibilities could also help the Member set aside preparation time without disrupting other work."]);
+  assert.deepEqual([PROXY_WORK_BENEFITS.task_b.leader.wr1, PROXY_WORK_BENEFITS.task_b.leader.wr2], ["Knowing the project-day allocation could help the team set realistic weekly milestones.","Clear reporting responsibilities could also help turn project progress into timely client updates."]);
+  assert.deepEqual([PROXY_WORK_BENEFITS.task_b.member.wr1, PROXY_WORK_BENEFITS.task_b.member.wr2], ["Knowing the project-day commitment could help the Member reserve time for existing deadlines.","Clear reporting responsibilities could also help the Member fit report preparation around other work."]);
+  for (const task of TASKS) for (const role of ROLES) {
+    const { wr1, wr2 } = PROXY_WORK_BENEFITS[task][role];
+    assert.match(wr1, /could/);
+    assert.match(wr2, /could also/);
+    assert.doesNotMatch(wr1 + wr2, /more days|fewer days|Leader handle|Leader prepare|bonus|director|privately/);
+  }
+});
+
 function count(text, needle) {
   return text.split(needle).length - 1;
 }
