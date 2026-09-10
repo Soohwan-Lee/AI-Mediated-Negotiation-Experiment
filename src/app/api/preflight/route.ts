@@ -31,6 +31,7 @@
 import { NextResponse } from "next/server";
 import { AI_CONFIG, modelReadiness } from "@/lib/ai/config";
 import { STUDY, timingIsHonest, TOTAL_MINUTES } from "@/lib/study-config";
+import { storageReady } from "@/lib/server/study-db";
 
 export const runtime = "nodejs";
 /** Env is read per request; a cached answer would report a stale deployment. */
@@ -62,9 +63,15 @@ export async function GET(request: Request) {
    * held for retry rather than converted to `none` or allowed to advance.
    */
   if (url.searchParams.get("gate") === "1") {
+    const ready = readiness.ready && (!readiness.live || (
+      process.env.NEXT_PUBLIC_DEV_TOOLS === "off"
+      && !STUDY.prolificCompletionCode.startsWith("TBD")
+      && timingIsHonest()
+      && await storageReady()
+    ));
     return NextResponse.json(
-      { ready: readiness.ready },
-      { status: readiness.ready ? 200 : 503 },
+      { ready },
+      { status: ready ? 200 : 503 },
     );
   }
 
@@ -80,6 +87,11 @@ export async function GET(request: Request) {
   }
 
   const checks: Check[] = [
+    {
+      name: "durable_storage",
+      pass: await storageReady(),
+      detail: "The server must be able to reach all five research tables before recruitment.",
+    },
     {
       name: "model_configured",
       pass: readiness.keyConfigured,

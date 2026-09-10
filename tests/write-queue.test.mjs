@@ -59,6 +59,8 @@ const js = source
   .replace(/: Promise<void> \| null/g, "")
   .replace(/: Promise<void>/g, "")
   .replace(/: Promise<boolean>/g, "")
+  .replace(/: unknown/g, "")
+  .replace(/: QueuedWrite/g, "")
   .replace(/private endpoint: string/g, "endpoint")
   .replace(/\(op: string, payload: unknown\)/g, "(op, payload)")
   .replace(/: number\b/g, "")
@@ -190,4 +192,17 @@ test("queued writes survive in storage until they land", async () => {
   const persisted = JSON.parse(store.get("amne:writequeue"));
   assert.equal(persisted.length, 1, "an unsent write must be on disk");
   assert.equal(persisted[0].op, "saveResponses");
+});
+
+test("an idempotent completion write is queued only once", async () => {
+  const sent = [];
+  const q = makeQueue(async (_url, init) => {
+    sent.push(JSON.parse(init.body).id);
+    return { ok: true };
+  });
+
+  q.pushIdempotent("logEvent", { type: "study_completed" }, "complete:P-1");
+  q.pushIdempotent("logEvent", { type: "study_completed" }, "complete:P-1");
+  assert.equal(await q.flush(), true);
+  assert.deepEqual(sent, ["complete:P-1"]);
 });

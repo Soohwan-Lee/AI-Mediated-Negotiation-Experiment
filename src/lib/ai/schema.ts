@@ -39,34 +39,23 @@ export interface NegotiationAction {
    */
   reasonSourceId: string | null;
   /**
-   * A TRIPWIRE, not a slot to fill. Always null in correct output.
-   *
-   * Ver.2.20 abolished the role-plausible pool: neither policy adds a reason of
-   * its own any more. AI-Supplemented REPLACES the sensitive card with the
-   * fixed §6.6 sentences, and those are supplied by the route rather than
-   * invented by the model — so there is nothing legitimate to put here, under
-   * either policy, and any value is a `provenance_policy_violation`. The field
-   * survives precisely so a model that invents a reason is caught saying so,
-   * rather than doing it silently in the rationale.
+   * Null unless the trusted AI-Supplemented renderer adds its two approved
+   * public work-benefit arguments. Arbitrary model-authored source ids remain
+   * guardrail violations.
    */
   addedReasonSourceId: string | null;
   /** Short rationale text used to generate the visible message. */
   rationale: string;
   unresolved: boolean;
-  /**
-   * Audit-only. Stored in the backend, never rendered to participants in the
-   * AI-Supplemented condition (Design §7 "이유 출처 표시").
-   *
-   * ONE VALUE SINCE VER.2.20. The role-plausible pool is gone (§6.6): the
-   * AI-Supplemented policy no longer ADDS a reason beside the principal's
-   * card, it REPLACES the card with the fixed abstraction and two covers, all
-   * three supplied by the route. So every message draws on the principal, and
-   * a model that wanted to claim otherwise no longer has a value to claim it
-   * with — which is the point of narrowing the enum rather than leaving a
-   * dead one in place.
-   */
-  internalProvenance: "principal_reason";
+  /** Audit-only and stripped from the participant-facing response. */
+  internalProvenance:
+    | "principal_reason"
+    | "principal_reason_with_ai_work_benefits";
 }
+
+/** The only additive reason source the trusted policy renderer may attach. */
+export const AI_WORK_BENEFITS_SOURCE_ID =
+  "system:approved_work_benefits" as const;
 
 /** JSON Schema passed to the model for structured output. */
 export const NEGOTIATION_ACTION_SCHEMA = {
@@ -117,7 +106,10 @@ export const NEGOTIATION_ACTION_SCHEMA = {
     unresolved: { type: "boolean" },
     internalProvenance: {
       type: "string",
-      enum: ["principal_reason"],
+      enum: [
+        "principal_reason",
+        "principal_reason_with_ai_work_benefits",
+      ],
     },
   },
 } as const;

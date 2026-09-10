@@ -536,20 +536,20 @@ export function ProxyFlowSteps({ className }: { className?: string }) {
   const steps: Array<{ illustration: IllustrationKey; label: string }> = [
     {
       illustration: "proxyStepBrief",
-      label: "You brief your AI Proxy.",
+      label: "Choose your preferred options and which reasons your Proxy may share.",
     },
     {
       illustration: "proxyStepNegotiate",
-      label: "The two AI Proxies negotiate. You watch.",
+      label: "The two AI Proxies negotiate based on those instructions. You watch.",
     },
     {
       illustration: "proxyStepResult",
-      label: "You review the Proxy transcript and proposed terms.",
+      label: "Review the Proxy exchange and proposed terms.",
     },
     {
       /* The SAME file as step ② of the Direct row — see lib/illustrations.ts. */
       illustration: "chat",
-      label: "You finish in a short chat and both confirm the result.",
+      label: "Discuss the proposal directly with the other participant and both agree on the final terms.",
     },
   ];
 

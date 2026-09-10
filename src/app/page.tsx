@@ -343,11 +343,12 @@ export default function ConsentPage() {
                 where the mandate is set.
               */}
               <p className="mb-4 max-w-prose text-sm leading-relaxed text-slate-700 sm:text-base">
-                You negotiate two workplace arrangements with another
-                participant. You chat directly in one task. In the other an{" "}
-                <strong>AI Proxy</strong> (a software tool) speaks for you
-                first. You then talk with the other participant to confirm the
-                final agreement.
+                This study looks at how people reach agreements at work. You
+                will keep the same assigned role in two fictional workplace
+                scenarios. In one task, you chat directly with another
+                participant. In the other, an <strong>AI Proxy</strong> (a
+                software tool) speaks for you first. You then talk with the
+                other participant to confirm the agreement.
               </p>
               <ol className="grid gap-2.5 sm:grid-cols-2">
                 {STEPS.map((step, i) => (

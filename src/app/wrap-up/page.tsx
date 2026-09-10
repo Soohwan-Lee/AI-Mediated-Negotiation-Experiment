@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MeasureBlock, PreviousPart, missingIds, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
+import { LoadRetry } from "@/components/load-retry";
 import { Card, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { END_CHECK_BLOCKS, OEC1_BLOCK, dummyAnswer } from "@/lib/measures";
@@ -25,6 +26,8 @@ export default function WrapUpPage() {
   const [part, setPart] = useState<number | null>(null);
   const [checksSubmitted, setChecksSubmitted] = useState(false);
   const [restored, setRestored] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const pageIds = useMemo(() => PARTS.map((blocks) => blocks.flatMap((block) => block.items.map((item) => item.id))), []);
@@ -35,7 +38,7 @@ export default function WrapUpPage() {
     let active = true;
     void getStore().loadResponses(participantKey, RESPONSE_BLOCK).then((saved) => {
       if (!active) return;
-      const filtered = answersForIds(saved ?? {}, allIds);
+      const filtered = { ...answersForIds(saved ?? {}, allIds), ...latestAnswers.current };
       if (explicitlyCompleted(saved ?? {})) { router.replace(nextHref("wrap-up")); return; }
       const submittedChecks = saved?._checks_submitted === true;
       setChecksSubmitted(submittedChecks);
@@ -43,9 +46,9 @@ export default function WrapUpPage() {
       setAnswers(filtered);
       setPart(restoredValidPart(pageIds, filtered, submittedChecks ? 1 : 0));
       setRestored(true);
-    });
+    }).catch(() => { if (active) setLoadFailed(true); });
     return () => { active = false; };
-  }, [allIds, pageIds, participantKey, router]);
+  }, [allIds, pageIds, participantKey, router, loadAttempt]);
 
   const activePart = part ?? 0;
   const blocks = PARTS[activePart] ?? PARTS[0];
@@ -87,7 +90,9 @@ export default function WrapUpPage() {
     } finally { submitting.current = false; setBusy(false); }
   }
 
-  if (!restored) return <Page><p className="text-sm text-[var(--ink-2)]">Loading final questions…</p></Page>;
+  if (!restored) return <Page>{loadFailed
+    ? <LoadRetry onRetry={() => { setLoadFailed(false); setLoadAttempt((value) => value + 1); }} />
+    : <p className="text-sm text-[var(--ink-2)]">Loading final questions…</p>}</Page>;
   return <>
     <Page>
       <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-blue-50/30">

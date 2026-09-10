@@ -17,12 +17,10 @@
 /**
  * Between-participant: which proxy policy the participant experiences.
  *
- * Ver.2.18 renamed these. `user_specified` (was User-Specified) relays the checked
- * cards with every fact intact; `ai_supplemented` (was AI-Supplemented) abstracts the
- * sensitive card to its KIND and embeds it, unlabelled, among two cover
- * reasons (§6.6). The rename is not cosmetic — Ver.2.20's ai_supplemented no
- * longer ADDS to the card, it REPLACES it, so the old name described the
- * wrong operation.
+ * `user_specified` relays only the reason the participant authorized.
+ * `ai_supplemented` relays that same reason, with the same facts and wording,
+ * then adds two fixed work benefits. The benefits are task-grounded and never
+ * authorize or substitute for a sensitive background card.
  */
 export type ProxyPolicy = "user_specified" | "ai_supplemented";
 
@@ -207,36 +205,6 @@ export interface ReasonCard {
     | "client_asked_for_someone_else"
     | "missed_call_complaint";
   /**
-   * What an AI-Supplemented proxy says INSTEAD of this card (§6.6, sensitive
-   * cards only). Fixed text, never generated: the model's only job is to join
-   * the sentences into one natural message.
-   *
-   * `frame` is the proxy's own opening line — "Having looked at the situation
-   * on the side of the team member I represent, I think… There are three
-   * reasons for that —". THE SPEAKER IS THE PROXY (Ver.2.21, 11th correction).
-   * Through Ver.2.20 the sentences were relayed as the principal's, which sent
-   * every bit of responsibility back to the principal and left the two policies
-   * differing only in how much detail arrived.
-   *
-   * `abstract` keeps the KIND of fact and its link to the core term and drops
-   * the event, the third party's words, the concealment, and any attribution to
-   * the principal. It is still tier 2 — a circumstance specific to that side is
-   * what the counterpart needs in order to justify moving upward — while what
-   * the counterpart LEARNS stops at "something happened".
-   *
-   * `cover` are two role-plausible sentences the proxy supplies, in two GRADES
-   * (§6.6, 12th correction). `cover[0]` is WR-GRADE: role generality of the
-   * "both terms need attention" kind, appended on the decline turn when only
-   * the work reason is authorized, so the policy difference shows on that path
-   * too. `cover[1]` is SB-GRADE: why the term matters that much, used only
-   * beside the abstraction so it is unclear which of the three sentences is the
-   * principal's own circumstance. Neither ever moves the tier — they are role
-   * generalities, not this person's situation.
-   */
-  frame?: string;
-  abstract?: string;
-  cover?: readonly [string, string];
-  /**
    * The card as a PROXY reports it — third person, the principal referred to
    * rather than speaking (Ver.2.19 §6.5).
    *
@@ -254,8 +222,8 @@ export interface ReasonCard {
    * reporting a third party's words. Both persons of a load-bearing sentence
    * are worth writing once.
    *
-   * Used by the MOCKUP only. The live proxies get the rule in P3/P4 and
-   * re-voice the card themselves, which reads better than any fixed wording.
+   * Used by both live and mock Proxy paths as the canonical factual base. This
+   * keeps the sensitive wording byte-identical across the two proxy policies.
    */
   relayed?: string;
 }
@@ -473,12 +441,13 @@ export interface TranscriptMessage {
    * Internal provenance — stored for audit but NEVER rendered to the
    * participant (Design §7 "이유 출처 표시").
    *
-   * `pool_reason` is gone with the pool itself (Ver.2.20 §6.6): the
-   * AI-Supplemented policy no longer adds a reason beside the principal's
-   * card, it replaces the card with the fixed abstraction. Every message is a
-   * principal reason now, and what differs is how much of it survived.
+   * `principal_reason_with_ai_work_benefits` means the same authorized reason
+   * was followed by the two fixed, task-grounded benefits supplied by the AI.
+   * It does not change the reason tier or sensitive-disclosure permission.
    */
-  internalProvenance?: "principal_reason";
+  internalProvenance?:
+    | "principal_reason"
+    | "principal_reason_with_ai_work_benefits";
   /**
    * The move the state machine chose for this turn, stored beside the rendered
    * sentence. Design §4 requires the pair so an audit can show the model never

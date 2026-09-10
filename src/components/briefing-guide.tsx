@@ -288,7 +288,7 @@ export function StudyOrientation({
             */}
             <p className="rounded-2xl border border-rose-200 bg-rose-50/50 px-5 py-3.5 text-sm leading-relaxed text-rose-950">
               <span aria-hidden className="mr-1.5">⚠</span>
-              <strong>Stay in your assigned role.</strong> The sensitive background is private context belonging to this fictional role, not a request for your real personal history. You decide whether to convey it. If conveyed, it may shape how the other person sees your role and may be considered in the later bonus or upward evaluation.
+              <strong>Stay in your assigned role.</strong> The sensitive background is private context belonging to this fictional role, not a request for your real personal history. You decide whether to convey it. If conveyed, it may shape how the other person sees your role and may be considered in the later bonus or upward evaluation. The bonus is real money paid through Prolific after the study.
             </p>
 
             {/*

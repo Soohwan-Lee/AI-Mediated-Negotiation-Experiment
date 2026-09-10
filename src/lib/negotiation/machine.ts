@@ -13,7 +13,7 @@
  * the sensitive background?
  *
  *   no  (nothing, the work reason, or a bare priority claim) → 3rd option each
- *   yes (the SB, or the §6.6 abstraction)                    → best option each
+ *   yes (the authorized SB, relayed with its facts intact)   → best option each
  *
  * Both cores land on the SAME rank, so each rung pays 1,000 / 3,000 to each
  * side. Impasse pays nothing at all.

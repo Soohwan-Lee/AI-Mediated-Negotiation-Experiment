@@ -1,14 +1,8 @@
 /**
  * Persistence facade.
  *
- * Every write the experiment performs goes through `Store`. The current
- * implementation is localStorage-backed so the flow is walkable with no
- * backend. Swapping in Supabase means writing a `SupabaseStore` that satisfies
- * the same interface and changing `getStore()` — no page component changes.
- *
- * Method names deliberately mirror the planned tables (docs/DATA_MODEL.md):
- *   participants / assignment_slots / events / responses / sessions /
- *   mandates / messages / agreements
+ * Development uses localStorage; recruitment uses signed-session server routes.
+ * The shared interface maps onto the compact five-table research schema.
  */
 
 import type {
@@ -20,8 +14,15 @@ import type {
   SurveyResponses,
   TranscriptMessage,
 } from "./types";
+import { SupabaseStore } from "./store-supabase";
 
 export interface Store {
+  /** What a successful `confirmSaved` call actually guarantees. */
+  readonly persistenceKind: "local" | "remote";
+
+  /** Retry pending writes and report whether this store is currently settled. */
+  confirmSaved(): Promise<boolean>;
+
   createParticipant(
     participantKey: string,
     prolific: ProlificContext,
@@ -118,19 +119,52 @@ function read<T>(k: string): T | null {
   }
 }
 
-function write(k: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(k, JSON.stringify(value));
-  } catch {
-    // Nothing useful to do here: the value is already in memory for this
-    // session, and the participant must not see a negotiation turn fail.
-  }
-}
+export class LocalStore implements Store {
+  readonly persistenceKind = "local" as const;
 
-class LocalStore implements Store {
+  /** Latest unsaved value per key; intentionally not a general-purpose queue. */
+  private pendingWrites = new Map<string, string>();
+
+  private readValue<T>(k: string): T | null {
+    const pending = this.pendingWrites.get(k);
+    if (pending !== undefined) {
+      try {
+        return JSON.parse(pending) as T;
+      } catch {
+        return null;
+      }
+    }
+    return read<T>(k);
+  }
+
+  private writeValue(k: string, value: unknown): void {
+    if (typeof window === "undefined") return;
+    const serialized = JSON.stringify(value);
+    try {
+      window.localStorage.setItem(k, serialized);
+      this.pendingWrites.delete(k);
+    } catch {
+      // Preserve the newest value for reads and a later explicit retry. Live
+      // negotiation actions still never fail because localStorage is blocked.
+      this.pendingWrites.set(k, serialized);
+    }
+  }
+
+  async confirmSaved(): Promise<boolean> {
+    if (typeof window === "undefined") return false;
+    for (const [k, serialized] of [...this.pendingWrites]) {
+      try {
+        window.localStorage.setItem(k, serialized);
+        this.pendingWrites.delete(k);
+      } catch {
+        // Keep every failed key for the next Retry press.
+      }
+    }
+    return this.pendingWrites.size === 0;
+  }
+
   async createParticipant(participantKey: string, prolific: ProlificContext) {
-    write(key("participant", participantKey), {
+    this.writeValue(key("participant", participantKey), {
       participantKey,
       ...prolific,
       createdAt: new Date().toISOString(),
@@ -138,18 +172,24 @@ class LocalStore implements Store {
   }
 
   async saveAssignment(assignment: Assignment) {
-    write(key("assignment", assignment.participantKey), assignment);
+    this.writeValue(key("assignment", assignment.participantKey), assignment);
   }
 
   async loadAssignment(participantKey: string) {
-    return read<Assignment>(key("assignment", participantKey));
+    return this.readValue<Assignment>(key("assignment", participantKey));
   }
 
   async logEvent(event: ExperimentEvent) {
     const k = key("events", event.participantKey);
-    const existing = read<ExperimentEvent[]>(k) ?? [];
+    const existing = this.readValue<ExperimentEvent[]>(k) ?? [];
+    if (
+      event.type === "study_completed" &&
+      existing.some((saved) => saved.type === "study_completed")
+    ) {
+      return;
+    }
     existing.push(event);
-    write(k, existing);
+    this.writeValue(k, existing);
     if (process.env.NODE_ENV === "development") {
       console.debug("[event]", event.type, event.page ?? "", event.payload ?? "");
     }
@@ -160,59 +200,85 @@ class LocalStore implements Store {
     block: string,
     responses: SurveyResponses,
   ) {
-    write(key("responses", participantKey, block), responses);
+    this.writeValue(key("responses", participantKey, block), responses);
   }
 
   async loadResponses(participantKey: string, block: string) {
-    return read<SurveyResponses>(key("responses", participantKey, block));
+    return this.readValue<SurveyResponses>(key("responses", participantKey, block));
   }
 
   async saveMandate(participantKey: string, mandate: Mandate) {
-    write(key("mandate", participantKey, mandate.sessionIndex), mandate);
+    this.writeValue(key("mandate", participantKey, mandate.sessionIndex), mandate);
   }
 
   async loadMandate(participantKey: string, sessionIndex: 1 | 2) {
-    return read<Mandate>(key("mandate", participantKey, sessionIndex));
+    return this.readValue<Mandate>(key("mandate", participantKey, sessionIndex));
   }
 
   async appendMessage(participantKey: string, message: TranscriptMessage) {
     const k = key("messages", participantKey, message.sessionIndex);
-    const existing = read<TranscriptMessage[]>(k) ?? [];
-    existing.push(message);
-    write(k, existing);
+    const existing = this.readValue<TranscriptMessage[]>(k) ?? [];
+    const duplicateIndex = existing.findIndex((saved) => saved.id === message.id);
+    if (duplicateIndex >= 0) {
+      // The same message is sometimes written once when rendered and again
+      // after classification. Keep its identity, text, time and position while
+      // adding only metadata that the later write actually defines.
+      const definedMetadata = Object.fromEntries(
+        Object.entries(message).filter(
+          ([field, value]) =>
+            !["id", "text", "createdAt"].includes(field) && value !== undefined,
+        ),
+      );
+      existing[duplicateIndex] = {
+        ...existing[duplicateIndex],
+        ...definedMetadata,
+      };
+    } else {
+      existing.push(message);
+    }
+    this.writeValue(k, existing);
   }
 
   async loadMessages(participantKey: string, sessionIndex: 1 | 2) {
-    return read<TranscriptMessage[]>(key("messages", participantKey, sessionIndex)) ?? [];
+    return this.readValue<TranscriptMessage[]>(key("messages", participantKey, sessionIndex)) ?? [];
   }
 
   async saveAgreement(participantKey: string, agreement: CandidateAgreement) {
-    write(key("agreement", participantKey, agreement.sessionIndex), agreement);
+    this.writeValue(key("agreement", participantKey, agreement.sessionIndex), agreement);
   }
 
   async loadAgreement(participantKey: string, sessionIndex: 1 | 2) {
-    return read<CandidateAgreement>(
+    return this.readValue<CandidateAgreement>(
       key("agreement", participantKey, sessionIndex),
     );
   }
 
   async logGuardrailEvent(participantKey: string, event: GuardrailEvent) {
     const k = key("guardrail", participantKey);
-    const existing = read<GuardrailEvent[]>(k) ?? [];
+    const existing = this.readValue<GuardrailEvent[]>(k) ?? [];
     existing.push(event);
-    write(k, existing);
+    this.writeValue(k, existing);
   }
 }
 
 let instance: Store | null = null;
+let identity: string | null = null;
+
+/** Development and mock flows always stay local, even when server keys exist. */
+export const REMOTE_STUDY = process.env.NEXT_PUBLIC_DEV_TOOLS === "off";
+
+/** Each attempt has its own recoverable queue. Old queues are left in place. */
+export function setStoreIdentity(participantKey: string): void {
+  if (!REMOTE_STUDY || identity === participantKey) return;
+  identity = participantKey;
+  instance = new SupabaseStore(participantKey);
+}
 
 /**
- * TODO(supabase): return a `SupabaseStore` when
- * NEXT_PUBLIC_SUPABASE_URL is configured. Writes that must not be
- * client-forgeable (assignment claim, event log) should route through
- * `/api/*` server routes rather than the browser client.
+ * Production requires the server-backed store. Missing server configuration
+ * fails closed in admission/preflight, never by falling back to local storage.
  */
 export function getStore(): Store {
-  if (!instance) instance = new LocalStore();
+  if (!instance) instance = REMOTE_STUDY ? new SupabaseStore() : new LocalStore();
   return instance;
 }

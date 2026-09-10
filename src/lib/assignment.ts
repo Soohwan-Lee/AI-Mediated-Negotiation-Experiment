@@ -143,11 +143,10 @@ export function resolveAssignment(
 }
 
 /**
- * Claims the next available slot.
+ * Resolves a deterministic development-only assignment.
  *
- * TODO(supabase): replace the body with an atomic RPC call:
- *   const { data } = await supabase.rpc('claim_assignment_slot', { p_key: participantKey })
- * and drop the local rotation entirely.
+ * Production uses requestAdmission and the server's atomic
+ * claim_study_assignment RPC, not this local hash-based stand-in.
  */
 export async function claimSlot(
   participantKey: string,

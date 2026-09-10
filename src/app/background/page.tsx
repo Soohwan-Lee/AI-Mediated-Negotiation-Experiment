@@ -19,6 +19,7 @@ import {
   type Answers,
 } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
+import { LoadRetry } from "@/components/load-retry";
 import { Page, PageHeader } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { BACKGROUND_BLOCKS, dummyAnswer, requiredIds } from "@/lib/measures";
@@ -69,7 +70,7 @@ export default function BackgroundPage() {
   // they had just asked to go back to. Answers still merge whenever the read
   // lands, with local edits winning.
   const landed = useRef(false);
-  useRestoreAnswers(RESPONSE_BLOCK, (saved) => {
+  const restoration = useRestoreAnswers(RESPONSE_BLOCK, (saved) => {
     const filtered = answersForIds(saved, BACKGROUND_IDS);
     const merged = { ...filtered, ...latestAnswers.current };
     latestAnswers.current = merged;
@@ -192,6 +193,7 @@ export default function BackgroundPage() {
           subtitle={copy.subtitle}
         />
 
+        {restoration.loadFailed ? <LoadRetry onRetry={restoration.retry} /> : null}
         <MeasureBlock
           block={currentBlock}
           answers={answers}

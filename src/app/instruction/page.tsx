@@ -35,6 +35,7 @@ import {
 } from "@/components/briefing-guide";
 import { useEffect, useMemo, useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
+import { LoadRetry } from "@/components/load-retry";
 import {
   Callout,
   Card,
@@ -119,7 +120,7 @@ export default function InstructionPage() {
     return () => window.clearTimeout(id);
   }, [participantKey, router]);
 
-  useRestoreAnswers("instruction_check", (saved) => {
+  const restoration = useRestoreAnswers("instruction_check", (saved) => {
     const restored = Object.fromEntries(
       CHECKS.map((c) => [c.id, saved[c.id]]).filter(
         ([, v]) => typeof v === "string",
@@ -187,6 +188,7 @@ export default function InstructionPage() {
           subtitle="Check your understanding of the setup. If an answer is wrong, read the note and try again."
         />
 
+        {restoration.loadFailed ? <LoadRetry onRetry={restoration.retry} /> : null}
         <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-950">
           {assignment?.role === "leader" ? (
             <p>

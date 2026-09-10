@@ -20,11 +20,13 @@ import {
 } from "react";
 import {
   DEV_PARTICIPANT_KEY,
+  claimSlot,
   participantKeyForDevSlot,
   resolveAssignment,
 } from "./assignment";
 import { useDevMode } from "./dev-mode";
-import { getStore } from "./store";
+import { getStore, REMOTE_STUDY, setStoreIdentity } from "./store";
+import { requestAdmission } from "./admission";
 import type {
   Assignment,
   EventType,
@@ -116,7 +118,8 @@ function readInitialState(): ParticipantState {
     sessionId: params.get("SESSION_ID"),
   };
 
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  let stored: string | null = null;
+  try { stored = window.localStorage.getItem(STORAGE_KEY); } catch { /* Server identity can still restore. */ }
   if (!stored) {
     return {
       participantKey: null,
@@ -126,19 +129,24 @@ function readInitialState(): ParticipantState {
     };
   }
 
-  const parsed = JSON.parse(stored) as {
+  let parsed: {
     participantKey: string;
     prolific: ProlificContext;
     consented: boolean;
   };
+  try { parsed = JSON.parse(stored); } catch {
+    return { participantKey: null, prolific: urlProlific, assignment: null, consented: false };
+  }
+  const changed = Boolean(urlProlific.prolificPid &&
+    (urlProlific.prolificPid !== parsed.prolific?.prolificPid || urlProlific.studyId !== parsed.prolific?.studyId));
 
   return {
-    participantKey: parsed.participantKey,
+    participantKey: changed || REMOTE_STUDY ? null : parsed.participantKey,
     // Fresh URL params win if present, otherwise keep what we stored.
-    prolific: urlProlific.prolificPid ? urlProlific : parsed.prolific,
+    prolific: REMOTE_STUDY ? urlProlific : urlProlific.prolificPid ? urlProlific : parsed.prolific,
     // Loaded asynchronously below.
     assignment: null,
-    consented: parsed.consented,
+    consented: changed || REMOTE_STUDY ? false : parsed.consented,
   };
 }
 
@@ -150,6 +158,27 @@ export function ParticipantProvider({
   const [state, setState] = useState<ParticipantState>(readInitialState);
   const hydrated = useHydrated();
   const dev = useDevMode();
+  const [admission, setAdmission] = useState<"pending" | "ready" | "failed">(REMOTE_STUDY ? "pending" : "ready");
+  const [admissionError, setAdmissionError] = useState("");
+  const [admissionRetry, setAdmissionRetry] = useState(0);
+
+  useEffect(() => {
+    if (!REMOTE_STUDY) return;
+    let cancelled = false;
+    void requestAdmission(state.prolific).then((result) => {
+      if (cancelled) return;
+      setStoreIdentity(result.assignment.participantKey);
+      setState(s => ({ ...s, participantKey: result.assignment.participantKey,
+        assignment: result.assignment, consented: result.consented === true }));
+      setAdmission("ready");
+      if (result.status === "completed" && window.location.pathname !== "/complete") window.location.replace("/complete");
+    }).catch((error: unknown) => {
+      if (cancelled) return;
+      setAdmissionError(error instanceof Error ? error.message : "Unable to start the study.");
+      setAdmission("failed");
+    });
+    return () => { cancelled = true; };
+  }, [admissionRetry, state.prolific]);
   const useDevSlot = dev.enabled && (dev.slotOverride || !state.assignment);
   const effectiveParticipantKey = participantKeyForDevSlot(
     state.participantKey,
@@ -160,7 +189,7 @@ export function ParticipantProvider({
   // external-store read, so it belongs in an effect.
   const restoredKey = state.participantKey;
   useEffect(() => {
-    if (!restoredKey) return;
+    if (!restoredKey || REMOTE_STUDY) return;
     let cancelled = false;
     void getStore()
       .loadAssignment(restoredKey)
@@ -177,44 +206,38 @@ export function ParticipantProvider({
 
   const persist = useCallback(
     (next: Pick<ParticipantState, "participantKey" | "prolific" | "consented">) => {
-      window.localStorage.setItem(
+      try { window.localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
           participantKey: next.participantKey,
           prolific: next.prolific,
           consented: next.consented,
         }),
-      );
+      ); } catch { if (!REMOTE_STUDY) throw new Error("Browser storage is unavailable"); }
     },
     [],
   );
 
   const beginStudy = useCallback(async () => {
     const store = getStore();
+    if (REMOTE_STUDY) {
+      if (admission !== "ready" || !state.assignment || !state.participantKey) throw new Error("Study admission is not ready");
+      await store.createParticipant(state.participantKey, state.prolific);
+      if (!(await store.confirmSaved())) throw new Error("Consent could not be saved");
+      persist({ participantKey: state.participantKey, prolific: state.prolific, consented: true });
+      setState(s => ({ ...s, consented: true }));
+      return state.assignment;
+    }
     const participantKey = state.participantKey ?? newParticipantKey();
 
     await store.createParticipant(participantKey, state.prolific);
 
-    // THE CLAIM IS THE SERVER'S, NOT THE BROWSER'S. The local idempotency
-    // check comes first — a refresh must never reassign — and only a genuinely
-    // new participant asks the route for a slot. Doing the claim here in the
-    // browser meant `/api/assign` had no caller at all, so the planned swap to
-    // the atomic `claim_assignment_slot` RPC would have taken effect nowhere.
+    // Local previews retain their deterministic assignment without touching
+    // the production allocator. Production admission already happened above.
     const existing = await store.loadAssignment(participantKey);
     let assignment = existing;
     if (!assignment) {
-      const res = await fetch("/api/assign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          participantKey,
-          prolificPid: state.prolific.prolificPid ?? null,
-        }),
-      });
-      if (!res.ok) throw new Error(`Assignment failed with ${res.status}`);
-      const data = (await res.json()) as { assignment?: Assignment };
-      if (!data.assignment) throw new Error("Assignment failed: no slot");
-      assignment = data.assignment;
+      assignment = await claimSlot(participantKey);
       await store.saveAssignment(assignment);
     }
 
@@ -232,7 +255,7 @@ export function ParticipantProvider({
     persist({ participantKey, prolific: state.prolific, consented: true });
     setState((s) => ({ ...s, participantKey, assignment, consented: true }));
     return assignment;
-  }, [persist, state.participantKey, state.prolific]);
+  }, [admission, persist, state.assignment, state.participantKey, state.prolific]);
 
   const logEvent = useCallback<ParticipantContextValue["logEvent"]>(
     (type, payload, extra) => {
@@ -288,7 +311,7 @@ export function ParticipantProvider({
   // Children need localStorage and URL params, so they wait for the client.
   // `hydrated` is false during the server render AND during the hydrating
   // render, which is what keeps the two identical — see useHydrated.
-  if (!hydrated) {
+  if (!hydrated || admission === "pending") {
     return (
       <ParticipantContext.Provider value={value}>
         <div
@@ -299,6 +322,15 @@ export function ParticipantProvider({
         </div>
       </ParticipantContext.Provider>
     );
+  }
+
+  if (admission === "failed") {
+    return <main className="mx-auto max-w-xl p-8 text-center">
+      <h1 className="text-xl font-semibold">The study is not available yet</h1>
+      <p className="my-4">{admissionError}</p>
+      <button type="button" onClick={() => { setAdmission("pending"); setAdmissionRetry(n => n + 1); }}
+        className="rounded-lg border px-5 py-3">Try again</button>
+    </main>;
   }
 
   return (

@@ -33,9 +33,8 @@
  * THE AUDIT IS THE POINT OF STORING IT. Every {text, label, confidence} is
  * kept so the Direct transcripts can be re-coded by hand afterwards and
  * reported as κ against this classifier, with a sensitivity analysis excluding
- * disagreements (§6.2). Gate 19 requires κ ≥ .90; below it the study switches
- * to Wizard-of-Oz tagging (§13-24). Persistence lands with `/api/persist` —
- * see docs/DATA_MODEL.md.
+ * disagreements (§6.2). The authenticated server audit is persisted before
+ * returning the classification, with a stable message key for later recoding.
  */
 
 import { NextResponse } from "next/server";
@@ -43,6 +42,7 @@ import { NextResponse } from "next/server";
 import { classifyReason } from "@/lib/ai/client";
 import { ModelNotConfiguredError } from "@/lib/ai/config";
 import { getTask } from "@/lib/tasks";
+import { beginNegotiationAudit } from "@/lib/server/negotiation-audit";
 import type { NegotiationTask, Role, TaskId } from "@/lib/types";
 
 // Same runtime and budget as the sibling AI routes. Without them this one ran
@@ -53,6 +53,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 interface RequestBody {
+  sessionIndex?: number;
+  messageId?: string;
   taskId: TaskId;
   /** The participant's own role — the cards read are theirs. */
   role: Role;
@@ -128,6 +130,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const audit = await beginNegotiationAudit(request, body, "classifier");
     const result = await classifyReason({
       ctx: { task, role: body.role, messages: body.messages },
     });
@@ -145,12 +148,14 @@ export async function POST(request: Request) {
       result.stance === "counter"
         ? resolveCounterTerms(task, result.counterTerms)
         : null;
+    await audit({ input: { messages: body.messages }, result: {
+      ...result, bonusRequest, counterTerms,
+    } });
 
     // THE AUDIT LINE (§6.2, gate 19). The latest message plus the CUMULATIVE
     // label, which is the pair a human re-coder is asked to reproduce. Written
-    // here rather than by the client because the client must never hold a
-    // per-message record of what the classifier thought — that log is what
-    // κ is computed from, and it lands with /api/persist.
+    // here as an operational diagnostic; the private durable audit above is
+    // the analysis record, not this process log or the client's copy.
     console.info(
       "[classify-reason] audit",
       JSON.stringify({

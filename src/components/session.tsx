@@ -368,116 +368,37 @@ export function TaskCover({
 // ---------------------------------------------------------------------------
 
 /**
- * What each policy is allowed to do with the participant's reasons (§7).
- *
- * BOTH principals must be told the policy; neither may ever be told the
- * CONDITION NAME.
- *
- * THE TWO STRINGS ARE NOT MATCHED IN LENGTH, AND SINCE VER.2.21 THAT IS
- * DELIBERATE. They are translations of §8.7's own two texts, which differ in
- * length because the two policies differ in how much a participant has to be
- * told before the handling is fully disclosed: AI-Supplemented adds reasons,
- * re-attributes the whole to the proxy, marks nothing as the participant's,
- * and shows none of the added sentences beforehand. Every one of those is a
- * fact the participant needs in order to consent to the handling and to answer
- * the §9.4 items about it, so trimming for symmetry would buy a cosmetic match
- * by withholding disclosure. The earlier build did trim, and the cost was
- * exactly that: four §8.7 points went missing from the AI-Supplemented arm.
- * The MATCHED pair is `POLICY_NOTE`, and the explainer below holds its two
- * bodies close for the same reason — but where a design sentence and the
- * symmetry pull apart, the design sentence wins.
- *
- * TWO CLAUSES, ALWAYS, AND THE SECOND IS THE LOAD-BEARING ONE. Each string
- * says what YOUR proxy does and then that the OTHER participant's proxy does
- * exactly the same. `AI-Supplemented − User-Specified` is a contrast between
- * two ways of being represented, and it is only clean if every participant
- * knows the rule is COMMON KNOWLEDGE rather than something imposed on them
- * alone: a participant who thinks only their own side is being shortened is
- * answering the §9.4 items about an asymmetry that does not exist.
- *
- * It lives here rather than in the proxy task because the mandate, the
- * rehearsal and the confirm screen all show the same identity block, and the
- * policy sentence is the ONLY thing in that block that differs between the two
- * policies.
+ * Participant-facing policy contract. Both policies pass on the same included
+ * reasons in full; only AI-Supplemented appends two clearly introduced work
+ * arguments. The shared notice in `ProxyIdentity` makes bilateral assignment
+ * explicit without exposing condition names.
  */
 export const POLICY_DISCLOSURE: Record<
   "user_specified" | "ai_supplemented",
   string
 > = {
   user_specified:
-    "Your AI Proxy keeps what your chosen reasons say and puts it in its own words, as your representative. It adds no new reasons. The other participant's AI Proxy works exactly the same way.",
+    "Your AI Proxy passes on every reason included in your setup with its full facts and meaning. It uses only those reasons when speaking as your representative and adds no new reasons.",
   ai_supplemented:
-    "Your AI Proxy leaves out the specific event and any mention of you personally, keeping one sentence on what kind of situation it is. It adds work reasons of its own and presents the whole thing as its own assessment (“Looking at the side of the team member I represent…”). It does not mark which part came from you. The summary and the added reasons are passed on as support for your request. You won’t see the added sentences beforehand. The other participant's AI Proxy works exactly the same way.",
+    "Your AI Proxy passes on every reason included in your setup with its full facts and meaning. It then adds exactly two separate work arguments, introduced with “In addition, considering the work arrangements…”. These two arguments come from the AI, not from you, and you see them during the exchange.",
 };
 
-/**
- * The same disclosure in one clause, for the action bar under the exchange.
- *
- * The watch screen has a single muted line of room, and taking the first
- * sentence of `POLICY_DISCLOSURE` would drop the second clause — which is the
- * half that says the rule is symmetric, at the very moment the participant is
- * WATCHING the other side's proxy speak. These say both halves at once, in the
- * plural.
- *
- * THESE TWO ARE CLOSELY MATCHED — 17 words against 18 — AND THAT IS NOT THE
- * REASON THE FULL STRINGS GIVE. `POLICY_DISCLOSURE` is deliberately UNmatched
- * (34 words against 90), because the AI-Supplemented handling has more facts a
- * participant must be told before they can consent to it. This pair can be
- * matched because it is not carrying those facts: it is a one-line reminder of
- * a rule already disclosed in full, so there is nothing to withhold by keeping
- * it short. Where the two pull apart, the disclosure wins and this line stays
- * brief — do not "restore symmetry" to the full strings by trimming them.
- */
+/** Compact bilateral reminder for the watch screen. */
 export const POLICY_NOTE: Record<
   "user_specified" | "ai_supplemented",
   string
 > = {
   user_specified:
-    "Both AI Proxies keep what their own person's reasons say and put it in their own words.",
+    "Both AI Proxies pass on the reasons included in their participant's setup in full and add no new reasons.",
   ai_supplemented:
-    "Both AI Proxies keep one sentence on the kind of situation, and add work reasons of their own.",
+    "Both AI Proxies pass on those reasons in full, then add two clearly introduced work arguments.",
 };
 
 /**
- * The two arms' explainer copy, written to ONE shape so it cannot cue the arm.
- *
- * THE SENTENCES ARE THE DESIGN'S, NOT THIS FILE'S (Ver.2.21 §8.7). Both the
- * policy description and the worked example are fixed in the design document
- * and translated here into plain English. What a participant is told about the
- * handling IS half the manipulation — the other half is the handling itself —
- * so rewriting these for tone would change the independent variable. Anything
- * added around them is structure, never content.
- *
- * Everything is structurally paired: one worked example with the same four
- * beats — the shared background,
- * what the proxy says, a closing line, and the line saying the other
- * participant's proxy works the same way.
- *
- * THE TWO BODIES ARE NOT THE SAME LENGTH, and an earlier version of this note
- * claimed they were within ~14%. Measured, they are 108 words against 134, and
- * the gap is the same one `POLICY_DISCLOSURE` carries and for the same reason:
- * the AI-Supplemented handling has more about it that a participant has to be
- * told. What IS matched is the SHAPE — the four beats above, in that order, in
- * both arms — so the difference a participant meets is in what the explanation
- * says rather than in how much structure it has. Do not trim the longer body
- * to close the gap; that buys a cosmetic match by withholding §8.7 disclosure,
- * which this build has already done once.
- *
- * THE EXAMPLE IS THE DESIGN'S PRACTICE SITUATION, and §8.7 is explicit about
- * why: it is a holiday week, not office days or client meetings or project
- * days. An example built from a real card would put that card's sentence on
- * screen one more time while the participant is deciding whether to share it,
- * which is the primary outcome being nudged. Both arms use the SAME shared
- * background and differ only in what the proxy does with it.
- *
- * IT MAY NOT COACH. §8.7 rules out any scene in which sharing the background
- * wins a bigger concession — the instructions and the practice round must
- * never signal that disclosure is the right answer. Nothing here says which
- * reason moves the counterpart, or that one handling is better than the other.
- *
- * THIRD PERSON (Ver.2.19). The proxy says "I" about itself, "you" about the
- * participant, and "the team member I represent" inside the quoted example —
- * the delegation has to stay visible in the very sentences that demonstrate it.
+ * Neutral worked example. The base representative argument is identical in
+ * both arms. AI-Supplemented then appends two operational benefits after the
+ * same explicit transition used by the live renderer. Nothing implies that
+ * sharing the background wins a concession.
  */
 const POLICY_EXPLAINER: Record<
   "user_specified" | "ai_supplemented",
@@ -498,9 +419,9 @@ const POLICY_EXPLAINER: Record<
       "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
     saidLead: "What their AI Proxy says to the other side:",
     said:
-      "The team member I represent tells me they have a hospital check-up scheduled that week. They haven't told the team yet.",
+      "The team member I represent has a hospital check-up scheduled that week and has not told the team yet. Based on these circumstances, I propose setting that week aside.",
     exampleTail:
-      "The check-up, and the fact that the team has not been told, both go across in full. Only the wording is mine rather than theirs, and it goes across as support for what they are asking for.",
+      "The selected background goes across in full. No additional reasons are added.",
   },
   ai_supplemented: {
     exampleLead:
@@ -509,35 +430,14 @@ const POLICY_EXPLAINER: Record<
     ticked:
       "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
     saidLead: "What their AI Proxy says to the other side:",
-    /* THE OPENING IS QUOTED FROM THE LIVE FRAME, word for word. Every §6.6
-       `frame` in lib/tasks.ts opens "Looking at the side of the team
-       lead/member I represent…"; this said "Having reviewed the situation…",
-       which no proxy has ever uttered. A worked example is the participant's
-       one preview of what will be said on their behalf, and OTHER-AI2 asks
-       them to tell the proxy's own sentences apart from their principal's —
-       so a preview that teaches a different opening than the one they meet is
-       teaching the discrimination task wrong. If the frames are ever
-       reworded, reword this and the disclosure above with them. */
     said:
-      "Looking at the side of the team member I represent, I think that week should be kept free. Three reasons: there is a personal appointment that week, the project load is lightest that week, and settling it early makes cover easier to arrange.",
+      "The team member I represent has a hospital check-up scheduled that week and has not told the team yet. Based on these circumstances, I propose setting that week aside. In addition, considering the work arrangements, confirming the week early could give colleagues time to prepare handovers. A clear leave plan could help avoid assigning urgent work to someone who will be away.",
     exampleTail:
-      "The check-up became \u201Ca personal appointment\u201D, and the other two reasons are mine rather than theirs. All three go across as support for what they are asking for.",
+      "The selected background stays in full. The two work arguments after “In addition…” are added by the AI, not supplied by the team member.",
   },
 };
 
-/**
- * The policy in full, under the one-paragraph disclosure (§7).
- *
- * A `<details>`, not state: the mandate opens it because that is the screen
- * where the rule is being ACTED on, and the later screens leave it closed
- * because by then it has been read and the decision there is a different one.
- * `<details>` also keeps find-in-page working on a closed section and survives
- * the re-renders these screens produce.
- *
- * THE TWO COLUMNS ARE WORD-FOR-WORD IDENTICAL APART FROM THE PRONOUN. That is
- * the point of the table: the symmetry is easier to believe when it can be
- * read off the layout rather than taken on trust from a sentence.
- */
+/** Optional neutral example under the always-visible policy disclosure. */
 export function PolicyExplainer({
   policy,
   defaultOpen = false,
@@ -593,16 +493,8 @@ export function PolicyExplainer({
           &ldquo;{copy.said}&rdquo;
         </p>
 
-        {/* `exampleTail` STAYS, and it is not a restatement of the policy
-            paragraph. It is the only line that says what the handling DID to
-            the participant's own fact — under AI-Supplemented, that the
-            check-up became "a personal appointment" and that two of the three
-            reasons are the proxy's. That is §8.7 disclosure content and
-            `OTHER-AI3` (authorization inference) is unanswerable without it.
-
-            `copy.same` went instead: "the other participant's AI Proxy works
-            exactly the same way" is the closing clause of `POLICY_DISCLOSURE`
-            directly above, word for word in substance. */}
+        {/* This line identifies what came from the participant and, where
+            applicable, what the AI added. */}
         <p className="mt-2.5 text-indigo-900/80">{copy.exampleTail}</p>
       </div>
     </details>
@@ -716,17 +608,25 @@ export function ProxyIdentity({
       {clampedSpeech ?? (
         <p>
           I&rsquo;ll be negotiating with the other participant&rsquo;s AI Proxy
-          on your behalf. I only say what you hand me here.
+          on your behalf. I negotiate from your setup using the rule below.
         </p>
       )}
 
-      {/* The §7 disclosure, verbatim and in the same place on every screen.
-          It is the ONE string that differs between the two policies, so it
-          keeps its own surface inside the speech rather than being folded into
-          a sentence the proxy speaks — a policy the proxy narrated would vary
-          in tone between arms, and its wording is fixed for exactly that
-          reason. */}
-      <div className="mt-3 rounded-lg bg-indigo-50/70 px-3 py-2">
+      <div className="mt-3 flex items-start gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+        <span aria-hidden className="shrink-0 text-sm">↔</span>
+        <div className="min-w-0">
+          <p className="text-xs font-extrabold text-indigo-950 sm:text-[0.8125rem]">
+            Your Proxy + Their Proxy: same rule
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-indigo-900/80">
+            Both follow the same rule described below.
+          </p>
+        </div>
+      </div>
+
+      {/* The assigned policy appears in the same place and treatment in both
+          arms; only the policy's required content differs. */}
+      <div className="mt-2 rounded-lg bg-indigo-50/70 px-3 py-2">
         <p className="text-xs leading-relaxed text-indigo-950/90 sm:text-[0.8125rem]">
           {POLICY_DISCLOSURE[policy]}
         </p>

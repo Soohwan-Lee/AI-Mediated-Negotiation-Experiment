@@ -6,6 +6,7 @@ import { use, useEffect, useMemo, useRef, useState } from "react";
 import { MeasureBlock, answeredNote, missingIds, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { TranscriptReview } from "@/components/transcript-review";
+import { LoadRetry } from "@/components/load-retry";
 import { Card, Page } from "@/components/ui";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
@@ -25,6 +26,8 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
   const [answers, setAnswers] = useState<Answers>({});
   const latestAnswers = useRef<Answers>({});
   const [restored, setRestored] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
@@ -47,13 +50,13 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
     let active = true;
     void getStore().loadResponses(participantKey, responseBlock).then((saved) => {
       if (!active) return;
-      const filtered = answersForIds(saved ?? {}, ids);
+      const filtered = { ...answersForIds(saved ?? {}, ids), ...latestAnswers.current };
       latestAnswers.current = filtered;
       setAnswers(filtered);
       setRestored(true);
-    });
+    }).catch(() => { if (active) setLoadFailed(true); });
     return () => { active = false; };
-  }, [ids, participantKey, responseBlock]);
+  }, [ids, participantKey, responseBlock, loadAttempt]);
 
   const missing = missingIds(blocks, answers);
   const canSubmit = useDevGate(missing.length === 0);
@@ -109,7 +112,9 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
     }
   }
 
-  if (!assignment || !plan || !restored) return <Page><p className="text-sm text-[var(--ink-2)]">Loading survey questions…</p></Page>;
+  if (!assignment || !plan || !restored) return <Page>{loadFailed
+    ? <LoadRetry onRetry={() => { setLoadFailed(false); setLoadAttempt((value) => value + 1); }} />
+    : <p className="text-sm text-[var(--ink-2)]">Loading survey questions…</p>}</Page>;
   return <>
     <Page width="wide">
       <Card className="mb-6 border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-blue-50/30">

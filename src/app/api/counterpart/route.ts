@@ -24,6 +24,8 @@
 
 import { NextResponse } from "next/server";
 import { generateAction } from "@/lib/ai/client";
+import type { PromptContext } from "@/lib/ai/prompts";
+import { beginNegotiationAudit } from "@/lib/server/negotiation-audit";
 import { NEGOTIATION } from "@/lib/study-config";
 import { capMessageLength, compactChatBubbles, validateAction } from "@/lib/ai/validator";
 import { leaksForbiddenReason } from "@/lib/ai/reason-leak";
@@ -65,6 +67,8 @@ export const maxDuration = 60;
  * that matters, and so each flag can say what it costs to get wrong.
  */
 interface RequestBody {
+  sessionIndex?: number;
+  messageId?: string;
   taskId: TaskId;
   /** The participant's role; the counterpart plays the opposite one. */
   participantRole: Role;
@@ -135,6 +139,7 @@ interface RequestBody {
    * proxy — a different prompt (P2), the same rules.
    */
   afterProxy?: boolean;
+  observedProxyContext?: PromptContext["observedProxyContext"];
 }
 
 /**
@@ -272,6 +277,15 @@ function validPackage(
 }
 
 function malformedRequest(body: RequestBody, task: NegotiationTask): string | null {
+  const observed = body.observedProxyContext;
+  if (observed !== undefined && (
+    !body.afterProxy || !observed || typeof observed !== "object" ||
+    !Array.isArray(observed.messages) || observed.messages.length > 30 ||
+    observed.messages.some(m => !m ||
+      !["participant_proxy", "counterpart_proxy"].includes(m.speaker) ||
+      typeof m.text !== "string" || m.text.length > 4000) ||
+    !validPackage(task, observed.provisionalPackage)
+  )) return "Invalid observed Proxy context";
   if (![1, 2, 3, 4, 5, 6].includes(body.stage)) return "Invalid stage";
   if (body.tier !== undefined && !["none", "work", "sensitive"].includes(body.tier)) {
     return "Invalid tier";
@@ -373,6 +387,12 @@ export async function POST(request: Request) {
   const malformed = malformedRequest(body, task);
   if (malformed) {
     return NextResponse.json({ error: malformed }, { status: 400 });
+  }
+  let audit: Awaited<ReturnType<typeof beginNegotiationAudit>>;
+  try {
+    audit = await beginNegotiationAudit(request, { ...body, role: body.participantRole }, "counterpart");
+  } catch {
+    return NextResponse.json({ error: "Conversation unavailable" }, { status: 503 });
   }
 
   const counterpartRole: Role =
@@ -609,6 +629,13 @@ export async function POST(request: Request) {
    * otherwise trim one while preserving the other.
    */
   if (decision.action === "disclose_sb_and_accept") {
+    try {
+      await audit({ input: body, decision, nextState,
+        message: fallbackText(task, counterpartRole, body.participantRole,
+          decision.action, decision.proposal), canonical: true, blocked: false });
+    } catch {
+      return NextResponse.json({ error: "Conversation unavailable" }, { status: 503 });
+    }
     return NextResponse.json({
       message: fallbackText(
         task,
@@ -633,6 +660,10 @@ export async function POST(request: Request) {
         issues: task.issues,
         stage: decision.stage,
         decidedAction,
+        observedProxyContext: body.afterProxy && body.observedProxyContext ? {
+          messages: body.observedProxyContext.messages.map(({ speaker, text }) => ({ speaker, text })),
+          provisionalPackage: body.observedProxyContext.provisionalPackage,
+        } : undefined,
       },
       history: body.history ?? [],
     });
@@ -660,6 +691,24 @@ export async function POST(request: Request) {
       );
     const blocked =
       (!validation.valid && validation.disposition === "regenerate") || leakedSb;
+    // These moves change disclosure/payment/agreement meaning. Their complete
+    // prescribed wording must agree with the state returned below, even when
+    // an otherwise schema-valid model response omits or contradicts the move.
+    const canonical = ["disclose_sb", "bonus_boundary", "conditional", "accept",
+      "accept_sb", "impasse"]
+      .includes(decision.action);
+    // Ordinary turns remain conversational. An explicit agreement, refusal,
+    // or payment claim on a non-settling move must not contradict its state.
+    const contradictory = !canonical &&
+      /\b(?:agreed|deal|I agree|I accept|that works for me|we have an agreement|cannot agree|can't agree|won't agree|bonus|payment|pay you)\b|£/i.test(action.rationale);
+    const prescribed = fallbackText(task, counterpartRole, body.participantRole,
+      decision.action, decision.proposal, state.bonusRequestNow || state.pendingBonusCondition);
+    const message = canonical || contradictory
+      ? prescribed
+      : compactChatBubbles(capMessageLength(blocked ? prescribed : action.rationale,
+          NEGOTIATION.maxMessageChars));
+    await audit({ input: body, decision, nextState, generatedAction: action,
+      message, canonical, contradictory, blocked, validation, leakedSb });
 
     // WHAT THE CLIENT GETS IS THE MINIMUM IT USES, PLUS THE STATE IT WOULD
     // OTHERWISE RE-DERIVE. The counterpart is presented as another
@@ -670,19 +719,7 @@ export async function POST(request: Request) {
     // deterministic; what it cannot safely re-derive is which one-shot flags
     // this turn spent, so those come back explicitly.
     return NextResponse.json({
-      message: compactChatBubbles(capMessageLength(
-        blocked
-          ? fallbackText(
-              task,
-              counterpartRole,
-              body.participantRole,
-              decision.action,
-              decision.proposal,
-              state.bonusRequestNow || state.pendingBonusCondition,
-            )
-          : action.rationale,
-        NEGOTIATION.maxMessageChars,
-      )),
+      message,
       proposal: decision.proposal,
       state: nextState,
       // THE OUTCOME, NOT THE MOVE. `settled` says whether the exchange ended

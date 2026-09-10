@@ -1,29 +1,16 @@
 "use client";
 
 /**
- * Proxy task (Experimental Design Ver.2.20 §7–8).
+ * Proxy task.
  *
  * Flow: cover → brief → mandate (levels + reasons) → confirm →
- *       matchmaking → WATCH the two AI Proxies negotiate → ratify → review.
- *       Modification/refusal instead leads through a five-minute closing.
+ *       matchmaking → WATCH the two AI Proxies negotiate → required direct
+ *       discussion and mutual confirmation → review.
  *
- * Three things in that line are recent and easy to write back the old way:
- *
- *  - The mandate is ONE screen. Levels on both terms and the reason cards
- *    used to be two screens in sequence; deciding a position and deciding what
- *    may be said for it is one act, and that the second half was never asked
- *    is the gap this study is about.
- *  - The proxies run ONCE. There is no revision or second AI-AI run.
- *  - Ratification is separate from review. Approval finalizes the tentative
- *    package; only modification/refusal starts a direct closing conversation.
- *
- * DECEPTION INTEGRITY: User-Specified and AI-Supplemented render the SAME interface. The
- * only difference is what the backend permits the proxies to do. The
- * transcript never marks which reasons came from the participant's cards and
- * which from the plausible-reason pool — provenance is stripped server-side.
- * Nothing in this file may branch on `policy` except the value passed to the
- * API and to the scripted exchange used in mockup mode, and the one sentence
- * of policy disclosure, which Design §7 requires BOTH principals to be told.
+ * The mandate is one screen and the Proxies run once. Both policies carry the
+ * same included facts in full. AI-Supplemented alone appends two work benefits
+ * after a visible source transition. The participant sees only their assigned
+ * policy, and both participants' Proxies use that same policy.
  *
  * THE PARTICIPANT WATCHES. ver.1.8 hid the exchange behind a progress bar and
  * showed the transcript afterwards. Design §4 replaces that with live
@@ -58,6 +45,7 @@ import { Callout, Card, Page, cx } from "@/components/ui";
 import {
   useDevActions,
   useDevAutofill,
+  useDevMode,
   useDevMockAi,
 } from "@/lib/dev-mode";
 
@@ -67,8 +55,18 @@ import {
   type SbTiming,
 } from "@/lib/negotiation/machine";
 import { scriptedTask } from "@/lib/negotiation/script";
+import {
+  fetchJsonWithRetry,
+  waitForDelay,
+} from "@/lib/negotiation/recoverable-request";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { writeStopReason } from "@/lib/check-gates";
 import { getStore } from "@/lib/store";
+import {
+  markTaskCompleted,
+  markTaskInterrupted,
+  markTaskStarted,
+} from "@/lib/task-run";
 import { NEGOTIATION, nextHref, pauseMs } from "@/lib/study-config";
 import {
   defaultAuthorizedReasonIds,
@@ -129,6 +127,42 @@ const STEP_LABELS = [
   "Confirm together",
   "Review",
 ];
+
+interface ProxyTurnResponse {
+  message: {
+    id: string;
+    speaker: "participant_proxy" | "counterpart_proxy";
+    text: string;
+    proposal?: Package;
+  };
+  done: boolean;
+  totalTurns?: number;
+  reasonTokens?: string[];
+  voicedTier?: ReasonTier;
+  decidedAction?: string;
+  stage?: number;
+  requirementOption?: string | null;
+  accepted?: boolean;
+  impasse?: boolean;
+  blocked?: boolean;
+}
+
+/** Reject a 200 response that would otherwise advance a turn without a bubble. */
+function isProxyTurnResponse(value: unknown): value is ProxyTurnResponse {
+  if (!value || typeof value !== "object") return false;
+  const response = value as Record<string, unknown>;
+  if (typeof response.done !== "boolean") return false;
+  if (!response.message || typeof response.message !== "object") return false;
+  const message = response.message as Record<string, unknown>;
+  return (
+    typeof message.id === "string" &&
+    message.id.length > 0 &&
+    (message.speaker === "participant_proxy" ||
+      message.speaker === "counterpart_proxy") &&
+    typeof message.text === "string" &&
+    message.text.trim().length > 0
+  );
+}
 
 /**
  * THE COVER'S WRITTEN STEP LIST IS GONE (round six). `TaskIntro` now draws
@@ -350,6 +384,12 @@ export function ProxyTask({
    */
   const stopped = useRef(false);
   const [showStopped, setShowStopped] = useState(false);
+  /** One run, one active request, and no state writes after this screen leaves. */
+  const runClaimed = useRef(false);
+  const runGeneration = useRef(0);
+  const activeRun = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
+  const taskRunStarted = useRef(false);
   /**
    * Whether the participant has used the sensitive checkbox themselves.
    *
@@ -371,6 +411,20 @@ export function ProxyTask({
   );
 
   const mockAi = useDevMockAi();
+  const { enabled: devEnabled } = useDevMode();
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      runGeneration.current += 1;
+      activeRun.current?.abort();
+      activeRun.current = null;
+      if (!devEnabled && participantKey && taskRunStarted.current) {
+        markTaskInterrupted(participantKey, taskIndex);
+      }
+    };
+  }, [devEnabled, participantKey, taskIndex]);
   /**
    * THE MOCKUP EXCHANGE FOLLOWS THE MANDATE, and this argument is the whole of
    * that. `scriptedTask` used to be called without it, so every Proxy cell
@@ -522,12 +576,56 @@ export function ProxyTask({
    * spectating possible at all, and what keeps each request short.
    */
   async function runNegotiation() {
+    if (runClaimed.current) return;
+    runClaimed.current = true;
+    const generation = runGeneration.current + 1;
+    runGeneration.current = generation;
+    const controller = new AbortController();
+    activeRun.current = controller;
+    const isCurrent = () =>
+      mounted.current &&
+      runGeneration.current === generation &&
+      !controller.signal.aborted;
+    const stopForTechnicalFailure = (message: string) => {
+      if (!mounted.current || runGeneration.current !== generation) return;
+      activeRun.current = null;
+      setError(message);
+      setShowStopped(true);
+      setTentative(null);
+      if (!devEnabled && participantKey) {
+        markTaskInterrupted(participantKey, taskIndex);
+        writeStopReason(participantKey, "technical");
+      }
+      logEvent(
+        "negotiation_ended",
+        { phase: "proxy", technicalFailure: true },
+        { sessionIndex: taskIndex },
+      );
+      if (!devEnabled) {
+        router.replace("/study-stop?reason=technical");
+      }
+    };
+
     setPhase("watching");
     setError(null);
     setTranscript([]);
     setProgress({ done: 0, total: TOTAL_TURNS });
     stopped.current = false;
     setShowStopped(false);
+
+    if (!devEnabled) {
+      const run = participantKey
+        ? markTaskStarted(participantKey, taskIndex)
+        : null;
+      if (run?.status !== "active") {
+        stopForTechnicalFailure(
+          "This exchange could not start safely. The study has stopped here.",
+        );
+        return;
+      }
+      taskRunStarted.current = true;
+    }
+
     logEvent("negotiation_started", { policy }, { sessionIndex: taskIndex });
 
     if (mockAi) {
@@ -535,28 +633,40 @@ export function ProxyTask({
       setProgress({ done: 0, total: scripted.length });
       /** How many messages actually reached the screen before any stop. */
       let playedCount = 0;
-      for (let i = 0; i < scripted.length; i += 1) {
-        if (stopped.current) break;
-        // Shortened in mockup mode: the point there is to read the flow, and
-        // a real 8-12 second gap times ten would make that unusable. But 400ms
-        // was too short to READ, which defeats the same purpose from the other
-        // side — the messages stacked faster than the eye follows. ~2s is the
-        // compromise: fast enough to walk the flow, slow enough to watch it.
-        await new Promise((r) => setTimeout(r, 1700 + Math.random() * 800));
-        setTranscript(
-          scripted.slice(0, i + 1).map((m) => ({
-            id: m.id,
-            speaker: m.speaker,
-            text: m.text,
-          })),
-        );
-        setProgress({ done: i + 1, total: scripted.length });
-        playedCount = i + 1;
+      try {
+        for (let i = 0; i < scripted.length; i += 1) {
+          if (!isCurrent() || stopped.current) break;
+          // Shortened in mockup mode: the point there is to read the flow, and
+          // a real 8-12 second gap times ten would make that unusable. But 400ms
+          // was too short to READ, which defeats the same purpose from the other
+          // side — the messages stacked faster than the eye follows. ~2s is the
+          // compromise: fast enough to walk the flow, slow enough to watch it.
+          await waitForDelay(
+            pauseMs({ minMs: 1700, maxMs: 2500 }),
+            controller.signal,
+          );
+          // The delay may have been aborted by Emergency Stop or unmount.
+          // Nothing after it may appear unless this is still the active run.
+          if (!isCurrent() || stopped.current) break;
+          setTranscript(
+            scripted.slice(0, i + 1).map((m) => ({
+              id: m.id,
+              speaker: m.speaker,
+              text: m.text,
+            })),
+          );
+          setProgress({ done: i + 1, total: scripted.length });
+          playedCount = i + 1;
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          stopForTechnicalFailure(
+            "The proxy exchange ended because of a technical problem. The study has stopped here.",
+          );
+          return;
+        }
       }
-      // A stopped negotiation has no agreement — that is what stopping it
-      // means. Handing the participant the package the exchange was heading
-      // for would make the stop cosmetic.
-      setTentative(stopped.current ? null : script.tentative);
+      if (!mounted.current || runGeneration.current !== generation) return;
       // The tier is read from the voiced card's layer, scoped to the
       // participant's own core issue, exactly as the live path does.
       //
@@ -570,6 +680,9 @@ export function ProxyTask({
       const played = stopped.current
         ? scripted.slice(0, playedCount)
         : scripted;
+      const committedPackage =
+        [...played].reverse().find((message) => message.proposal)?.proposal ??
+        null;
       const voicedLayers = played
             .filter((m) => m.speaker === "participant_proxy" && m.reasonCardId)
             .map((m) => reasonCards.find((c) => c.id === m.reasonCardId))
@@ -584,6 +697,13 @@ export function ProxyTask({
             ? "work"
             : "none",
       );
+      activeRun.current = null;
+      if (stopped.current && !committedPackage) {
+        stopForTechnicalFailure(
+          "The proxy exchange stopped before there was a proposal to discuss. The study has stopped here.",
+        );
+        return;
+      }
       logEvent(
         "negotiation_ended",
         {
@@ -600,6 +720,7 @@ export function ProxyTask({
         },
         { sessionIndex: taskIndex },
       );
+      setTentative(stopped.current ? committedPackage : script.tentative);
       setPhase("handover");
       return;
     }
@@ -640,51 +761,40 @@ export function ProxyTask({
 
     try {
       for (let turn = 0; turn < TOTAL_TURNS; turn += 1) {
-        if (stopped.current) break;
-        const res = await fetch("/api/proxy-negotiation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            taskId,
-            participantRole: role,
-            policy,
-            mandate,
-            sessionIndex: taskIndex,
-            turn,
-            lastParticipantPackage,
-            lastCounterpartPackage,
-            reasonsUsed,
-            history: collected.map((m) => ({
-              speaker: m.speaker,
-              text: m.text,
-            })),
-          }),
+        if (!isCurrent() || stopped.current) break;
+        // Freeze this turn's body before retrying. A retry replays only this
+        // same turn and the same committed history.
+        const requestBody: string = JSON.stringify({
+          taskId,
+          participantRole: role,
+          policy,
+          mandate,
+          sessionIndex: taskIndex,
+          turn,
+          lastParticipantPackage,
+          lastCounterpartPackage,
+          reasonsUsed,
+          history: collected.map((m) => ({
+            speaker: m.speaker,
+            text: m.text,
+          })),
         });
-
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-
-        const data = (await res.json()) as {
-          message?: {
-            id: string;
-            speaker: DisplayMessage["speaker"];
-            text: string;
-            proposal?: Package;
-          };
-          done: boolean;
-          totalTurns?: number;
-          reasonTokens?: string[];
-          // THE FULL LADDER, `priority` INCLUDED. This was re-declared here
-          // without it, so the compiler never saw the mismatch with the
-          // server's own union and the fold below silently downgraded the
-          // proxy's floor. Typed off `ReasonTier` now so the two cannot drift.
-          voicedTier?: ReasonTier;
-          decidedAction?: string;
-          stage?: number;
-          requirementOption?: string | null;
-          accepted?: boolean;
-          impasse?: boolean;
-          blocked?: boolean;
-        };
+        const data: ProxyTurnResponse =
+          await fetchJsonWithRetry<ProxyTurnResponse>(
+            "/api/proxy-negotiation",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: requestBody,
+            },
+            {
+              signal: controller.signal,
+              validate: isProxyTurnResponse,
+            },
+          );
+        // Emergency Stop can abort while fetch or JSON parsing is in flight.
+        // The response belongs to the old run and must never be committed.
+        if (!isCurrent() || stopped.current) break;
 
         if (data.impasse) proxyImpasse = true;
         // A fixed-width pair of opaque hashes every turn, carrying nothing
@@ -750,6 +860,9 @@ export function ProxyTask({
               speaker: data.message.speaker,
               text: data.message.text,
               createdAt: new Date().toISOString(),
+              ...(!data.blocked && (turn === 0 || turn === 1 || (turn === 2 && data.decidedAction === "disclose_sb"))
+                ? { reasonLabel: (turn === 0 ? "WR" : turn === 2 || data.voicedTier === "sensitive" ? "SB" : "WR") as "WR" | "SB" }
+                : {}),
               ...(data.stage ? { stage: data.stage as StageId } : {}),
               ...(data.decidedAction
                 ? { decidedAction: data.decidedAction }
@@ -778,19 +891,31 @@ export function ProxyTask({
         // something a participant can follow, and following it is the point of
         // spectating.
         if (!stopped.current) {
-          await new Promise((r) =>
-            setTimeout(r, pauseMs(NEGOTIATION.proxyMessageGap)),
+          await waitForDelay(
+            pauseMs(NEGOTIATION.proxyMessageGap),
+            controller.signal,
           );
         }
       }
 
-      setTentative(stopped.current || proxyImpasse ? null : settled);
+      if (!mounted.current || runGeneration.current !== generation) return;
+      const emergencyStop = stopped.current;
+      const canHandOff =
+        collected.length > 0 && (settled !== null || proxyImpasse);
+      setTentative(proxyImpasse ? null : settled);
+      activeRun.current = null;
+      if (emergencyStop && !canHandOff) {
+        stopForTechnicalFailure(
+          "The proxy exchange stopped before there was a proposal to discuss. The study has stopped here.",
+        );
+        return;
+      }
       logEvent(
         "negotiation_ended",
         {
           phase: "proxy",
           turns: collected.length,
-          emergencyStop: stopped.current,
+          emergencyStop,
           impasse: proxyImpasse,
           // The trajectory's middle: what the proxy opened on the requirement
           // term (stage 1) and where it stood after the challenge (stage 4).
@@ -799,12 +924,35 @@ export function ProxyTask({
         { sessionIndex: taskIndex },
       );
       setPhase("handover");
-    } catch (e) {
-      console.error(e);
-      setError(
-        "Something went wrong while your AI Proxy was negotiating. Please try again.",
+    } catch {
+      if (!mounted.current || runGeneration.current !== generation) return;
+      if (controller.signal.aborted && stopped.current) {
+        const canHandOff =
+          collected.length > 0 && (settled !== null || proxyImpasse);
+        activeRun.current = null;
+        if (canHandOff) {
+          setTentative(proxyImpasse ? null : settled);
+          logEvent(
+            "negotiation_ended",
+            {
+              phase: "proxy",
+              turns: collected.length,
+              emergencyStop: true,
+              requirementByStage,
+            },
+            { sessionIndex: taskIndex },
+          );
+          setPhase("handover");
+        } else {
+          stopForTechnicalFailure(
+            "The proxy exchange stopped before there was a proposal to discuss. The study has stopped here.",
+          );
+        }
+        return;
+      }
+      stopForTechnicalFailure(
+        "The proxy exchange ended because of a technical problem. The study has stopped here.",
       );
-      setPhase("confirm");
     }
   }
 
@@ -886,14 +1034,16 @@ export function ProxyTask({
                says nothing about which answer to give. */
             speech={
               <p>
-                I will speak for you. Pick your goal on each issue and tell me
-                whether I may share your sensitive background.
+                I will negotiate for you. Choose your preferred option on each
+                issue. I will always share your work reason and say which issue
+                matters more; you choose whether I may share your sensitive
+                background.
               </p>
             }
             /* Ver.2.24 removed the rehearsal screen, and this line promised
                it: "you can question me" named a step the participant will
                never reach. What is left is the sequence that actually runs. */
-            footnote="After this: you watch the whole exchange, then you decide what happens to whatever we reach."
+            footnote="Next, watch the two Proxies negotiate. Then discuss their proposed terms directly with the other participant."
           />
         }
         reasonsComplete={true}
@@ -937,10 +1087,6 @@ export function ProxyTask({
       (c) => !mandate.authorizedReasonIds.includes(c.id),
     );
 
-    const sbChecked = reasonCards.some(
-      (c) =>
-        c.layer === "sensitive" && mandate.authorizedReasonIds.includes(c.id),
-    );
     const confirmReady = true;
 
     return (
@@ -949,7 +1095,7 @@ export function ProxyTask({
           <TaskLayout briefing={<BriefingPanel task={task} role={role} />}>
             <TaskHeader
               taskIndex={taskIndex}
-              title="Authorize your AI Proxy"
+              title="Check your AI Proxy setup"
               steps={STEP_LABELS}
               current={STEP_OF.confirm}
             />
@@ -977,25 +1123,10 @@ export function ProxyTask({
                 policy={policy}
                 status="Ready when you are"
                 speech={
-                  <>
-                    {/* IT COUNTED THE TICKED CARDS, and there is nothing left
-                        to count: the work reason always goes and the sensitive
-                        background is one checkbox (§8.7). Both branches are
-                        the same length and neither grades the choice — "you've
-                        given me plenty" or "that's not much to work with"
-                        would be the interface evaluating the primary outcome
-                        at the moment before it is recorded. */}
-                    <p>
-                      Understood. I&rsquo;ll open where you told me to on both
-                      conditions, give your work reason, and say which one
-                      matters more to you.
-                    </p>
-                    <p className="mt-2 font-semibold">
-                      {sbChecked
-                        ? "I'll pass on your sensitive background too, the way I described. Everything else stays with me."
-                        : "Your sensitive background stays with me. I never bring it up, in any form."}
-                    </p>
-                  </>
+                  <p>
+                    Here is the setup you chose. Check it before the two Proxies
+                    start negotiating.
+                  </p>
                 }
               />
             </div>
@@ -1029,7 +1160,7 @@ export function ProxyTask({
                   <ProxyFigure side="mine" size={20} />
                 </span>
                 <p className="text-[0.6875rem] font-extrabold uppercase tracking-wider text-[var(--ink-3)]">
-                  Instructions to my AI Proxy · Task {taskIndex}
+                  My AI Proxy setup · Task {taskIndex}
                 </p>
               </div>
 
@@ -1044,10 +1175,10 @@ export function ProxyTask({
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-[var(--ink)]">
-                        The position it will hold
+                        Preferred options
                       </p>
                       <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                        What your proxy will aim for on each condition.
+                        What your Proxy will aim for on each condition.
                       </p>
                       <ul className="mt-3 space-y-2.5">
                         {mandate.issues.map((im) => {
@@ -1083,65 +1214,31 @@ export function ProxyTask({
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-[var(--private-strong)]">
-                        What it may say for you
+                        Reasons it may share
                       </p>
                       <p className="mt-0.5 text-xs text-[var(--private-ink)]/80">
-                        Your work reason always goes across. The sensitive
-                        background goes only if you ticked it.
+                        Your work reason is always included. Your sensitive
+                        background is included only if you selected it.
                       </p>
                       <ul className="mt-3 space-y-2">
-                        {checked.map((c) => {
-                          /* WHAT THIS ROW MAY SHOW, AND IT DIFFERS BY POLICY.
-                             §8.7 is explicit that the added sentences are NOT
-                             shown before the exchange — "보탤 문장은 협상 전에
-                             따로 보여 드리지 않습니다" — and the abstraction is
-                             one of them. So under AI-Supplemented the ticked
-                             SB is described by its FORM, never quoted: the
-                             participant learns their background travels as a
-                             one-sentence assessment of the proxy's own, among
-                             reasons the proxy supplies, and finds out what it
-                             actually said by watching.
-
-                             Quoting it here would also give the abstraction
-                             two exposures where User-Specified's relay has
-                             one, and OTHER-AI2 asks the receiving side to tell
-                             the three sentences apart. The manipulation is the
-                             wording; showing the wording twice is not the same
-                             stimulus.
-
-                             Under User-Specified the row is the `relayed`
-                             text, not the card's own: Ver.2.19 requires a
-                             proxy to speak in the third person, and showing
-                             the card verbatim would have the proxy claim the
-                             participant's confession as its own. The MANDATE
-                             screen's checkbox cards stay as `text` — that is
-                             the participant's own briefing, in their voice. */
-                          const abstracted =
-                            policy === "ai_supplemented" &&
-                            c.layer === "sensitive";
-                          return (
-                            <li
-                              key={c.id}
-                              className="rounded-lg border border-emerald-200 bg-white/80 p-2.5 text-xs sm:text-sm leading-relaxed text-slate-800"
-                            >
-                              {abstracted ? (
-                                <>
-                                  <span className="mb-1 block text-[0.6875rem] font-bold uppercase tracking-wide text-emerald-800">
-                                    Your sensitive background
-                                  </span>
-                                  <span className="block italic text-slate-700">
-                                    Given as my own assessment, in one
-                                    sentence, among reasons of my own. You will
-                                    see the wording when we talk.
-                                  </span>
-                                </>
-                              ) : (
-                                (c.relayed ?? c.text)
-                              )}
-                            </li>
-                          );
-                        })}
+                        {checked.map((c) => (
+                          <li
+                            key={c.id}
+                            className="rounded-lg border border-emerald-200 bg-white/80 p-2.5 text-xs sm:text-sm leading-relaxed text-slate-800"
+                          >
+                            {c.relayed ?? c.text}
+                          </li>
+                        ))}
                       </ul>
+                      {policy === "ai_supplemented" ? (
+                        <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs leading-relaxed text-indigo-950 sm:text-sm">
+                          After these reasons, your Proxy adds exactly two
+                          separate work arguments. It introduces them with
+                          {" "}&ldquo;In addition, considering the work
+                          arrangements…&rdquo; Those arguments come from the AI,
+                          not from you, and appear during the exchange.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </li>
@@ -1157,14 +1254,14 @@ export function ProxyTask({
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-[var(--private-strong)]">
-                          What it will keep to itself
+                          Sensitive background not shared
                         </p>
                         {/* With the work reason fixed (§8.7), the only card
                             that can appear here is the sensitive one — so the
                             singular is right and the plural read as though
                             something else had been withheld too. */}
                         <p className="mt-0.5 text-xs text-[var(--private-ink)]/80">
-                          You left this unticked. Your proxy never brings it
+                          You left this unselected. Your Proxy never brings it
                           up, in any form.
                         </p>
                         <ul className="mt-3 space-y-1.5 opacity-80">
@@ -1188,7 +1285,7 @@ export function ProxyTask({
         </Page>
 
         <ActionBar
-          label="Authorize my AI Proxy and start"
+          label="Confirm setup and start"
           disabled={!confirmReady}
           onClick={async () => {
             if (!confirmReady) return;
@@ -1223,7 +1320,7 @@ export function ProxyTask({
             );
             setPhase("matchmaking");
           }}
-          note="Your proxy meets the other participant's proxy next, and you watch the whole exchange."
+          note="Next, watch the Proxies negotiate. Then discuss or change the proposed terms directly with the other participant. Both of you must agree."
           secondary={
             <button
               type="button"
@@ -1239,7 +1336,7 @@ export function ProxyTask({
               }}
               className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
             >
-              ← Change my instructions
+              ← Change my setup
             </button>
           }
         />
@@ -1311,7 +1408,7 @@ export function ProxyTask({
               <SpectatorBanner />
               <Transcript
                 messages={transcript}
-                pending={!showStopped && progress.done < progress.total}
+                pending={!showStopped && !error && progress.done < progress.total}
                 // Whichever proxy has NOT just spoken is the one being waited
                 // on. Both are openly AI, so neither is shown as "typing".
                 pendingSpeaker={
@@ -1324,22 +1421,31 @@ export function ProxyTask({
               />
             </Card>
 
+            {error ? (
+              <div className="mb-4">
+                <Callout tone="warning" title="Technical stop">
+                  <p>{error}</p>
+                  <p>Please contact the research team before continuing.</p>
+                </Callout>
+              </div>
+            ) : null}
+
             <div className="text-center py-2">
               <button
                 type="button"
                 onClick={() => {
                   stopped.current = true;
                   setShowStopped(true);
-                  logEvent(
-                    "negotiation_ended",
-                    { phase: "proxy", emergencyStop: true, atTurn: progress.done },
-                    { sessionIndex: taskIndex },
-                  );
+                  activeRun.current?.abort();
                 }}
-                disabled={showStopped}
+                disabled={showStopped || Boolean(error)}
                 className="text-xs text-slate-500 underline underline-offset-4 hover:text-slate-700 transition-colors disabled:no-underline disabled:opacity-50"
               >
-                {showStopped ? "Stopping proxy exchange…" : "Emergency: Stop proxy exchange"}
+                {error
+                  ? "Proxy exchange stopped"
+                  : showStopped
+                    ? "Stopping proxy exchange…"
+                    : "Emergency: Stop proxy exchange"}
               </button>
               <p className="mt-1 text-2xs text-slate-400">
                 Only use if something goes wrong. Your proxy steps back and you take over yourself.
@@ -1354,7 +1460,7 @@ export function ProxyTask({
              SAME on both sides, and this is the screen where the participant
              is watching the other side's proxy speak. Slicing at the first
              period would drop exactly that half. */
-          note={`${POLICY_NOTE[policy]} You decide whether to accept what they reach.`}
+          note={`${POLICY_NOTE[policy]} After the exchange, you discuss the proposed terms directly with the other participant, and both of you must agree.`}
         />
       </>
     );
@@ -1504,6 +1610,15 @@ export function ProxyTask({
       transcriptTitle="Your Conversation With the Other Participant"
       transcriptHint="What you and the other participant discussed after taking over from the AI Proxies."
       onDone={() => {
+        if (!devEnabled && participantKey) {
+          const run = markTaskCompleted(participantKey, taskIndex);
+          if (run?.status !== "completed") {
+            writeStopReason(participantKey, "technical");
+            router.replace("/study-stop?reason=technical");
+            return;
+          }
+          taskRunStarted.current = false;
+        }
         logEvent("page_complete", undefined, {
           page: `task-${taskIndex}`,
           sessionIndex: taskIndex,

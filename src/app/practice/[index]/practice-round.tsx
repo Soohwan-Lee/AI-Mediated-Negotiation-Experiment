@@ -78,6 +78,10 @@ import {
   PROXY_PRACTICE_CHECK,
 } from "@/lib/measures";
 import { readCheckGate, writeCheckGate } from "@/lib/check-gates";
+import {
+  practiceCheckDecision,
+  selectPracticeCheckAnswer,
+} from "@/lib/practice-check";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { STAGE_MINUTES, nextHref, type FlowKey } from "@/lib/study-config";
 import { PRACTICE_TASK } from "@/lib/tasks";
@@ -95,11 +99,10 @@ import { bestWish } from "@/app/task/[index]/shared";
  * disclosure ladder that the classifier then scores, which is the primary
  * outcome. Nothing in the real flow pre-fills a composer.
  *
- * The text itself is deliberately empty of content: it names no option, no
- * points and no reason, so it cannot model an opening move either.
+ * The text itself is deliberately empty of negotiation content: it names no
+ * option, points, reason or priority, so it rehearses only sending.
  */
-const PRACTICE_DRAFT =
-  "Hi! Here's my opening thought on the arrangement. What matters most on your side?";
+const PRACTICE_DRAFT = "Hi, I'm ready to start.";
 
 const PROXY_CONFIRM_DRAFT =
   "The two terms shown above work for me. Do you confirm the same agreement?";
@@ -304,7 +307,13 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   const isProxy = plan ? isProxyCondition(plan.condition) : false;
   const task = PRACTICE_TASK;
   const practiceCheck = isProxy ? PROXY_PRACTICE_CHECK : DIRECT_PRACTICE_CHECK;
-  const reasonCorrect = reasonAnswer === PRACTICE_CHECK_ANSWERS[practiceCheck.id];
+  const correctAnswer = PRACTICE_CHECK_ANSWERS[practiceCheck.id];
+  const reasonCorrect = reasonAnswer === correctAnswer;
+  const checkDecision = practiceCheckDecision(
+    reasonAnswer,
+    correctAnswer,
+    reasonSubmitted,
+  );
 
   const allSteps: readonly Step[] = isProxy ? PROXY_STEPS : DIRECT_STEPS;
   const steps: readonly Step[] = allSteps;
@@ -487,6 +496,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   }
 
   function finish() {
+    if (!reasonSubmitted || !reasonCorrect) return;
     if (participantKey) {
       writeCheckGate(participantKey, `task-${taskIndex}`, {
         status: "passed",
@@ -518,7 +528,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
       {
         id: `c${m.length}`,
         speaker: "counterpart",
-        text: "Thanks for the proposal! In this practice round, you can see how messages and offers update in real time.",
+        text: "Thanks! In this practice round, you can see how messages update in real time.",
       },
     ]);
     setPending(false);
@@ -594,7 +604,10 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
     }
   })();
 
-  const canContinue = bypass || (reasonSubmitted && reasonCorrect);
+  // IC5 and IC6 are study gates even in dev preview. The developer bypass
+  // still skips tutorial micro-step requirements below, but it cannot turn an
+  // unanswered or wrong comprehension response into a passed gate.
+  const canContinue = checkDecision === "complete";
 
   function goToStep(index: number) {
     // No scroll here: the effect above brings the new step's RINGED CONTROL
@@ -653,11 +666,11 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                 Same practice scenario as before, and it still does not count.
                 Task {taskIndex} works the other way:{" "}
                 {isProxy
-                  ? "an AI Proxy negotiates from your instructions. You then talk with the other participant to confirm the final agreement."
+                  ? "you give your AI Proxy your preferred options and choose which reasons it may share. The two Proxies negotiate using those instructions. You then discuss their result with the other participant and both confirm the final agreement."
                   : "you chat with the other participant yourself."}
               </>
             ) : isProxy ? (
-              "In Task 1 an AI Proxy negotiates from your instructions. You then talk with the other participant to confirm the final agreement. Here is a short run through those controls."
+              "In Task 1, you give your AI Proxy your preferred options and choose which reasons it may share. The two Proxies negotiate using those instructions. You then discuss their result with the other participant and both confirm the final agreement. Here is a short run through those controls."
             ) : (
               "In Task 1 you chat with the other participant yourself. Here is a short run through those controls."
             )}
@@ -807,7 +820,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
 
   const actionDisabled =
     step === "check"
-      ? !canContinue && !reasonAnswer
+      ? checkDecision === "choose"
       : !bypass && !stepDone[step] && !endsOnItsOwnButton;
 
   /*
@@ -852,24 +865,27 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
   function handleAction() {
     if (actionDisabled) return;
     if (step === "check") {
-      if (canContinue) {
-        finish();
-        return;
+      switch (checkDecision) {
+        case "complete":
+          finish();
+          return;
+        case "retry":
+          setReasonAnswer("");
+          setReasonSubmitted(false);
+          setCheckAttempt((current) => current + 1);
+          return;
+        case "submit":
+          if (!reasonCorrect && participantKey) {
+            writeCheckGate(participantKey, `task-${taskIndex}`, {
+              status: "pending",
+              attempts: checkAttempt,
+            });
+          }
+          setReasonSubmitted(true);
+          return;
+        case "choose":
+          return;
       }
-      if (reasonSubmitted) {
-        setReasonAnswer("");
-        setReasonSubmitted(false);
-        setCheckAttempt((current) => current + 1);
-        return;
-      }
-      if (!reasonCorrect && participantKey) {
-        writeCheckGate(participantKey, `task-${taskIndex}`, {
-          status: "pending",
-          attempts: checkAttempt,
-        });
-      }
-      setReasonSubmitted(true);
-      return;
     }
     advance();
   }
@@ -1334,8 +1350,24 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                   name={practiceCheck.id}
                   value={reasonAnswer}
                   onChange={(value) => {
-                    if (reasonSubmitted) return;
-                    setReasonAnswer(value);
+                    const selection = selectPracticeCheckAnswer(
+                      {
+                        answer: reasonAnswer,
+                        submitted: reasonSubmitted,
+                        attempt: checkAttempt,
+                      },
+                      value,
+                      correctAnswer,
+                    );
+                    setReasonAnswer(selection.answer);
+                    setReasonSubmitted(selection.submitted);
+                    setCheckAttempt(selection.attempt);
+                    if (selection.submitted && participantKey) {
+                      writeCheckGate(participantKey, `task-${taskIndex}`, {
+                        status: "pending",
+                        attempts: selection.attempt,
+                      });
+                    }
                   }}
                   options={practiceCheck.options}
                 />
@@ -1386,7 +1418,7 @@ export function PracticeRound({ taskIndex }: { taskIndex: 1 | 2 }) {
                     >
                       <p>
                         {canContinue
-                          ? "That is the whole practice round. Press the button to begin Task 1."
+                          ? `That is the whole practice round. Press the button to begin Task ${taskIndex}.`
                           : "Press the glowing button below."}
                       </p>
                     </Coach>

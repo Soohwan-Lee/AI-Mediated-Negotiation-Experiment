@@ -1,55 +1,24 @@
-/**
- * Server-authoritative condition assignment.
- *
- * DESIGN INTENT (Methods §Experimental assignment): on participant entry the
- * server claims the next unclaimed row from a pre-seeded `assignment_slots`
- * table, flips it to claimed, and returns it. The claim must be atomic so two
- * simultaneous participants cannot take the same slot:
- *
- *   -- supabase/migrations: claim_assignment_slot()
- *   UPDATE assignment_slots SET claimed = true, participant_key = p_key,
- *          claimed_at = now()
- *   WHERE id = (
- *     SELECT id FROM assignment_slots WHERE claimed = false
- *     ORDER BY slot_index LIMIT 1 FOR UPDATE SKIP LOCKED
- *   )
- *   RETURNING *;
- *
- * SCAFFOLD STATE: falls through to the deterministic local stand-in in
- * lib/assignment. Assignment is idempotent per participant key so a refresh
- * never reassigns (Methods: "assignment is not changed after session start").
- */
-
-import { NextResponse } from "next/server";
-import { claimSlot } from "@/lib/assignment";
+import { assignmentOf, claimParticipant, failure, participantFor, readBody, sessionCookie } from "@/lib/server/study-db";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-interface RequestBody {
-  participantKey: string;
-  // Unused by the local stand-in; the Supabase RPC records it on the slot.
-  prolificPid?: string | null;
+/** Admission is the only place a production assignment is created. */
+export async function POST(request: Request) {
+  try {
+    const row = await claimParticipant(await readBody(request));
+    return Response.json({ assignment: assignmentOf(row), status: row.status,
+      consented: row.operational?.consented === true }, {
+      headers: { "Set-Cookie": sessionCookie(row.participant_key, request), "Cache-Control": "no-store" },
+    });
+  } catch (error) { return failure(error); }
 }
 
-export async function POST(request: Request) {
-  let body: RequestBody;
+/** Internal URL refresh restores the signed identity, never a supplied key. */
+export async function GET(request: Request) {
   try {
-    body = (await request.json()) as RequestBody;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  if (!body.participantKey) {
-    return NextResponse.json(
-      { error: "participantKey is required" },
-      { status: 400 },
-    );
-  }
-
-  // TODO(supabase): check for an existing assignment by participant_key first,
-  // then call the claim_assignment_slot RPC. Return 409 if the pool is
-  // exhausted so the study can be closed cleanly.
-  const assignment = await claimSlot(body.participantKey);
-
-  return NextResponse.json({ assignment });
+    const row = await participantFor(request, true);
+    return Response.json({ assignment: assignmentOf(row), status: row.status,
+      consented: row.operational?.consented === true }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return failure(error); }
 }

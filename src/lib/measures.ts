@@ -89,7 +89,7 @@ export const DIRECT_PRACTICE_CHECK: ChoiceItem = {
 };
 export const PROXY_PRACTICE_CHECK: ChoiceItem = {
   kind: "choice", id: "IC6",
-  text: "After the two AI Proxies finish, what happens before the task ends?",
+  text: "After the two AI Proxies finish, what must happen for an agreement to become final?",
   options: [
     { value: "mutual_confirmation", label: "You talk with the other participant and both confirm the final agreement." },
     { value: "automatic", label: "The Proxy result becomes final automatically." },
@@ -102,7 +102,7 @@ export const PRACTICE_CHECK_ANSWERS: Record<string, string> = {
 };
 export const PRACTICE_CHECK_REMEDIATION: Record<string, string> = {
   IC5: "You write the messages you send during direct negotiation.",
-  IC6: "You talk with the other participant after the Proxy exchange, and the task ends only after both of you confirm the same final agreement.",
+  IC6: "You talk with the other participant after the Proxy exchange. An agreement becomes final only when both of you confirm the same terms. You can also end the task without agreement, in which case both sides receive 0 task points.",
 };
 
 export function experienceBlocks(role: Role, isProxy = false): Block[] {
@@ -180,6 +180,10 @@ export function taskOpenBlocks(isProxy: boolean): Block[] {
   if (isProxy) blocks.push({ id: "open_proxy", title: "Your experience with your Proxy", hint: OPEN_HINT, items: [{
     kind: "text", id: "OEP1", text: "What did you initially expect from your Proxy, and why? What in the negotiation reinforced or changed your view of it?",
     hint: "Optional prompt: Think of a particular message and explain why it mattered to you.", placeholder: "A brief answer is fine.", rows: 4,
+  }] });
+  blocks.push({ id: "open_task_comment", title: "Anything else?", optional: ["OET1"], items: [{
+    kind: "text", id: "OET1", text: "Is there anything else about this task or the way you negotiated that you would like to share?",
+    hint: "Optional. You may leave this blank.", placeholder: "Any other thoughts about this task (optional).", rows: 3,
   }] });
   return blocks;
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card } from "./ui";
+import { LoadRetry } from "./load-retry";
 import { getStore } from "@/lib/store";
 import type { Speaker, TranscriptMessage } from "@/lib/types";
 
@@ -22,15 +23,19 @@ export function TranscriptReview({
   taskIndex: 1 | 2;
 }) {
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!participantKey) return;
     let active = true;
     void getStore().loadMessages(participantKey, taskIndex).then((saved) => {
       if (active) setMessages(saved);
-    });
+    }).catch(() => { if (active) setLoadFailed(true); });
     return () => { active = false; };
-  }, [participantKey, taskIndex]);
+  }, [participantKey, taskIndex, attempt]);
+
+  if (loadFailed) return <LoadRetry label="the negotiation transcript" onRetry={() => { setLoadFailed(false); setAttempt((value) => value + 1); }} />;
 
   if (messages.length === 0) return null;
 

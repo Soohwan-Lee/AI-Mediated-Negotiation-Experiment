@@ -24,7 +24,7 @@
  * earns the counterpart matches:
  *
  *   nothing / WR only / a bare priority claim → 3rd option  1,000 each · joint 2,000
- *   SB (or the §6.6 abstraction)              → best option 3,000 each · joint 6,000
+ *   authorized SB voiced                       → best option 3,000 each · joint 6,000
  *   impasse                                   →                 0 each · joint 0
  *
  * NO AGREEMENT IS WORTH NOTHING (11th correction). There is no separate
@@ -201,10 +201,8 @@ function work(
  *
  * The text is SPEAKABLE — first person, said aloud to the other side.
  *
- * `frame`, `abstract` and `cover` are the AI-Supplemented rendering (§6.6) and
- * are fixed here rather than generated, because the manipulation is the
- * WORDING: a model writing its own abstraction each turn would vary how much
- * survives, and how much survives is the independent variable.
+ * Proxy presentation is kept separate from the raw card so both policies relay
+ * this same factual wording. AI-Supplemented adds only fixed work benefits.
  */
 function sensitive(
   id: string,
@@ -212,9 +210,6 @@ function sensitive(
   facet: NonNullable<ReasonCard["facet"]>,
   text: string,
   relayed: string,
-  frame: string,
-  abstract: string,
-  cover: readonly [string, string],
 ): ReasonCard {
   return {
     id,
@@ -223,9 +218,6 @@ function sensitive(
     facet,
     text,
     relayed,
-    frame,
-    abstract,
-    cover,
   };
 }
 
@@ -335,12 +327,6 @@ const TASK_A: NegotiationTask = {
           "promised_alone",
           "The truth is, I told the director that four office days a week would be possible before discussing it with the team. The director has already reported that answer upward. The team does not know about this.",
           "They told the director that four office days a week would be possible before discussing it with the team. The director has already reported that answer upward. The team does not know about this.",
-          "Looking at the side of the team lead I represent, I think the office days should stay at four. Three reasons —",
-          "the four office days a week have already been passed upward.",
-          [
-            "early in a project, both the office days and the presentations need the schedule kept tight.",
-            "the first few weeks need everyone in the same room, and adding days later will not win that back.",
-          ],
         ),
       ],
       batnaSummary:
@@ -373,12 +359,6 @@ const TASK_A: NegotiationTask = {
           "client_asked_for_someone_else",
           "The truth is, after the last presentation the client contact took me aside and said that from now on they would rather you presented. I never passed that on to you.",
           "After the last presentation the client contact took them aside and said that from now on they would rather the team lead presented. They have never passed that on to the team lead.",
-          "Looking at the side of the team member I represent, I think the presentations should come down this quarter. Three reasons —",
-          "on the presentations, there has been feedback from the client side.",
-          [
-            "in a quarter with a wide analysis scope, leaving room in the schedule helps the team.",
-            "when presentation prep runs into the analysis deadlines, the analysis quality slips first.",
-          ],
         ),
       ],
       batnaSummary:
@@ -488,12 +468,6 @@ const TASK_B: NegotiationTask = {
           "understated_headcount",
           "The truth is, when I submitted the new project plan, I mistakenly estimated fewer people than it actually needs. The plan only works if you are assigned four days a week, and asking for more people now would show the director that the estimate was wrong. The team does not know about this.",
           "When they submitted the new project plan, they mistakenly estimated fewer people than it actually needs. The plan only works if the team member is assigned four days a week, and asking for more people now would show the director that the estimate was wrong. The team does not know about this.",
-          "Looking at the side of the team lead I represent, I think the project days should stay at four. Three reasons —",
-          "this project's staffing is set tight.",
-          [
-            "a new project's first few weeks set the rhythm for the whole schedule.",
-            "if the days drop in the first four weeks, the schedule agreed with the client slips from the start.",
-          ],
         ),
       ],
       batnaSummary:
@@ -526,12 +500,6 @@ const TASK_B: NegotiationTask = {
           "client_asked_for_someone_else",
           "The truth is, last month the client contact told me directly that my weekly report was lacking and that they would prefer the team lead to prepare it from now on. I did not tell you.",
           "Last month the client contact told them directly that their weekly report was lacking and that they would prefer the team lead to prepare it from now on. They did not tell the team lead.",
-          "Looking at the side of the team member I represent, I think the weekly reports should come down this month. Three reasons —",
-          "on the weekly reports, there has been feedback from the client side.",
-          [
-            "in a month with overlapping deadlines, taking on less new work is safer for the team.",
-            "the client report is best written by whoever sees the whole project, so questions get answered on the spot.",
-          ],
         ),
       ],
       batnaSummary:
@@ -608,7 +576,7 @@ export const PRACTICE_TASK: NegotiationTask = {
     leader: {
       title: "Team Lead",
       organizationalPosition:
-        "You lead this project team. This round is practice: there is no bonus decision, no evaluation, and nothing is recorded.",
+        "You lead this project team. This round is practice: there is no bonus decision or evaluation, and it does not affect your task points or payment.",
       roleStory:
         "You lead this team. You and a senior member of the team are settling how next month's weekly meeting runs, four meetings in all: what time it starts, and how many of them are held in person.\n\nWhat matters most to you is **an early start**. An early slot leaves the rest of the day clear, and what the team decides can go into the director's late-morning sync the same day. How many meetings are in person matters less to you.",
       objectives: [
@@ -625,7 +593,7 @@ export const PRACTICE_TASK: NegotiationTask = {
     member: {
       title: "Senior Team Member",
       organizationalPosition:
-        "You are a senior member of this team. This round is practice: there is no bonus decision, no evaluation, and nothing is recorded.",
+        "You are a senior member of this team. This round is practice: there is no bonus decision or evaluation, and it does not affect your task points or payment.",
       roleStory:
         "You are a senior member of this team. You and the lead are settling how next month's weekly meeting runs, four meetings in all: what time it starts, and how many of them are held in person.\n\nWhat matters most to you is **as few in-person meetings as you can**. An in-person meeting breaks up your morning far more than an online one does. What time the meeting starts matters less to you.",
       objectives: [
@@ -802,50 +770,37 @@ export function reasonScope(
 }
 
 // ---------------------------------------------------------------------------
-// AI-Supplemented rendering (Design §6.6)
+// Fixed AI work benefits
 // ---------------------------------------------------------------------------
 
 /**
- * The sentences an AI-Supplemented proxy says INSTEAD of a sensitive card.
+ * The two approved work benefits the AI-Supplemented policy may add.
  *
- * `frame` is the proxy's own opening line — "Having looked at the situation on
- * the side of the team member I represent, I think… There are three reasons for
- * that —". THE SPEAKER IS THE PROXY (Ver.2.21 §6.6, 11th correction). Through
- * Ver.2.20 the three sentences were relayed as the principal's ("their side
- * tells me…"), which pointed every bit of responsibility back at the principal
- * and left the two policies differing only in how much detail arrived. Now the
- * proxy puts them forward as its own assessment, and nothing in the wording
- * says which of the three came from the person it represents.
- *
- * `abstract` keeps the KIND of fact and its link to the core term and drops the
- * event, the third party's words, the concealment, and any attribution to the
- * principal. `cover` are two role-plausible sentences the proxy supplies, and
- * they come in two GRADES (§6.6, 12th correction):
- *
- *   cover[0]  WR-grade — "both terms need attention" role generality. It is the
- *             one appended when only the work reason is authorized, so the
- *             policy difference is visible on that path too.
- *   cover[1]  SB-grade — why the term matters THAT much. It is used only
- *             alongside the abstraction, where its job is to make it unclear
- *             which of the three sentences is the principal's own circumstance.
- *
- * All three are subjectless declaratives of the same shape, so sentence form
- * alone cannot sort them, and the route shuffles their order.
+ * They use only public task context, describe two distinct work mechanisms,
+ * and remain calibrated predictions. They never change a reason card's tier or
+ * make an unauthorized sensitive card available.
  */
-export function abstractedReason(
-  card: ReasonCard,
-): {
-  frame: string;
-  abstract: string;
-  cover: readonly [string, string];
-} | null {
-  if (
-    card.layer !== "sensitive" ||
-    !card.frame ||
-    !card.abstract ||
-    !card.cover
-  ) {
-    return null;
-  }
-  return { frame: card.frame, abstract: card.abstract, cover: card.cover };
-}
+export const PROXY_WORK_BENEFITS: Readonly<
+  Record<TaskId, Readonly<Record<Role, readonly [string, string]>>>
+> = {
+  task_a: {
+    leader: [
+      "having the team together more often could reduce missed handoffs during the first weeks.",
+      "Having the team member present at more client meetings may help preserve continuity between the analysis and client follow-up.",
+    ],
+    member: [
+      "having the team lead present at more client meetings could leave more time to cross-check the analysis before client review.",
+      "Using the same lead presenter more often may help preserve continuity in follow-up answers.",
+    ],
+  },
+  task_b: {
+    leader: [
+      "having the team member on the project more days could reduce handoffs during the first four weeks.",
+      "Having the team member write more weekly reports may help preserve continuity between daily project work and client updates.",
+    ],
+    member: [
+      "having the team lead write more weekly reports could reduce the risk of conflicting report versions.",
+      "Keeping more reporting with the team lead may help make project dependencies clearer in client updates.",
+    ],
+  },
+};

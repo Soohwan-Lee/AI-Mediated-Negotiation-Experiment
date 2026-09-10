@@ -40,8 +40,13 @@ test("responsibility order is stable, varies by participant, and preserves fixed
 });
 
 test("open-ended sequence is shared OED1, OEE1, then Proxy-only OEP1", () => {
-  assert.deepEqual(ids(taskOpenBlocks(false)), ["OED1", "OEE1"]);
-  assert.deepEqual(ids(taskOpenBlocks(true)), ["OED1", "OEE1", "OEP1"]);
+  assert.deepEqual(ids(taskOpenBlocks(false)), ["OED1", "OEE1", "OET1"]);
+  assert.deepEqual(ids(taskOpenBlocks(true)), ["OED1", "OEE1", "OEP1", "OET1"]);
+  for (const isProxy of [false, true]) {
+    const optional = blockForTask(taskOpenBlocks(isProxy).at(-1), 2);
+    assert.deepEqual(requiredIds(optional), []);
+    assert.equal(optional.items[0].id, "OET1_t2");
+  }
   assert.equal(taskOpenBlocks(false)[0].items[0].text, taskOpenBlocks(true)[0].items[0].text);
   assert.equal(taskOpenBlocks(false)[1].items[0].text, taskOpenBlocks(true)[1].items[0].text);
   assert.deepEqual(ids([OEC1_BLOCK]), ["OEC1"]);

@@ -13,7 +13,7 @@
  * something typed while it was in flight.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParticipant } from "./participant-context";
 import { getStore } from "./store";
 import type { SurveyResponses } from "./types";
@@ -23,6 +23,8 @@ export function useRestoreAnswers(
   onRestore: (saved: SurveyResponses) => void,
 ) {
   const { participantKey } = useParticipant();
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const latest = useRef(onRestore);
   useEffect(() => {
@@ -38,10 +40,14 @@ export function useRestoreAnswers(
       .then((saved) => {
         if (cancelled || !saved || Object.keys(saved).length === 0) return;
         latest.current(saved);
+      }).catch(() => {
+        if (!cancelled) setLoadFailed(true);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [participantKey, block]);
+  }, [participantKey, block, attempt]);
+
+  return { loadFailed, retry: () => { setLoadFailed(false); setAttempt((value) => value + 1); } };
 }

@@ -11,7 +11,10 @@
  */
 
 import type { Issue, Mandate, Role } from "../types";
-import type { NegotiationAction } from "./schema";
+import {
+  AI_WORK_BENEFITS_SOURCE_ID,
+  type NegotiationAction,
+} from "./schema";
 
 export type ViolationCode =
   | "unknown_issue"
@@ -172,16 +175,8 @@ export function validateAction(
       // the principal never mandated is still a violation.
     }
 
-    // An unchecked reason card may inform which package the proxy chooses and
-    // must never appear in its text (Design §7). This holds under BOTH
-    // policies — the AI-Supplemented's latitude is over the fixed §6.6
-    // sentences the route supplies, never over the principal's own withheld
-    // circumstances, and confusing the two would turn "abstracts what it was
-    // given" into "discloses what you refused to disclose".
-    //
-    // THE `pool:` ESCAPE IS GONE with the pool itself (Ver.2.20 §6.6). A
-    // prefix that let an id through unchecked is exactly the shape a leak
-    // would take now that no legitimate id can carry it.
+    // Both policies must keep unchecked private reasons out of the text.
+    // Public work benefits never authorize a withheld reason card.
     const sayableIds =
       ctx.authorizedReasonIds ?? ctx.mandate.authorizedReasonIds;
     if (
@@ -203,21 +198,33 @@ export function validateAction(
     });
   }
 
-  // --- no additive reasons, under EITHER policy -------------------------
-  // Ver.2.20 abolished the role-plausible pool. The AI-Supplemented policy no
-  // longer ADDS a reason beside the principal's card — it REPLACES the card
-  // with the fixed §6.6 abstraction and says it among two cover sentences,
-  // all three supplied by the route. So there is nothing legitimate for a
-  // model to put in `addedReasonSourceId`, under either policy, and a value
-  // there means it invented a reason of its own.
-  //
-  // This is stricter than the Ver.2.14 rule it replaces, and deliberately so:
-  // that rule policed WHICH policy could add, and the answer is now neither.
-  if (action.addedReasonSourceId) {
+  // --- tightly scoped AI-added work-benefit provenance ------------------
+  // The AI-Supplemented renderer may append exactly two deterministic public
+  // work-benefit arguments. This trusted source marker is the sole exception;
+  // it does not authorize a model to invent a reason or a personal fact.
+  const claimsAiBenefits =
+    action.addedReasonSourceId === AI_WORK_BENEFITS_SOURCE_ID;
+  const hasAiBenefitProvenance =
+    action.internalProvenance ===
+    "principal_reason_with_ai_work_benefits";
+  if (
+    action.addedReasonSourceId !== null &&
+    (!claimsAiBenefits || ctx.policy !== "ai_supplemented")
+  ) {
     violations.push({
       code: "provenance_policy_violation",
       detail:
-        "No policy may add a reason beside the principal's card; the AI-Supplemented sentences are supplied by the system.",
+        "Only the trusted AI-Supplemented work-benefit source may add reasoning.",
+    });
+  }
+  if (
+    claimsAiBenefits !== hasAiBenefitProvenance ||
+    (hasAiBenefitProvenance && ctx.policy !== "ai_supplemented")
+  ) {
+    violations.push({
+      code: "provenance_policy_violation",
+      detail:
+        "The AI work-benefit source and internal provenance must appear together under AI-Supplemented.",
     });
   }
 

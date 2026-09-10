@@ -1,36 +1,8 @@
 /**
- * Supabase-backed `Store`. NOT WIRED UP YET — `getStore()` still returns the
- * localStorage implementation, and nothing imports this file at runtime.
- *
- * It exists now rather than later because the interface it satisfies is the
- * thing under review: writing it is how you find out whether the page
- * components really are free of persistence assumptions. They are, with the
- * exceptions noted below, and those are the work remaining.
- *
- * TO TURN IT ON
- *   1. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
- *   2. Apply the schema in docs/DATA_MODEL.md, including the RLS block — no
- *      policies for the anon role, so nothing writes from the browser directly.
- *   3. Create the `/api/persist` route described under `postWrite` below.
- *   4. In `store.ts`, return `new SupabaseStore()` from `getStore()`.
- * No page component changes. That is the whole point of the facade.
- *
- * WHY EVERY WRITE GOES THROUGH A SERVER ROUTE. Three reasons, and the first is
- * the one that matters: a participant who can watch their own network traffic
- * can infer their condition from it, and knowing the condition is the one
- * thing that invalidates their data (CLAUDE.md, "Things the participant must
- * never learn mid-study"). Beyond that, the service-role key must never reach
- * the browser bundle, and assignment claims must be server-authoritative or
- * the cell balance is forgeable.
- *
- * WHY THE QUEUE. The localStorage store cannot fail, so the call sites were
- * written as if writes always succeed — several are `void store.append…(…)`
- * with no `await` and no error branch, which is correct for a live negotiation
- * (a transcript write must never block the composer) and silently lossy over a
- * network. The queue closes that gap without touching a single call site:
- * writes are enqueued synchronously, retried with backoff, and mirrored to
- * localStorage so a participant who closes the tab mid-flush loses nothing
- * that a later session cannot re-send.
+ * Server-backed store with an ordered queue scoped to one participation attempt.
+ * Writes use signed-session API routes; server credentials never enter this file.
+ * Failed writes remain local for an explicit retry or reload. Completion requires
+ * both a successful flush and the server's separate completeness check.
  */
 
 import type {
@@ -55,19 +27,19 @@ interface QueuedWrite {
 
 const QUEUE_KEY = "amne:writequeue";
 
-function readQueue(): QueuedWrite[] {
+function readQueue(storageKey = QUEUE_KEY): QueuedWrite[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(window.localStorage.getItem(QUEUE_KEY) ?? "[]");
+    return JSON.parse(window.localStorage.getItem(storageKey) ?? "[]");
   } catch {
     return [];
   }
 }
 
-function writeQueue(queue: QueuedWrite[]): void {
+function writeQueue(queue: QueuedWrite[], storageKey = QUEUE_KEY): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    window.localStorage.setItem(storageKey, JSON.stringify(queue));
   } catch {
     // Storage full or blocked. The in-memory queue still drains this session;
     // durability across a reload is what is lost, and there is nothing useful
@@ -88,15 +60,12 @@ export class WriteQueue {
   private draining: Promise<void> | null = null;
   private seq = 0;
 
-  constructor(private endpoint: string) {
-    this.queue = readQueue();
+  constructor(private endpoint: string, private storageKey = QUEUE_KEY) {
+    this.queue = readQueue(storageKey);
     if (this.queue.length) void this.drain();
     if (typeof window !== "undefined") {
-      // A tab closing mid-flush is the common case, not an edge case: the
-      // study ends on a completion screen people close immediately.
-      window.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "hidden") this.flushBeacon();
-      });
+      // One ordered transport only. A parallel beacon could replay an older
+      // survey draft after a newer write. The durable queue resumes on reload.
       // Coming back online is the moment a stalled queue should retry, and it
       // costs nothing to wait for it rather than backing off blindly.
       window.addEventListener("online", () => {
@@ -107,13 +76,23 @@ export class WriteQueue {
 
   push(op: string, payload: unknown): void {
     this.seq += 1;
-    this.queue.push({
+    this.enqueue({
       id: `${Date.now()}-${this.seq}`,
       op,
       payload,
       queuedAt: new Date().toISOString(),
     });
-    writeQueue(this.queue);
+  }
+
+  /** Enqueue one logical record at most once, including after a page reload. */
+  pushIdempotent(op: string, payload: unknown, id: string): void {
+    if (this.queue.some((item) => item.id === id)) return;
+    this.enqueue({ id, op, payload, queuedAt: new Date().toISOString() });
+  }
+
+  private enqueue(item: QueuedWrite): void {
+    this.queue.push(item);
+    writeQueue(this.queue, this.storageKey);
     void this.drain();
   }
 
@@ -171,16 +150,16 @@ export class WriteQueue {
         const response = await fetch(this.endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // `id` travels so `/api/persist` can dedupe: a beacon that lands
-          // and a drain that retries the same item are the ordinary case, not
-          // an edge one, and the queue never drops an item to prevent it.
+          signal: AbortSignal.timeout(10_000),
+          // Transport IDs aid inspection. Database record keys make retries
+          // idempotent; no parallel beacon can replay an older draft.
           body: JSON.stringify({ id: item.id, op: item.op, payload: item.payload }),
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         this.queue.shift();
-        writeQueue(this.queue);
+        writeQueue(this.queue, this.storageKey);
       } catch {
-        writeQueue(this.queue);
+        writeQueue(this.queue, this.storageKey);
         // Nothing is discarded and nothing is reordered: the queue is a
         // transcript and its order is data. Stop here and let the next push,
         // an `online` event, or the next flush try again.
@@ -189,23 +168,6 @@ export class WriteQueue {
     }
   }
 
-  /**
-   * Last-ditch send on tab hide. `sendBeacon` survives the page going away,
-   * which a normal fetch does not.
-   */
-  private flushBeacon(): void {
-    if (!this.queue.length || typeof navigator === "undefined") return;
-    try {
-      navigator.sendBeacon(
-        this.endpoint,
-        new Blob([JSON.stringify({ batch: this.queue })], {
-          type: "application/json",
-        }),
-      );
-    } catch {
-      // Nothing further to try.
-    }
-  }
 }
 
 /**
@@ -216,7 +178,17 @@ export class WriteQueue {
  * `queue.flush()`; the rest are enqueued and drain in the background.
  */
 export class SupabaseStore implements Store {
-  private queue = new WriteQueue("/api/persist");
+  readonly persistenceKind = "remote" as const;
+  private queue: WriteQueue;
+
+  constructor(participantKey = "unclaimed") {
+    this.queue = new WriteQueue("/api/persist", `amne:writequeue:${participantKey}`);
+  }
+
+  /** Completion uses the queue's existing ordered flush contract. */
+  async confirmSaved(): Promise<boolean> {
+    return this.queue.flush();
+  }
 
   /**
    * Await a write the next screen depends on, and note it if it did not land.
@@ -237,12 +209,14 @@ export class SupabaseStore implements Store {
   }
 
   private async get<T>(op: string, params: unknown): Promise<T | null> {
+    if (!(await this.queue.flush())) throw new Error("Pending study data could not be saved");
     const response = await fetch("/api/persist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(10_000),
       body: JSON.stringify({ op, payload: params }),
     });
-    if (!response.ok) return null;
+    if (!response.ok) throw new Error("Saved study data could not be loaded");
     const body = (await response.json()) as { data?: T };
     return body.data ?? null;
   }
@@ -263,7 +237,9 @@ export class SupabaseStore implements Store {
   }
 
   async logEvent(event: ExperimentEvent) {
-    // Never awaited — an event log must not be able to stall a screen.
+    // Only analytic phase boundaries reach storage. Completion is finalized
+    // separately; clicks, comprehension attempts and practice are not records.
+    if (event.type !== "negotiation_started" && event.type !== "negotiation_ended") return;
     this.queue.push("logEvent", event);
   }
 
@@ -272,6 +248,7 @@ export class SupabaseStore implements Store {
     block: string,
     responses: SurveyResponses,
   ) {
+    if (block === "instruction_check" || block.startsWith("practice_")) return;
     this.queue.push("saveResponses", { participantKey, block, responses });
     await this.settle("saveResponses");
   }
@@ -320,6 +297,8 @@ export class SupabaseStore implements Store {
   }
 
   async logGuardrailEvent(participantKey: string, event: GuardrailEvent) {
-    this.queue.push("logGuardrailEvent", { participantKey, event });
+    // The authenticated model routes persist authoritative server_audit entries.
+    // Client guardrail echoes are deliberately not a second analysis source.
+    void participantKey; void event;
   }
 }

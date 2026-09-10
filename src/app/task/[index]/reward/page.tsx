@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
 import { TranscriptReview } from "@/components/transcript-review";
+import { LoadRetry } from "@/components/load-retry";
 import { Callout, Card, CardTitle, Page } from "@/components/ui";
 import { MeasureBlock, PreviousPart, missingIds, type Answers } from "@/components/measure";
 import { sessionPlan } from "@/lib/assignment";
+import { bonusAmountFromPercent } from "@/lib/bonus";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { BR1_ITEM, FE1_BLOCK, blockForTask, dummyAnswer, taskOpenBlocks } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
@@ -29,6 +31,8 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   const [openAnswers, setOpenAnswers] = useState<Answers>({});
   const latestOpenAnswers = useRef<Answers>({});
   const [restored, setRestored] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
 
@@ -49,7 +53,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
       getStore().loadResponses(participantKey, openBlockName),
     ]).then(([decision, open]) => {
       if (!active) return;
-      const filteredOpen = answersForIds(open ?? {}, openIds);
+      const filteredOpen = { ...answersForIds(open ?? {}, openIds), ...latestOpenAnswers.current };
       setOpenAnswers(filteredOpen);
       if (explicitlyCompleted(open ?? {})) {
         router.replace(nextHref(flowKey));
@@ -64,11 +68,11 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
       const decisionComplete = decision?._submitted === true;
       if (decisionComplete) setStage("open");
       setRestored(true);
-    });
+    }).catch(() => { if (active) setLoadFailed(true); });
     return () => { active = false; };
-  }, [assignment, decisionBlockName, flowKey, isLeader, openBlockName, openBlocks, openIds, participantKey, router, taskIndex]);
+  }, [assignment, decisionBlockName, flowKey, isLeader, openBlockName, openBlocks, openIds, participantKey, router, taskIndex, loadAttempt]);
 
-  const awarded = amountPercent === null ? null : Number(((amountPercent / 100) * Number(STUDY.bonusPerTask)).toFixed(2));
+  const awarded = amountPercent === null ? null : bonusAmountFromPercent(amountPercent);
   const evalMissing = missingIds([evalBlock], evalAnswers);
   const canSubmitDecision = useDevGate(isLeader ? amountPercent !== null && amountConfirmed : evalMissing.length === 0);
   const openMissing = missingIds(openBlocks, openAnswers);
@@ -94,7 +98,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
 
   function persistLeaderDraft(percent: number | null, confirmed: boolean) {
     if (!participantKey) return;
-    const pounds = percent === null ? null : Number(((percent / 100) * Number(STUDY.bonusPerTask)).toFixed(2));
+    const pounds = percent === null ? null : bonusAmountFromPercent(percent);
     void getStore().saveResponses(participantKey, decisionBlockName, {
       _instrument_version: "2.26", role: "leader",
       [`BR1_METHOD_t${taskIndex}`]: "percentage_slider_to_gbp",
@@ -169,7 +173,9 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
     } finally { submitting.current = false; setBusy(false); }
   }
 
-  if (!assignment || !restored) return <Page><p className="text-sm text-[var(--ink-2)]">Loading…</p></Page>;
+  if (!assignment || !restored) return <Page>{loadFailed
+    ? <LoadRetry onRetry={() => { setLoadFailed(false); setLoadAttempt((value) => value + 1); }} />
+    : <p className="text-sm text-[var(--ink-2)]">Loading…</p>}</Page>;
   if (stage === "open") return <>
     <Page>
       <TranscriptReview participantKey={participantKey} taskIndex={taskIndex} />

@@ -44,10 +44,13 @@
 import {
   cardOfLayer,
   counterRequirementIssue,
-  abstractedReason,
   rankedOptions,
   requirementIssue,
 } from "../tasks";
+import {
+  formatProxyReasonBubbles,
+  renderProxyReason,
+} from "../proxy-reason-presentation";
 import { tierPackage, type ReasonTier } from "./machine";
 import { seededOpeningText } from "./counterpart-text";
 import type {
@@ -224,7 +227,9 @@ export interface ScriptedMessage {
    * field for provenance, so a transcript component cannot show it even by
    * accident.
    */
-  internalProvenance?: "principal_reason";
+  internalProvenance?:
+    | "principal_reason"
+    | "principal_reason_with_ai_work_benefits";
 }
 
 export interface ScriptedTask {
@@ -394,11 +399,10 @@ function baselineScript(task: NegotiationTask, role: Role): ScriptedTask {
 /**
  * The Proxy script (§6.10 (c) — the SB-authorized path).
  *
- * THE TWO POLICIES DIFFER IN EXACTLY ONE PLACE, mirroring the backend: the
- * participant proxy's reason turn. User-Specified relays the card in the third
- * person with every fact intact; AI-Supplemented says the §6.6 frame plus the
- * abstraction and its two covers, as the proxy's OWN assessment, and never says
- * the card at all. Turn count and register stay matched (pilot gate 9).
+ * Both policies relay the same authorized card in the same representative
+ * voice, with every fact intact. AI-Supplemented then gives exactly two fixed,
+ * task-grounded work benefits. Each proxy gives those benefits once, while the
+ * turn count, reason tier and outcome stay matched.
  *
  * The participant's proxy voices the SB at its FIRST reason opportunity — the
  * §6.5 schedule. The counterpart reciprocates only on that disclosure path.
@@ -425,46 +429,62 @@ function proxyScript(
     extra: Partial<ScriptedMessage> = {},
   ): ScriptedMessage => ({ id, stage, speaker, text, ...extra });
 
-  const abstracted = mySb ? abstractedReason(mySb) : null;
-  const theirAbstracted = theirSb ? abstractedReason(theirSb) : null;
   const principal = role === "leader" ? "the team lead" : "the team member";
   const otherPrincipal = role === "leader" ? "the team member" : "the team lead";
 
   const L = (pack: Package, issueId: string) => label(task, pack, issueId);
 
-  /**
-   * The §6.6 message: the proxy's own frame, then the abstraction and the two
-   * covers. The live route SHUFFLES the three sentences so position carries no
-   * signal; the mockup fixes one order so the screen is stable to read, and the
-   * shuffle is tested where it lives, in the route.
-   */
-  const supplemented = (
-    rendered: NonNullable<ReturnType<typeof abstractedReason>>,
-  ) =>
-    `${rendered.frame} ${rendered.cover[0]} ${rendered.abstract} ${rendered.cover[1]}`;
-
   const myWr = cardOfLayer(task, role, "work");
+
+  const provenance = (includesBenefits: boolean) =>
+    policy === "ai_supplemented" && includesBenefits
+      ? ("principal_reason_with_ai_work_benefits" as const)
+      : ("principal_reason" as const);
 
   // Turn 1 is the same on both paths: the counterpart proxy introduces itself,
   // gives its principal's WORK reason and asks about the other side (§6.1 —
   // no package and no priority of its own).
+  const theirOpening = theirWr
+    ? renderProxyReason(task, other, theirWr, policy)
+    : null;
+  const openingIncludesBenefits = !sbAuthorized;
   const open = m(
     "p1c",
     1,
     "counterpart_proxy",
-    `Hello, I am the AI Proxy negotiating for ${otherPrincipal} I represent. ${theirWr?.relayed ?? ""} What is the situation on your side?`,
+    `Hello, I am the AI Proxy negotiating for ${otherPrincipal} I represent. ${
+      theirOpening
+        ? openingIncludesBenefits
+          ? formatProxyReasonBubbles(theirOpening)
+          : formatProxyReasonBubbles({
+              ...theirOpening,
+              addition: null,
+              text: theirOpening.base,
+            })
+        : "Both work arrangements matter on their side."
+    } What is the situation on your side?`,
+    {
+      reasonCardId: theirWr?.id,
+      internalProvenance: provenance(openingIncludesBenefits),
+    },
   );
 
   // This reciprocal disclosure is used only on the SB-authorized path.
+  const theirSensitivePresentation = theirSb
+    ? renderProxyReason(task, other, theirSb, policy)
+    : null;
   const theirDisclosure = m(
     "p4c",
     4,
     "counterpart_proxy",
-    policy === "ai_supplemented" && theirAbstracted
-      ? supplemented(theirAbstracted)
-      : theirSb?.relayed
-        ? `On their side as well. ${theirSb.relayed}`
-        : `The constraint on ${theirs.label.toLowerCase()} for ${otherPrincipal} I represent is a firm one.`,
+    (theirSensitivePresentation
+      ? formatProxyReasonBubbles(theirSensitivePresentation)
+      : null) ??
+      `The constraint on ${theirs.label.toLowerCase()} for ${otherPrincipal} I represent is a firm one.`,
+    {
+      reasonCardId: theirSb?.id,
+      internalProvenance: provenance(true),
+    },
   );
 
   // -------------------------------------------------------------------------
@@ -480,11 +500,13 @@ function proxyScript(
   //
   // The turn table is PROXY_TURN_ORDER's, unchanged: both policies run the
   // same seven turns whether or not the SB is authorized (§7's exposure
-  // control), and they differ in exactly one place — cover ① rides the decline
-  // turn under AI-Supplemented (§6.6 rule b), which is the only place the
-  // policy difference is visible on this path.
+  // control). On this path each proxy appends the two AI work benefits to its
+  // work reason, so the policy difference is visible without exposing either
+  // side's sensitive background.
   if (!sbAuthorized) {
-    const cover1 = mySb?.cover?.[0] ?? null;
+    const myWorkPresentation = myWr
+      ? renderProxyReason(task, role, myWr, policy)
+      : null;
     return {
       agreed: true,
       tentative: split,
@@ -499,10 +521,15 @@ function proxyScript(
           2,
           "participant_proxy",
           `I am the AI Proxy for ${principal} I represent. ${
-            myWr?.relayed ??
+            (myWorkPresentation
+              ? formatProxyReasonBubbles(myWorkPresentation)
+              : null) ??
             `Both terms are under pressure for ${principal} I represent this quarter.`
           }`,
-          { reasonCardId: myWr?.id },
+          {
+            reasonCardId: myWr?.id,
+            internalProvenance: provenance(true),
+          },
         ),
         m(
           "p4c",
@@ -521,17 +548,13 @@ function proxyScript(
         ),
         // Turn 5 — the proxy DECLINES ONCE and states the priority. It buys
         // nothing (§3.3): a claim the counterpart cannot repeat upward is
-        // cheap talk. Under AI-Supplemented cover ① is appended here as the
-        // proxy's OWN view — WR-grade role generality, so it moves no tier,
-        // and cover ② stays out of it because there is no abstraction here for
-        // it to hide beside.
+        // cheap talk. The two fixed benefits were already stated with the work
+        // reason, so they are not repeated here.
         m(
           "p5p",
           5,
           "participant_proxy",
-          `That is not what ${principal} I represent was hoping for. ${mine.label} matters more to them than ${theirs.label.toLowerCase()} does.${
-            policy === "ai_supplemented" && cover1 ? ` And in my view, ${lowerFirst(cover1)}` : ""
-          }`,
+          `That is not what ${principal} I represent was hoping for. ${mine.label} matters more to them than ${theirs.label.toLowerCase()} does.`,
           { proposal: trade },
         ),
         // Turn 6 — SCRIPT-ASKWHY, then the same T1 package again. The claim
@@ -564,18 +587,23 @@ function proxyScript(
     tentative: trade,
     messages: [
       open,
-      // Turn 2 — the participant proxy's first reason opportunity. This is the
-      // one turn the two policies say differently.
+      // Turn 2 — the participant proxy's first reason opportunity. The same
+      // authorized facts are said under both policies; AI-Supplemented follows
+      // them with its two fixed work benefits.
       m(
         "p2p",
         2,
         "participant_proxy",
-        policy === "ai_supplemented" && abstracted
-          ? `I am the AI Proxy for ${principal} I represent. ${supplemented(abstracted)}`
-          : `I am the AI Proxy for ${principal} I represent. ${sbRelayed(task, role, principal, mySb?.relayed)}`,
+        `I am the AI Proxy for ${principal} I represent. ${
+          mySb
+            ? formatProxyReasonBubbles(
+                renderProxyReason(task, role, mySb, policy),
+              )
+            : `${mine.label} is the term ${principal} I represent needs held.`
+        }`,
         {
           reasonCardId: mySb?.id,
-          internalProvenance: "principal_reason",
+          internalProvenance: provenance(true),
         },
       ),
       theirDisclosure,
@@ -614,30 +642,6 @@ function proxyScript(
       ),
     ],
   };
-}
-
-/**
- * The User-Specified proxy's relay of the sensitive card (P3's RELAY rule,
- * §6.5): EVERY fact kept — the event, the third party, the fact it was not
- * passed on — and only the voice changed, to the third person.
- *
- * This is the whole of that policy. It does not soften, abstract, or attribute
- * the fact to circumstances: the Ver.2.14 version did, and that made
- * User-Specified a mild version of AI-Supplemented rather than its contrast.
- * What separates the two policies is now exactly one thing — whether the fact
- * arrives whole and attributed, or as its kind inside the proxy's own opinion.
- */
-function sbRelayed(
-  task: NegotiationTask,
-  role: Role,
-  principal: string,
-  cardText: string | undefined,
-): string {
-  const mine = requirementIssue(task, role);
-  if (!cardText) {
-    return `${mine.label} is the term ${principal} I represent needs held.`;
-  }
-  return `Here is what ${principal} I represent tells me. ${cardText}`;
 }
 
 // ---------------------------------------------------------------------------

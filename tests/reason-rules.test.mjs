@@ -60,7 +60,6 @@ const {
   rankedOptions,
   scorePackage,
   cardOfLayer,
-  abstractedReason,
   MAX_INDIVIDUAL_POINTS,
   RESERVATION_POINTS,
 } = await import("../src/lib/tasks.ts");
@@ -1259,48 +1258,9 @@ test("the WR-only mockup never discloses either side's sensitive background", ()
           const sb = cardOfLayer(task, side, "sensitive");
           for (const message of script.messages) {
             assert.ok(!message.text.includes(sb.relayed));
-            assert.ok(!message.text.includes(sb.abstract));
           }
         }
       }
-    }
-  }
-});
-
-test("cover ① rides the AI-Supplemented decline turn, and cover ② stays out of it", () => {
-  // §6.6 rule (b), and it is the ONLY place the policy difference is visible
-  // when the participant has authorized nothing sensitive. Without it a
-  // participant who ticked nothing would experience the two policies
-  // identically, and `AI-Supplemented − User-Specified` would be estimated
-  // only among disclosers.
-  //
-  // Cover ② is SB-GRADE and must not appear: its job is to sit beside the
-  // abstraction and make it unclear which of three sentences is the
-  // principal's, and on a path with no abstraction it would just be a second
-  // reason.
-  for (const taskId of TASKS) {
-    for (const role of ROLES) {
-      const task = getTask(taskId);
-      const sb = cardOfLayer(task, role, "sensitive");
-      const supp = scriptedTask(task, role, "ai_supplemented", false);
-      const user = scriptedTask(task, role, "user_specified", false);
-      const suppText = supp.messages.map((m) => m.text).join(" ");
-      const userText = user.messages.map((m) => m.text).join(" ");
-
-      assert.ok(
-        suppText.includes(sb.cover[0].slice(1, 40)),
-        `${taskId}/${role}: cover ① is missing from the AI-Supplemented WR-only path`,
-      );
-      assert.ok(
-        !suppText.includes(sb.cover[1].slice(0, 40)),
-        `${taskId}/${role}: cover ② must not appear on the WR-only path`,
-      );
-      // And User-Specified adds nothing of its own: it relays what it was
-      // given and no more.
-      assert.ok(
-        !userText.includes(sb.cover[0].slice(1, 40)),
-        `${taskId}/${role}: User-Specified must not carry a cover sentence`,
-      );
     }
   }
 });
@@ -1388,7 +1348,7 @@ test("every fixed script line is short-bubbled and says what §6.4 says", () => 
 });
 
 // ---------------------------------------------------------------------------
-// 5. The §6.6 sentences and the no-additive-reason rule
+// 5. Reason authorization
 // ---------------------------------------------------------------------------
 
 const task = getTask("task_a");
@@ -1408,10 +1368,10 @@ function addingAction(overrides = {}) {
   };
 }
 
-test("no policy may add a reason of its own", () => {
-  // The §6.6 sentences are supplied by the route, so there is nothing
-  // legitimate for a model to put in `addedReasonSourceId` under EITHER policy,
-  // and a value there means it invented a reason.
+test("no policy may add an unapproved free-form reason", () => {
+  // AI-Supplemented has one fixed, validated source for its approved work
+  // benefits. A model-authored pool source remains an invented reason under
+  // either policy.
   for (const policy of ["user_specified", "ai_supplemented"]) {
     const result = validateAction(addingAction(), {
       issues: task.issues,
@@ -1423,74 +1383,6 @@ test("no policy may add a reason of its own", () => {
     assert.ok(
       result.violations.some((v) => v.code === "provenance_policy_violation"),
     );
-  }
-});
-
-test("every sensitive card carries its §6.6 frame, abstraction and two covers", () => {
-  // The sixteen sentences are FIXED (§6.6) — the model joins them, it never
-  // writes them, because what survives the abstraction IS the manipulation. A
-  // card missing them would silently fall back to relaying the card whole,
-  // making AI-Supplemented identical to User-Specified.
-  for (const taskId of TASKS) {
-    for (const role of ROLES) {
-      const sb = cardOfLayer(getTask(taskId), role, "sensitive");
-      const rendered = abstractedReason(sb);
-      assert.ok(rendered, `${taskId}/${role} has no §6.6 sentences`);
-      assert.equal(rendered.cover.length, 2);
-
-      // The frame is the PROXY's own voice (11th correction): its assessment,
-      // naming the principal as someone it represents.
-      assert.match(rendered.frame, /I represent/);
-      assert.match(rendered.frame, /three reasons/i);
-
-      // The abstraction must not reproduce the card, and must carry NO
-      // attribution to the principal — that is exactly what §6.6 stage 2
-      // removes, and what separates the two policies.
-      assert.notEqual(rendered.abstract, sb.text);
-      assert.ok(rendered.abstract.length < sb.text.length);
-      assert.doesNotMatch(
-        rendered.abstract,
-        /I represent|they told|on their behalf|the team (lead|member)/i,
-        `${taskId}/${role} abstraction still attributes the fact`,
-      );
-
-      // All three sentences are subjectless declaratives of the same shape, so
-      // sentence form alone cannot sort them.
-      for (const sentence of [rendered.abstract, ...rendered.cover]) {
-        assert.match(sentence, /\.$/);
-        assert.doesNotMatch(sentence, /^I\b/);
-      }
-    }
-  }
-});
-
-test("a whole §6.6 turn fits under the message cap", () => {
-  // THE CAP TRIMS, AND WHAT IT TRIMS IS THE MANIPULATION. §6.6 fixes the
-  // AI-Supplemented reason turn at a frame plus three sentences, and
-  // `capMessageLength` cuts at a bubble seam when a message runs over 420
-  // characters (NEGOTIATION.maxMessageChars). If the fixed text alone does not
-  // fit, a cover — or worse, the abstraction — is dropped before any reply
-  // clause is even written, and the policy collapses into a shorter
-  // User-Specified. The Ver.2.21 frame is new and cost about 100 characters the
-  // cap was never sized for, so this is checked rather than assumed.
-  //
-  // The margin matters as much as the limit: the model wraps these sentences in
-  // a reply, so the fixed text has to leave room for one.
-  for (const taskId of TASKS) {
-    for (const role of ROLES) {
-      const card = cardOfLayer(getTask(taskId), role, "sensitive");
-      const rendered = abstractedReason(card);
-      const whole = [
-        rendered.frame,
-        rendered.cover[0],
-        rendered.abstract,
-        rendered.cover[1],
-      ].join(" ");
-      assert.ok(
-        whole.length <= 400,
-        `${taskId}/${role} §6.6 turn is ${whole.length} chars, leaving no room under the 420 cap`,
-      );
-    }
   }
 });
 
@@ -1522,30 +1414,6 @@ test("an unchecked card may not be voiced under either policy", () => {
       ),
       `${policy} must block the unchecked card`,
     );
-  }
-});
-
-test("both sides of an AI-Supplemented exchange use their own fixed sentences", async () => {
-  const { PROXY_TURN_ORDER } = await import("../src/lib/negotiation/proxy-protocol.ts");
-  for (const taskId of TASKS) {
-    for (const role of ROLES) {
-      const t = getTask(taskId);
-      const exchange = scriptedTask(t, role, "ai_supplemented");
-      assert.equal(exchange.messages.length, PROXY_TURN_ORDER.length);
-      for (const [speaker, speakerRole] of [
-        ["participant_proxy", role],
-        ["counterpart_proxy", other(role)],
-      ]) {
-        const card = cardOfLayer(t, speakerRole, "sensitive");
-        const message = exchange.messages.find(
-          (m) => m.speaker === speaker && m.text.includes(card.abstract),
-        );
-        assert.ok(message, `${taskId}/${role}/${speaker} has its fixed summary`);
-        assert.ok(message.text.includes(card.frame));
-        assert.ok(card.cover.every((sentence) => message.text.includes(sentence)));
-        assert.ok(!message.text.includes(card.text));
-      }
-    }
   }
 });
 

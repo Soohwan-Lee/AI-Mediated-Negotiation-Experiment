@@ -1,21 +1,4 @@
-/**
- * The AI-AI exchange's contract (Ver.2.21 §6.5, §6.6, §6.10).
- *
- * THE FIRST TEST HERE IS THE ONE THAT MATTERS MOST. `abstractedSentences` was
- * once computed, protected in the length cap and used for the retry check —
- * and never put into the prompt, so P4 rendered "(none this turn)" and the
- * model improvised. The AI-Supplemented arm ran as a paraphrase of
- * User-Specified: a plausible transcript, wrong data, and nothing in any log to
- * say so. Everything downstream of the prompt was right; only the wire into it
- * was missing. So these assert what reaches the PROMPT, not what the route
- * computed.
- *
- * The rest pin the things §6.6 and §7 make load-bearing: the frame leads and is
- * never shuffled, the three sentences are shuffled, cover ① rides the decline
- * turn on the WR-only path, the response shape is identical under both
- * policies, and `voicedTier` floors at `work` rather than the deleted
- * `priority`.
- */
+/** Runtime contract for full factual bases and two public work benefits. */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -24,6 +7,8 @@ import ts from "typescript";
 const machine = await import("../src/lib/negotiation/machine.ts");
 const tasks = await import("../src/lib/tasks.ts");
 const protocol = await import("../src/lib/negotiation/proxy-protocol.ts");
+const presentation = await import("../src/lib/proxy-reason-presentation.ts");
+const schema = await import("../src/lib/ai/schema.ts");
 const validator = await import("../src/lib/ai/validator.ts");
 
 const TASK_A = tasks.getTask("task_a");
@@ -33,7 +18,7 @@ const { buildSystemPrompt } = await import("../src/lib/ai/prompts.ts");
  * Loads the route with a `generateAction` that records every prompt context it
  * is handed and echoes back whatever rationale the test asks for.
  */
-async function loadRoute(rationaleFor = () => "The position stands.") {
+async function loadRoute(rationaleFor = () => "The position stands.", actionOverrides = {}, validationOverride = validator, audit = async () => {}) {
   const seen = [];
   const source = await readFile(
     new URL("../src/app/api/proxy-negotiation/route.ts", import.meta.url),
@@ -48,6 +33,7 @@ async function loadRoute(rationaleFor = () => "The position stands.") {
   });
   const loadedModule = { exports: {} };
   const dependencies = {
+    "@/lib/server/negotiation-audit": { beginNegotiationAudit: async () => audit },
     "next/server": {
       NextResponse: { json: (body, init) => Response.json(body, init) },
     },
@@ -65,16 +51,19 @@ async function loadRoute(rationaleFor = () => "The position stands.") {
             rationale: rationaleFor(ctx),
             unresolved: false,
             internalProvenance: "principal_reason",
+            ...actionOverrides,
           },
           stubbed: false,
         };
       },
     },
     "@/lib/study-config": { NEGOTIATION: { maxMessageChars: 420 } },
-    "@/lib/ai/validator": validator,
+    "@/lib/ai/validator": validationOverride,
     "@/lib/negotiation/machine": machine,
     "@/lib/negotiation/proxy-protocol": protocol,
     "@/lib/tasks": tasks,
+    "@/lib/proxy-reason-presentation": presentation,
+    "@/lib/ai/schema": schema,
   };
   const require = (specifier) => {
     if (specifier in dependencies) return dependencies[specifier];
@@ -120,6 +109,21 @@ function post(POST, body) {
   );
 }
 
+test("Proxy provenance and guardrail details remain server-only and required audit fails closed", async () => {
+  const entries = [];
+  const { POST } = await loadRoute(() => "invented wording", {}, validator, async entry => entries.push(entry));
+  const body = { policy: "ai_supplemented", mandate: mandate("member", { sb: true }), turn: 1 };
+  const response = await post(POST, body);
+  assert.equal(response.status, 200);
+  const visible = await response.json();
+  assert.equal(entries[0].action.internalProvenance, "principal_reason_with_ai_work_benefits");
+  assert.equal(entries[0].reasonCardId, SB_A_MEMBER.id);
+  assert.equal(entries[0].blocked, false);
+  assert.equal(visible.message.internalProvenance, undefined);
+  const unavailable = await loadRoute(undefined, {}, validator, async () => { throw new Error("storage unavailable"); });
+  assert.ok((await post(unavailable.POST, body)).status >= 500);
+});
+
 function rawPost(POST, body) {
   return POST(new Request("https://example.test/api/proxy-negotiation", {
     method: "POST",
@@ -130,187 +134,70 @@ function rawPost(POST, body) {
 
 const SB_A_MEMBER = tasks.cardOfLayer(TASK_A, "member", "sensitive");
 
-test("the §6.6 sentences REACH THE PROMPT, frame and all", async () => {
-  const { POST, seen } = await loadRoute();
-  await post(POST, {
-    policy: "ai_supplemented",
-    mandate: mandate("member", { sb: true }),
-    turn: protocol.PROXY_FIRST_REASON_TURN,
-  });
-  const ctx = seen.at(-1);
-  assert.equal(ctx.supplementedFrame, SB_A_MEMBER.frame);
-  assert.equal(ctx.abstractedSentences.length, 3);
-  assert.ok(
-    ctx.abstractedSentences.includes(SB_A_MEMBER.abstract),
-    "the abstraction must be among the sentences handed to the model",
-  );
-  for (const cover of SB_A_MEMBER.cover) {
-    assert.ok(ctx.abstractedSentences.includes(cover));
-  }
-});
-
-test("User-Specified is handed the card itself and no §6.6 sentences", async () => {
-  const { POST, seen } = await loadRoute();
-  await post(POST, {
-    policy: "user_specified",
-    mandate: mandate("member", { sb: true }),
-    turn: protocol.PROXY_FIRST_REASON_TURN,
-  });
-  const ctx = seen.at(-1);
-  assert.equal(ctx.abstractedSentences, undefined);
-  assert.equal(ctx.supplementedFrame, undefined);
-  assert.ok(
-    ctx.decidedAction.includes(SB_A_MEMBER.text),
-    "the card's own text is what this policy relays",
-  );
-});
-
-test("the three sentences are shuffled, so position carries no signal", async () => {
-  // If the abstraction always led (or trailed), a receiver could sort the
-  // principal's own circumstance out of the three by layout alone, and
-  // OTHER-AI2 would be measuring a formatting convention.
-  const orders = new Set();
-  for (let i = 0; i < 40; i += 1) {
+test("both policy prompts contain the same complete authorized factual base", async () => {
+  const bases = [];
+  for (const policy of ["user_specified", "ai_supplemented"]) {
     const { POST, seen } = await loadRoute();
-    await post(POST, {
-      policy: "ai_supplemented",
-      mandate: mandate("member", { sb: true }),
-      turn: protocol.PROXY_FIRST_REASON_TURN,
-    });
-    orders.add(seen.at(-1).abstractedSentences.join("|"));
-  }
-  assert.ok(orders.size > 1, "the sentence order never varied across 40 runs");
-});
-
-test("a dropped frame is put back by the route, not left to the model", async () => {
-  // MEASURED LIVE, THE MODEL DROPPED IT 3 TIMES IN 8. The turn already asks
-  // the proxy to introduce itself, and the frame competed with that
-  // instruction and lost — the same way the Ver.2.14 pool clause failed, and
-  // the same fix: the route places it rather than requesting it.
-  //
-  // It is not cosmetic. The frame is what makes the three sentences read as
-  // the PROXY'S OWN assessment rather than a relay, and whether responsibility
-  // still lands on the principal is what OTHER-AI4 and ATTR2 measure.
-  const { POST } = await loadRoute(
-    () =>
-      "I am the AI Proxy for the team member I represent.||On the presentations, there has been feedback from the client side.",
-  );
-  const body = await (
-    await post(POST, {
-      policy: "ai_supplemented",
-      mandate: mandate("member", { sb: true }),
-      turn: protocol.PROXY_FIRST_REASON_TURN,
-    })
-  ).json();
-  const text = body.message.text;
-  assert.ok(
-    /three reasons/i.test(text),
-    `the frame must be restored: ${text}`,
-  );
-  // And it lands AFTER the self-introduction, so the message still opens the
-  // way a representative would.
-  const bubbles = text.split("||").map((b) => b.trim());
-  assert.ok(/Proxy/i.test(bubbles[0]), `intro must stay first: ${text}`);
-});
-
-test("a frame the model already wrote is not duplicated", async () => {
-  const { POST } = await loadRoute(
-    (ctx) =>
-      `${ctx.supplementedFrame}||On the presentations, there has been feedback from the client side.`,
-  );
-  const body = await (
-    await post(POST, {
-      policy: "ai_supplemented",
-      mandate: mandate("member", { sb: true }),
-      turn: protocol.PROXY_FIRST_REASON_TURN,
-    })
-  ).json();
-  const hits = body.message.text.match(/three reasons/gi) ?? [];
-  assert.equal(hits.length, 1, `frame appears ${hits.length} times`);
-});
-
-test("User-Specified is never given a frame to insert", async () => {
-  const { POST } = await loadRoute(() => "They tell me the client asked.");
-  const body = await (
-    await post(POST, {
-      policy: "user_specified",
-      mandate: mandate("member", { sb: true }),
-      turn: protocol.PROXY_FIRST_REASON_TURN,
-    })
-  ).json();
-  assert.ok(!/three reasons/i.test(body.message.text));
-});
-
-test("the frame is never shuffled into the three", async () => {
-  for (let i = 0; i < 20; i += 1) {
-    const { POST, seen } = await loadRoute();
-    await post(POST, {
-      policy: "ai_supplemented",
-      mandate: mandate("member", { sb: true }),
-      turn: protocol.PROXY_FIRST_REASON_TURN,
-    });
+    await post(POST, { policy, mandate: mandate("member", { sb: true }), turn: 1 });
     const ctx = seen.at(-1);
-    assert.ok(!ctx.abstractedSentences.includes(ctx.supplementedFrame));
+    bases.push(ctx.reasonPresentation.base);
+    assert.ok(ctx.reasonPresentation.base.includes(SB_A_MEMBER.relayed));
+    const prompt = buildSystemPrompt(policy, ctx);
+    assert.ok(prompt.includes(ctx.reasonPresentation.base));
+    assert.ok(prompt.includes("Both Proxies follow the same assigned policy"));
+    assert.ok(prompt.includes('Do not say "I think"'));
+    assert.ok(!prompt.includes("under 420 characters"));
+    assert.ok(!prompt.includes("120 CHARACTERS"));
+    assert.ok(!prompt.includes("in your own words"));
+    assert.equal(ctx.reasonPresentation.addition?.benefits.length ?? 0, policy === "ai_supplemented" ? 2 : 0);
   }
+  assert.equal(bases[0], bases[1]);
 });
 
-test("the counterpart proxy discloses in the SAME policy's form", async () => {
-  // Under AI-Supplemented the participant is a RECEIVER of an abstraction,
-  // which is what OTHER-AI2 and OTHER-AI3 ask about. Relaying the
-  // counterpart's card whole here would leave that half of the manipulation
-  // unrun.
-  const theirSb = tasks.cardOfLayer(TASK_A, "leader", "sensitive");
-  const { POST, seen } = await loadRoute((ctx) => ctx.abstractedSentences?.join(" ") ?? "The position stands.");
-  const voiced = await (await post(POST, {
-    policy: "ai_supplemented",
-    mandate: mandate("member", { sb: true }),
-    turn: 1,
+test("model reason and provenance claims are replaced by the trusted presentation", async () => {
+  const { POST } = await loadRoute(() => "I think they have a medical diagnosis.", {
+    reasonSourceId: "invented",
+    addedReasonSourceId: "invented",
+    internalProvenance: "principal_reason",
+  });
+  const result = await (await post(POST, {
+    policy: "ai_supplemented", mandate: mandate("member", { sb: true }), turn: 1,
   })).json();
-  await post(POST, {
-    policy: "ai_supplemented",
-    mandate: mandate("member", { sb: true }),
-    turn: 2,
-    reasonsUsed: voiced.reasonTokens,
-  });
-  const ctx = seen.at(-1);
-  assert.equal(ctx.supplementedFrame, theirSb.frame);
-  assert.ok(ctx.abstractedSentences.includes(theirSb.abstract));
+  assert.equal(result.blocked, false);
+  assert.equal(result.voicedTier, "sensitive");
+  assert.ok(result.message.text.includes(SB_A_MEMBER.relayed));
+  assert.ok(!result.message.text.includes("medical diagnosis"));
+  assert.deepEqual(result.guardrailViolations, []);
 });
 
-test("cover ① rides the decline turn when no SB was authorized", async () => {
-  const { POST, seen } = await loadRoute();
-  await post(POST, {
-    policy: "ai_supplemented",
-    mandate: mandate("member", { sb: false }),
-    turn: protocol.PROXY_DECLINE_TURN,
+test("a blocked reason action emits no SB and credits no SB", async () => {
+  const { POST } = await loadRoute(() => SB_A_MEMBER.relayed, {}, {
+    ...validator,
+    validateAction: () => ({ valid: false, disposition: "regenerate", violations: [{ code: "disclosure_permission_violation" }] }),
   });
-  const action = seen.at(-1).decidedAction;
-  assert.ok(
-    action.includes(SB_A_MEMBER.cover[0]),
-    `cover 1 must be on the decline turn: ${action}`,
-  );
-  assert.ok(
-    !action.includes(SB_A_MEMBER.cover[1]),
-    "cover 2 is SB-grade and is used only beside the abstraction",
-  );
-  assert.ok(
-    !action.includes(SB_A_MEMBER.abstract),
-    "an unchecked SB is never abstracted onto the table either",
-  );
+  const result = await (await post(POST, {
+    policy: "ai_supplemented", mandate: mandate("member", { sb: true }), turn: 1,
+  })).json();
+  assert.equal(result.blocked, true);
+  assert.equal(result.voicedTier, "work");
+  assert.ok(!result.message.text.includes(SB_A_MEMBER.relayed));
+  const reciprocal = await (await post(POST, {
+    policy: "ai_supplemented", mandate: mandate("member", { sb: true }), turn: 2,
+    reasonsUsed: result.reasonTokens,
+  })).json();
+  assert.notEqual(reciprocal.decidedAction, "disclose_sb");
 });
 
-test("User-Specified adds nothing on the decline turn", async () => {
-  const { POST, seen } = await loadRoute();
-  await post(POST, {
-    policy: "user_specified",
-    mandate: mandate("member", { sb: false }),
-    turn: protocol.PROXY_DECLINE_TURN,
+for (const policy of ["user_specified", "ai_supplemented"]) {
+  test(`${policy} adds no reason on the decline turn`, async () => {
+    const { POST, seen } = await loadRoute(() => "Invented sensitive fact.");
+    const result = await (await post(POST, {
+      policy, mandate: mandate("member"), turn: protocol.PROXY_DECLINE_TURN,
+    })).json();
+    assert.equal(seen.at(-1).reasonPresentation, undefined);
+    assert.ok(!result.message.text.includes("Invented"));
   });
-  const action = seen.at(-1).decidedAction;
-  for (const cover of SB_A_MEMBER.cover) {
-    assert.ok(!action.includes(cover));
-  }
-});
+}
 
 test("an unchecked SB never reaches the prompt as a sayable reason", async () => {
   const { POST, seen } = await loadRoute();
@@ -323,7 +210,7 @@ test("an unchecked SB never reaches the prompt as a sayable reason", async () =>
   assert.equal(ctx.forbiddenReasons, undefined, "withheld facts must not enter the render prompt");
   assert.ok(!ctx.authorizedReasons.some((r) => r.id === SB_A_MEMBER.id));
   assert.ok(!ctx.decidedAction.includes(SB_A_MEMBER.text));
-  assert.equal(ctx.abstractedSentences, undefined);
+  assert.ok(ctx.reasonPresentation.base.includes(tasks.cardOfLayer(TASK_A, "member", "work").relayed));
 });
 
 test("the work reason is authorized even when the mandate omits its id", async () => {
@@ -418,6 +305,29 @@ test("a model that invents a reason trips provenance_policy_violation", async ()
     result.violations.some((v) => v.code === "provenance_policy_violation"),
   );
   assert.equal(result.disposition, "regenerate");
+});
+
+test("work-benefit provenance is accepted only as a matched pair under AI-Supplemented", () => {
+  for (const policy of ["direct", "user_specified", "ai_supplemented"]) {
+    for (const paired of [false, true]) {
+      const result = validator.validateAction({
+        actionType: "propose", stage: 2, issueTargets: [], proposedTerms: [],
+        reasonSourceId: null, addedReasonSourceId: schema.AI_WORK_BENEFITS_SOURCE_ID,
+        rationale: "Both work arrangements matter.", unresolved: false,
+        internalProvenance: paired ? "principal_reason_with_ai_work_benefits" : "principal_reason",
+      }, { issues: TASK_A.issues, policy, actorRole: "member" });
+      assert.equal(result.valid, paired && policy === "ai_supplemented");
+    }
+  }
+});
+
+test("a generation failure remains an error instead of a successful canonical turn", async () => {
+  const { POST } = await loadRoute(() => { throw new Error("Generation unavailable"); });
+  const response = await post(POST, {
+    policy: "ai_supplemented", mandate: mandate("member", { sb: true }), turn: 1,
+  });
+  assert.ok(response.status >= 500);
+  assert.equal((await response.json()).message, undefined);
 });
 
 test("a turn outside the seven-turn order is a 400", async () => {
@@ -560,11 +470,9 @@ for (const taskId of ["task_a", "task_b"]) {
           for (const ctx of seen) {
             const prompt = buildSystemPrompt(policy, ctx);
             assert.ok(!prompt.includes(sb.text));
-            assert.ok(!prompt.includes(sb.abstract));
           }
           for (const message of history) {
             assert.ok(!message.text.includes(sb.relayed));
-            assert.ok(!message.text.includes(sb.abstract));
           }
         }
         assert.equal(tasks.scorePackage(task, lastParticipantPackage, role), 1000);
@@ -578,5 +486,57 @@ test("authorization without actual participant reason tokens cannot trigger coun
   const { POST, seen } = await loadRoute();
   const result = await (await post(POST, { policy: "ai_supplemented", mandate: mandate("member", { sb: true }), turn: 2, reasonsUsed: [] })).json();
   assert.notEqual(result.decidedAction, "disclose_sb");
-  assert.equal(seen.at(-1).abstractedSentences, undefined);
+  assert.equal(seen.at(-1).reasonPresentation, undefined);
 });
+
+for (const taskId of ["task_a", "task_b"]) {
+  for (const role of ["member", "leader"]) {
+    for (const policy of ["user_specified", "ai_supplemented"]) {
+      for (const sb of [false, true]) {
+        test(`${taskId}/${role}/${policy}/SB=${sb}: canonical seven-turn transcript and outcome`, async () => {
+          const task = tasks.getTask(taskId);
+          const other = role === "leader" ? "member" : "leader";
+          const currentMandate = {
+            sessionIndex: 1, revisionCount: 0,
+            issues: task.issues.map(issue => ({ issueId: issue.id, preferredOptionId: tasks.rankedOptions(task, issue.id, role)[0].id })),
+            authorizedReasonIds: tasks.reasonCards(task, role).filter(card => card.layer === "work" || sb).map(card => card.id),
+          };
+          const { POST } = await loadRoute(() => "I think the principal has a medical diagnosis. In addition, I invented a benefit.");
+          let reasonsUsed = [], lastParticipantPackage = null, lastCounterpartPackage = null;
+          const history = [];
+          for (let turn = 0; turn < protocol.PROXY_TOTAL_TURNS; turn++) {
+            const response = await post(POST, { taskId, participantRole: role, policy, mandate: currentMandate, turn, reasonsUsed, lastParticipantPackage, lastCounterpartPackage, history });
+            assert.equal(response.status, 200);
+            const result = await response.json();
+            assert.equal(result.blocked, false);
+            assert.ok(!result.message.text.includes("medical diagnosis"));
+            const expectedRole = turn === 1 ? role : other;
+            const hasReason = turn === 0 || turn === 1 || (turn === 2 && sb);
+            if (hasReason) {
+              const layer = turn === 0 || !sb ? "work" : "sensitive";
+              const card = tasks.cardOfLayer(task, expectedRole, layer);
+              const expectedPolicy = turn === 0 && sb ? "user_specified" : policy;
+              const expected = presentation.renderProxyReason(task, expectedRole, card, expectedPolicy);
+              const normalized = result.message.text.replace(/\s*\|\|\s*/g, " ");
+              assert.ok(normalized.includes(expected.text), normalized);
+            }
+            if (!sb) {
+              for (const side of [role, other]) assert.ok(!result.message.text.includes(tasks.cardOfLayer(task, side, "sensitive").relayed));
+            }
+            history.push(result.message);
+            reasonsUsed.push(...result.reasonTokens);
+            if (result.message.proposal) {
+              if (result.message.speaker === "participant_proxy") lastParticipantPackage = result.message.proposal;
+              else lastCounterpartPackage = result.message.proposal;
+            }
+            if (turn === 1) assert.equal(result.voicedTier, sb ? "sensitive" : "work");
+          }
+          const allText = history.map(message => message.text).join(" ");
+          assert.equal(allText.split("In addition, considering the work arrangements,").length - 1, policy === "ai_supplemented" ? 2 : 0);
+          assert.equal(tasks.scorePackage(task, lastParticipantPackage, role), sb ? 3000 : 1000);
+          assert.equal(tasks.scorePackage(task, lastParticipantPackage, other), sb ? 3000 : 1000);
+        });
+      }
+    }
+  }
+}

@@ -94,6 +94,7 @@ import {
 } from "@/lib/study-config";
 import { getStore } from "@/lib/store";
 import { writeStopReason } from "@/lib/check-gates";
+import { markTaskInterrupted } from "@/lib/task-run";
 import {
   cardOfLayer,
   packageValue,
@@ -109,6 +110,9 @@ import type {
   Package,
   Role,
 } from "@/lib/types";
+
+export const EXPLICIT_NO_AGREEMENT_REASON =
+  "participant_ended_without_agreement";
 
 // ---------------------------------------------------------------------------
 // Phase: the cover
@@ -178,7 +182,7 @@ export function TaskIntro({
             <div className="mb-3">
               <p className="mb-2.5 font-bold text-blue-950">
                 <span aria-hidden>🤖</span>{" "}
-                In this task, an AI Proxy speaks for you.
+                Your AI Proxy negotiates on your behalf.
               </p>
               <ProxyFlowSteps />
             </div>
@@ -209,7 +213,7 @@ export function TaskIntro({
       steps={[]}
       scene={scene}
       minutes={minutes ?? STAGE_MINUTES.task}
-      actionLabel={`Start Task ${taskIndex}`}
+      actionLabel={`Read Task ${taskIndex} briefing`}
       onStart={onStart}
     />
   );
@@ -350,7 +354,10 @@ export function TaskBrief({
               Points are not money. They show how well an agreement fits your goals.
             </p>
             <IssueValueTable issues={task.issues} role={role} reservationPoints={task.reservationPoints} />
-            <p className="mt-4 text-sm font-bold">Do not share point numbers in the conversation.</p>
+            <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2.5 text-sm font-bold leading-relaxed text-rose-950">
+              <span aria-hidden className="shrink-0">🔒</span>
+              <span>Do not share point numbers in the conversation.</span>
+            </div>
           </Card>
         )}
       </Page>
@@ -814,6 +821,77 @@ export function TermsList({
   );
 }
 
+export function CurrentOfferDecision({
+  task,
+  offer,
+  disabled,
+  onAccept,
+}: {
+  task: NegotiationTask;
+  offer: Package;
+  disabled: boolean;
+  onAccept: () => void;
+}) {
+  return (
+    <div className="mb-4">
+      <Card className="mb-2.5 border-emerald-200 bg-emerald-50/30">
+        <CardTitle>Current offer</CardTitle>
+        <div className="mt-3">
+          <TermsList task={task} terms={offer} />
+        </div>
+      </Card>
+      <button
+        type="button"
+        onClick={onAccept}
+        disabled={disabled}
+        className="w-full rounded-xl border-2 border-emerald-700 bg-emerald-600 px-5 py-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
+      >
+        ✓ Accept current offer
+      </button>
+    </div>
+  );
+}
+
+export function EndWithoutAgreementControl({
+  onConfirm,
+}: {
+  onConfirm: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  return confirming ? (
+    <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+      <p className="text-sm font-semibold text-amber-950">
+        This ends this task with no agreement. Both sides receive 0 task points.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="rounded-lg bg-amber-800 px-4 py-2 text-sm font-bold text-white hover:bg-amber-900"
+        >
+          Confirm end
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+        >
+          Keep negotiating
+        </button>
+      </div>
+    </div>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      className="mb-6 text-sm font-semibold text-slate-600 underline underline-offset-4 hover:text-slate-900"
+    >
+      End without agreement (0 task points)
+    </button>
+  );
+}
+
 /**
  * What the package is worth to you.
  *
@@ -1101,6 +1179,7 @@ export function DirectNegotiation({
   const expiryPending = useRef(false);
   const [replies, setReplies] = useState(0);
   const [settled, setSettled] = useState<"agreed" | "impasse" | null>(null);
+  const [endReason, setEndReason] = useState<string | null>(null);
   const [finalPackage, setFinalPackage] = useState<Package | null>(
     openingPackage,
   );
@@ -1246,6 +1325,7 @@ export function DirectNegotiation({
     // inside the same tick.
     if (settledRef.current) return;
     settledRef.current = true;
+    setEndReason(reason);
     setFinalPackage(pkg);
     setSettled(kind);
     const committedTier = committed?.tier ?? tier;
@@ -1419,6 +1499,8 @@ export function DirectNegotiation({
                   taskId: task.id,
                   role,
                   messages: turn.texts,
+                  sessionIndex: taskIndex,
+                  messageId: turn.ownId,
                 }),
               },
               {
@@ -1501,8 +1583,11 @@ export function DirectNegotiation({
             reasonLabel: storedLabel(label),
             reasonConfidence: confidence,
           });
+          markTaskInterrupted(participantKey, taskIndex);
           writeStopReason(participantKey, "withdrawal");
         }
+        // Queue the final utterance before closing its server-side attempt.
+        logEvent("negotiation_ended", { phase: "withdrawal" }, { sessionIndex: taskIndex });
         router.push("/study-stop?reason=withdrawal");
         return;
       }
@@ -1639,6 +1724,12 @@ export function DirectNegotiation({
               stage: stageNow,
               incoming,
               afterProxy: true,
+              sessionIndex: taskIndex,
+              messageId: `d-c${next.length}`,
+              observedProxyContext: {
+                messages: proxyTranscript.map(({ speaker, text }) => ({ speaker, text })),
+                provisionalPackage: openingPackage,
+              },
               history: next.map((m) => ({
                 role: m.speaker === "participant" ? "user" : "assistant",
                 content: m.text,
@@ -1996,6 +2087,12 @@ export function DirectNegotiation({
               stage: stageNow,
               incoming: null,
               afterProxy: true,
+              sessionIndex: taskIndex,
+              messageId: `d-nudge${messages.length}`,
+              observedProxyContext: {
+                messages: proxyTranscript.map(({ speaker, text }) => ({ speaker, text })),
+                provisionalPackage: openingPackage,
+              },
               history: messages.map((m) => ({
                 role: m.speaker === "participant" ? "user" : "assistant",
                 content: m.text,
@@ -2091,11 +2188,27 @@ export function DirectNegotiation({
    */
   function acceptStanding() {
     if (!lastCounterpartPackage || pending || stagedTurn || settled) return;
-    setOffer(lastCounterpartPackage);
+    const currentOffer = { ...lastCounterpartPackage };
+    setOffer(currentOffer);
     void send(
       "I agree to the current offer.",
-      lastCounterpartPackage,
+      currentOffer,
     );
+  }
+
+  function endWithoutAgreement() {
+    if (settledRef.current) return;
+    turnGeneration.current += 1;
+    requestedTurn.current += 1;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    expiryPending.current = false;
+    recoveryStartedAt.current = null;
+    setRecovering(false);
+    setPending(false);
+    setTurnError(null);
+    setStagedTurn(null);
+    settle("impasse", null, EXPLICIT_NO_AGREEMENT_REASON);
   }
 
   return (
@@ -2114,7 +2227,7 @@ export function DirectNegotiation({
 
           <NavigationNotice className="mb-3" />
 
-          {openingPackage ? <Card className="mb-3"><CardTitle>Provisional agreement</CardTitle><TermsList task={task} terms={openingPackage} /><p className="mt-3 text-sm text-slate-600">Confirm or adjust these terms together in the conversation below.</p></Card> : null}
+          {openingPackage ? <Card className="mb-3"><CardTitle>Proxy provisional agreement</CardTitle><TermsList task={task} terms={openingPackage} /><p className="mt-3 text-sm text-slate-600">This is the starting package from the Proxy exchange. A newer current offer below replaces it.</p></Card> : null}
           <ProxyTranscriptPanel transcript={proxyTranscript} />
 
           <div className="sticky top-[calc(var(--header-h)+0.25rem)] z-20 mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/95 px-4 py-3 shadow-sm backdrop-blur-md sm:px-5">
@@ -2126,7 +2239,9 @@ export function DirectNegotiation({
                   {settled === "agreed"
                     ? "✓ You have reached a mutual agreement!"
                     : settled === "impasse"
-                      ? "⚠️ Time ran out. Nothing is settled, so you both score 0 for this task."
+                      ? endReason === EXPLICIT_NO_AGREEMENT_REASON
+                        ? "You ended this task without agreement. Both sides receive 0 task points."
+                        : "No agreement was reached. Both sides receive 0 task points."
                       : openingPackage
                         ? "You are talking directly with the other participant. Confirm or adjust what the proxies reached."
                         : // NO STANDING PACKAGE, and two different things
@@ -2229,26 +2344,16 @@ export function DirectNegotiation({
             />
           </Card>
 
-          {/* NO PARTICIPANT-INITIATED IMPASSE. A closing conversation ends the
-              same three ways as the Direct arm's: a package the counterpart
-              accepts by the ladder, this explicit Accept, or the clock. The
-              "End without agreement" control was only ever here, so it gave
-              the Proxy arm a route to the no-agreement outcome that Direct has
-              no counterpart for — on the primary contrast, taken by the
-              participant rather than by the machine. Restore it only in BOTH
-              arms at once, if at all. */}
           {!settled && lastCounterpartPackage ? (
-            <div className="mb-6 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={acceptStanding}
-                disabled={pending || Boolean(stagedTurn)}
-                className="w-full rounded-xl border-2 border-emerald-700 bg-emerald-600 px-5 py-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
-              >
-                ✓ Accept current offer
-                <span className="mt-1 block text-sm font-normal">{task.issues.map((issue) => `${issue.label}: ${issue.options.find((o) => o.id === lastCounterpartPackage[issue.id])?.label ?? ""}`).join(" · ")}</span>
-              </button>
-            </div>
+            <CurrentOfferDecision
+              task={task}
+              offer={lastCounterpartPackage}
+              disabled={pending || Boolean(stagedTurn)}
+              onAccept={acceptStanding}
+            />
+          ) : null}
+          {!settled ? (
+            <EndWithoutAgreementControl onConfirm={endWithoutAgreement} />
           ) : null}
 
 

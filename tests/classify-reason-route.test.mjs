@@ -51,7 +51,20 @@ const TASK_A = {
   ],
 };
 
-async function loadRoute(classifyReason) {
+test("classifier persists full private flags before success and refuses unsaved results", async () => {
+  const entries = [];
+  const POST = await loadRoute(async () => result({ stance: "conditional", bonusRequest: true }), async entry => entries.push(entry));
+  const response = await POST(request({ messages: ["My workload is heavy.", "I agree if I get the bonus."] }));
+  assert.equal(response.status, 200);
+  assert.equal(entries[0].input.messages.length, 2);
+  assert.equal(entries[0].result.stance, "conditional");
+  assert.equal(entries[0].result.bonusRequest, true);
+  assert.equal((await response.json()).audit, undefined);
+  const unavailable = await loadRoute(async () => result(), async () => { throw new Error("storage unavailable"); });
+  assert.equal((await unavailable(request())).status, 503);
+});
+
+async function loadRoute(classifyReason, audit = async () => {}) {
   const source = await readFile(
     new URL("../src/app/api/classify-reason/route.ts", import.meta.url),
     "utf8",
@@ -65,6 +78,7 @@ async function loadRoute(classifyReason) {
   });
   const loadedModule = { exports: {} };
   const dependencies = {
+    "@/lib/server/negotiation-audit": { beginNegotiationAudit: async () => audit },
     "next/server": {
       NextResponse: { json: (body, init) => Response.json(body, init) },
     },

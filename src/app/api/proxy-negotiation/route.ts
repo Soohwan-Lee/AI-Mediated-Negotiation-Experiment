@@ -14,14 +14,14 @@
  *   2 counterpart proxy  its own principal's SB only after participant-side SB
  *   3 counterpart proxy  the tier package (T1 with no SB, T2 with one)
  *   4 participant proxy  with an SB: accept. Without: decline once and state
- *                        the priority (AI-Supplemented adds cover ① here)
+ *                        the priority
  *   5 counterpart proxy  with an SB: confirm. Without: ASKWHY and T1 again
  *   6 participant proxy  accept, and hand the package back for direct mutual confirmation
  *
  * BOTH POLICIES RUN THE SAME TURNS, and that is an exposure control (§7): if
  * one policy simply got more turns to speak in, any difference in what the
  * counterpart learns would be confounded with how much was said. They differ
- * only in the WORDING of the participant proxy's reason turns.
+ * only in the two added work-benefit arguments on each proxy's reason turn.
  *
  * ONE TURN PER REQUEST: the client drives the sequence, each request stays
  * well inside Vercel's 60s limit, and the waiting screen shows real progress.
@@ -35,7 +35,9 @@ import {
   PROXY_DECLINE_TURN,
 } from "@/lib/negotiation/proxy-protocol";
 import { generateAction } from "@/lib/ai/client";
+import { beginNegotiationAudit } from "@/lib/server/negotiation-audit";
 import { capMessageLength, validateAction } from "@/lib/ai/validator";
+import { AI_WORK_BENEFITS_SOURCE_ID } from "@/lib/ai/schema";
 import { NEGOTIATION } from "@/lib/study-config";
 import {
   buildProxyPlan,
@@ -51,9 +53,13 @@ import {
   cardOfLayer,
   counterRequirementIssue,
   getTask,
-  abstractedReason,
   requirementIssue,
 } from "@/lib/tasks";
+import {
+  formatProxyReasonBubbles,
+  renderProxyReason,
+  type ProxyReasonPresentation,
+} from "@/lib/proxy-reason-presentation";
 import type {
   Mandate,
   NegotiationTask,
@@ -235,94 +241,6 @@ function resolveReasonTokens(
     const hit = byToken.get(key);
     return hit ? [{ key, ...hit }] : [];
   });
-}
-
-/**
- * Does this message carry the designated clause's substance?
- *
- * Content-word overlap, not a substring: the proxies are REQUIRED to reframe
- * a card rather than quote it (§6.5, §6.6), so an exact match would fail on
- * every correct message. A third of the clause's distinctive words is
- * deliberately lenient — the check exists to catch a message that dropped the
- * reason entirely, and a false "it is there" costs far less than re-rolling
- * good reframings in front of a waiting participant.
- */
-function mentionsCard(message: string, cardText: string): boolean {
-  const words = (t: string) =>
-    new Set(
-      t
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, " ")
-        .split(/\s+/)
-        .filter((w) => w.length > 4),
-    );
-  const want = words(cardText);
-  if (want.size === 0) return true;
-  const have = words(message);
-  let hits = 0;
-  for (const w of want) if (have.has(w)) hits += 1;
-  return hits / want.size >= 0.33;
-}
-
-/**
- * Did this message already carry the §6.6 frame?
- *
- * NOT `mentionsCard`, AND THE DIFFERENCE MATTERS. That function asks whether a
- * FACT survived, at a deliberately lenient third of its distinctive words. The
- * frame shares most of its vocabulary with any correct message on this turn —
- * "member", "represent", "presentations" — so it scored exactly 0.33 against a
- * message that did not contain it at all, and the insertion never fired.
- *
- * The frame's job is to present the sentences as a COUNTED set of reasons the
- * proxy is giving on its own account, so that is what is tested for: the count
- * phrase, plus a recommendation about the term. Both halves, because either
- * alone appears in messages that are not framed.
- */
-function carriesFrame(message: string, frame: string): boolean {
-  const counted = /\b(three|3)\s+reasons\b|\breasons are\b|\bfor three\b/i;
-  if (!counted.test(message)) return false;
-  // The recommendation: the model may paraphrase "I think the office days
-  // should stay at four" freely, so this looks for the shape rather than the
-  // wording, and falls back to the frame's own distinctive words.
-  const recommends =
-    /\bI think\b|\bshould (stay|come down|be|remain)\b|\blooking at\b|\bhaving (looked|reviewed)\b|\breviewed\b/i;
-  if (recommends.test(message)) return true;
-  const words = (t: string) =>
-    new Set(
-      t
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, " ")
-        .split(/\s+/)
-        .filter((w) => w.length > 5),
-    );
-  const want = words(frame);
-  if (want.size === 0) return true;
-  const have = words(message);
-  let hits = 0;
-  for (const w of want) if (have.has(w)) hits += 1;
-  return hits / want.size >= 0.6;
-}
-
-/**
- * Order the §6.6 sentences so their POSITION carries nothing.
- *
- * If the abstraction always came first (or last), a receiver could sort the
- * principal's own circumstance out of the three by layout alone, and
- * `OTHER-AI2` — "could you tell which reasons the counterpart had selected" —
- * would be measuring a formatting convention instead of the manipulation.
- *
- * THE FRAME IS NOT SHUFFLED. It is the proxy's own opening line and always
- * leads: "Looking at the side of the team member I represent, I think... Three
- * reasons —". It says nothing about any of the three and is identical whether
- * or not the abstraction is among them.
- */
-function shuffle<T>(items: readonly T[]): T[] {
-  const out = items.slice();
-  for (let i = out.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
 }
 
 /**
@@ -551,16 +469,8 @@ export async function POST(request: Request) {
   let decidedAction: string;
   /** The card the schedule told this turn to voice (participant side). */
   let designatedCard: ReasonCard | null = null;
-  /**
-   * The §6.6 sentences an AI-Supplemented proxy renders INSTEAD of the
-   * designated sensitive card — the abstraction plus its two covers, shuffled
-   * so the abstraction's position carries no signal.
-   */
-  let abstractedSentences: string[] | null = null;
-  /** The frame those sentences sit under — the proxy's own assessment. */
-  let supplementedFrame: string | null = null;
-  /** Cover ① on the decline turn, when no SB was authorized (§6.6 rule b). */
-  let supplementalReason: string | null = null;
+  /** Trusted visible wording for the designated reason, if this turn has one. */
+  let reasonPresentation: ProxyReasonPresentation | null = null;
   let accepted = false;
   /**
    * The AI-AI exchange has no way to end without a package (§2.6): the range
@@ -599,33 +509,20 @@ export async function POST(request: Request) {
       );
       proposal = plan.opening;
 
-      // AI-SUPPLEMENTED REPLACES THE CARD, IT DOES NOT DECORATE IT (§6.6).
-      // When the designated card is the sensitive one, the proxy renders its
-      // own frame plus the fixed abstraction and two covers instead of the
-      // card's text. The three are shuffled so position never marks which is
-      // the principal's — if the abstraction always came first or last, a
-      // receiver could sort them without reading, and OTHER-AI2 would be
-      // measuring a layout convention rather than the manipulation.
-      const abstracted =
-        body.policy === "ai_supplemented" &&
-        designatedCard?.layer === "sensitive"
-          ? abstractedReason(designatedCard)
-          : null;
-      if (abstracted) {
-        supplementedFrame = abstracted.frame;
-        abstractedSentences = shuffle([
-          abstracted.abstract,
-          ...abstracted.cover,
-        ]);
+      designatedCard ??= cardOfLayer(
+        task,
+        body.participantRole,
+        "work",
+      ) ?? null;
+      if (designatedCard) {
+        reasonPresentation = renderProxyReason(
+          task,
+          body.participantRole,
+          designatedCard,
+          body.policy,
+        );
       }
-
-      if (abstractedSentences) {
-        decidedAction = `Introduce yourself as the AI Proxy negotiating for ${principal} you represent, and answer their question. Then give your own assessment: open with the frame you are given, and render the three sentences you are given, in the order given, as one natural message. They are plain statements with no attribution — never say who told you any of them. Propose no levels this turn.`;
-      } else if (designatedCard?.layer === "sensitive") {
-        decidedAction = `Introduce yourself as the AI Proxy negotiating for ${principal} you represent, and answer their question. Relay exactly this authorized background, in your own representative voice, keeping every fact — the event, the third party, and the fact it was not passed on: "${designatedCard.text}". Do not add that the term cannot be changed. Propose no levels this turn.`;
-      } else {
-        decidedAction = `Introduce yourself as the AI Proxy negotiating for ${principal} you represent, and answer their question with this work reason and nothing more: "${designatedCard?.text ?? cardOfLayer(task, body.participantRole, "work")?.text ?? ""}". Do not say yet which term matters more. Propose no levels this turn.`;
-      }
+      decidedAction = `Introduce yourself as the AI Proxy negotiating for ${principal} you represent, answer their question, and use the complete required reason presentation exactly as supplied. Keep its base unchanged. If it includes an AI addition, keep the transition and both benefits in order. Propose no levels this turn.`;
     } else if (turn === PROXY_DECLINE_TURN) {
       // The counterpart has put its tier package up. With an SB authorized the
       // exchange is already at T2 and the proxy simply accepts; without one it
@@ -649,19 +546,6 @@ export async function POST(request: Request) {
       } else {
         proposal = plan.tradeProposal;
         decidedAction = `Decline the package they just put forward — say it is not what ${principal} you represent was hoping for — and say plainly that ${yourRequirement.label.toLowerCase()} matters more to them than ${theirRequirement.label.toLowerCase()}. Give no new background. Keep it to two short sentences.`;
-        if (body.policy === "ai_supplemented") {
-          // §6.6 RULE (b), and it is the one place the policy difference shows
-          // on the WR-only path. Cover ① is WR-GRADE role generality — it
-          // cannot move the tier, and is said as the PROXY's own view rather
-          // than as anything the principal said. Fixed, not shuffled: there is
-          // only one, and sessions have to be comparable.
-          supplementalReason =
-            cardOfLayer(task, body.participantRole, "sensitive")?.cover?.[0] ??
-            null;
-          if (supplementalReason) {
-            decidedAction += ` Then add this as your own view, prefaced that way ("and in my view..."): "${supplementalReason}". Do not present it as anything your principal told you, and add no private fact.`;
-          }
-        }
       }
     } else {
       // The last participant turn — the close, answering the counterpart's
@@ -690,7 +574,26 @@ export async function POST(request: Request) {
       // SCRIPT-OPEN (§6.1, §6.4): its principal's work reason — which names
       // BOTH terms — and the question. No package and no priority of its own.
       const openWr = cardOfLayer(task, counterpartRole, "work");
-      decidedAction = `Open the exchange. Introduce yourself as the AI Proxy negotiating for the ${counterpartRole === "leader" ? "team lead" : "team member"} you represent. Give their reason by conveying exactly this and nothing more: "${openWr?.text ?? ""}". Do NOT say which of the two terms matters most to them. Then ask what the situation is on the other side. Propose no levels this turn.`;
+      designatedCard = openWr ?? null;
+      const participantSb = cardOfLayer(
+        task,
+        body.participantRole,
+        "sensitive",
+      );
+      const participantSbAuthorized = Boolean(
+        participantSb && authorizedIds.includes(participantSb.id),
+      );
+      if (openWr) {
+        reasonPresentation = renderProxyReason(
+          task,
+          counterpartRole,
+          openWr,
+          body.policy === "ai_supplemented" && participantSbAuthorized
+            ? "user_specified"
+            : body.policy,
+        );
+      }
+      decidedAction = `Open the exchange. Introduce yourself as the AI Proxy negotiating for the ${counterpartRole === "leader" ? "team lead" : "team member"} you represent. Use the complete required reason presentation exactly as supplied, then ask what the situation is on the other side. Do not say which term matters most and propose no levels this turn.`;
     } else if (turn === 2 && tier !== "sensitive") {
       // No participant SB was actually voiced. Keep this matched turn WR-only.
       counterpartAction = "acknowledge_work";
@@ -701,22 +604,15 @@ export async function POST(request: Request) {
       const sb = cardOfLayer(task, counterpartRole, "sensitive");
       designatedCard = sb ?? null;
       counterpartAction = "disclose_sb";
-      // THE COUNTERPART PROXY USES THE SAME POLICY'S FORM. Under
-      // AI-Supplemented the participant is a RECEIVER of an abstraction, which
-      // is what OTHER-AI2 and OTHER-AI3 ask about; relaying the counterpart's
-      // card whole here would leave that half of the manipulation unrun.
-      const summarized =
-        body.policy === "ai_supplemented" && sb ? abstractedReason(sb) : null;
-      if (summarized) {
-        supplementedFrame = summarized.frame;
-        abstractedSentences = shuffle([
-          summarized.abstract,
-          ...summarized.cover,
-        ]);
-        decidedAction = `Give your own assessment of your principal's side: open with the frame you are given, then render the three sentences you are given, in the order given, as one natural message. They are plain statements with no attribution — never say who told you any of them, and never restore the full private story. Attach no package and no request.`;
-      } else {
-        decidedAction = `Share your principal's own background: they have authorized you to say exactly this, in your own representative voice, keeping every fact: "${sb?.text ?? ""}". Attach no demand and no package to it, do not ask the other side to reciprocate, and do not add that the term cannot be changed.`;
+      if (sb) {
+        reasonPresentation = renderProxyReason(
+          task,
+          counterpartRole,
+          sb,
+          body.policy,
+        );
       }
+      decidedAction = `Use the complete required reason presentation exactly as supplied, keeping its factual base unchanged. If it includes an AI addition, keep the transition and both benefits in order. Attach no package or request, and do not add that the term cannot be changed.`;
       // The proxy register is plain sentences rather than chat bubbles, so no
       // split instruction here — see the counterpart route for why the
       // human-voiced disclosure needs one.
@@ -773,6 +669,8 @@ export async function POST(request: Request) {
   }));
 
   try {
+    const audit = await beginNegotiationAudit(request, { ...body,
+      role: body.participantRole, messageId: `m${turn}` }, "proxy");
     // One pass: it returns both halves, and calling it twice repeated a
     // `getTask` plus two filters and two maps on every request.
     const mandateReasons = isParticipantSide
@@ -793,103 +691,53 @@ export async function POST(request: Request) {
             : undefined,
           authorizedReasons: isParticipantSide
             ? mandateReasons?.authorized.filter((reason) =>
-                reason.id === designatedCard?.id &&
-                !(body.policy === "ai_supplemented" && reason.sensitive),
+                reason.id === designatedCard?.id,
               )
             : undefined,
           // Unchecked facts never enter a language-generation prompt.
           forbiddenReasons: undefined,
-          // THE §6.6 FRAME AND SENTENCES, WHEN THIS TURN RENDERS THEM. Handed
-          // over already shuffled: the abstraction's POSITION must carry no
-          // information, or a receiver could sort the principal's own
-          // circumstance out of the three by layout alone and OTHER-AI2 would
-          // be measuring a formatting convention.
-          //
-          // They REPLACE the card here rather than being appended afterwards,
-          // because under §6.6 the three sentences ARE the message — there is
-          // no card text for them to sit beside.
-          //
-          // This is the wire that broke silently once: the sentences were
-          // computed, protected in the cap and used for the retry check, and
-          // never put into the prompt — so P4 rendered "(none this turn)" and
-          // the model improvised. The AI-Supplemented arm ran as a paraphrase
-          // of User-Specified with a plausible transcript and wrong data.
-          supplementedFrame: supplementedFrame ?? undefined,
-          abstractedSentences: abstractedSentences ?? undefined,
+          reasonPresentation: reasonPresentation ?? undefined,
         },
         history,
       });
 
-    /**
-     * WHAT THIS TURN HAD TO SAY, which is policy-dependent.
-     *
-     * Under User-Specified it is the card, re-voiced. Under AI-Supplemented the
-     * card is never said at all — the §6.6 abstraction stands in for it — so
-     * checking for the card's own words there would fail every correct message
-     * and retry until it produced a wrong one.
-     */
-    const requiredText =
-      supplementalReason ??
-      (abstractedSentences
-        ? (designatedCard?.abstract ?? null)
-        : (designatedCard?.text ?? null));
-
-    let { action, stubbed } = await generate();
-
-    /**
-     * ONE RETRY WHEN THE DESIGNATED CLAUSE WENT UNSAID.
-     *
-     * The schedule records the card as voiced and the credibility ladder is
-     * driven off that record, so a message that quietly omitted it credited
-     * the participant with a disclosure nobody ever heard — the ladder's
-     * primary outcome, wrong, with nothing in the log to show it. Measured
-     * live it happened in roughly one generation in four.
-     *
-     * A RETRY, NOT A VIOLATION. Marking it hard would swap the whole message
-     * for the package-only fallback, which on the reason turn is worse than
-     * the problem: the fallback carries no reason at all and nulls the reason
-     * token, handing the direct conversation a false "no reason was given".
-     * And it cannot simply be appended, because §6.5 requires the proxy to
-     * re-voice a card in its own representative voice rather than read it
-     * out — pasting the card's own first-person words would break the third
-     * person the whole delegation is visible through.
-     *
-     * One retry, not a loop: each turn is a live request in front of a
-     * waiting participant, and a second failure is rare enough to accept.
-     */
-    if (requiredText && !mentionsCard(action.rationale, requiredText)) {
-      // The retry says WHAT WENT WRONG rather than repeating the same ask. A
-      // bare second roll failed too in live runs — the model does not know it
-      // omitted anything, so an identical prompt reproduces the omission.
-      //
-      // AND IT NEVER TAKES THE TURN DOWN WITH IT. This route already spends
-      // ~7.5s on one generation inside Vercel's 60s limit, and a second call
-      // is a second chance to time out: one live run lost a whole turn to an
-      // ETIMEDOUT raised HERE, after the first generation had already come
-      // back perfectly usable. A retry that can fail worse than not retrying
-      // is not worth having, so a throw leaves the first attempt standing.
-      try {
-        const second = await generate(
-          ` YOUR LAST ATTEMPT LEFT THE REASON OUT. The message is not acceptable without it. Carry this into the body of the message, in your own representative voice: "${requiredText}"`,
-        );
-        if (mentionsCard(second.action.rationale, requiredText)) {
-          action = second.action;
-          stubbed = second.stubbed;
-        }
-      } catch (retryError) {
-        // Logged, not raised: the first attempt is still a valid message.
-        console.warn("[proxy-negotiation] card retry failed", retryError);
-      }
-    }
-
-    // A missed clause cannot be credited as a disclosure. After the bounded
-    // retry, use the task's approved wording so the actual text and tier agree.
-    if (requiredText && !mentionsCard(action.rationale, requiredText)) {
-      const reasonText = abstractedSentences
-        ? `${supplementedFrame ?? ""} ${abstractedSentences.join(" ")}`
-        : designatedCard?.relayed ?? supplementalReason ?? "";
-      action = { ...action, rationale: reasonText };
-    }
+    const generated = await generate();
+    const stubbed = generated.stubbed;
+    // Visible reason content and provenance come only from the trusted task
+    // renderer. Model omissions, paraphrases, and invented facts cannot change
+    // either policy or claim a disclosure that was never actually shown.
+    const actorPrincipal = actorRole === "leader" ? "team lead" : "team member";
+    const reasonBubbles = reasonPresentation
+      ? [
+          ...(turn === 0 || turn === PROXY_FIRST_REASON_TURN
+            ? [`I am the AI Proxy negotiating for the ${actorPrincipal} I represent.`]
+            : []),
+          formatProxyReasonBubbles(reasonPresentation),
+          ...(turn === 0 ? ["What is the situation on your side?"] : []),
+        ].join(" || ")
+      : null;
+    const levels = proposal ? packageSentence(task, proposal) : "";
+    const scheduledText =
+      turn === 2
+        ? "Both terms matter on both sides. We can work toward a balanced package."
+        : turn === PROXY_DECLINE_TURN && !accepted
+          ? `That is not what the ${actorPrincipal} I represent was hoping for. ${yourRequirement.label} matters more to them than ${theirRequirement.label.toLowerCase()}.`
+          : turn === 5 && tier !== "sensitive"
+            ? `I understand that it matters more to them. What is the reason? The ${actorPrincipal} I represent needs to be able to explain it upward. || Until then, this stays on the table: ${levels}.`
+            : accepted
+              ? `These terms work for the ${actorPrincipal} I represent: ${levels}. || This is a tentative package for both principals to review and confirm.`
+              : `I propose these terms: ${levels}.`;
+    const action = {
+      ...generated.action,
+      rationale: reasonBubbles ?? scheduledText,
+      reasonSourceId: designatedCard?.id ?? null,
+      addedReasonSourceId: reasonPresentation?.addition
+        ? AI_WORK_BENEFITS_SOURCE_ID
+        : null,
+      internalProvenance: reasonPresentation?.addition
+        ? "principal_reason_with_ai_work_benefits" as const
+        : "principal_reason" as const,
+    };
 
     // On the participant side the SCHEDULE is the record, not the model's
     // self-report: a model returning a different card id is a reporting
@@ -917,86 +765,14 @@ export async function POST(request: Request) {
     const blocked =
       !validation.valid && validation.disposition === "regenerate";
 
-    // WHAT MUST SURVIVE THE CAP, IN PRIORITY ORDER.
-    //
-    // Under User-Specified that is the principal's card. Under
-    // AI-Supplemented the card is never said at all — the three §6.6
-    // sentences ARE the message — so the ABSTRACTION is protected first and
-    // the two covers after it.
-    //
-    // The ordering is load-bearing and was learned the hard way. Cutting from
-    // the end removed whichever clause the model wrote last; protecting the
-    // wrong one pushed the reason out while the schedule still recorded it as
-    // voiced, so a participant was credited with a disclosure nobody heard.
-    // The abstraction comes first for the same reason the card does: it is
-    // what the ladder is driven off, and losing a cover costs only some of the
-    // cover. The FRAME is short and is not protected — it carries no fact.
-    //
-    // Matching is by CONTENT OVERLAP, never containment — a User-Specified
-    // proxy is required to re-voice its card rather than quote it, so a
-    // containment match would find the verbatim sentences every time and the
-    // re-voiced card never.
-    const protectedClauses = blocked
-      ? null
-      : abstractedSentences
-        ? [
-            designatedCard?.abstract ?? null,
-            ...abstractedSentences.filter(
-              (s) => s !== designatedCard?.abstract,
-            ),
-          ]
-        : [designatedCard?.text ?? null, supplementalReason];
-
-    /**
-     * THE FRAME IS PLACED, NOT REQUESTED — the same lesson as the §6.6
-     * sentences themselves.
-     *
-     * Measured live it went missing in 3 of 8 generations: the turn already
-     * asks the proxy to introduce itself, and the frame competed with that
-     * instruction and lost. That is exactly how the Ver.2.14 pool clause
-     * failed, and the fix there was the same one — the route places it.
-     *
-     * IT IS NOT COSMETIC. The frame is what makes the three sentences read as
-     * the PROXY'S OWN ASSESSMENT rather than a relay ("Looking at the side of
-     * the team lead I represent, I think the office days should stay at four.
-     * Three reasons —"). Without it the abstraction arrives as a bare
-     * statement among two others with no speaker attached, and §6.6's whole
-     * point is that an AI is recommending this on its own account. Whether
-     * responsibility still lands on the principal is measured downstream, so
-     * a message missing the frame is measuring something else.
-     *
-     * Prepended only when the model did not produce it, matched by overlap
-     * because the proxy paraphrases. It goes AFTER any self-introduction, so
-     * the message still opens the way a representative would.
-     */
-    const framed = (rendered: string): string => {
-      if (!supplementedFrame || blocked) return rendered;
-      if (carriesFrame(rendered, supplementedFrame)) return rendered;
-      const bubbles = rendered
-        .split("||")
-        .map((b) => b.trim())
-        .filter(Boolean);
-      const intro = bubbles[0] && /\bProxy\b/i.test(bubbles[0]) ? 1 : 0;
-      bubbles.splice(intro, 0, supplementedFrame);
-      return bubbles.join(" || ");
-    };
-
-    const text = capMessageLength(
-      blocked
-        ? fallbackText(task, proposal, isParticipantSide)
-        : framed(action.rationale),
-      NEGOTIATION.maxMessageChars,
-      // THE FRAME IS PROTECTED LAST, BEHIND THE ABSTRACTION AND THE COVERS.
-      // Order here is priority, and the abstraction is what the ladder is
-      // driven off — putting the frame ahead of it would let the cap drop the
-      // participant's own disclosure while the schedule recorded it as voiced,
-      // which is the precise inversion this list exists to prevent. A message
-      // that keeps all three sentences and loses the frame is a worse message;
-      // one that keeps the frame and loses the abstraction is wrong data.
-      supplementedFrame && protectedClauses
-        ? [...protectedClauses, supplementedFrame]
-        : protectedClauses,
-    );
+    // Canonical reason bubbles are exempt from the ordinary conversational
+    // cap: every authorized fact and both benefits must survive in full.
+    const text = blocked
+      ? capMessageLength(
+          fallbackText(task, proposal, isParticipantSide),
+          NEGOTIATION.maxMessageChars,
+        )
+      : action.rationale;
 
     const message: TranscriptMessage = {
       id: `m${turn}`,
@@ -1009,9 +785,11 @@ export async function POST(request: Request) {
       internalProvenance: action.internalProvenance,
     };
 
-    // Provenance is stripped before the response leaves the server: the
-    // participant must not be able to tell an abstraction from a cover — that
-    // indistinguishability IS the AI-Supplemented condition.
+    await audit({ input: body, generatedAction: generated.action, action,
+      validation, blocked, message, reasonCardId: designatedCard?.id ?? null,
+      decidedAction: counterpartAction, accepted, impasse, tier });
+
+    // Keep internal source bookkeeping server-side.
     const { internalProvenance, ...visible } = message;
     void internalProvenance;
 
@@ -1035,11 +813,7 @@ export async function POST(request: Request) {
         isParticipantSide && !blocked && voicedReasonId
           ? reasonToken(voicedReasonId)
           : reasonToken(`nil:a:${turn}`),
-        // Always a decoy. There is no second reason id to carry — the
-        // AI-Supplemented policy replaces the card rather than adding beside
-        // it — but the RESPONSE SHAPE must not change, so the slot is padded.
-        // An array that were one element under one policy and two under the
-        // other is a per-message tell of exactly the kind §7 forbids.
+        // Public work benefits are not a second private reason or tier credit.
         reasonToken(`nil:b:${turn}`),
       ],
       // WHAT THE PARTICIPANT'S OWN PROXY VOICED THIS TURN, as a tier rung.

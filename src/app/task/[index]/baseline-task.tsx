@@ -35,6 +35,7 @@ import {
   useDevActions,
   useDevAutofill,
   useDevMockAi,
+  useDevMode,
 } from "@/lib/dev-mode";
 import {
   NEGOTIATION_SECONDS,
@@ -76,6 +77,11 @@ import { scriptedTask } from "@/lib/negotiation/script";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { getStore } from "@/lib/store";
 import { writeStopReason } from "@/lib/check-gates";
+import {
+  markTaskCompleted,
+  markTaskInterrupted,
+  markTaskStarted,
+} from "@/lib/task-run";
 import { counterpartDelayMs, nextHref } from "@/lib/study-config";
 import { cardOfLayer, getTask, requirementIssue } from "@/lib/tasks";
 import type { NegotiationTask, Package, Role, TaskId } from "@/lib/types";
@@ -83,6 +89,9 @@ import { ReviewPhase } from "./review";
 import {
   Matchmaking,
   PreferenceForm,
+  CurrentOfferDecision,
+  EndWithoutAgreementControl,
+  EXPLICIT_NO_AGREEMENT_REASON,
   TaskBrief,
   TaskIntro,
   type Preferences,
@@ -262,6 +271,7 @@ export function BaselineTask({
   usePageEnter(`task-${taskIndex}`);
   const router = useRouter();
   const { logEvent, participantKey } = useParticipant();
+  const { enabled: devEnabled } = useDevMode();
   // Non-null: the route only renders a task page for a valid id, and `TaskId`
   // is the compile-time story — the lookup's `undefined` is for API callers
   // reading an id off a JSON body, which guard it themselves.
@@ -296,6 +306,7 @@ export function BaselineTask({
   const [replies, setReplies] = useState(0);
   /** Set when the counterpart accepts or declares an impasse. */
   const [settled, setSettled] = useState<"agreed" | "impasse" | null>(null);
+  const [endReason, setEndReason] = useState<string | null>(null);
   /** Synchronous settlement guard for timeout versus an in-flight reply. */
   const settledRef = useRef(false);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -582,7 +593,8 @@ export function BaselineTask({
               method: "POST",
               headers: { "Content-Type": "application/json" },
               // THE WHOLE LIST, EVERY TIME (§6.2a). See `StagedTurn.texts`.
-              body: JSON.stringify({ taskId, role, messages: turn.texts }),
+              body: JSON.stringify({ taskId, role, messages: turn.texts,
+                sessionIndex: taskIndex, messageId: turn.ownId }),
             },
             {
               signal: controller.signal,
@@ -664,8 +676,11 @@ export function BaselineTask({
             reasonLabel: storedLabel(label),
             reasonConfidence: confidence,
           });
+          markTaskInterrupted(participantKey, taskIndex);
           writeStopReason(participantKey, "withdrawal");
         }
+        // Queue the final utterance before closing its server-side attempt.
+        logEvent("negotiation_ended", { phase: "withdrawal" }, { sessionIndex: taskIndex });
         router.push("/study-stop?reason=withdrawal");
         return;
       }
@@ -829,6 +844,8 @@ export function BaselineTask({
               stage: stageNow,
               incoming,
               afterProxy: false,
+              sessionIndex: taskIndex,
+              messageId: `c${next.length}`,
               history: next.map((m) => ({
                 role: m.speaker === "participant" ? "user" : "assistant",
                 content: m.text,
@@ -1125,6 +1142,7 @@ export function BaselineTask({
       priorityClaimed: boolean;
     },
   ) {
+    setEndReason(reason);
     // THE OUTCOME IS CODED BY THE MACHINE, not by this screen. `codeOutcome`
     // owns "no agreement is worth nothing" (§3.2) and the requirement
     // trajectory the review screen reads.
@@ -1232,6 +1250,8 @@ export function BaselineTask({
               stage: stageNow,
               incoming: null,
               afterProxy: false,
+              sessionIndex: taskIndex,
+              messageId: `c-nudge${messages.length}`,
               history: messages.map((m) => ({
                 role: m.speaker === "participant" ? "user" : "assistant",
                 content: m.text,
@@ -1404,11 +1424,36 @@ export function BaselineTask({
    */
   function acceptStanding() {
     if (!lastCounterpartPackage || pending || stagedTurn || settled) return;
-    setOffer(lastCounterpartPackage);
+    const currentOffer = { ...lastCounterpartPackage };
+    setOffer(currentOffer);
     void send(
       "I agree to the current offer.",
-      lastCounterpartPackage,
+      currentOffer,
     );
+  }
+
+  function endWithoutAgreement() {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    turnGeneration.current += 1;
+    requestedTurn.current += 1;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    expiryPending.current = false;
+    recoveryStartedAt.current = null;
+    setRecovering(false);
+    setPending(false);
+    setTurnError(null);
+    setStagedTurn(null);
+    setTentative(null);
+    setSettled("impasse");
+    endTask("impasse", null, EXPLICIT_NO_AGREEMENT_REASON, {
+      replies,
+      tier,
+      sbFirstChoice,
+      sbEverVoiced,
+      priorityClaimed,
+    });
   }
 
   // --- phases -------------------------------------------------------------
@@ -1474,6 +1519,14 @@ export function BaselineTask({
     return (
       <Matchmaking
         onReady={() => {
+          if (!devEnabled && participantKey) {
+            const run = markTaskStarted(participantKey, taskIndex);
+            if (run?.status !== "active") {
+              writeStopReason(participantKey, "technical");
+              router.replace("/study-stop?reason=technical");
+              return;
+            }
+          }
           // The counterpart opens, and its opening is FIXED (Design §4 stage
           // 1: its own best package on both terms). Every participant
           // therefore answers the same anchor, which is what makes their
@@ -1496,6 +1549,13 @@ export function BaselineTask({
               text: scripted?.text ?? openingLine(task, counterpartRole),
             },
           ]);
+          if (participantKey) {
+            void getStore().appendMessage(participantKey, {
+              id: "c-open", sessionIndex: taskIndex, speaker: "counterpart",
+              text: scripted?.text ?? openingLine(task, counterpartRole),
+              createdAt: new Date().toISOString(), stage: 1, reasonLabel: "WR",
+            });
+          }
           // DECISION-LOCK (Ver.2.12 §6.1): from here the participant's
           // disclosure choices are made live, against the clock; the entry
           // preferences are already saved.
@@ -1534,6 +1594,14 @@ export function BaselineTask({
         transcriptTitle="The conversation"
         transcriptHint="Everything the two of you said."
         onDone={() => {
+          if (!devEnabled && participantKey) {
+            const run = markTaskCompleted(participantKey, taskIndex);
+            if (run?.status !== "completed") {
+              writeStopReason(participantKey, "technical");
+              router.replace("/study-stop?reason=technical");
+              return;
+            }
+          }
           logEvent("page_complete", undefined, {
             page: `task-${taskIndex}`,
             sessionIndex: taskIndex,
@@ -1576,7 +1644,9 @@ export function BaselineTask({
                   {settled === "agreed"
                     ? "✓ Both parties agreed on a complete package!"
                     : settled === "impasse"
-                      ? "⚠️ Time ran out. Nothing is settled, so you both score 0 for this task."
+                      ? endReason === EXPLICIT_NO_AGREEMENT_REASON
+                        ? "You ended this task without agreement. Both sides receive 0 task points."
+                        : "No agreement was reached. Both sides receive 0 task points."
                       : "Messages are sent directly to the other participant in real time."}
                 </p>
               </div>
@@ -1679,20 +1749,16 @@ export function BaselineTask({
           </Card>
 
           {!settled && lastCounterpartPackage ? (
-            <div className="mb-6">
-              <button
-                type="button"
-                onClick={acceptStanding}
-                disabled={pending || Boolean(stagedTurn)}
-                className="w-full rounded-xl border-2 border-emerald-700 bg-emerald-600 px-5 py-4 text-base font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
-              >
-                ✓ Accept current offer
-                <span className="mt-1 block text-sm font-normal">{task.issues.map((issue) => `${issue.label}: ${issue.options.find((o) => o.id === lastCounterpartPackage[issue.id])?.label ?? ""}`).join(" · ")}</span>
-              </button>
-            </div>
+            <CurrentOfferDecision
+              task={task}
+              offer={lastCounterpartPackage}
+              disabled={pending || Boolean(stagedTurn)}
+              onAccept={acceptStanding}
+            />
           ) : null}
-
-
+          {!settled ? (
+            <EndWithoutAgreementControl onConfirm={endWithoutAgreement} />
+          ) : null}
         </TaskLayout>
       </Page>
 

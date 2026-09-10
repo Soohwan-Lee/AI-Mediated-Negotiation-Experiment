@@ -8,6 +8,11 @@ import {
   writeCheckGate,
   writeStopReason,
 } from "../src/lib/check-gates.ts";
+import {
+  markTaskCompleted,
+  markTaskStarted,
+  readTaskRun,
+} from "../src/lib/task-run.ts";
 
 function installStorage(seed = {}) {
   const entries = new Map(Object.entries(seed));
@@ -150,4 +155,60 @@ test("task gate routing is shared across common, practice, pass, and withdrawal 
   assert.deepEqual(taskGateRedirect("participant-a", 1), {
     href: "/study-stop?reason=withdrawal",
   });
+});
+
+test("reload remains allowed before the measured task becomes active", () => {
+  installStorage();
+  writeCheckGate("participant-a", "common", { status: "passed", attempts: 8 });
+  writeCheckGate("participant-a", "task-1", { status: "passed", attempts: 9 });
+
+  assert.equal(readTaskRun("participant-a", 1), null);
+  assert.equal(taskGateRedirect("participant-a", 1), null);
+  assert.equal(taskGateRedirect("participant-a", 1), null);
+  assert.equal(readTaskRun("participant-a", 1), null);
+});
+
+test("re-entering an active task marks it interrupted and stops the study", () => {
+  installStorage();
+  writeCheckGate("participant-a", "common", { status: "passed", attempts: 1 });
+  writeCheckGate("participant-a", "task-1", { status: "passed", attempts: 1 });
+  markTaskStarted("participant-a", 1);
+
+  assert.deepEqual(taskGateRedirect("participant-a", 1), {
+    href: "/study-stop?reason=technical",
+  });
+  assert.equal(readTaskRun("participant-a", 1)?.status, "interrupted");
+  assert.equal(readStopReason("participant-a"), "technical");
+});
+
+test("a completed task re-entry advances to its questionnaire instead of restarting", () => {
+  installStorage();
+  markTaskStarted("participant-a", 1);
+  markTaskCompleted("participant-a", 1);
+
+  assert.deepEqual(taskGateRedirect("participant-a", 1), {
+    href: "/task/1/survey",
+    preserveFurthest: true,
+  });
+});
+
+test("a completed old task never lowers a participant's later position", () => {
+  installStorage({ "amne:furthest": "8" });
+  markTaskStarted("participant-a", 1);
+  markTaskCompleted("participant-a", 1);
+
+  assert.deepEqual(taskGateRedirect("participant-a", 1), {
+    href: "/task/2",
+    preserveFurthest: true,
+  });
+});
+
+test("task run markers do not leak from the first task to the second", () => {
+  installStorage();
+  writeCheckGate("participant-a", "common", { status: "passed", attempts: 3 });
+  writeCheckGate("participant-a", "task-2", { status: "passed", attempts: 4 });
+  markTaskStarted("participant-a", 1);
+
+  assert.equal(taskGateRedirect("participant-a", 2), null);
+  assert.equal(readTaskRun("participant-a", 2), null);
 });

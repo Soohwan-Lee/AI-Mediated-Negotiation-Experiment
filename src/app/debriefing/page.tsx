@@ -148,11 +148,13 @@ export default function DebriefingPage() {
               something that reflects badly on you. This study asks what
               changes when an AI Proxy makes that case on your behalf instead
               of you making it yourself — whether people are more willing to
-              have a sensitive reason used, and how it feels afterwards either
-              way. Participants were assigned one proxy that passed their
-              chosen reasons on as they were, or one that summarised a
-              sensitive reason and said it among other reasons. Both were
-              described to you before your proxy negotiated.
+              have a sensitive reason used, and how the AI&rsquo;s participation
+              in constructing reasons changes reputation concerns and judgments
+              of responsibility. Participants were assigned either a Proxy that
+              used only the included reasons, or one that used the same included
+              reasons and added two clearly introduced work arguments. Each
+              participant was informed of the assigned policy, which both
+              Proxies in that session used.
             </p>
           </Card>
 
