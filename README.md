@@ -15,6 +15,22 @@ npm run dev     # http://localhost:3000
 Works with no API key — the counterpart falls back to canned text so the whole
 flow is walkable.
 
+To rerun the focused instruction-gate and 16-cell task-routing browser check,
+build with `NEXT_PUBLIC_DEV_TOOLS=off npm run build`, then serve it in another
+shell with `PORT=3141 NEXT_PUBLIC_DEV_TOOLS=off npm start`. Run:
+
+```bash
+bash ~/.codex/skills/playwright/scripts/playwright_cli.sh --session routing-fix open about:blank
+bash ~/.codex/skills/playwright/scripts/playwright_cli.sh --session routing-fix run-code "$(< scripts/verify-participant-routing.playwright.js)"
+bash ~/.codex/skills/playwright/scripts/playwright_cli.sh --session practice-routing open about:blank
+bash ~/.codex/skills/playwright/scripts/playwright_cli.sh --session practice-routing run-code "$(< scripts/verify-practice-routing.playwright.js)"
+```
+
+The checks mock participant APIs and block requests outside the local origin.
+The first covers direct correction, then seeds passed practice gates to inspect
+all task, role, and order mappings. The second runs both genuine practice rounds
+for every assignment cell before entering the corresponding main task.
+
 ## Environment
 
 ```bash
