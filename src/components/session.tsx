@@ -369,7 +369,7 @@ export function TaskCover({
 
 /**
  * Participant-facing policy contract. Both policies reformulate authorized
- * reasons with all facts intact; AI-Supplemented appends two clearly introduced
+ * reasons with all facts intact; AI-Supplemented adds two work-related
  * arguments. The shared notice in `ProxyIdentity` makes bilateral assignment
  * explicit without exposing condition names.
  */
@@ -380,7 +380,7 @@ export const POLICY_DISCLOSURE: Record<
   user_specified:
     "Your AI Proxy will rephrase the reasons you authorize into clear, work-focused language and explain how they relate to your request. It will preserve the facts and add no new reasons.",
   ai_supplemented:
-    "Your AI Proxy will rephrase the reasons you authorize into clear, work-focused language and preserve the facts. It will also add two work-related arguments based on the information you authorize, introduced as the AI's additional considerations.",
+    "Your AI Proxy will rephrase the reasons you authorize into clear, work-focused language and preserve the facts. It will also add two work-related arguments based on the information you authorize.",
 };
 
 /** Compact bilateral reminder for the watch screen. */
@@ -396,8 +396,8 @@ export const POLICY_NOTE: Record<
 
 /**
  * Neutral worked example. The base representative argument is identical in
- * both arms. AI-Supplemented then appends two operational benefits after the
- * same explicit transition used by the live renderer. Nothing implies that
+ * both arms. AI-Supplemented includes two operational benefits without marking
+ * their sentence-level sources, as in the live renderer. Nothing implies that
  * sharing the background wins a concession.
  */
 const POLICY_EXPLAINER: Record<
@@ -431,9 +431,9 @@ const POLICY_EXPLAINER: Record<
       "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
     saidLead: "What their AI Proxy says to the other side:",
     said:
-      "The requested week of leave coincides with the Member's hospital check-up. The Member has not yet told the team about the check-up. Additional work considerations from this Proxy: Confirming leave dates early could give colleagues time to prepare handovers. Planning cover for that week could help colleagues handle work while the Member attends the check-up.",
+      "The requested week of leave coincides with the Member's hospital check-up. The Member has not yet told the team about the check-up. Confirming leave dates early could give colleagues time to prepare handovers. Planning cover for that week could help colleagues handle work while the Member attends the check-up.",
     exampleTail:
-      "The Proxy preserves both facts and adds two work considerations based on the authorized information. The possible benefits come from the AI.",
+      "The Proxy represents the request using the authorized information and the policy described above.",
   },
 };
 

@@ -152,7 +152,8 @@ export default function DebriefingPage() {
               in constructing reasons changes reputation concerns and judgments
               of responsibility. Participants were assigned either a Proxy that
               used only the included reasons, or one that used the same included
-              reasons and added two clearly introduced work arguments. Each
+              reasons and added two work arguments without labeling individual
+              sentences by source. Each
               participant was informed of the assigned policy, which both
               Proxies in that session used.
             </p>

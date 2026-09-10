@@ -10,15 +10,12 @@ import type {
 export interface ProxyReasonPresentation {
   base: string;
   addition: null | {
-    transition: string;
     benefits: readonly [string, string];
   };
   text: string;
 }
 
-const MAX_BASE_BUBBLE_CHARS = 220;
-
-export const ADDITION_TRANSITION = "Additional work considerations from this Proxy:";
+const MAX_BUBBLE_CHARS = 220;
 
 /** Fixed, fact-preserving Proxy wording; original cards remain unchanged. */
 export const PROXY_REASON_BASES: Readonly<
@@ -84,25 +81,25 @@ export function renderProxyReason(
     card.layer === "sensitive" ? approved.sb1 : approved.wr2,
   ];
   const addition = {
-    transition: ADDITION_TRANSITION,
     benefits,
   } as const;
 
   return {
     base,
     addition,
-    text: `${base} ${addition.transition} ${benefits[0]} ${benefits[1]}`,
+    text: `${base} ${benefits[0]} ${benefits[1]}`,
   };
 }
 
 /**
  * Adds display bubble boundaries without changing any policy-controlled text.
- * Base facts split only between sentences; each AI benefit stays intact.
+ * The entire utterance uses the same sentence/length rules. Hidden provenance
+ * never determines a bubble boundary or a visible source label.
  */
 export function formatProxyReasonBubbles(
   presentation: ProxyReasonPresentation,
 ): string {
-  const sentences = presentation.base.match(/[^.!?]+[.!?]+|[^.!?]+$/g);
+  const sentences = presentation.text.match(/[^.!?]+[.!?]+|[^.!?]+$/g);
   if (!sentences) return presentation.text;
 
   const bubbles: string[] = [];
@@ -110,7 +107,7 @@ export function formatProxyReasonBubbles(
   for (const rawSentence of sentences) {
     const sentence = rawSentence.trim();
     const candidate = current ? `${current} ${sentence}` : sentence;
-    if (current && candidate.length > MAX_BASE_BUBBLE_CHARS) {
+    if (current && candidate.length > MAX_BUBBLE_CHARS) {
       bubbles.push(current);
       current = sentence;
     } else {
@@ -118,13 +115,6 @@ export function formatProxyReasonBubbles(
     }
   }
   if (current) bubbles.push(current);
-
-  if (presentation.addition) {
-    bubbles.push(
-      `${presentation.addition.transition} ${presentation.addition.benefits[0]}`,
-      presentation.addition.benefits[1],
-    );
-  }
 
   return bubbles.join(" || ");
 }

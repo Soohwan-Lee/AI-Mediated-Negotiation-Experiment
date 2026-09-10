@@ -276,12 +276,8 @@ ${ctx.decidedAction}`;
  * person has already heard the whole exchange, so no re-introductions and no
  * re-run of what the proxies said. Acceptance and limits stay the system's.
  *
- * Ver.2.13 §7 narrowed WHEN this happens: the closing conversation is reached
- * only when the participant asks for a change or refuses the package, never
- * after an approval. That does not change the voice — the other side is a
- * person who watched the same exchange either way — but it does mean this
- * counterpart is always answering a participant who wanted something different
- * from what the proxies reached.
+ * Both principals discuss the provisional terms here and must confirm the
+ * final agreement, whether they keep or change the Proxy proposal.
  */
 function counterpartPrincipalPrompt(ctx: PromptContext): string {
   const brief = ctx.task.roleBriefs[ctx.agentRole];
@@ -303,8 +299,10 @@ ${HUMAN_CHAT_STYLE}
   says to.
 - If they walk back or soften something they already told you, do not argue
   and do not drop it. Acknowledge it in a few words and return to the terms.
-- If they ask what was behind your Proxy's summary, say it is as your Proxy
-  put it and return to the terms.
+- Do not volunteer or reconstruct sentence-level provenance from the Proxy
+  exchange. If asked who supplied a particular argument, refer to the substantive
+  reasons and proposal without inventing source claims, denying already shared
+  facts, or disclaiming responsibility.
 
 YOUR ROLE: ${brief.title}
 ${brief.organizationalPosition}
@@ -350,9 +348,9 @@ two system-approved work arguments based on the authorized information.
 The supplied pair is WR1 + WR2 for work only, or WR1 + SB1 for authorized SB.
 It preserves every event detail in the shared, work-focused wording.
 
-- If a reason presentation is supplied below, reproduce its BASE completely.
-- Then use the supplied TRANSITION and both BENEFITS, in that order. Do not add
-  a third benefit or another fact.`
+- Reproduce the complete supplied utterance unchanged. It already contains
+  the factual base and both arguments. Add no source labels, separators,
+  commentary about AI authorship, third argument, or further fact.`
       : `POLICY (both principals know): a User-Specified Proxy may use only the
 reasons checked by its own principal. It conveys the supplied complete base
 reason and adds no argument of its own.`;
@@ -364,13 +362,8 @@ reason and adds no argument of its own.`;
   "principal_reason".`;
   const reasonBlock = presentation
     ? `REQUIRED REASON PRESENTATION. Keep every sentence and fact. Do not
-paraphrase or shorten it:
-BASE: ${presentation.base}
-${
-  presentation.addition
-    ? `TRANSITION: ${presentation.addition.transition}\nBENEFIT 1: ${presentation.addition.benefits[0]}\nBENEFIT 2: ${presentation.addition.benefits[1]}`
-    : "NO AI-ADDED BENEFITS THIS TURN."
-}`
+paraphrase or shorten it. Copy this complete unlabeled utterance:
+${presentation.text}`
     : "NO REASON PRESENTATION IS REQUIRED THIS TURN.";
 
   return `You are an AI negotiation Proxy for a human principal. Both sides are
@@ -394,9 +387,10 @@ VOICE — YOU ARE A REPRESENTATIVE, NOT THE PRINCIPAL
 - Use the same representative voice under both policies. The supplied base
   connects the work circumstances to the request while preserving the facts.
 - Do not say "I think" or present a private circumstance as your own opinion.
-- The base describes supplied circumstances. Any added benefits are predicted
-  work outcomes, not additional events or private facts. Keep the explicit
-  transition so the addition remains distinct from the factual base.
+- Known circumstances remain facts and possible work outcomes remain qualified
+  predictions. Do not identify the source of individual sentences in speech.
+  Source IDs and internalProvenance belong only in structured metadata, never
+  in rationale text or visible labels.
 
 CONVERSATION STYLE
 - Short, plain sentences. Begin each message by briefly responding to the

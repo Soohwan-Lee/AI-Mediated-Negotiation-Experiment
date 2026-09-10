@@ -7,7 +7,7 @@ const {
   getTask,
   scorePackage,
 } = await import("../src/lib/tasks.ts");
-const { ADDITION_TRANSITION, PROXY_REASON_BASES, formatProxyReasonBubbles, renderProxyReason } = await import(
+const { PROXY_REASON_BASES, formatProxyReasonBubbles, renderProxyReason } = await import(
   "../src/lib/proxy-reason-presentation.ts"
 );
 const { scriptedTask } = await import("../src/lib/negotiation/script.ts");
@@ -15,12 +15,25 @@ const { scriptedTask } = await import("../src/lib/negotiation/script.ts");
 const TASKS = ["task_a", "task_b"];
 const ROLES = ["leader", "member"];
 const POLICIES = ["user_specified", "ai_supplemented"];
-const TRANSITION = ADDITION_TRANSITION;
 const other = (role) => (role === "leader" ? "member" : "leader");
 
 function count(text, needle) {
   return text.split(needle).length - 1;
 }
+
+test("bubble boundaries depend only on complete text, never hidden source metadata", () => {
+  const base = "The Member needs this arrangement. This keeps the request clear.";
+  const benefits = ["It could simplify planning.", "It could make handovers easier."];
+  const text = [base, ...benefits].join(" ");
+  const supplemented = { base, addition: { benefits }, text };
+  assert.equal(formatProxyReasonBubbles(supplemented), text, "short base and additions share one bubble");
+  assert.equal(formatProxyReasonBubbles(supplemented), formatProxyReasonBubbles({ base: text, addition: null, text }));
+  for (const taskId of TASKS) for (const role of ROLES) for (const layer of ["work", "sensitive"]) {
+    const task = getTask(taskId);
+    const rendered = renderProxyReason(task, role, cardOfLayer(task, role, layer), "ai_supplemented");
+    assert.equal(formatProxyReasonBubbles(rendered), formatProxyReasonBubbles({ base: rendered.text, addition: null, text: rendered.text }));
+  }
+});
 
 test("the renderer keeps the authorized reason identical and adds exactly two approved work benefits", () => {
   for (const taskId of TASKS) {
@@ -49,7 +62,7 @@ test("the renderer keeps the authorized reason identical and adds exactly two ap
         assert.equal(specified.addition, null);
         assert.equal(specified.text, specified.base);
 
-        assert.equal(supplemented.addition.transition, TRANSITION);
+        assert.equal("transition" in supplemented.addition, false);
         assert.deepEqual(
           supplemented.addition.benefits,
           [PROXY_WORK_BENEFITS[taskId][role].wr1,
@@ -60,7 +73,8 @@ test("the renderer keeps the authorized reason identical and adds exactly two ap
           assert.ok(supplemented.text.includes(benefit));
           assert.match(benefit, /\b(?:could|may help)\b/i);
         }
-        assert.equal(count(supplemented.text, TRANSITION), 1);
+        assert.equal(supplemented.text, [specified.base, ...supplemented.addition.benefits].join(" "));
+        assert.doesNotMatch(supplemented.text, /Additional work considerations|from this Proxy|AI-generated/i);
         assert.ok(supplemented.text.startsWith(`${specified.base} `));
         const formatted = formatProxyReasonBubbles(supplemented);
         assert.equal(formatted.replaceAll(" || ", " "), supplemented.text);
@@ -131,10 +145,10 @@ test("all task, role, policy and SB cells preserve the disclosure gate and outco
               .filter((candidate) => candidate.speaker === speaker)
               .map((candidate) => candidate.text)
               .join(" ");
-            assert.equal(
-              count(speakerText, TRANSITION),
-              policy === "ai_supplemented" ? 1 : 0,
-            );
+            const bank = PROXY_WORK_BENEFITS[taskId][speakerRole];
+            for (const benefit of [bank.wr1, bank[layer === "sensitive" ? "sb1" : "wr2"]]) {
+              assert.equal(count(speakerText.replaceAll(" || ", " "), benefit), policy === "ai_supplemented" ? 1 : 0);
+            }
             assert.equal(
               message.internalProvenance,
               policy === "ai_supplemented"

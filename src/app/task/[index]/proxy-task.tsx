@@ -9,7 +9,7 @@
  *
  * The mandate is one screen and the Proxies run once. Both policies carry the
  * same included facts in full. AI-Supplemented alone appends two work benefits
- * after a visible source transition. The participant sees only their assigned
+ * without sentence-level source labels. The participant sees only their assigned
  * policy, and both participants' Proxies use that same policy.
  *
  * THE PARTICIPANT WATCHES. ver.1.8 hid the exchange behind a progress bar and
@@ -1233,9 +1233,7 @@ export function ProxyTask({
                       {policy === "ai_supplemented" ? (
                         <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs leading-relaxed text-indigo-950 sm:text-sm">
                           Your Proxy also adds two work arguments based on the
-                          information you authorize. It introduces them as
-                          &ldquo;Additional work considerations from this
-                          Proxy:&rdquo; during the exchange.
+                          information you authorize.
                         </p>
                       ) : null}
                     </div>

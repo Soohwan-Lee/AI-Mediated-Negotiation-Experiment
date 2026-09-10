@@ -68,7 +68,7 @@ test("the Proxy setup explains the participant's choices and the final direct ag
   assert.match(proxyTask, /Your work reason is always included\. Your sensitive[\s\S]*background is included only if you selected it\./);
   assert.match(proxyTask, /\{c\.relayed \?\? c\.text\}/);
   assert.match(proxyTask, /Your Proxy also adds two work arguments based on the[\s\S]*information you authorize/);
-  assert.match(proxyTask, /Additional work considerations from this[\s\S]*Proxy:/);
+  assert.doesNotMatch(proxyTask, /Additional work considerations from this[\s\S]*Proxy:/);
   assert.match(proxyTask, /Then discuss or change the proposed terms directly with the other participant\. Both of you must agree\./);
   assert.doesNotMatch(proxyTask, /Authorize your AI Proxy|Authorize my AI Proxy and start/);
 });
@@ -79,7 +79,7 @@ test("both Proxy policies preserve facts and explain information-dependent addit
   assert.equal(session.split("rephrase the reasons you authorize into clear, work-focused language").length - 1, 2);
   assert.match(session, /preserve the facts and add no new reasons/);
   assert.match(session, /add two work-related arguments based on the information you authorize/);
-  assert.match(session, /introduced as the AI's additional considerations/);
+  assert.doesNotMatch(session, /introduced as the AI's additional considerations|Additional work considerations|Individual sentences will not/);
   const sharedExampleBase = "The requested week of leave coincides with the Member's hospital check-up. The Member has not yet told the team about the check-up.";
   assert.equal(session.split(sharedExampleBase).length - 1, 2);
   assert.match(session, /Confirming leave dates early could give colleagues time to prepare handovers/);
@@ -92,7 +92,7 @@ test("both Proxy policies preserve facts and explain information-dependent addit
 
 test("debriefing accurately distinguishes the assigned Proxy policies", () => {
   assert.match(debriefing, /AI&rsquo;s participation[\s\S]*reputation concerns and judgments[\s\S]*of responsibility/);
-  assert.match(debriefing, /used only the included reasons, or one that used the same included[\s\S]*reasons and added two clearly introduced work arguments/);
+  assert.match(debriefing, /used only the included reasons, or one that used the same included[\s\S]*reasons and added two work arguments without labeling individual/);
   assert.match(debriefing, /assigned policy, which both[\s\S]*Proxies in that session used/);
   assert.doesNotMatch(debriefing, /summarised a[\s\S]*sensitive reason|Both were[\s\S]*described to you/);
 });
