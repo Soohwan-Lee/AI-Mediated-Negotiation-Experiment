@@ -53,7 +53,7 @@ import {
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { useRestoreAnswers } from "@/lib/saved-answers";
 import { nextHref, STUDY } from "@/lib/study-config";
-import { readCheckGate, writeCheckGate } from "@/lib/check-gates";
+import { confirmCheckGateAdvance, readCheckGate, writeCheckGate } from "@/lib/check-gates";
 
 /**
  * The three comprehension items (Design §9.1.3). Wording, correct answers and
@@ -157,6 +157,16 @@ export default function InstructionPage() {
   }
 
   function goNext() {
+    if (!participantKey) return;
+    if (!bypass && !confirmCheckGateAdvance(
+        participantKey,
+        "common",
+        submitted,
+        allCorrect,
+        attempt,
+      )) return;
+    // Direct remediation edits do not pass through `check()` again.
+    void saveResponses("instruction_check", answers);
     logEvent("page_complete", undefined, { page: "instruction" });
     router.push(nextHref("instruction"));
   }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  confirmCheckGateAdvance,
   readCheckGate,
   readStopReason,
   taskGateRedirect,
@@ -154,6 +155,54 @@ test("task gate routing is shared across common, practice, pass, and withdrawal 
   writeStopReason("participant-a", "withdrawal");
   assert.deepEqual(taskGateRedirect("participant-a", 1), {
     href: "/study-stop?reason=withdrawal",
+  });
+});
+
+test("a direct remediation correction closes the common gate before Task 1", () => {
+  installStorage();
+  writeCheckGate("participant-a", "common", { status: "pending", attempts: 1 });
+
+  assert.equal(
+    confirmCheckGateAdvance("participant-a", "common", true, true, 1),
+    true,
+  );
+  writeCheckGate("participant-a", "task-1", { status: "passed", attempts: 1 });
+
+  assert.deepEqual(readCheckGate("participant-a", "common"), {
+    status: "passed",
+    attempts: 1,
+  });
+  assert.equal(taskGateRedirect("participant-a", 1), null);
+});
+
+test("retry remains required until a corrected check is submitted", () => {
+  installStorage();
+  writeCheckGate("participant-a", "common", { status: "pending", attempts: 1 });
+
+  assert.equal(
+    confirmCheckGateAdvance("participant-a", "common", false, true, 2),
+    false,
+  );
+  assert.equal(
+    confirmCheckGateAdvance("participant-a", "common", true, false, 2),
+    false,
+  );
+  assert.equal(
+    confirmCheckGateAdvance("participant-a", "common", false, false, 2),
+    false,
+  );
+  assert.deepEqual(taskGateRedirect("participant-a", 1), {
+    href: "/instruction",
+    furthestKey: "instruction",
+  });
+
+  assert.equal(
+    confirmCheckGateAdvance("participant-a", "common", true, true, 2),
+    true,
+  );
+  assert.deepEqual(readCheckGate("participant-a", "common"), {
+    status: "passed",
+    attempts: 2,
   });
 });
 

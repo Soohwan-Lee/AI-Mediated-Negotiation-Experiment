@@ -40,6 +40,22 @@ export function writeCheckGate(participantKey: string, scope: CheckGateScope, re
   window.localStorage.setItem(key(participantKey, scope), JSON.stringify(record));
 }
 
+/** Close a comprehension gate at the navigation boundary. */
+export function confirmCheckGateAdvance(
+  participantKey: string,
+  scope: CheckGateScope,
+  submitted: boolean,
+  allCorrect: boolean,
+  attempts: number,
+): boolean {
+  if (!submitted || !allCorrect) return false;
+  writeCheckGate(participantKey, scope, {
+    status: "passed",
+    attempts: Math.max(1, attempts),
+  });
+  return true;
+}
+
 export type StopReason = "check" | "withdrawal" | "technical";
 
 export function readStopReason(participantKey: string): StopReason | null {
