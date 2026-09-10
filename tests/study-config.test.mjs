@@ -18,9 +18,11 @@ import {
   TOTAL_MINUTES,
   timingIsHonest,
   backStep,
+  bubbleDelayMs,
+  counterpartDelayMs,
+  NEGOTIATION,
 } from "../src/lib/study-config.ts";
 import { capMessageLength } from "../src/lib/ai/validator.ts";
-import { NEGOTIATION } from "../src/lib/study-config.ts";
 
 const money = (s) => Number(s);
 
@@ -255,6 +257,45 @@ test("the debrief calls the observed bonus input a recommendation, not a transfe
 test("Ver.2.26 pacing uses one minute per mode practice and no artificial Proxy delay", () => {
   assert.equal(NEGOTIATION.practiceSeconds, 60);
   assert.deepEqual(NEGOTIATION.proxyMessageGap, { minMs: 0, maxMs: 0 });
+});
+
+test("ostensible-human typing runs at 70% speed without slowing Proxy bubbles", () => {
+  const originalRandom = Math.random;
+  const config = readFileSync(
+    new URL("../src/components/negotiation.tsx", import.meta.url),
+    "utf8",
+  );
+  const direct = readFileSync(
+    new URL("../src/app/task/[index]/baseline-task.tsx", import.meta.url),
+    "utf8",
+  );
+  const postProxy = readFileSync(
+    new URL("../src/app/task/[index]/shared.tsx", import.meta.url),
+    "utf8",
+  );
+
+  try {
+    Math.random = () => 0.5;
+    assert.equal(counterpartDelayMs(0), Math.round(4500 / 0.7));
+    assert.equal(counterpartDelayMs(200), Math.round(13500 / 0.7));
+    assert.equal(counterpartDelayMs(10_000), Math.round(16000 / 0.7));
+    assert.equal(bubbleDelayMs(120), 1800);
+    assert.equal(bubbleDelayMs(120, true), Math.round(1800 / 0.7));
+
+    Math.random = () => 0;
+    assert.equal(counterpartDelayMs(0), Math.round(4500 / 0.7));
+    assert.equal(bubbleDelayMs(10, true), Math.round(425 / 0.7));
+
+    Math.random = () => 1;
+    assert.equal(counterpartDelayMs(10_000), Math.round(16000 / 0.7));
+  } finally {
+    Math.random = originalRandom;
+  }
+
+  assert.match(config, /bubbleDelayMs\(bubbleLengths\[i\], humanCounterpart\)/);
+  assert.match(config, /last\?\.speaker === "counterpart"/);
+  assert.match(direct, /counterpartDelayMs\(/);
+  assert.match(postProxy, /counterpartDelayMs\(/);
 });
 
 test("post-task questionnaires cannot be revisited after the decision stimulus", () => {

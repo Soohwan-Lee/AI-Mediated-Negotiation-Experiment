@@ -166,6 +166,7 @@ function useBubbleReveal(
   lastId: string | undefined,
   bubbleLengths: readonly number[],
   enabled: boolean,
+  humanCounterpart: boolean,
 ): number {
   const bubbleCount = bubbleLengths.length;
   // Keyed by message id rather than stored as a bare count: the reveal state
@@ -184,7 +185,7 @@ function useBubbleReveal(
     const timers: number[] = [];
     let elapsed = 0;
     for (let i = 1; i < bubbleCount; i += 1) {
-      elapsed += bubbleDelayMs(bubbleLengths[i]);
+      elapsed += bubbleDelayMs(bubbleLengths[i], humanCounterpart);
       timers.push(
         window.setTimeout(() => {
           if (cancelled) return;
@@ -204,7 +205,7 @@ function useBubbleReveal(
     // and the count pin it; listing the array itself would restart the
     // stagger every render, since it is rebuilt each time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastId, enabled, bubbleCount]);
+  }, [lastId, enabled, bubbleCount, humanCounterpart]);
 
   if (!enabled) return bubbleCount;
   // A message the timers have not spoken for yet shows its first bubble only.
@@ -258,6 +259,7 @@ export function Transcript({
     last?.id,
     lastBubbles.map((b) => b.length),
     staggerLast,
+    last?.speaker === "counterpart",
   );
 
   useEffect(() => {
