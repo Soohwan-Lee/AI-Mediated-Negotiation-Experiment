@@ -1,5 +1,8 @@
 export const RECOVERABLE_REQUEST_ATTEMPTS = 3;
-export const RECOVERABLE_REQUEST_TIMEOUT_MS = 20_000;
+// Let the 60-second server function finish and return its own retryable error.
+// A shorter browser deadline can abandon a still-running OpenAI request, then
+// start another attempt while the first paid call continues server-side.
+export const RECOVERABLE_REQUEST_TIMEOUT_MS = 65_000;
 export const RECOVERABLE_REQUEST_BACKOFF_MS = 350;
 
 export function nextCountdownValue(

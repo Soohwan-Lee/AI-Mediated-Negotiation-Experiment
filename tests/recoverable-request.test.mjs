@@ -6,7 +6,19 @@ import {
   nextCountdownValue,
   waitForDelay,
   RECOVERABLE_REQUEST_ATTEMPTS,
+  RECOVERABLE_REQUEST_TIMEOUT_MS,
 } from "../src/lib/negotiation/recoverable-request.ts";
+
+test("the browser timeout outlives the server function without becoming unbounded", () => {
+  assert.ok(
+    RECOVERABLE_REQUEST_TIMEOUT_MS > 60_000,
+    "the browser must not preempt the 60-second model route",
+  );
+  assert.ok(
+    RECOVERABLE_REQUEST_TIMEOUT_MS <= 65_000,
+    "one failed attempt must still have a bounded deadline",
+  );
+});
 
 test("superseding a typing delay releases the serialized next turn immediately", async () => {
   const controller = new AbortController();
