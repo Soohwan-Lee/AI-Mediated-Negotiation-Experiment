@@ -5,6 +5,7 @@ import {
   confirmCheckGateAdvance,
   readCheckGate,
   readStopReason,
+  secondTaskPrerequisiteRedirect,
   taskGateRedirect,
   writeCheckGate,
   writeStopReason,
@@ -252,12 +253,24 @@ test("a completed old task never lowers a participant's later position", () => {
   });
 });
 
-test("task run markers do not leak from the first task to the second", () => {
+test("Task 2 requires Task 1 completion before its own gate can open", () => {
   installStorage();
   writeCheckGate("participant-a", "common", { status: "passed", attempts: 3 });
   writeCheckGate("participant-a", "task-2", { status: "passed", attempts: 4 });
-  markTaskStarted("participant-a", 1);
 
+  assert.deepEqual(secondTaskPrerequisiteRedirect("participant-a"), {
+    href: "/task/1",
+    furthestKey: "task-1",
+  });
+  assert.deepEqual(taskGateRedirect("participant-a", 2), {
+    href: "/task/1",
+    furthestKey: "task-1",
+  });
+
+  markTaskStarted("participant-a", 1);
+  markTaskCompleted("participant-a", 1);
+
+  assert.equal(secondTaskPrerequisiteRedirect("participant-a"), null);
   assert.equal(taskGateRedirect("participant-a", 2), null);
   assert.equal(readTaskRun("participant-a", 2), null);
 });

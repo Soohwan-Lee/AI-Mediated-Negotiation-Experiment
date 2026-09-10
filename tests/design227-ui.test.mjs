@@ -73,6 +73,11 @@ test("the Proxy setup explains the participant's choices and the final direct ag
   assert.doesNotMatch(proxyTask, /Authorize your AI Proxy|Authorize my AI Proxy and start/);
 });
 
+test("the Proxy emergency helper distinguishes stopping before and after a proposal", () => {
+  assert.match(proxyTask, /Stopping before the Proxies[\s\S]*reach a proposal or impasse ends the study/);
+  assert.match(proxyTask, /After that point,[\s\S]*your Proxy steps back and you take over yourself/);
+});
+
 test("both Proxy policies preserve facts and explain information-dependent additions", () => {
   assert.match(session, /Your Proxy \+ Their Proxy: same rule/);
   assert.match(session, /Both follow the same rule described below\./);

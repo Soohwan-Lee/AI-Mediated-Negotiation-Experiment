@@ -1445,7 +1445,9 @@ export function ProxyTask({
                     : "Emergency: Stop proxy exchange"}
               </button>
               <p className="mt-1 text-2xs text-slate-400">
-                Only use if something goes wrong. Your proxy steps back and you take over yourself.
+                Only use if something goes wrong. Stopping before the Proxies
+                reach a proposal or impasse ends the study. After that point,
+                your Proxy steps back and you take over yourself.
               </p>
             </div>
           </TaskLayout>

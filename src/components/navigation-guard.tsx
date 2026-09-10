@@ -26,7 +26,11 @@ import { useDevMode } from "@/lib/dev-mode";
 import { readFurthest, writeFurthest } from "@/lib/flow-position";
 import { FLOW, flowIndex, flowKeyFromPath } from "@/lib/study-config";
 import { useParticipant } from "@/lib/participant-context";
-import { readStopReason, taskGateRedirect } from "@/lib/check-gates";
+import {
+  readStopReason,
+  secondTaskPrerequisiteRedirect,
+  taskGateRedirect,
+} from "@/lib/check-gates";
 
 export function NavigationGuard() {
   const pathname = usePathname();
@@ -62,6 +66,15 @@ export function NavigationGuard() {
       const stopped = readStopReason(participantKey);
       if (stopped) {
         router.replace(`/study-stop?reason=${stopped}`);
+        return;
+      }
+    }
+
+    if (participantKey && (key === "practice-2" || key === "task-2")) {
+      const redirect = secondTaskPrerequisiteRedirect(participantKey);
+      if (redirect) {
+        writeFurthest(flowIndex(redirect.furthestKey));
+        router.replace(redirect.href);
         return;
       }
     }

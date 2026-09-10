@@ -87,7 +87,16 @@ export type TaskGateRedirect =
   | { href: "/study-stop?reason=technical" }
   | { href: string; preserveFurthest: true }
   | { href: "/instruction"; furthestKey: "instruction" }
+  | { href: "/task/1"; furthestKey: "task-1" }
   | { href: `/practice/${1 | 2}`; furthestKey: "practice" | "practice-2" };
+
+export function secondTaskPrerequisiteRedirect(
+  participantKey: string,
+): { href: "/task/1"; furthestKey: "task-1" } | null {
+  return readTaskRun(participantKey, 1)?.status === "completed"
+    ? null
+    : { href: "/task/1", furthestKey: "task-1" };
+}
 
 /** One gate decision shared by typed-URL navigation and the task route itself. */
 export function taskGateRedirect(
@@ -97,6 +106,11 @@ export function taskGateRedirect(
   const stopped = readStopReason(participantKey);
   if (stopped === "withdrawal") return { href: "/study-stop?reason=withdrawal" };
   if (stopped === "technical") return { href: "/study-stop?reason=technical" };
+
+  if (taskIndex === 2) {
+    const redirect = secondTaskPrerequisiteRedirect(participantKey);
+    if (redirect) return redirect;
+  }
 
   const taskRun = readTaskRun(participantKey, taskIndex);
   if (taskRun?.status === "active") {

@@ -14,6 +14,7 @@ import type {
   SurveyResponses,
   TranscriptMessage,
 } from "./types";
+import { setFlowPositionIdentity } from "./flow-position";
 import { SupabaseStore } from "./store-supabase";
 
 export interface Store {
@@ -270,6 +271,7 @@ export const REMOTE_STUDY = process.env.NEXT_PUBLIC_DEV_TOOLS === "off";
 /** Each attempt has its own recoverable queue. Old queues are left in place. */
 export function setStoreIdentity(participantKey: string): void {
   if (!REMOTE_STUDY || identity === participantKey) return;
+  setFlowPositionIdentity(participantKey);
   identity = participantKey;
   instance = new SupabaseStore(participantKey);
 }

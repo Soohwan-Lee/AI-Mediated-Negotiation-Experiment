@@ -32,13 +32,19 @@ import {
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { STUDY, nextHref } from "@/lib/study-config";
+import {
+  readDebriefDraft,
+  writeDebriefDraft,
+} from "@/lib/debrief-draft";
 
 export default function DebriefingPage() {
   usePageEnter("debriefing");
   const router = useRouter();
-  const { assignment, saveResponses, logEvent } = useParticipant();
+  const { assignment, participantKey, saveResponses, logEvent } = useParticipant();
   const [acknowledged, setAcknowledged] = useState(false);
-  const [comments, setComments] = useState("");
+  const [comments, setComments] = useState(() =>
+    participantKey ? readDebriefDraft(participantKey) : "",
+  );
   const [busy, setBusy] = useState(false);
 
   const isMember = assignment?.role === "member";
@@ -201,7 +207,10 @@ export default function DebriefingPage() {
             <Field label="Optional: Any feedback or comments for the research team?">
               <TextArea
                 value={comments}
-                onChange={setComments}
+                onChange={(value) => {
+                  setComments(value);
+                  if (participantKey) writeDebriefDraft(participantKey, value);
+                }}
                 rows={3}
                 placeholder="Share any thoughts about your experience (optional)…"
               />

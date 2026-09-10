@@ -67,14 +67,27 @@ async (page) => {
     const condition = assignment.sessions[taskIndex - 1].condition;
     const isProxy = condition !== "direct";
     await page.goto(`${origin}/instruction`, { waitUntil: "domcontentloaded" });
-    await page.evaluate(({ participantKey }) => {
+    await page.evaluate(({ participantKey, taskIndex }) => {
       localStorage.clear();
       sessionStorage.clear();
       localStorage.setItem(
         `amne:check-gate:${participantKey}:common`,
         JSON.stringify({ status: "passed", attempts: 2 }),
       );
-    }, { participantKey: assignment.participantKey });
+      // The second practice is only reachable after the first measured task.
+      // This harness performs genuine practice controls, but seeds that prior
+      // completed run so each assignment arm can be checked independently.
+      if (taskIndex === 2) {
+        localStorage.setItem(
+          `amne:task-run:${participantKey}:1`,
+          JSON.stringify({
+            status: "completed",
+            startedAt: "2026-09-11T00:00:00.000Z",
+            completedAt: "2026-09-11T00:01:00.000Z",
+          }),
+        );
+      }
+    }, { participantKey: assignment.participantKey, taskIndex });
     await page.goto(`${origin}/practice/${taskIndex}`, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: taskIndex === 1 ? "Start practice" : "Start the short practice", exact: true }).click();
     await page.getByRole("button", { name: /^I've read it/ }).click();
