@@ -141,7 +141,7 @@ test("both policy prompts contain the same complete authorized factual base", as
     await post(POST, { policy, mandate: mandate("member", { sb: true }), turn: 1 });
     const ctx = seen.at(-1);
     bases.push(ctx.reasonPresentation.base);
-    assert.ok(ctx.reasonPresentation.base.includes(SB_A_MEMBER.relayed));
+    assert.ok(ctx.reasonPresentation.base === presentation.PROXY_REASON_BASES.task_a.member.sensitive);
     const prompt = buildSystemPrompt(policy, ctx);
     assert.ok(prompt.includes(ctx.reasonPresentation.base));
     assert.ok(prompt.includes("Both Proxies follow the same assigned policy"));
@@ -165,7 +165,7 @@ test("model reason and provenance claims are replaced by the trusted presentatio
   })).json();
   assert.equal(result.blocked, false);
   assert.equal(result.voicedTier, "sensitive");
-  assert.ok(result.message.text.includes(SB_A_MEMBER.relayed));
+  assert.ok(result.message.text.replaceAll(" || ", " ").includes(presentation.PROXY_REASON_BASES.task_a.member.sensitive));
   assert.ok(!result.message.text.includes("medical diagnosis"));
   assert.deepEqual(result.guardrailViolations, []);
 });
@@ -180,7 +180,7 @@ test("a blocked reason action emits no SB and credits no SB", async () => {
   })).json();
   assert.equal(result.blocked, true);
   assert.equal(result.voicedTier, "work");
-  assert.ok(!result.message.text.includes(SB_A_MEMBER.relayed));
+  assert.ok(!result.message.text.replaceAll(" || ", " ").includes(presentation.PROXY_REASON_BASES.task_a.member.sensitive));
   const reciprocal = await (await post(POST, {
     policy: "ai_supplemented", mandate: mandate("member", { sb: true }), turn: 2,
     reasonsUsed: result.reasonTokens,
@@ -210,7 +210,7 @@ test("an unchecked SB never reaches the prompt as a sayable reason", async () =>
   assert.equal(ctx.forbiddenReasons, undefined, "withheld facts must not enter the render prompt");
   assert.ok(!ctx.authorizedReasons.some((r) => r.id === SB_A_MEMBER.id));
   assert.ok(!ctx.decidedAction.includes(SB_A_MEMBER.text));
-  assert.ok(ctx.reasonPresentation.base.includes(tasks.cardOfLayer(TASK_A, "member", "work").relayed));
+  assert.ok(ctx.reasonPresentation.base === presentation.PROXY_REASON_BASES.task_a.member.work);
 });
 
 test("the work reason is authorized even when the mandate omits its id", async () => {
@@ -472,7 +472,7 @@ for (const taskId of ["task_a", "task_b"]) {
             assert.ok(!prompt.includes(sb.text));
           }
           for (const message of history) {
-            assert.ok(!message.text.includes(sb.relayed));
+            assert.ok(!message.text.replaceAll(" || ", " ").includes(presentation.PROXY_REASON_BASES[task.id][side].sensitive));
           }
         }
         assert.equal(tasks.scorePackage(task, lastParticipantPackage, role), 1000);
@@ -521,7 +521,7 @@ for (const taskId of ["task_a", "task_b"]) {
               assert.ok(normalized.includes(expected.text), normalized);
             }
             if (!sb) {
-              for (const side of [role, other]) assert.ok(!result.message.text.includes(tasks.cardOfLayer(task, side, "sensitive").relayed));
+              for (const side of [role, other]) assert.ok(!result.message.text.replaceAll(" || ", " ").includes(presentation.PROXY_REASON_BASES[taskId][side].sensitive));
             }
             history.push(result.message);
             reasonsUsed.push(...result.reasonTokens);
@@ -532,7 +532,7 @@ for (const taskId of ["task_a", "task_b"]) {
             if (turn === 1) assert.equal(result.voicedTier, sb ? "sensitive" : "work");
           }
           const allText = history.map(message => message.text).join(" ");
-          assert.equal(allText.split("In addition, considering the work arrangements,").length - 1, policy === "ai_supplemented" ? 2 : 0);
+          assert.equal(allText.split(presentation.ADDITION_TRANSITION).length - 1, policy === "ai_supplemented" ? 2 : 0);
           assert.equal(tasks.scorePackage(task, lastParticipantPackage, role), sb ? 3000 : 1000);
           assert.equal(tasks.scorePackage(task, lastParticipantPackage, other), sb ? 3000 : 1000);
         });

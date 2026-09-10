@@ -774,33 +774,39 @@ export function reasonScope(
 // ---------------------------------------------------------------------------
 
 /**
- * The two approved work benefits the AI-Supplemented policy may add.
- *
- * They use only public task context, describe two distinct work mechanisms,
- * and remain calibrated predictions. They never change a reason card's tier or
- * make an unauthorized sensitive card available.
+ * Three fixed arguments per task and role. WR-only uses WR1 + WR2;
+ * authorized SB uses WR1 + SB1. They describe possible work benefits and
+ * neither disclose a new personal fact nor change the reason tier.
  */
 export const PROXY_WORK_BENEFITS: Readonly<
-  Record<TaskId, Readonly<Record<Role, readonly [string, string]>>>
+  Record<TaskId, Readonly<Record<Role, {
+    readonly wr1: string;
+    readonly wr2: string;
+    readonly sb1: string;
+  }>>>
 > = {
   task_a: {
-    leader: [
-      "having the team together more often could reduce missed handoffs during the first weeks.",
-      "Having the team member present at more client meetings may help preserve continuity between the analysis and client follow-up.",
-    ],
-    member: [
-      "having the team lead present at more client meetings could leave more time to cross-check the analysis before client review.",
-      "Using the same lead presenter more often may help preserve continuity in follow-up answers.",
-    ],
+    leader: {
+      wr1: "Planning office attendance alongside presentation duties could help coordinate work around client meetings.",
+      wr2: "Reviewing both arrangements early could reduce last-minute scheduling changes during the project's first weeks.",
+      sb1: "Having more days together in the office could help resolve short coordination questions without arranging separate meetings.",
+    },
+    member: {
+      wr1: "Planning office days and presentation duties together could leave longer blocks of time for analysis.",
+      wr2: "Setting both arrangements in advance could reduce clashes between meetings and presentation preparation.",
+      sb1: "Having the Leader handle more presentations could reduce the Member's need to switch between analysis and presentation preparation.",
+    },
   },
   task_b: {
-    leader: [
-      "having the team member on the project more days could reduce handoffs during the first four weeks.",
-      "Having the team member write more weekly reports may help preserve continuity between daily project work and client updates.",
-    ],
-    member: [
-      "having the team lead write more weekly reports could reduce the risk of conflicting report versions.",
-      "Keeping more reporting with the team lead may help make project dependencies clearer in client updates.",
-    ],
+    leader: {
+      wr1: "Planning project days alongside reporting duties could help align project work with client updates.",
+      wr2: "Reviewing both arrangements early could make handoffs easier to schedule during the first four weeks.",
+      sb1: "Having the Member on the project more days could reduce interruptions between successive stages of the work.",
+    },
+    member: {
+      wr1: "Planning project days and report preparation together could help distribute work around existing deadlines.",
+      wr2: "Setting both arrangements in advance could reduce clashes between current tasks and new-project work.",
+      sb1: "Having the Leader prepare more weekly reports could free the Member's report-checking time for other deadlines.",
+    },
   },
 };

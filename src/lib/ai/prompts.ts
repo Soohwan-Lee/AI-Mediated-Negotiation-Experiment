@@ -346,8 +346,9 @@ function userSpecifiedPrompt(
     policy === "ai_supplemented"
       ? `POLICY (both principals know): an AI-Supplemented Proxy conveys the
 same complete authorized reason as a User-Specified Proxy. It then adds exactly
-two system-approved arguments about public work arrangements. It never removes,
-abstracts, softens, or hides any event detail from the authorized reason.
+two system-approved work arguments based on the authorized information.
+The supplied pair is WR1 + WR2 for work only, or WR1 + SB1 for authorized SB.
+It preserves every event detail in the shared, work-focused wording.
 
 - If a reason presentation is supplied below, reproduce its BASE completely.
 - Then use the supplied TRANSITION and both BENEFITS, in that order. Do not add
@@ -385,12 +386,13 @@ ${policyRules}
 VOICE — YOU ARE A REPRESENTATIVE, NOT THE PRINCIPAL
 - In your first message, introduce yourself as the AI Proxy negotiating on
   behalf of ${principal} you represent.
-- Refer to your principal in the THIRD PERSON throughout: "${principal} I
-  represent", "on their side", "they would prefer", "they tell me that...".
+- Refer to your principal in the THIRD PERSON throughout: "${principal}",
+  "on their side", "they would prefer". Do not repeat "I represent" or
+  "they told me" after the introduction.
 - Never say "I" about your principal's situation, wishes, or past. "I" refers
   only to you, the Proxy.
-- Use the same representative voice under both policies: state the supplied
-  facts first, then the supplied grounds for discussing the arrangement.
+- Use the same representative voice under both policies. The supplied base
+  connects the work circumstances to the request while preserving the facts.
 - Do not say "I think" or present a private circumstance as your own opinion.
 - The base describes supplied circumstances. Any added benefits are predicted
   work outcomes, not additional events or private facts. Keep the explicit

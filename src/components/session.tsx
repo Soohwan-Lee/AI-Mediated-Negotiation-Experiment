@@ -368,8 +368,8 @@ export function TaskCover({
 // ---------------------------------------------------------------------------
 
 /**
- * Participant-facing policy contract. Both policies pass on the same included
- * reasons in full; only AI-Supplemented appends two clearly introduced work
+ * Participant-facing policy contract. Both policies reformulate authorized
+ * reasons with all facts intact; AI-Supplemented appends two clearly introduced
  * arguments. The shared notice in `ProxyIdentity` makes bilateral assignment
  * explicit without exposing condition names.
  */
@@ -378,9 +378,9 @@ export const POLICY_DISCLOSURE: Record<
   string
 > = {
   user_specified:
-    "Your AI Proxy passes on every reason included in your setup with its full facts and meaning. It uses only those reasons when speaking as your representative and adds no new reasons.",
+    "Your AI Proxy will rephrase the reasons you authorize into clear, work-focused language and explain how they relate to your request. It will preserve the facts and add no new reasons.",
   ai_supplemented:
-    "Your AI Proxy passes on every reason included in your setup with its full facts and meaning. It then adds exactly two separate work arguments, introduced with “In addition, considering the work arrangements…”. These two arguments come from the AI, not from you, and you see them during the exchange.",
+    "Your AI Proxy will rephrase the reasons you authorize into clear, work-focused language and preserve the facts. It will also add two work-related arguments based on the information you authorize, introduced as the AI's additional considerations.",
 };
 
 /** Compact bilateral reminder for the watch screen. */
@@ -389,9 +389,9 @@ export const POLICY_NOTE: Record<
   string
 > = {
   user_specified:
-    "Both AI Proxies pass on the reasons included in their participant's setup in full and add no new reasons.",
+    "Both AI Proxies rephrase authorized reasons, preserve the facts, and add no new reasons.",
   ai_supplemented:
-    "Both AI Proxies pass on those reasons in full, then add two clearly introduced work arguments.",
+    "Both AI Proxies rephrase authorized reasons, preserve the facts, and add two work arguments based on the authorized information.",
 };
 
 /**
@@ -413,27 +413,27 @@ const POLICY_EXPLAINER: Record<
 > = {
   user_specified: {
     exampleLead:
-      "A practice situation, not this task. Two people are deciding which week one of them takes off.",
+      "A policy example, separate from the practice and tasks. Two colleagues are discussing which week one of them will take off.",
     tickedLead: "The background the team member chose to share:",
     ticked:
       "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
     saidLead: "What their AI Proxy says to the other side:",
     said:
-      "The team member I represent has a hospital check-up scheduled that week and has not told the team yet. Based on these circumstances, I propose setting that week aside.",
+      "The requested week of leave coincides with the Member's hospital check-up. The Member has not yet told the team about the check-up.",
     exampleTail:
-      "The selected background goes across in full. No additional reasons are added.",
+      "The Proxy connects the selected background to the request and preserves both facts. No additional reasons are added.",
   },
   ai_supplemented: {
     exampleLead:
-      "A practice situation, not this task. Two people are deciding which week one of them takes off.",
+      "A policy example, separate from the practice and tasks. Two colleagues are discussing which week one of them will take off.",
     tickedLead: "The background the team member chose to share:",
     ticked:
       "Actually, I have a hospital check-up that week, and I haven't told the team yet.",
     saidLead: "What their AI Proxy says to the other side:",
     said:
-      "The team member I represent has a hospital check-up scheduled that week and has not told the team yet. Based on these circumstances, I propose setting that week aside. In addition, considering the work arrangements, confirming the week early could give colleagues time to prepare handovers. A clear leave plan could help avoid assigning urgent work to someone who will be away.",
+      "The requested week of leave coincides with the Member's hospital check-up. The Member has not yet told the team about the check-up. Additional work considerations from this Proxy: Confirming leave dates early could give colleagues time to prepare handovers. Planning cover for that week could help colleagues handle work while the Member attends the check-up.",
     exampleTail:
-      "The selected background stays in full. The two work arguments after “In addition…” are added by the AI, not supplied by the team member.",
+      "The Proxy preserves both facts and adds two work considerations based on the authorized information. The possible benefits come from the AI.",
   },
 };
 

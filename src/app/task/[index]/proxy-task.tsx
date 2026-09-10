@@ -1232,11 +1232,10 @@ export function ProxyTask({
                       </ul>
                       {policy === "ai_supplemented" ? (
                         <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-xs leading-relaxed text-indigo-950 sm:text-sm">
-                          After these reasons, your Proxy adds exactly two
-                          separate work arguments. It introduces them with
-                          {" "}&ldquo;In addition, considering the work
-                          arrangements…&rdquo; Those arguments come from the AI,
-                          not from you, and appear during the exchange.
+                          Your Proxy also adds two work arguments based on the
+                          information you authorize. It introduces them as
+                          &ldquo;Additional work considerations from this
+                          Proxy:&rdquo; during the exchange.
                         </p>
                       ) : null}
                     </div>

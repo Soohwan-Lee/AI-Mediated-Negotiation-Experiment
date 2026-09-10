@@ -67,29 +67,27 @@ test("the Proxy setup explains the participant's choices and the final direct ag
   assert.match(proxyTask, /I will always share your work reason and say which issue[\s\S]*matters more; you choose whether I may share your sensitive[\s\S]*background\./);
   assert.match(proxyTask, /Your work reason is always included\. Your sensitive[\s\S]*background is included only if you selected it\./);
   assert.match(proxyTask, /\{c\.relayed \?\? c\.text\}/);
-  assert.match(proxyTask, /After these reasons, your Proxy adds exactly two[\s\S]*separate work arguments/);
-  assert.match(proxyTask, /Those arguments come from the AI,[\s\S]*not from you, and appear during the exchange/);
+  assert.match(proxyTask, /Your Proxy also adds two work arguments based on the[\s\S]*information you authorize/);
+  assert.match(proxyTask, /Additional work considerations from this[\s\S]*Proxy:/);
   assert.match(proxyTask, /Then discuss or change the proposed terms directly with the other participant\. Both of you must agree\./);
   assert.doesNotMatch(proxyTask, /Authorize your AI Proxy|Authorize my AI Proxy and start/);
 });
 
-test("both Proxy policies preserve selected reasons and clearly identify AI additions", () => {
+test("both Proxy policies preserve facts and explain information-dependent additions", () => {
   assert.match(session, /Your Proxy \+ Their Proxy: same rule/);
   assert.match(session, /Both follow the same rule described below\./);
-  assert.equal(
-    session.split("passes on every reason included in your setup with its full facts and meaning").length - 1,
-    2,
-  );
-  assert.match(session, /adds exactly two separate work arguments/);
-  assert.match(session, /In addition, considering the work arrangements…/);
-  assert.match(session, /These two arguments come from the AI, not from you/);
-  const sharedExampleBase = "The team member I represent has a hospital check-up scheduled that week and has not told the team yet. Based on these circumstances, I propose setting that week aside.";
+  assert.equal(session.split("rephrase the reasons you authorize into clear, work-focused language").length - 1, 2);
+  assert.match(session, /preserve the facts and add no new reasons/);
+  assert.match(session, /add two work-related arguments based on the information you authorize/);
+  assert.match(session, /introduced as the AI's additional considerations/);
+  const sharedExampleBase = "The requested week of leave coincides with the Member's hospital check-up. The Member has not yet told the team about the check-up.";
   assert.equal(session.split(sharedExampleBase).length - 1, 2);
-  assert.match(session, /confirming the week early could give colleagues time to prepare handovers/);
-  assert.match(session, /A clear leave plan could help avoid assigning urgent work to someone who will be away/);
-  assert.match(session, /The selected background stays in full/);
-  assert.doesNotMatch(session, /leaves out the specific event|personal appointment|own assessment|I think that week|I only say what you hand me here/);
-  assert.doesNotMatch(proxyTask, /summarize this in one[\s\S]*sentence without the specific event|present the whole explanation as[\s\S]*its own assessment/);
+  assert.match(session, /Confirming leave dates early could give colleagues time to prepare handovers/);
+  assert.match(session, /Planning cover for that week could help colleagues handle work while the Member attends the check-up/);
+  assert.match(session, /A policy example, separate from the practice and tasks/);
+  assert.doesNotMatch(session, /A practice situation|leaves out the specific event|personal appointment|own assessment/);
+  assert.doesNotMatch(session, /SB1|WR1|WR2|stronger argument|better outcome|more persuasive/);
+  assert.doesNotMatch(proxyTask, /summarize this in one[\s\S]*sentence without the specific event/);
 });
 
 test("debriefing accurately distinguishes the assigned Proxy policies", () => {
