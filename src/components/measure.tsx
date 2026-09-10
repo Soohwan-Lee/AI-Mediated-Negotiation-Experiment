@@ -141,6 +141,10 @@ function MeasureItem({
   const asText = typeof value === "string" ? value : "";
   const asNumber = typeof value === "number" ? value : null;
   const labelledText = `(${item.id.replace(/_t[12]$/, "")}) ${item.text}`;
+  const invalidNumber =
+    item.kind === "number" &&
+    asText !== "" &&
+    (!Number.isFinite(Number(asText)) || Number(asText) < 0);
 
   if (item.kind === "scale") {
     // No wrapper here: `Scale`'s own `border-b … last:border-b-0` already draws
@@ -211,14 +215,22 @@ function MeasureItem({
             options={item.options}
           />
         ) : item.kind === "number" ? (
-          <TextInput
-            type="number"
-            inputMode="numeric"
-            ariaLabel={labelledText}
-            value={asText}
-            onChange={(v) => onChange(item.id, v)}
-            placeholder={item.placeholder}
-          />
+          <div>
+            <TextInput
+              type="number"
+              inputMode="numeric"
+              ariaLabel={labelledText}
+              value={asText}
+              onChange={(v) => onChange(item.id, v)}
+              placeholder={item.placeholder}
+              min={0}
+            />
+            {invalidNumber ? (
+              <p className="mt-1.5 text-xs font-medium text-red-700" role="alert">
+                Enter zero or a positive number.
+              </p>
+            ) : null}
+          </div>
         ) : item.kind === "line" ? (
           <TextInput
             ariaLabel={labelledText}

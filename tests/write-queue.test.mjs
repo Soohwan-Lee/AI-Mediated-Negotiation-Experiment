@@ -206,3 +206,138 @@ test("an idempotent completion write is queued only once", async () => {
   assert.equal(await q.flush(), true);
   assert.deepEqual(sent, ["complete:P-1"]);
 });
+
+test("a corrected response snapshot supersedes its rejected 400 predecessor only", async () => {
+  const sent = [];
+  const q = makeQueue(async (_url, init) => {
+    const item = JSON.parse(init.body);
+    sent.push([item.op, item.payload.responses?.BG4 ?? null]);
+    if (item.payload.responses?.BG4 === "-1") {
+      return { ok: false, status: 400 };
+    }
+    return { ok: true, status: 200 };
+  });
+
+  q.push("saveResponses", {
+    participantKey: "P-1", block: "v226_background", responses: { BG4: "-1" },
+  });
+  q.push("logEvent", { type: "negotiation_started" });
+  q.push("saveResponses", {
+    participantKey: "P-1", block: "v226_background", responses: { BG4: "5" },
+  });
+
+  assert.equal(await q.flush(), true);
+  assert.deepEqual(sent, [
+    ["saveResponses", "-1"],
+    ["logEvent", null],
+    ["saveResponses", "5"],
+  ], "the unrelated event must remain ordered between the two snapshots");
+});
+
+test("a legacy stored 413 snapshot recovers through a later same-block snapshot", async () => {
+  store.clear();
+  store.set("amne:writequeue", JSON.stringify([
+    { id: "old-large", op: "saveResponses", payload: {
+      participantKey: "P-1", block: "v226_task_open_t1", responses: { OED1_t1: "too large" },
+    }, queuedAt: "x" },
+    { id: "old-fixed", op: "saveResponses", payload: {
+      participantKey: "P-1", block: "v226_task_open_t1", responses: { OED1_t1: "fixed" },
+    }, queuedAt: "y" },
+  ]));
+  const sent = [];
+  globalThis.fetch = async (_url, init) => {
+    const item = JSON.parse(init.body);
+    sent.push(item.payload.responses.OED1_t1);
+    return item.id === "old-large"
+      ? { ok: false, status: 413 }
+      : { ok: true, status: 200 };
+  };
+
+  const q = new WriteQueue("/api/persist");
+  assert.equal(await q.flush(), true);
+  assert.deepEqual(sent, ["too large", "fixed"]);
+});
+
+test("a transient 503 never discards or reorders same-block snapshots", async () => {
+  const sent = [];
+  let up = false;
+  const q = makeQueue(async (_url, init) => {
+    const item = JSON.parse(init.body);
+    if (!up) return { ok: false, status: 503 };
+    sent.push(item.payload.responses.BG4);
+    return { ok: true, status: 200 };
+  });
+  q.push("saveResponses", {
+    participantKey: "P-1", block: "v226_background", responses: { BG4: "4" },
+  });
+  q.push("saveResponses", {
+    participantKey: "P-1", block: "v226_background", responses: { BG4: "5" },
+  });
+
+  assert.equal(await q.flush(), false);
+  assert.equal(q.pending, 2);
+  up = true;
+  assert.equal(await q.flush(), true);
+  assert.deepEqual(sent, ["4", "5"]);
+});
+
+for (const status of [401, 409]) {
+  test(`HTTP ${status} never discards a response snapshot`, async () => {
+    const q = makeQueue(async () => ({ ok: false, status }));
+    q.push("saveResponses", {
+      participantKey: "P-1", block: "v226_background", responses: { BG4: "4" },
+    });
+    q.push("saveResponses", {
+      participantKey: "P-1", block: "v226_background", responses: { BG4: "5" },
+    });
+
+    assert.equal(await q.flush(), false);
+    assert.equal(q.pending, 2);
+  });
+}
+
+test("a partial later response snapshot cannot compensate for rejected answers", async () => {
+  const q = makeQueue(async () => ({ ok: false, status: 400 }));
+  q.push("saveResponses", {
+    participantKey: "P-1",
+    block: "v226_background",
+    responses: { BG3: "manager", BG4: "-1" },
+  });
+  q.push("saveResponses", {
+    participantKey: "P-1",
+    block: "v226_background",
+    responses: { BG4: "5" },
+  });
+
+  assert.equal(await q.flush(), false);
+  assert.equal(q.pending, 2);
+});
+
+test("a rejected protocol block is never treated as a replaceable survey snapshot", async () => {
+  const q = makeQueue(async () => ({ ok: false, status: 400 }));
+  q.push("saveResponses", {
+    participantKey: "P-1", block: "task_run_t1", responses: { state: "old" },
+  });
+  q.push("saveResponses", {
+    participantKey: "P-1", block: "task_run_t1", responses: { state: "new" },
+  });
+
+  assert.equal(await q.flush(), false);
+  assert.equal(q.pending, 2);
+});
+
+test("a 400 is retained without a later snapshot for the same participant and block", async () => {
+  const q = makeQueue(async () => ({ ok: false, status: 400 }));
+  q.push("saveResponses", {
+    participantKey: "P-1", block: "v226_background", responses: { BG4: "-1" },
+  });
+  q.push("saveResponses", {
+    participantKey: "P-1", block: "v226_task_open_t1", responses: { OED1_t1: "later" },
+  });
+  q.push("saveResponses", {
+    participantKey: "P-2", block: "v226_background", responses: { BG4: "5" },
+  });
+
+  assert.equal(await q.flush(), false);
+  assert.equal(q.pending, 3, "another block or participant cannot compensate for the rejection");
+});

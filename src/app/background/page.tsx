@@ -32,6 +32,23 @@ const BLOCKS = BACKGROUND_BLOCKS;
 const RESPONSE_BLOCK = "v226_background";
 const BACKGROUND_IDS = BLOCKS.flatMap((block) => block.items.map((item) => item.id));
 const BACKGROUND_PAGE_IDS = BLOCKS.map(requiredIds);
+const NUMBER_IDS = BLOCKS.flatMap((block) =>
+  block.items.filter((item) => item.kind === "number").map((item) => item.id),
+);
+
+function invalidNumberIds(answers: Answers): string[] {
+  return NUMBER_IDS.filter((id) => {
+    const value = answers[id];
+    const numeric = typeof value === "string" || typeof value === "number"
+      ? Number(value)
+      : Number.NaN;
+    return (
+      value !== undefined &&
+      value !== "" &&
+      (!Number.isFinite(numeric) || numeric < 0)
+    );
+  });
+}
 
 const SECTION_COPY = [
   {
@@ -92,14 +109,18 @@ export default function BackgroundPage() {
   const ageValid =
     answers["BG1"] === undefined || answers["BG1"] === "" ||
     (Number.isFinite(age) && age >= 18 && age <= 100);
-  const currentMissing = [
+  const currentMissing = [...new Set([
     ...missingIds([currentBlock], answers),
+    ...invalidNumberIds(answers).filter((id) =>
+      currentBlock.items.some((item) => item.id === id),
+    ),
     ...(currentBlock.id === "demographics" && !ageValid ? ["BG1"] : []),
-  ];
-  const allMissing = [
+  ])];
+  const allMissing = [...new Set([
     ...missingIds(BLOCKS, answers),
+    ...invalidNumberIds(answers),
     ...(!ageValid ? ["BG1"] : []),
-  ];
+  ])];
   const missing = part === BLOCKS.length - 1 ? allMissing : currentMissing;
   const canContinue = useDevGate(missing.length === 0);
 
@@ -122,7 +143,12 @@ export default function BackgroundPage() {
     const next = { ...latestAnswers.current, [id]: value };
     latestAnswers.current = next;
     setAnswers(next);
-    void saveResponses(RESPONSE_BLOCK, { ...next, _instrument_version: "2.26", _submitted_parts: submittedParts });
+    // Do not let one temporarily invalid number enter a full-block snapshot:
+    // the server correctly rejects it, and that rejected FIFO head would also
+    // hold every later corrected snapshot behind it.
+    if (invalidNumberIds(next).length === 0) {
+      void saveResponses(RESPONSE_BLOCK, { ...next, _instrument_version: "2.26", _submitted_parts: submittedParts });
+    }
     setFlagged((prev) => {
       if (!prev.has(id)) return prev;
       const next = new Set(prev);

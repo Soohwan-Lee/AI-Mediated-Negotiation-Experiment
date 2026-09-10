@@ -7,6 +7,9 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const reward = read("../src/app/task/[index]/reward/page.tsx");
 const survey = read("../src/app/task/[index]/survey/page.tsx");
 const wrapUp = read("../src/app/wrap-up/page.tsx");
+const background = read("../src/app/background/page.tsx");
+const measure = read("../src/components/measure.tsx");
+const ui = read("../src/components/ui.tsx");
 
 test("fully answered drafts never count as explicitly completed", () => {
   const draft = { OED1_t1: "Done", OEE1_t1: "Done", OEP1_t1: "Done" };
@@ -78,4 +81,12 @@ test("wrap-up keeps checks together and does not skip a filled draft", () => {
   assert.match(wrapUp, /saved\?\._checks_submitted === true/);
   assert.match(wrapUp, /explicitlyCompleted/);
   assert.doesNotMatch(wrapUp, /SUS|ICC4|FR1|FR2/);
+});
+
+test("client input bounds match server-valid survey snapshots", () => {
+  assert.match(measure, /Number\.isFinite\(Number\(asText\)\)[\s\S]*Number\(asText\) < 0/);
+  assert.match(measure, /min=\{0\}/);
+  assert.match(measure, /Enter zero or a positive number/);
+  assert.match(background, /if \(invalidNumberIds\(next\)\.length === 0\)/);
+  assert.match(ui, /maxLength=\{20_000\}/);
 });

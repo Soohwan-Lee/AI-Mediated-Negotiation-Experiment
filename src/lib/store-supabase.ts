@@ -25,6 +25,41 @@ interface QueuedWrite {
   queuedAt: string;
 }
 
+const RECOVERABLE_RESPONSE_BLOCK =
+  /^(?:debriefing|v226_(?:background|wrap_up|post_task_scales_t[12]|task_decision_t[12]|task_open_t[12]))$/;
+
+function responseSnapshot(item: QueuedWrite) {
+  if (item.op !== "saveResponses" || !item.payload || typeof item.payload !== "object") return null;
+  const payload = item.payload;
+  if (
+    !("participantKey" in payload) ||
+    typeof payload.participantKey !== "string" ||
+    !("block" in payload) ||
+    typeof payload.block !== "string" ||
+    !("responses" in payload) ||
+    !payload.responses ||
+    typeof payload.responses !== "object" ||
+    Array.isArray(payload.responses)
+  ) return null;
+  return {
+    participantKey: payload.participantKey,
+    block: payload.block,
+    responses: payload.responses,
+  };
+}
+
+function supersedesSurveySnapshot(firstItem: QueuedWrite, secondItem: QueuedWrite) {
+  const first = responseSnapshot(firstItem);
+  const second = responseSnapshot(secondItem);
+  return Boolean(
+    first && second &&
+    RECOVERABLE_RESPONSE_BLOCK.test(first.block) &&
+    second.participantKey === first.participantKey &&
+    second.block === first.block &&
+    Object.keys(first.responses).every((key) => Object.hasOwn(second.responses, key)),
+  );
+}
+
 const QUEUE_KEY = "amne:writequeue";
 
 function readQueue(storageKey = QUEUE_KEY): QueuedWrite[] {
@@ -155,7 +190,23 @@ export class WriteQueue {
           // idempotent; no parallel beacon can replay an older draft.
           body: JSON.stringify({ id: item.id, op: item.op, payload: item.payload }),
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          const supersededValidationFailure =
+            (response.status === 400 || response.status === 413) &&
+            this.queue.slice(1).some((candidate) =>
+              supersedesSurveySnapshot(item, candidate),
+            );
+          if (supersededValidationFailure) {
+            // Survey writes are complete block snapshots. A later snapshot for
+            // the same attempt and block therefore compensates for this
+            // rejected one. Keep every unrelated write in place, and never do
+            // this for auth, conflict, or transient server failures.
+            this.queue.shift();
+            writeQueue(this.queue, this.storageKey);
+            continue;
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
         this.queue.shift();
         writeQueue(this.queue, this.storageKey);
       } catch {

@@ -388,6 +388,7 @@ export function TextInput({
   type = "text",
   inputMode,
   ariaLabel,
+  min,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -395,6 +396,7 @@ export function TextInput({
   type?: "text" | "number";
   inputMode?: "numeric";
   ariaLabel?: string;
+  min?: number;
 }) {
   return (
     <input
@@ -403,6 +405,7 @@ export function TextInput({
       value={value}
       placeholder={placeholder}
       aria-label={ariaLabel}
+      min={min}
       onChange={(e) => onChange(e.target.value)}
       className={INPUT_CLASS}
     />
@@ -426,6 +429,7 @@ export function TextArea({
     <textarea
       value={value}
       rows={rows}
+      maxLength={20_000}
       placeholder={placeholder}
       aria-label={ariaLabel}
       onChange={(e) => onChange(e.target.value)}
