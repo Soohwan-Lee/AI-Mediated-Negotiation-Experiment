@@ -120,10 +120,10 @@ const PROXY_CONFIRM_DRAFT =
  */
 const PRACTICE_REASONS: Record<Role, { work: string }> = {
   leader: {
-    work: "The quarterly review is coming up, so when the move happens affects how much settles before it.",
+    work: "An early slot leaves the rest of your day clear, so when the meeting starts affects how much you get through.",
   },
   member: {
-    work: "You are at your desk most of the day, so the printer's spot affects how often you are up and down.",
+    work: "Your mornings are for analysis work, so how many of the meetings are in person affects how much of that time stays whole.",
   },
 };
 
@@ -146,7 +146,7 @@ const PROXY_WATCH_SCRIPT: ReadonlyArray<{
 }> = [
   {
     speaker: "participant_proxy",
-    text: "I represent one of the two of you here. On the move week and the printer, my side has a preference on each.",
+    text: "I represent one of the two of you here. On the start time and the in-person meetings, my side has a preference on each.",
   },
   {
     speaker: "counterpart_proxy",

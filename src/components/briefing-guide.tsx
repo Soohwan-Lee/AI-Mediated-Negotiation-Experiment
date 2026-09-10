@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { ActionBar, BackButton } from "./study-chrome";
 import { RoleDecisionFlow } from "./proxy-art";
+import { NavigationNotice } from "./navigation-notice";
 import { Card, CardTitle, Page, PageHeader, cx } from "./ui";
 import { PHASES, STUDY, type PhaseKey } from "@/lib/study-config";
 import type { Role } from "@/lib/types";
@@ -138,6 +139,12 @@ export function StudyOrientation({
         <PageHeader eyebrow={`Study guide · ${page + 1} of ${GUIDE_PAGES.length}`}
           title={[`You are the ${isLeader ? "team lead" : "team member"}`, "What happens after each task", "What to do in each negotiation"][page]}
           subtitle={["You and one other participant settle two working conditions. You keep this role in both tasks.", "", "Three rules, then a short check and one practice round."][page]} />
+
+        {/* The first thing on the instruction page, above the role and the
+            payment: a live negotiation is component state, so a reload ends it
+            and there is nothing to resume. Page 0 only — repeating it on every
+            guide page would turn a warning into chrome. */}
+        {page === 0 ? <NavigationNotice tone="prominent" className="mb-6" /> : null}
 
         {page === 0 ? (
           <div className="grid items-start gap-6 md:grid-cols-[0.95fr_1.05fr]">

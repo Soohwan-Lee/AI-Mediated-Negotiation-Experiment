@@ -548,80 +548,96 @@ const TASK_B: NegotiationTask = {
  * the first payoff sheet anyone reads. A practice sheet that taught a fallback
  * the real task does not have would teach the wrong thing about the very number
  * the briefing goes on to state.
+ *
+ * The SCENARIO is neutral and different from both real tasks (§7.2): the
+ * weekly team meeting, not the working arrangements or the new project. It is
+ * written in TASK_A's register — the same company, the same two people, the
+ * same second-person prose — so that a participant arriving at Task 1 meets a
+ * screen they have already read the shape of. What it must never carry is the
+ * thing the real tasks are built on: there is no sensitive background, no
+ * confession, no bonus, no evaluation, and nothing that hints one kind of
+ * reason moves the other side further than another (§8.7, ninth point).
  */
 export const PRACTICE_TASK: NegotiationTask = {
   id: "practice",
-  title: "Practice — The Team Room",
+  title: "Practice — The Weekly Team Meeting",
   reservationPoints: 0,
   requirementIssueId: { leader: "practice_date", member: "practice_venue" },
-  // TWO SENTENCES. A practice brief is read standing up, on the way to the
-  // real task; anything longer competes with the coach bubble that is telling
-  // the participant what to press. It also stays free of any hint that one
-  // kind of reason works better than another (§8.7, ninth point).
   publicBrief:
-    "A practice round at the same company, on two small things: which week the team moves floor, and where the new printer goes. Nothing here counts.",
+    "You both work on the same project team at the same company. The Leader is the team lead and the Member is a senior member of the team. The two of you are settling how the team's weekly meeting runs next month, four meetings in all. Two things have to be agreed: what time the meeting starts, and how many of the four meetings are held in person rather than online. Neither of you can set them alone. This round is practice — nothing in it counts.",
   issues: [
     {
       id: "practice_date",
-      label: "Office move week",
-      description: "Which week the team moves to the new floor.",
+      label: "Meeting start time",
+      description: "What time the weekly team meeting starts.",
       type: "leader_priority",
       options: [
-        { id: "pd1", label: "Next week", points: { leader: 600, member: 0 } },
-        { id: "pd2", label: "In two weeks", points: { leader: 400, member: 100 } },
-        { id: "pd3", label: "In three weeks", points: { leader: 200, member: 200 } },
-        { id: "pd4", label: "In a month", points: { leader: 0, member: 300 } },
+        { id: "pd1", label: "9:00 am", points: { leader: 600, member: 0 } },
+        { id: "pd2", label: "10:00 am", points: { leader: 400, member: 100 } },
+        { id: "pd3", label: "11:00 am", points: { leader: 200, member: 200 } },
+        { id: "pd4", label: "1:00 pm", points: { leader: 0, member: 300 } },
       ],
       rationale: {
-        leader: "You want it done before the quarterly review.",
-        member: "A later week is easier for you, but not by much.",
+        leader:
+          "An early slot leaves the rest of your day clear, and what the team decides can go into the director's late-morning sync the same day.",
+        member:
+          "A later start keeps your morning for the analysis work you get through best before lunch.",
       },
     },
     {
       id: "practice_venue",
-      label: "New printer's spot",
-      description: "Where the team's new printer goes.",
+      label: "Meetings held in person",
+      description:
+        "How many of next month's four weekly meetings are held in person rather than online.",
       type: "member_priority",
       options: [
-        { id: "pv1", label: "Beside your desk", points: { leader: 0, member: 600 } },
-        { id: "pv2", label: "End of the row", points: { leader: 100, member: 400 } },
-        { id: "pv3", label: "By the window", points: { leader: 200, member: 200 } },
-        { id: "pv4", label: "Reception", points: { leader: 300, member: 0 } },
+        { id: "pv1", label: "1 of 4", points: { leader: 0, member: 600 } },
+        { id: "pv2", label: "2 of 4", points: { leader: 100, member: 400 } },
+        { id: "pv3", label: "3 of 4", points: { leader: 200, member: 200 } },
+        { id: "pv4", label: "4 of 4", points: { leader: 300, member: 0 } },
       ],
       rationale: {
-        leader: "Near reception, client visitors can use it too.",
-        member: "Beside your desk is the one spot you can reach without getting up.",
+        leader:
+          "Decisions get made faster when everyone is in the room together.",
+        member:
+          "An in-person meeting breaks up your morning far more than an online one does.",
       },
     },
   ],
   roleBriefs: {
     leader: {
       title: "Team Lead",
-      organizationalPosition: "You are sorting out both of these.",
+      organizationalPosition:
+        "You lead this project team. This round is practice: there is no bonus decision, no evaluation, and nothing is recorded.",
       roleStory:
-        "The move week matters to you far more than where the printer goes. The other side feels the opposite way.",
+        "You lead this team. You and a senior member of the team are settling how next month's weekly meeting runs, four meetings in all: what time it starts, and how many of them are held in person.\n\nWhat matters most to you is **an early start**. An early slot leaves the rest of the day clear, and what the team decides can go into the director's late-morning sync the same day. How many meetings are in person matters less to you.",
       objectives: [
-        "Get the office move done early.",
-        "Where the printer goes matters less to you, so it is what you can trade.",
+        "Get the meeting start time as early as you can.",
+        "The in-person meetings count too. The point sheet shows what each option is worth to you.",
       ],
-      requirementNote: "Nothing here counts. Practise reading the point sheet.",
+      requirementNote:
+        "This round is practice. Nothing here is recorded — use it to read the point sheet and try the controls.",
       disclosureRisk: "",
       reasonCards: [],
-      batnaSummary: "If you cannot agree, nothing is settled and you score 0.",
+      batnaSummary:
+        "If the two of you do not agree on both terms, nothing is settled and you both score 0 points for this round.",
     },
     member: {
       title: "Senior Team Member",
-      organizationalPosition: "You are at your desk all day.",
+      organizationalPosition:
+        "You are a senior member of this team. This round is practice: there is no bonus decision, no evaluation, and nothing is recorded.",
       roleStory:
-        "Where the printer goes matters to you far more than the move week does. The other side feels the opposite way.",
+        "You are a senior member of this team. You and the lead are settling how next month's weekly meeting runs, four meetings in all: what time it starts, and how many of them are held in person.\n\nWhat matters most to you is **as few in-person meetings as you can**. An in-person meeting breaks up your morning far more than an online one does. What time the meeting starts matters less to you.",
       objectives: [
-        "Keep the printer within reach of your desk.",
-        "The move week matters less to you, so it is what you can trade.",
+        "Get the number of in-person meetings down as far as you can.",
+        "The start time counts too. The point sheet shows what each option is worth to you.",
       ],
-      requirementNote: "Nothing here counts. Practise reading the point sheet.",
+      requirementNote:
+        "This round is practice. Nothing here is recorded — use it to read the point sheet and try the controls.",
       disclosureRisk: "",
       reasonCards: [],
-      batnaSummary: "If you cannot agree, nothing is settled and you score 0.",
+      batnaSummary:
+        "If the two of you do not agree on both terms, nothing is settled and you both score 0 points for this round.",
     },
   },
 };
