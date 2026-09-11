@@ -9,11 +9,21 @@ import {
 
 const ids = (blocks) => blocks.flatMap((block) => block.items.map((item) => item.id));
 
-test("Ver.2.26 background has the seven canonical BG codes and eight covariate items", () => {
+test("background preserves BG1-BG7 and adds two optional demographic fields", () => {
   assert.deepEqual(ids(BACKGROUND_BLOCKS), [
-    "BG1", "BG2", "BG3", "BG4", "BG5", "BG6", "BG7",
+    "BG1", "BG2", "BG3", "BG4", "BG8", "BG9", "BG5", "BG6", "BG7",
     "FTS1", "FTS2", "FTS3", "AIA1", "AIA2", "AIA3", "AIA4", "AIA5",
   ]);
+  const demographics = BACKGROUND_BLOCKS[0];
+  assert.deepEqual(demographics.optional, ["BG1", "BG4", "BG8", "BG9"]);
+  assert.deepEqual(requiredIds(demographics), ["BG2", "BG3", "BG5", "BG6", "BG7"]);
+  const race = demographics.items.find((item) => item.id === "BG8");
+  assert.equal(race.kind, "select");
+  assert.deepEqual(race.options.map((option) => option.label), [
+    "Asian", "Black", "White", "Middle Eastern/North African", "Indigenous",
+    "Mixed/multiple backgrounds", "Another background", "Prefer not to say",
+  ]);
+  assert.equal(demographics.items.find((item) => item.id === "BG9").kind, "line");
 });
 
 test("each task scale page contains Direct 9 or Proxy 17 items in grouped blocks", () => {

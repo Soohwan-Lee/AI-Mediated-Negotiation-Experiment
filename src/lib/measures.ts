@@ -20,7 +20,7 @@ export const BACKGROUND_BLOCKS: Block[] = [
   {
     id: "demographics", title: "About you",
     hint: "These questions describe the study sample. You may choose not to answer demographic questions.",
-    optional: ["BG1", "BG4"],
+    optional: ["BG1", "BG4", "BG8", "BG9"],
     items: [
       { kind: "number", id: "BG1", text: "What is your age?", placeholder: "e.g. 34", half: true },
       { kind: "select", id: "BG2", text: "How would you describe your gender?", half: true, options: [
@@ -34,6 +34,13 @@ export const BACKGROUND_BLOCKS: Block[] = [
         { value: "no_answer", label: "Prefer not to say" },
       ] },
       { kind: "number", id: "BG4", text: "How many years of work experience do you have?", placeholder: "e.g. 8", half: true },
+      { kind: "select", id: "BG8", text: "How would you describe your race or ethnicity? (Optional)", half: true, options: [
+        { value: "asian", label: "Asian" }, { value: "black", label: "Black" },
+        { value: "white", label: "White" }, { value: "middle_eastern_north_african", label: "Middle Eastern/North African" },
+        { value: "indigenous", label: "Indigenous" }, { value: "mixed_multiple", label: "Mixed/multiple backgrounds" },
+        { value: "another_background", label: "Another background" }, { value: "no_answer", label: "Prefer not to say" },
+      ] },
+      { kind: "line", id: "BG9", text: "What country do you currently live in? (Optional)", placeholder: "e.g. United Kingdom", half: true },
       { kind: "choice", id: "BG5", text: "Have you worked as a supervisor or manager?", columns: 2, options: [
         { value: "no", label: "No" }, { value: "yes", label: "Yes" }, { value: "no_answer", label: "Prefer not to say" },
       ] },
@@ -317,6 +324,6 @@ export function dummyAnswer(item: Item): string | number {
     case "choice":
     case "select": return item.options[0].value;
     case "number": return item.id === "BG1" ? "34" : "8";
-    default: return MOCK_TEXT[item.id.replace(/_t[12]$/, "")] ?? "A brief response for the study walkthrough.";
+    default: return item.id === "BG9" ? "United Kingdom" : MOCK_TEXT[item.id.replace(/_t[12]$/, "")] ?? "A brief response for the study walkthrough.";
   }
 }

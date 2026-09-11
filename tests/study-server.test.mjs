@@ -174,10 +174,41 @@ test("real suffixed scales, responsibility order, zero bonus, and open answers m
 test("optional background blanks remain valid and malformed scales never write", async () => {
   await save("saveResponses", { block: "v226_background", responses: { BG1: "", BG4: "", FTS1: 3, _submitted_parts: 3 } });
   assert.equal(row.bg1, null); assert.equal(row.bg4, null); assert.equal(row.fts1, 3);
+  assert.equal(row.bg8, undefined); assert.equal(row.bg9, undefined);
   assert.equal(row.operational.background_submitted, true);
   const before = calls.length;
   await assert.rejects(save("saveResponses", { block: "v226_background", responses: { FTS1: 99 } }), /invalid_scale/);
   assert.equal(calls.length, before);
+});
+
+test("optional race and country responses validate and persist in coded and raw forms", async () => {
+  await save("saveResponses", { block: "v226_background", responses: {
+    BG8: "asian", BG9: "South Korea", _submitted_parts: 1,
+  } });
+  assert.equal(row.bg8, "asian"); assert.equal(row.bg9, "South Korea");
+  assert.equal(row.background_answers.BG8, "asian");
+  assert.equal(row.background_answers.BG9, "South Korea");
+
+  await save("saveResponses", { block: "v226_background", responses: { BG8: "", BG9: "" } });
+  assert.equal(row.bg8, null); assert.equal(row.bg9, null);
+  assert.equal(row.background_answers.BG8, "");
+  assert.equal(row.background_answers.BG9, "");
+
+  for (const race of [
+    "asian", "black", "white", "middle_eastern_north_african", "indigenous",
+    "mixed_multiple", "another_background", "no_answer",
+  ]) {
+    await save("saveResponses", { block: "v226_background", responses: { BG8: race } });
+    assert.equal(row.bg8, race);
+  }
+  await assert.rejects(
+    save("saveResponses", { block: "v226_background", responses: { BG8: "unsupported" } }),
+    /invalid_choice/,
+  );
+  await assert.rejects(
+    save("saveResponses", { block: "v226_background", responses: { BG9: 42 } }),
+    /invalid_record/,
+  );
 });
 
 test("real later-turn SB and approved-as-is ratification are retained", async () => {

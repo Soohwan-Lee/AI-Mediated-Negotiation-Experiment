@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 
 const migration = readFileSync(new URL("../supabase/migrations/20260910041518_compact_research_storage.sql", import.meta.url), "utf8");
+const optionalBackgroundMigration = readFileSync(new URL("../supabase/migrations/20260911001701_optional_background_demographics.sql", import.meta.url), "utf8");
 
 test("storage migration exposes five private tables and service-only RPCs", () => {
   assert.equal([...migration.matchAll(/^create table public\./gm)].length, 5);
@@ -12,6 +13,14 @@ test("storage migration exposes five private tables and service-only RPCs", () =
   assert.match(migration, /from public, anon, authenticated/);
   assert.match(migration, /unique \(prolific_pid, study_id\)/);
   assert.match(migration, /primary key \(participant_key, task_index, message_id\)/);
+});
+
+test("optional background migration adds nullable coded columns without changing completion", () => {
+  assert.match(optionalBackgroundMigration, /add column bg8 text/);
+  assert.match(optionalBackgroundMigration, /add column bg9 text/);
+  assert.match(optionalBackgroundMigration, /comment on column public\.study_participants\.bg8/);
+  assert.match(optionalBackgroundMigration, /comment on column public\.study_participants\.bg9/);
+  assert.doesNotMatch(optionalBackgroundMigration, /not null|complete_study_participation/i);
 });
 
 // Optional real PostgreSQL engine, installed outside this repository. No network
