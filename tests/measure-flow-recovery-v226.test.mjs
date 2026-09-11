@@ -49,7 +49,7 @@ test("task scale page is one grouped page with draft persistence and explicit su
   assert.match(survey, /proxyExperienceBlocks\(participantKey\)/);
   assert.match(survey, /lg:grid-cols-2/);
   assert.match(survey, /TranscriptReview/);
-  assert.match(survey, /label="Submit & Continue"/);
+  assert.match(survey, /"Submit & Continue"/);
   assert.doesNotMatch(survey, /setPart|restoredSurveyPart/);
 });
 
@@ -60,7 +60,7 @@ test("reward groups all task open questions behind one explicit submit", () => {
   assert.match(reward, /_submitted_parts: 0,[\s\S]*_completed: false/);
   assert.match(reward, /_submitted_parts: 1,[\s\S]*_completed: true/);
   assert.match(reward, /_completed: true/);
-  assert.match(reward, /label="Submit & Continue"/);
+  assert.match(reward, /"Submit & Continue"/);
   assert.doesNotMatch(reward, /setOpenPart|activeOpenPart/);
   assert.doesNotMatch(reward, /restoredSurveyPart|setShowRemark|RemarkPhase|attr_t/);
 });

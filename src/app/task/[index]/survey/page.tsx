@@ -7,7 +7,7 @@ import { MeasureBlock, answeredNote, missingIds, type Answers } from "@/componen
 import { ActionBar } from "@/components/study-chrome";
 import { TranscriptReview } from "@/components/transcript-review";
 import { LoadRetry } from "@/components/load-retry";
-import { Card, Page } from "@/components/ui";
+import { Callout, Card, Page } from "@/components/ui";
 import { isProxyCondition, sessionPlan } from "@/lib/assignment";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { blockForTask, dummyAnswer, experienceBlocks, proxyExperienceBlocks, responsibilityOrder } from "@/lib/measures";
@@ -30,6 +30,7 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const submitting = useRef(false);
 
   const plan = assignment ? sessionPlan(assignment, taskIndex) : null;
@@ -69,6 +70,7 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
   }, `task-survey-v226-${taskIndex}-${restored}`);
 
   function answer(id: string, value: string | number) {
+    if (submitting.current) return;
     const next = { ...latestAnswers.current, [id]: value };
     latestAnswers.current = next;
     setAnswers(next);
@@ -92,9 +94,11 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
     if (!canSubmit) { setFlagged(new Set(missing)); return; }
     submitting.current = true;
     setBusy(true);
+    setSaveFailed(false);
     try {
       if (participantKey) {
-        await getStore().saveResponses(participantKey, responseBlock, {
+        const store = getStore();
+        await store.saveResponses(participantKey, responseBlock, {
             ...latestAnswers.current,
             _instrument_version: "2.26",
             _submitted: true,
@@ -103,9 +107,15 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
             _pop_responsibility_order: responsibilityOrder(participantKey) === "human_first" ? "ai_first" : "human_first",
           } : {}),
         });
+        if (!(await store.confirmSaved())) {
+          setSaveFailed(true);
+          return;
+        }
       }
       logEvent("survey_saved", { block: responseBlock, instrumentVersion: "2.26" }, { sessionIndex: taskIndex });
       router.push(nextHref(flowKey));
+    } catch {
+      setSaveFailed(true);
     } finally {
       submitting.current = false;
       setBusy(false);
@@ -123,10 +133,11 @@ export default function TaskSurveyPage({ params }: { params: Promise<{ index: st
         <p className="mt-2 text-sm leading-relaxed text-slate-700">Please answer all questions about the negotiation you just completed, then submit the page.</p>
       </Card>
       <TranscriptReview participantKey={participantKey} taskIndex={taskIndex} />
-      <div className="mt-6 grid items-start gap-x-5 lg:grid-cols-2">
+      <fieldset disabled={busy} className="mt-6 grid items-start gap-x-5 lg:grid-cols-2">
         {blocks.map((block) => <MeasureBlock key={block.id} block={block} answers={answers} onChange={answer} flagged={flagged} stackedScales />)}
-      </div>
+      </fieldset>
+      {saveFailed ? <div className="mb-6" role="alert"><Callout tone="warning"><p>We couldn&apos;t save yet. Your answers are still here. Please retry.</p></Callout></div> : null}
     </Page>
-    <ActionBar label="Submit & Continue" onClick={submit} busy={busy} remaining={flagged.size > 0 ? missing.length : 0} firstUnansweredId={missing[0] ?? null} note={answeredNote(blocks, answers)} />
+    <ActionBar label={saveFailed ? "Retry saving" : "Submit & Continue"} onClick={submit} busy={busy} remaining={flagged.size > 0 ? missing.length : 0} firstUnansweredId={missing[0] ?? null} note={answeredNote(blocks, answers)} />
   </>;
 }

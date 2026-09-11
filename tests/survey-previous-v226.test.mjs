@@ -17,8 +17,8 @@ test("Previous is shown wherever an earlier participant-facing section exists", 
 
 test("each back handler refuses to step below zero and saves before moving", () => {
   assert.match(background, /handlePrevious\(\)[\s\S]*if \(part === 0 \|\| submitting\.current\) return;[\s\S]*await saveResponses[\s\S]*setPart\(part - 1\)/);
-  assert.match(reward, /previousOpen\(\)[\s\S]*if \(submitting\.current\) return;[\s\S]*await getStore\(\)\.saveResponses[\s\S]*setStage\("decision"\)/);
-  assert.match(wrapUp, /previous\(\)[\s\S]*if \(activePart === 0 \|\| submitting\.current\) return;[\s\S]*await getStore\(\)\.saveResponses[\s\S]*setPart\(activePart - 1\)/);
+  assert.match(reward, /previousOpen\(\)[\s\S]*if \(submitting\.current\) return;[\s\S]*await store\.saveResponses[\s\S]*setStage\("decision"\)/);
+  assert.match(wrapUp, /previous\(\)[\s\S]*if \(activePart === 0 \|\| submitting\.current\) return;[\s\S]*await store\.saveResponses[\s\S]*setPart\(activePart - 1\)/);
 });
 
 test("reload landing comes from submitted progress, not filled drafts", () => {

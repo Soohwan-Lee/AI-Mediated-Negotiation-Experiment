@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MeasureBlock, PreviousPart, missingIds, type Answers } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { LoadRetry } from "@/components/load-retry";
-import { Card, Page } from "@/components/ui";
+import { Callout, Card, Page } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { END_CHECK_BLOCKS, OEC1_BLOCK, isExpandedOpenInstrument, dummyAnswer } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
@@ -30,6 +30,7 @@ export default function WrapUpPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [comparisonInTask, setComparisonInTask] = useState(false);
   const submitting = useRef(false);
   const PARTS = useMemo(() => comparisonInTask ? [END_CHECK_BLOCKS] : LEGACY_PARTS, [comparisonInTask]);
@@ -71,6 +72,7 @@ export default function WrapUpPage() {
   }, `wrap-up-v226-${activePart}`);
 
   function answer(id: string, value: string | number) {
+    if (submitting.current) return;
     const next = { ...latestAnswers.current, [id]: value };
     latestAnswers.current = next; setAnswers(next);
     if (participantKey) void getStore().saveResponses(participantKey, RESPONSE_BLOCK, { ...next, _instrument_version: "2.26", _checks_submitted: checksSubmitted });
@@ -79,21 +81,41 @@ export default function WrapUpPage() {
   async function submit() {
     if (!canSubmit || submitting.current) return;
     submitting.current = true; setBusy(true);
+    setSaveFailed(false);
     try {
-      if (participantKey) await getStore().saveResponses(participantKey, RESPONSE_BLOCK, { ...latestAnswers.current, _instrument_version: "2.26", _checks_submitted: true, _completed: isLast });
+      if (participantKey) {
+        const store = getStore();
+        await store.saveResponses(participantKey, RESPONSE_BLOCK, { ...latestAnswers.current, _instrument_version: "2.26", _checks_submitted: true, _completed: isLast });
+        if (!(await store.confirmSaved())) {
+          setSaveFailed(true);
+          return;
+        }
+      }
       if (!isLast) { setChecksSubmitted(true); setPart(activePart + 1); window.scrollTo({ top: 0 }); return; }
       logEvent("survey_saved", { block: RESPONSE_BLOCK, instrumentVersion: "2.26" });
       router.push(nextHref("wrap-up"));
+    } catch {
+      setSaveFailed(true);
     } finally { submitting.current = false; setBusy(false); }
   }
 
   async function previous() {
     if (activePart === 0 || submitting.current) return;
     submitting.current = true; setBusy(true);
+    setSaveFailed(false);
     try {
-      if (participantKey) await getStore().saveResponses(participantKey, RESPONSE_BLOCK, { ...latestAnswers.current, _instrument_version: "2.26", _checks_submitted: checksSubmitted });
+      if (participantKey) {
+        const store = getStore();
+        await store.saveResponses(participantKey, RESPONSE_BLOCK, { ...latestAnswers.current, _instrument_version: "2.26", _checks_submitted: checksSubmitted });
+        if (!(await store.confirmSaved())) {
+          setSaveFailed(true);
+          return;
+        }
+      }
       logEvent("survey_back", { block: RESPONSE_BLOCK, from: activePart, to: activePart - 1 });
       setPart(activePart - 1); window.scrollTo({ top: 0 });
+    } catch {
+      setSaveFailed(true);
     } finally { submitting.current = false; setBusy(false); }
   }
 
@@ -107,8 +129,11 @@ export default function WrapUpPage() {
         <h1 className="mt-2 text-xl font-black tracking-tight text-[var(--ink)] sm:text-2xl">{activePart === 0 ? "Your role and interaction" : "Comparing your experiences"}</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-700">Please answer based on your experience across the study.</p>
       </Card>
-      {blocks.map((block) => <MeasureBlock key={block.id} block={block} answers={answers} onChange={answer} />)}
+      <fieldset disabled={busy}>
+        {blocks.map((block) => <MeasureBlock key={block.id} block={block} answers={answers} onChange={answer} />)}
+      </fieldset>
+      {saveFailed ? <div className="mb-6" role="alert"><Callout tone="warning"><p>We couldn&apos;t save yet. Your answers are still here. Please retry.</p></Callout></div> : null}
     </Page>
-    <ActionBar label={isLast ? "Submit & Continue to Debriefing" : "Next Section"} onClick={submit} busy={busy} disabled={!canSubmit} remaining={missing.length} firstUnansweredId={missing[0] ?? null} secondary={activePart > 0 ? <PreviousPart onClick={previous} disabled={busy} /> : null} />
+    <ActionBar label={saveFailed ? "Retry saving" : isLast ? "Submit & Continue to Debriefing" : "Next Section"} onClick={submit} busy={busy} disabled={!canSubmit} remaining={missing.length} firstUnansweredId={missing[0] ?? null} secondary={activePart > 0 ? <PreviousPart onClick={previous} disabled={busy} /> : null} />
   </>;
 }

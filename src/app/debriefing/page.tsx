@@ -17,7 +17,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActionBar } from "@/components/study-chrome";
 import {
   Callout,
@@ -31,6 +31,7 @@ import {
 } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
+import { getStore } from "@/lib/store";
 import { STUDY, nextHref } from "@/lib/study-config";
 import {
   readDebriefDraft,
@@ -46,6 +47,8 @@ export default function DebriefingPage() {
     participantKey ? readDebriefDraft(participantKey) : "",
   );
   const [busy, setBusy] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const submitting = useRef(false);
 
   const isMember = assignment?.role === "member";
 
@@ -54,13 +57,22 @@ export default function DebriefingPage() {
   const canContinue = useDevGate(acknowledged);
 
   async function handleFinish() {
-    if (!canContinue) return;
+    if (!canContinue || submitting.current) return;
+    submitting.current = true;
     setBusy(true);
+    setSaveFailed(false);
     try {
       await saveResponses("debriefing", { acknowledged, comments });
+      if (!(await getStore().confirmSaved())) {
+        setSaveFailed(true);
+        return;
+      }
       logEvent("debriefing_acknowledged");
       router.push(nextHref("debriefing"));
+    } catch {
+      setSaveFailed(true);
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
@@ -190,13 +202,14 @@ export default function DebriefingPage() {
           </Card>
         </div>
 
+        <fieldset disabled={busy}>
         <Card className="border-indigo-200 bg-indigo-50/30">
           <CardTitle hint="Please confirm before generating your completion code:">
             Acknowledgement & Feedback
           </CardTitle>
 
           <div className="mt-3">
-            <Checkbox checked={acknowledged} onChange={setAcknowledged}>
+            <Checkbox checked={acknowledged} onChange={(value) => { if (!submitting.current) setAcknowledged(value); }}>
               <span className="font-bold text-slate-900">
                 I have read and understood this debriefing explanation.
               </span>
@@ -208,6 +221,7 @@ export default function DebriefingPage() {
               <TextArea
                 value={comments}
                 onChange={(value) => {
+                  if (submitting.current) return;
                   setComments(value);
                   if (participantKey) writeDebriefDraft(participantKey, value);
                 }}
@@ -217,10 +231,12 @@ export default function DebriefingPage() {
             </Field>
           </div>
         </Card>
+        </fieldset>
+        {saveFailed ? <div className="mt-5" role="alert"><Callout tone="warning"><p>We couldn&apos;t save yet. Your answers are still here. Please retry.</p></Callout></div> : null}
       </Page>
 
       <ActionBar
-        label="Acknowledge & Get Prolific Completion Code"
+        label={saveFailed ? "Retry saving" : "Acknowledge & Get Prolific Completion Code"}
         onClick={handleFinish}
         disabled={!canContinue}
         busy={busy}

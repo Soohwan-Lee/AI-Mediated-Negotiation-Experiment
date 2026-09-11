@@ -20,11 +20,12 @@ import {
 } from "@/components/measure";
 import { ActionBar } from "@/components/study-chrome";
 import { LoadRetry } from "@/components/load-retry";
-import { Page, PageHeader } from "@/components/ui";
+import { Callout, Page, PageHeader } from "@/components/ui";
 import { useDevAutofill, useDevGate } from "@/lib/dev-mode";
 import { BACKGROUND_BLOCKS, dummyAnswer, requiredIds } from "@/lib/measures";
 import { useParticipant, usePageEnter } from "@/lib/participant-context";
 import { useRestoreAnswers } from "@/lib/saved-answers";
+import { getStore } from "@/lib/store";
 import { nextHref } from "@/lib/study-config";
 import { answersForIds, restoredValidPart } from "@/lib/survey-progress";
 
@@ -75,6 +76,7 @@ export default function BackgroundPage() {
   const [submittedParts, setSubmittedParts] = useState(0);
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const submitting = useRef(false);
 
   // Reachable again via Back from the instructions. Resume after the last
@@ -140,6 +142,7 @@ export default function BackgroundPage() {
   );
 
   function answer(id: string, value: string | number) {
+    if (submitting.current) return;
     const next = { ...latestAnswers.current, [id]: value };
     latestAnswers.current = next;
     setAnswers(next);
@@ -166,9 +169,14 @@ export default function BackgroundPage() {
     }
     submitting.current = true;
     setBusy(true);
+    setSaveFailed(false);
     try {
       const nextSubmittedParts = Math.max(submittedParts, part + 1);
       await saveResponses(RESPONSE_BLOCK, { ...latestAnswers.current, _instrument_version: "2.26", _submitted_parts: nextSubmittedParts });
+      if (!(await getStore().confirmSaved())) {
+        setSaveFailed(true);
+        return;
+      }
       setSubmittedParts(nextSubmittedParts);
       if (part < BLOCKS.length - 1) {
         setPart((current) => current + 1);
@@ -178,6 +186,8 @@ export default function BackgroundPage() {
       }
       logEvent("page_complete", undefined, { page: "background" });
       router.push(nextHref("background"));
+    } catch {
+      setSaveFailed(true);
     } finally {
       submitting.current = false;
       setBusy(false);
@@ -198,12 +208,19 @@ export default function BackgroundPage() {
     if (part === 0 || submitting.current) return;
     submitting.current = true;
     setBusy(true);
+    setSaveFailed(false);
     try {
       await saveResponses(RESPONSE_BLOCK, { ...latestAnswers.current, _instrument_version: "2.26", _submitted_parts: submittedParts });
+      if (!(await getStore().confirmSaved())) {
+        setSaveFailed(true);
+        return;
+      }
       logEvent("survey_back", { block: RESPONSE_BLOCK, from: part, to: part - 1 }, { page: "background" });
       setPart(part - 1);
       setFlagged(new Set());
       window.scrollTo({ top: 0 });
+    } catch {
+      setSaveFailed(true);
     } finally {
       submitting.current = false;
       setBusy(false);
@@ -220,16 +237,19 @@ export default function BackgroundPage() {
         />
 
         {restoration.loadFailed ? <LoadRetry onRetry={restoration.retry} /> : null}
-        <MeasureBlock
-          block={currentBlock}
-          answers={answers}
-          onChange={answer}
-          flagged={flagged}
-        />
+        <fieldset disabled={busy}>
+          <MeasureBlock
+            block={currentBlock}
+            answers={answers}
+            onChange={answer}
+            flagged={flagged}
+          />
+        </fieldset>
+        {saveFailed ? <div className="mb-5" role="alert"><Callout tone="warning"><p>We couldn&apos;t save yet. Your answers are still here. Please retry.</p></Callout></div> : null}
       </Page>
 
       <ActionBar
-        label={part === BLOCKS.length - 1 ? "Continue" : "Next section"}
+        label={saveFailed ? "Retry saving" : part === BLOCKS.length - 1 ? "Continue" : "Next section"}
         onClick={handleNext}
         busy={busy}
         remaining={flagged.size > 0 ? missing.length : 0}

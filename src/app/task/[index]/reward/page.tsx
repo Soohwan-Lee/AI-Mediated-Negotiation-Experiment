@@ -35,6 +35,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const submitting = useRef(false);
 
   const isLeader = assignment?.role === "leader";
@@ -101,7 +102,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   }, `reward-v227-${taskIndex}-${stage}`);
 
   function persistLeaderDraft(percent: number | null, confirmed: boolean) {
-    if (!participantKey) return;
+    if (!participantKey || submitting.current) return;
     const pounds = percent === null ? null : bonusAmountFromPercent(percent);
     void getStore().saveResponses(participantKey, decisionBlockName, {
       _instrument_version: "2.26", role: "leader",
@@ -113,6 +114,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   }
 
   function answerEvaluation(id: string, value: string | number) {
+    if (submitting.current) return;
     const next = { ...evalAnswers, [id]: value };
     setEvalAnswers(next);
     if (participantKey) void getStore().saveResponses(participantKey, decisionBlockName, { ...next, _instrument_version: "2.26", role: "member" });
@@ -121,6 +123,7 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   async function submitDecision() {
     if (!canSubmitDecision || submitting.current) return;
     submitting.current = true; setBusy(true);
+    setSaveFailed(false);
     try {
       const payload: Answers = isLeader ? {
         _instrument_version: "2.26", role: "leader",
@@ -129,13 +132,23 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
         [`BR1_t${taskIndex}`]: awarded,
         [`BR1_CONFIRMED_t${taskIndex}`]: amountConfirmed, _submitted: true,
       } : { ...evalAnswers, _instrument_version: "2.26", role: "member", _submitted: true };
-      if (participantKey) await getStore().saveResponses(participantKey, decisionBlockName, payload);
+      if (participantKey) {
+        const store = getStore();
+        await store.saveResponses(participantKey, decisionBlockName, payload);
+        if (!(await store.confirmSaved())) {
+          setSaveFailed(true);
+          return;
+        }
+      }
       logEvent("reward_decision", { kind: isLeader ? "BR1" : "FE1", value: isLeader ? awarded : evalAnswers[`FE1_t${taskIndex}`], instrumentVersion: "2.26" }, { sessionIndex: taskIndex });
       setStage("open"); window.scrollTo({ top: 0 });
+    } catch {
+      setSaveFailed(true);
     } finally { submitting.current = false; setBusy(false); }
   }
 
   function answerOpen(id: string, value: string | number) {
+    if (submitting.current) return;
     const next = { ...latestOpenAnswers.current, [id]: value };
     latestOpenAnswers.current = next;
     setOpenAnswers(next);
@@ -150,30 +163,50 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
   async function submitOpen() {
     if (!canSubmitOpen || submitting.current) return;
     submitting.current = true; setBusy(true);
+    setSaveFailed(false);
     try {
-      if (participantKey) await getStore().saveResponses(participantKey, openBlockName, {
-        ...latestOpenAnswers.current,
-        _instrument_version: openVersion,
-        _submitted_parts: 1,
-        _completed: true,
-      });
+      if (participantKey) {
+        const store = getStore();
+        await store.saveResponses(participantKey, openBlockName, {
+          ...latestOpenAnswers.current,
+          _instrument_version: openVersion,
+          _submitted_parts: 1,
+          _completed: true,
+        });
+        if (!(await store.confirmSaved())) {
+          setSaveFailed(true);
+          return;
+        }
+      }
       logEvent("survey_saved", { block: openBlockName, instrumentVersion: openVersion }, { sessionIndex: taskIndex });
       router.push(nextHref(flowKey));
+    } catch {
+      setSaveFailed(true);
     } finally { submitting.current = false; setBusy(false); }
   }
 
   async function previousOpen() {
     if (submitting.current) return;
     submitting.current = true; setBusy(true);
+    setSaveFailed(false);
     try {
-      if (participantKey) await getStore().saveResponses(participantKey, openBlockName, {
-        ...latestOpenAnswers.current,
-        _instrument_version: openVersion,
-        _submitted_parts: 0,
-        _completed: false,
-      });
+      if (participantKey) {
+        const store = getStore();
+        await store.saveResponses(participantKey, openBlockName, {
+          ...latestOpenAnswers.current,
+          _instrument_version: openVersion,
+          _submitted_parts: 0,
+          _completed: false,
+        });
+        if (!(await store.confirmSaved())) {
+          setSaveFailed(true);
+          return;
+        }
+      }
       logEvent("survey_back", { block: openBlockName, from: "open", to: "decision" }, { sessionIndex: taskIndex });
       setStage("decision"); window.scrollTo({ top: 0 });
+    } catch {
+      setSaveFailed(true);
     } finally { submitting.current = false; setBusy(false); }
   }
 
@@ -188,16 +221,19 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
         <h1 className="mt-2 text-xl font-black tracking-tight text-[var(--ink)] sm:text-2xl">Tell us about this negotiation</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-700">Please answer in your own words. A brief answer is fine.</p>
       </Card>
-      {openBlocks.map((block) => (
-        <MeasureBlock
-          key={block.id}
-          block={block}
-          answers={openAnswers}
-          onChange={answerOpen}
-        />
-      ))}
+      <fieldset disabled={busy}>
+        {openBlocks.map((block) => (
+          <MeasureBlock
+            key={block.id}
+            block={block}
+            answers={openAnswers}
+            onChange={answerOpen}
+          />
+        ))}
+      </fieldset>
+      {saveFailed ? <div className="mb-6" role="alert"><Callout tone="warning"><p>We couldn&apos;t save yet. Your answers are still here. Please retry.</p></Callout></div> : null}
     </Page>
-    <ActionBar label="Submit & Continue" onClick={submitOpen} busy={busy} disabled={!canSubmitOpen} remaining={openMissing.length} firstUnansweredId={openMissing[0] ?? null} secondary={<PreviousPart onClick={previousOpen} disabled={busy} />} />
+    <ActionBar label={saveFailed ? "Retry saving" : "Submit & Continue"} onClick={submitOpen} busy={busy} disabled={!canSubmitOpen} remaining={openMissing.length} firstUnansweredId={openMissing[0] ?? null} secondary={<PreviousPart onClick={previousOpen} disabled={busy} />} />
   </>;
 
   if (!isLeader) return <>
@@ -207,9 +243,10 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
         <h1 className="mt-2 text-xl font-black tracking-tight text-[var(--ink)] sm:text-2xl">Evaluate the Team Lead</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-700">Consider the negotiation as a whole and whether you would want to work with this person again. This evaluation will be sent to the director.</p>
       </Card>
-      <MeasureBlock block={evalBlock} answers={evalAnswers} onChange={answerEvaluation} />
+      <fieldset disabled={busy}><MeasureBlock block={evalBlock} answers={evalAnswers} onChange={answerEvaluation} /></fieldset>
+      {saveFailed ? <div className="mb-6" role="alert"><Callout tone="warning"><p>We couldn&apos;t save yet. Your answers are still here. Please retry.</p></Callout></div> : null}
     </Page>
-    <ActionBar label="Submit Evaluation" onClick={submitDecision} busy={busy} disabled={!canSubmitDecision} remaining={evalMissing.length} firstUnansweredId={evalMissing[0] ?? null} />
+    <ActionBar label={saveFailed ? "Retry saving" : "Submit Evaluation"} onClick={submitDecision} busy={busy} disabled={!canSubmitDecision} remaining={evalMissing.length} firstUnansweredId={evalMissing[0] ?? null} />
   </>;
 
   const bonusUnit = BR1_ITEM.kind === "amount" ? BR1_ITEM.unit : undefined;
@@ -220,21 +257,24 @@ export default function TaskRewardPage({ params }: { params: Promise<{ index: st
         <h1 className="mt-2 text-xl font-black tracking-tight text-[var(--ink)] sm:text-2xl">Recommend the Member&apos;s Bonus</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-700">Consider the negotiation as a whole and whether you would want to work with this person again.</p>
       </Card>
-      <Card className="mb-6 border-slate-200" id={`q-BR1_t${taskIndex}`}>
-        <CardTitle hint={bonusUnit}>(BR1) {BR1_ITEM.text}</CardTitle>
-        <div className="mt-5">
-          <label htmlFor={`BR1_t${taskIndex}`} className="sr-only">BR1 bonus percentage from 0 to 100</label>
-          <input id={`BR1_t${taskIndex}`} type="range" min={0} max={100} step={1} value={amountPercent ?? 0}
-            onChange={(event) => { const value = Number(event.target.value); setAmountPercent(value); setAmountConfirmed(false); persistLeaderDraft(value, false); }}
-            className="w-full accent-[var(--accent)]" aria-valuetext={awarded === null ? "No value selected" : `${STUDY.currencySymbol}${awarded.toFixed(2)}`} />
-          <div className="mt-2 flex justify-between text-xs font-semibold text-[var(--ink-3)]"><span>£0.00</span><span>£{STUDY.bonusPerTask}</span></div>
-          {amountPercent === null ? <button type="button" onClick={() => { setAmountPercent(0); setAmountConfirmed(false); persistLeaderDraft(0, false); }} className="mt-4 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-[var(--accent)]">Choose £0.00</button> : null}
-        </div>
-        {awarded !== null ? <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-center"><p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Recommended Bonus Amount</p><p className="my-1 font-mono text-3xl font-black text-emerald-950">£{awarded.toFixed(2)}</p></div> : null}
-      </Card>
-      <label className="mb-6 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700"><input type="checkbox" checked={amountConfirmed} disabled={amountPercent === null} onChange={(event) => { setAmountConfirmed(event.target.checked); persistLeaderDraft(amountPercent, event.target.checked); }} className="mt-0.5 h-5 w-5 accent-[var(--accent)]" /><span>I intend to recommend {awarded === null ? "the amount shown above" : `£${awarded.toFixed(2)}`} for this task.</span></label>
-      <Callout title="Independent Recommendation" tone="neutral"><p>This recommendation does not reduce your own payment.</p></Callout>
+      <fieldset disabled={busy}>
+        <Card className="mb-6 border-slate-200" id={`q-BR1_t${taskIndex}`}>
+          <CardTitle hint={bonusUnit}>(BR1) {BR1_ITEM.text}</CardTitle>
+          <div className="mt-5">
+            <label htmlFor={`BR1_t${taskIndex}`} className="sr-only">BR1 bonus percentage from 0 to 100</label>
+            <input id={`BR1_t${taskIndex}`} type="range" min={0} max={100} step={1} value={amountPercent ?? 0}
+              onChange={(event) => { if (submitting.current) return; const value = Number(event.target.value); setAmountPercent(value); setAmountConfirmed(false); persistLeaderDraft(value, false); }}
+              className="w-full accent-[var(--accent)]" aria-valuetext={awarded === null ? "No value selected" : `${STUDY.currencySymbol}${awarded.toFixed(2)}`} />
+            <div className="mt-2 flex justify-between text-xs font-semibold text-[var(--ink-3)]"><span>£0.00</span><span>£{STUDY.bonusPerTask}</span></div>
+            {amountPercent === null ? <button type="button" onClick={() => { if (submitting.current) return; setAmountPercent(0); setAmountConfirmed(false); persistLeaderDraft(0, false); }} className="mt-4 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-[var(--accent)]">Choose £0.00</button> : null}
+          </div>
+          {awarded !== null ? <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-center"><p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Recommended Bonus Amount</p><p className="my-1 font-mono text-3xl font-black text-emerald-950">£{awarded.toFixed(2)}</p></div> : null}
+        </Card>
+        <label className="mb-6 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700"><input type="checkbox" checked={amountConfirmed} disabled={amountPercent === null} onChange={(event) => { if (submitting.current) return; setAmountConfirmed(event.target.checked); persistLeaderDraft(amountPercent, event.target.checked); }} className="mt-0.5 h-5 w-5 accent-[var(--accent)]" /><span>I intend to recommend {awarded === null ? "the amount shown above" : `£${awarded.toFixed(2)}`} for this task.</span></label>
+        <Callout title="Independent Recommendation" tone="neutral"><p>This recommendation does not reduce your own payment.</p></Callout>
+      </fieldset>
+      {saveFailed ? <div className="mt-6 mb-6" role="alert"><Callout tone="warning"><p>We couldn&apos;t save yet. Your answers are still here. Please retry.</p></Callout></div> : null}
     </Page>
-    <ActionBar label="Confirm Bonus Recommendation" onClick={submitDecision} busy={busy} disabled={!canSubmitDecision} remaining={amountPercent === null || !amountConfirmed ? 1 : 0} firstUnansweredId={amountPercent === null ? `BR1_t${taskIndex}` : null} note={amountPercent === null ? "Choose a value, even if it is £0.00." : !amountConfirmed ? "Confirm the exact amount before continuing." : "Ready to confirm"} />
+    <ActionBar label={saveFailed ? "Retry saving" : "Confirm Bonus Recommendation"} onClick={submitDecision} busy={busy} disabled={!canSubmitDecision} remaining={amountPercent === null || !amountConfirmed ? 1 : 0} firstUnansweredId={amountPercent === null ? `BR1_t${taskIndex}` : null} note={amountPercent === null ? "Choose a value, even if it is £0.00." : !amountConfirmed ? "Confirm the exact amount before continuing." : "Ready to confirm"} />
   </>;
 }

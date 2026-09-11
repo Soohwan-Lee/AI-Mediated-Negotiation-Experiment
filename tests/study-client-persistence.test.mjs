@@ -77,6 +77,34 @@ test("failed remote reads do not masquerade as empty saved responses", async () 
   await assert.rejects(store.loadResponses("attempt-b", "v226_background"), /could not be loaded/);
 });
 
+test("a failed survey submission remains queued and an explicit retry saves it", async () => {
+  let available = false;
+  const sent = [];
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    sent.push(body);
+    return available
+      ? Response.json({ data: null })
+      : new Response(null, { status: 503 });
+  };
+
+  const store = new SupabaseStore("attempt-retry");
+  await store.saveResponses("attempt-retry", "v226_task_open_t1", {
+    OED1_t1: "My answer",
+    _completed: true,
+  });
+
+  const queued = JSON.parse(storage.get("amne:writequeue:attempt-retry"));
+  assert.equal(queued.length, 1);
+  assert.equal(queued[0].payload.responses.OED1_t1, "My answer");
+  assert.equal(await store.confirmSaved(), false);
+
+  available = true;
+  assert.equal(await store.confirmSaved(), true);
+  assert.equal(JSON.parse(storage.get("amne:writequeue:attempt-retry")).length, 0);
+  assert.equal(sent.at(-1).payload.responses._completed, true);
+});
+
 test("practice, comprehension, click and completion events never enter the remote queue", async () => {
   let calls = 0;
   globalThis.fetch = async () => { calls++; return Response.json({ data: null }); };
