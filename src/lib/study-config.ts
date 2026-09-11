@@ -47,10 +47,10 @@ export const STUDY = {
     principalInvestigator: "Soohwan Lee",
     researcherEmail: "soohwanlee@unist.ac.kr",
   },
-  /** Temporary dry-run sentinel. Replace with the real code before recruitment. */
-  prolificCompletionCode: "TESTONLY",
+  /** Prolific completion code shown only after server-confirmed completion. */
+  prolificCompletionCode: "CZIX80EU",
   prolificCompletionUrl:
-    "https://app.prolific.com/submissions/complete?cc=TESTONLY",
+    "https://app.prolific.com/submissions/complete?cc=CZIX80EU",
 } as const;
 
 /** Test admission is not recruitment readiness or a Prolific submission. */

@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import ts from "typescript";
 import { STUDY, completionSettings } from "../src/lib/study-config.ts";
 
-async function route(name, { code = "TESTONLY", model = true, storage = true, timing = true, complete = true } = {}) {
+async function route(name, { code = STUDY.prolificCompletionCode, model = true, storage = true, timing = true, complete = true } = {}) {
   const source = await readFile(new URL(`../src/app/api/${name}/route.ts`, import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const loaded = { exports: {} };
@@ -27,11 +27,11 @@ test("temporary code permits entry only with every other production guard", asyn
   try {
     process.env.NEXT_PUBLIC_DEV_TOOLS = "off";
     for (const [options, expected] of [[{}, 200], [{ model: false }, 503], [{ storage: false }, 503], [{ timing: false }, 503], [{ code: "TBD-X" }, 503]]) {
-      const { GET } = await route("preflight", options);
+      const { GET } = await route("preflight", { code: "TESTONLY", ...options });
       assert.equal((await GET(new Request("https://fixture/api/preflight?gate=1"))).status, expected);
     }
     process.env.NEXT_PUBLIC_DEV_TOOLS = "on";
-    const { GET } = await route("preflight");
+    const { GET } = await route("preflight", { code: "TESTONLY" });
     assert.equal((await GET(new Request("https://fixture/api/preflight?gate=1"))).status, 503);
   } finally { if (old === undefined) delete process.env.NEXT_PUBLIC_DEV_TOOLS; else process.env.NEXT_PUBLIC_DEV_TOOLS = old; }
 });
@@ -40,7 +40,7 @@ test("authorized detailed preflight never calls TESTONLY recruitment-ready", asy
   const old = process.env.PREFLIGHT_TOKEN;
   try {
     process.env.PREFLIGHT_TOKEN = "fixture-token";
-    const { GET } = await route("preflight");
+    const { GET } = await route("preflight", { code: "TESTONLY" });
     const response = await GET(new Request("https://fixture/api/preflight?token=fixture-token"));
     const body = await response.json();
     assert.equal(body.ready, false);
@@ -51,9 +51,9 @@ test("authorized detailed preflight never calls TESTONLY recruitment-ready", asy
 
 test("temporary finalization still requires saved completion and exposes no Prolific URL or code", async () => {
   const request = () => new Request("https://fixture/api/complete", { method: "POST" });
-  const blocked = await route("complete", { complete: false });
+  const blocked = await route("complete", { code: "TESTONLY", complete: false });
   assert.equal((await blocked.POST(request())).status, 409);
-  const temporary = await route("complete");
+  const temporary = await route("complete", { code: "TESTONLY" });
   const result = await (await temporary.POST(request())).json();
   assert.equal(result.complete, true); assert.equal(result.testOnly, true);
   assert.equal(result.completionUrl, null); assert.equal(result.completionCode, null);
@@ -61,6 +61,26 @@ test("temporary finalization still requires saved completion and exposes no Prol
   const live = await (await real.POST(request())).json();
   assert.equal(live.testOnly, false); assert.equal(live.completionCode, "ABC12345");
   assert.equal(live.completionUrl, "https://app.prolific.com/submissions/complete?cc=ABC12345");
+});
+
+test("configured completion returns the real Prolific code only after server finalization", async () => {
+  assert.equal(STUDY.prolificCompletionCode, "CZIX80EU");
+  assert.equal(STUDY.prolificCompletionUrl, "https://app.prolific.com/submissions/complete?cc=CZIX80EU");
+  assert.deepEqual(completionSettings(), {
+    testOnly: false,
+    entryReady: true,
+    recruitmentReady: true,
+    submissionUrl: STUDY.prolificCompletionUrl,
+  });
+
+  const request = () => new Request("https://fixture/api/complete", { method: "POST" });
+  const blocked = await route("complete", { complete: false });
+  assert.equal((await blocked.POST(request())).status, 409);
+  const ready = await route("complete");
+  const result = await (await ready.POST(request())).json();
+  assert.equal(result.complete, true);
+  assert.equal(result.completionCode, "CZIX80EU");
+  assert.equal(result.completionUrl, STUDY.prolificCompletionUrl);
 });
 
 test("completion UI isolates test confirmation from payment and copy controls", async () => {
