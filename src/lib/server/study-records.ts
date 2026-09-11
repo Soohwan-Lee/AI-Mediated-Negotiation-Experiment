@@ -109,7 +109,8 @@ async function saveResponses(row: ParticipantRow, block: string, answers: Row): 
         order[key] = value; clean[`_${key}`] = value;
       }
     }
-    await upsert(row, "self_reports", index, { ...coded, ...order, scales_submitted: answers._submitted === true,
+    await upsert(row, "self_reports", index, { ...coded, ...order,
+      scales_submitted: previous.scales_submitted === true || answers._submitted === true,
       responses: { ...object(previous.responses), [block]: clean } });
     return;
   }
@@ -132,7 +133,8 @@ async function saveResponses(row: ParticipantRow, block: string, answers: Row): 
       if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 7) throw new StudyError(400, "invalid_scale");
       values.fe1 = value; clean[`FE1_t${index}`] = value;
     }
-    await upsert(row, "self_reports", index, { ...values, decision_submitted: answers._submitted === true,
+    await upsert(row, "self_reports", index, { ...values,
+      decision_submitted: previous.decision_submitted === true || answers._submitted === true,
       responses: { ...object(previous.responses), [block]: clean } });
     return;
   }
@@ -150,12 +152,14 @@ async function saveResponses(row: ParticipantRow, block: string, answers: Row): 
     const { coded, clean } = codedAnswers(answers,
       taskOpenBlocks(isProxy, { role: row.role, taskIndex: index, version: String(version) }).flatMap(b => b.items), `_t${index}`);
     await upsert(row, "self_reports", index, {
-      ...coded, open_instrument_version: version, open_submitted: answers._completed === true,
+      ...coded, open_instrument_version: version,
+      open_submitted: previous.open_submitted === true || answers._completed === true,
       responses: { ...object(previous.responses), [block]: clean },
     });
     // Keep the historical comparison column available without rewriting any
     // operational flags from this request's earlier participant snapshot.
-    if (index === 2 && isExpandedOpenInstrument(version) && Object.hasOwn(coded, "oec1")) {
+    if (index === 2 && answers._completed === true
+      && isExpandedOpenInstrument(version) && Object.hasOwn(coded, "oec1")) {
       await participantPatch(row, { oec1: coded.oec1 });
     }
     return;

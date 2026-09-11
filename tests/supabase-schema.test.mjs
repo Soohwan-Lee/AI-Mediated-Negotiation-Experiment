@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 
 const migration = readFileSync(new URL("../supabase/migrations/20260910041518_compact_research_storage.sql", import.meta.url), "utf8");
 const optionalBackgroundMigration = readFileSync(new URL("../supabase/migrations/20260911001701_optional_background_demographics.sql", import.meta.url), "utf8");
+const submittedGuardMigration = readFileSync(new URL("../supabase/migrations/20260911032955_extend_attempts_and_protect_submitted_self_reports.sql", import.meta.url), "utf8");
 
 test("storage migration exposes five private tables and service-only RPCs", () => {
   assert.equal([...migration.matchAll(/^create table public\./gm)].length, 5);
@@ -23,6 +24,112 @@ test("optional background migration adds nullable coded columns without changing
   assert.doesNotMatch(optionalBackgroundMigration, /not null|complete_study_participation/i);
 });
 
+test("attempt extension is future-only and the submitted-block guard is additive", () => {
+  assert.match(submittedGuardMigration, /check \(participant_id between 1 and 200\)/);
+  assert.match(submittedGuardMigration, /from generate_series\(181, 200\)/);
+  assert.doesNotMatch(submittedGuardMigration, /update public\.assignment_slots/i);
+  assert.match(submittedGuardMigration, /alter column expires_at set default \(now\(\) \+ interval '3 hours'\)/);
+  assert.doesNotMatch(submittedGuardMigration, /update public\.study_participants/i);
+  assert.match(submittedGuardMigration, /create trigger protect_submitted_self_report_blocks[\s\S]*before update on public\.self_reports/);
+  assert.match(submittedGuardMigration, /old\.scales_submitted or new\.scales_submitted/);
+  assert.match(submittedGuardMigration, /old\.decision_submitted or new\.decision_submitted/);
+  assert.match(submittedGuardMigration, /old\.open_submitted or new\.open_submitted/);
+  assert.doesNotMatch(submittedGuardMigration, /security definer/i);
+});
+
+test("three-hour default preserves existing expiry and delayed drafts cannot replace submitted blocks", {
+  skip: !process.env.PGLITE_MODULE_PATH,
+}, async () => {
+  const { PGlite } = await import(process.env.PGLITE_MODULE_PATH);
+  const db = new PGlite();
+  try {
+    await db.exec("create role anon; create role authenticated; create role service_role bypassrls;");
+    const directory = new URL("../supabase/migrations/", import.meta.url);
+    const files = readdirSync(directory).filter(file => file.endsWith(".sql")).sort();
+    const pending = files.find(file => file.includes("extend_attempts_and_protect_submitted_self_reports"));
+    assert.ok(pending);
+    for (const file of files.slice(0, files.indexOf(pending))) {
+      await db.exec(readFileSync(new URL(file, directory), "utf8"));
+    }
+    const seededSlots = (await db.query(
+      "select * from public.assignment_slots order by participant_id",
+    )).rows;
+    assert.equal(seededSlots.length, 180);
+    await db.exec("set role service_role");
+    const existingKey = randomUUID();
+    const existing = (await db.query(
+      "select public.claim_study_assignment('before-extension','study','session',$1) as result", [existingKey],
+    )).rows[0].result;
+    const existingExpiry = existing.expires_at;
+    const originalSlots = (await db.query(
+      "select * from public.assignment_slots order by participant_id",
+    )).rows;
+
+    await db.exec("reset role");
+    await db.exec(readFileSync(new URL(pending, directory), "utf8"));
+    await db.exec("set role service_role");
+    const extendedSlots = (await db.query(
+      "select * from public.assignment_slots order by participant_id",
+    )).rows;
+    assert.deepEqual(extendedSlots.slice(0, 180), originalSlots);
+    assert.deepEqual(extendedSlots.slice(180).map(slot => slot.participant_id),
+      Array.from({ length: 20 }, (_, index) => index + 181));
+    assert.equal((await db.query(
+      "select expires_at from public.study_participants where participant_key=$1", [existingKey],
+    )).rows[0].expires_at.toISOString(), new Date(existingExpiry).toISOString());
+
+    const newKey = randomUUID();
+    const fresh = (await db.query(
+      "select public.claim_study_assignment('after-extension','study','session',$1) as result", [newKey],
+    )).rows[0].result;
+    const lifetime = Date.parse(fresh.expires_at) - Date.parse(fresh.assigned_at);
+    assert.equal(lifetime, 3 * 60 * 60 * 1000);
+
+    const scalesKey = "v226_post_task_scales_t1";
+    const decisionKey = "v226_task_decision_t1";
+    const openKey = "v226_task_open_t1";
+    const submitted = {
+      [scalesKey]: { SCF1_t1: 6, _submitted: true },
+      [decisionKey]: { FE1_t1: 5, _submitted: true },
+      [openKey]: { OED1_t1: "Final answer", _completed: true },
+    };
+    await db.query(`insert into public.self_reports
+      (participant_key,task_index,scf1,fe1,oed1,open_instrument_version,
+       scales_submitted,decision_submitted,open_submitted,responses)
+      values($1,1,6,5,'Final answer','2.27',true,true,true,$2::jsonb)`, [existingKey, JSON.stringify(submitted)]);
+
+    const lateDraft = {
+      [scalesKey]: { SCF1_t1: 1, _submitted: false },
+      [decisionKey]: { FE1_t1: 1 },
+      [openKey]: { OED1_t1: "Late draft", _completed: false },
+    };
+    await db.query(`update public.self_reports set scf1=1,fe1=1,oed1='Late draft',
+      scales_submitted=false,decision_submitted=false,open_submitted=false,responses=$2::jsonb
+      where participant_key=$1 and task_index=1`, [existingKey, JSON.stringify(lateDraft)]);
+    let report = (await db.query(
+      "select * from public.self_reports where participant_key=$1 and task_index=1", [existingKey],
+    )).rows[0];
+    assert.equal(report.scf1, 6);
+    assert.equal(report.fe1, 5);
+    assert.equal(report.oed1, "Final answer");
+    assert.equal(report.scales_submitted, true);
+    assert.equal(report.decision_submitted, true);
+    assert.equal(report.open_submitted, true);
+    assert.deepEqual(report.responses, submitted);
+
+    const explicitRetry = { ...submitted, [decisionKey]: { FE1_t1: 7, _submitted: true } };
+    await db.query(`update public.self_reports set fe1=7,responses=$2::jsonb
+      where participant_key=$1 and task_index=1`, [existingKey, JSON.stringify(explicitRetry)]);
+    report = (await db.query(
+      "select fe1,responses from public.self_reports where participant_key=$1 and task_index=1", [existingKey],
+    )).rows[0];
+    assert.equal(report.fe1, 7);
+    assert.equal(report.responses[decisionKey].FE1_t1, 7);
+  } finally {
+    await db.close();
+  }
+});
+
 // Optional real PostgreSQL engine, installed outside this repository. No network
 // or remote database is used. Set PGLITE_MODULE_PATH to its dist/index.js file.
 test("database allocation, isolation, expiry, transcript metrics and completion", {
@@ -37,11 +144,11 @@ test("database allocation, isolation, expiry, transcript metrics and completion"
       await db.exec(readFileSync(new URL(file, directory), "utf8"));
     }
     const rows = (await db.query("select * from public.assignment_slots order by participant_id")).rows;
-    assert.equal(rows.length, 180);
+    assert.equal(rows.length, 200);
     assert.equal(rows[0].participant_id, 1);
-    assert.equal(rows.at(-1).participant_id, 180);
+    assert.equal(rows.at(-1).participant_id, 200);
     assert.ok(rows.every((row) => !row.assigned && !row.completed));
-    for (const count of [120, 180]) {
+    for (const count of [120, 180, 200]) {
       const subset = rows.slice(0, count);
       for (const field of ["proxy_policy", "task_order", "mode_order", "role"]) {
         const levels = Map.groupBy(subset, (row) => row[field]);
@@ -255,9 +362,13 @@ test("exact task-mode migration preserves closed records and restores every writ
       }
       for (const key of attempts) await assert.rejects(db.query(`update public.${table} set task_mode='direct' where participant_key=$1`,[key]),/no longer writable/);
     }
-    assert.deepEqual((await db.query("select * from public.assignment_slots order by participant_id")).rows,slotsBefore);
+    const slotsAfter=(await db.query("select * from public.assignment_slots order by participant_id")).rows;
+    assert.deepEqual(slotsAfter.slice(0,180),slotsBefore);
+    assert.equal(slotsAfter.length,200);
+    assert.ok(slotsAfter.slice(180).every(slot=>!slot.assigned&&!slot.completed));
     const guards=(await db.query("select tgname,tgenabled from pg_trigger where not tgisinternal and tgrelid in ('public.self_reports'::regclass,'public.task_metrics'::regclass,'public.chat_messages'::regclass)")).rows;
-    assert.equal(guards.length,4);
+    assert.equal(guards.length,5);
+    assert.ok(guards.some(trigger=>trigger.tgname==='protect_submitted_self_report_blocks'));
     assert.ok(guards.every(trigger=>trigger.tgenabled==='O'));
   } finally { await db.close(); }
 });

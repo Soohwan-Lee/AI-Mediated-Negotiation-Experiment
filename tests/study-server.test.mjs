@@ -90,8 +90,12 @@ test("admission ignores browser assignment and signs the server-owned identity",
   assert.equal(body.assignment.participantKey, key);
   assert.equal(body.assignment.role, "leader");
   assert.equal(body.consented, true);
-  assert.match(response.headers.get("set-cookie"), /HttpOnly; SameSite=Lax/);
-  assert.match(response.headers.get("set-cookie"), /Secure/);
+  const cookie = response.headers.get("set-cookie");
+  assert.match(cookie, /HttpOnly; SameSite=Lax/);
+  assert.match(cookie, /Max-Age=10800/);
+  assert.match(cookie, /Secure/);
+  const expires = Number(cookie.match(new RegExp(`${key}\\.(\\d{13})\\.`))[1]);
+  assert.ok(expires - Date.now() > 10_799_000 && expires - Date.now() <= 10_800_000);
   const claim = calls.find(call => call.path.startsWith("rpc/claim"));
   assert.notEqual(claim.body.p_participant_key, otherKey);
   assert.equal(claim.body.p_session_id, sessionId);
@@ -169,6 +173,33 @@ test("real suffixed scales, responsibility order, zero bonus, and open answers m
   assert.deepEqual(await save("loadResponses", { block: "v226_task_open_t1" }), open);
   const restored = await save("loadResponses", { block: "v226_post_task_scales_t1" });
   assert.equal(restored.SCF1_t1, 6);
+});
+
+test("submitted flags stay monotonic and an open draft cannot replace the final comparison mirror", async () => {
+  await save("saveResponses", { block: "v226_post_task_scales_t1", responses: { SCF1_t1: 6, _submitted: true } });
+  await save("saveResponses", { block: "v226_post_task_scales_t1", responses: { SCF1_t1: 2, _submitted: false } });
+  await save("saveResponses", { block: "v226_task_decision_t1", responses: {
+    BR1_PERCENT_t1: 20, BR1_CONFIRMED_t1: true, _submitted: true,
+  } });
+  await save("saveResponses", { block: "v226_task_decision_t1", responses: {
+    BR1_PERCENT_t1: 30, BR1_CONFIRMED_t1: true, _submitted: false,
+  } });
+  await save("saveResponses", { block: "v226_task_open_t1", responses: {
+    OED1_t1: "Final", _completed: true,
+  } });
+  await save("saveResponses", { block: "v226_task_open_t1", responses: {
+    OED1_t1: "Draft", _completed: false,
+  } });
+  assert.equal(tables.self_reports[0].scales_submitted, true);
+  assert.equal(tables.self_reports[0].decision_submitted, true);
+  assert.equal(tables.self_reports[0].open_submitted, true);
+
+  const final = { OEC1_t2: "Final comparison", _instrument_version: "2.27-open-v3", _completed: true };
+  await save("saveResponses", { block: "v226_task_open_t2", responses: final });
+  await save("saveResponses", { block: "v226_task_open_t2", responses: {
+    ...final, OEC1_t2: "Late draft", _completed: false,
+  } });
+  assert.equal(row.oec1, "Final comparison");
 });
 
 test("optional background blanks remain valid and malformed scales never write", async () => {

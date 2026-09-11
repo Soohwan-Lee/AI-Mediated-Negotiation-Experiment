@@ -25,6 +25,7 @@ export interface ParticipantRow extends Record<string, unknown> {
 }
 
 const COOKIE = "amne_study";
+const SESSION_DURATION_SECONDS = 3 * 60 * 60;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const validProlificId = (value: unknown): value is string =>
   typeof value === "string" && /^[a-f0-9]{24}$/i.test(value);
@@ -80,9 +81,9 @@ function signature(value: string): string {
 }
 
 export function sessionCookie(key: string, request: Request): string {
-  const value = `${key}.${Date.now() + 2 * 60 * 60 * 1000}`;
+  const value = `${key}.${Date.now() + SESSION_DURATION_SECONDS * 1000}`;
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${COOKIE}=${value}.${signature(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200${secure}`;
+  return `${COOKIE}=${value}.${signature(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION_SECONDS}${secure}`;
 }
 
 export function sessionKey(request: Request): string {
