@@ -64,8 +64,8 @@ test("temporary finalization still requires saved completion and exposes no Prol
 });
 
 test("configured completion returns the real Prolific code only after server finalization", async () => {
-  assert.equal(STUDY.prolificCompletionCode, "CZIX80EU");
-  assert.equal(STUDY.prolificCompletionUrl, "https://app.prolific.com/submissions/complete?cc=CZIX80EU");
+  assert.equal(STUDY.prolificCompletionCode, "CE12T8IH");
+  assert.equal(STUDY.prolificCompletionUrl, "https://app.prolific.com/submissions/complete?cc=CE12T8IH");
   assert.deepEqual(completionSettings(), {
     testOnly: false,
     entryReady: true,
@@ -79,7 +79,7 @@ test("configured completion returns the real Prolific code only after server fin
   const ready = await route("complete");
   const result = await (await ready.POST(request())).json();
   assert.equal(result.complete, true);
-  assert.equal(result.completionCode, "CZIX80EU");
+  assert.equal(result.completionCode, "CE12T8IH");
   assert.equal(result.completionUrl, STUDY.prolificCompletionUrl);
 });
 

@@ -48,9 +48,9 @@ export const STUDY = {
     researcherEmail: "soohwanlee@unist.ac.kr",
   },
   /** Prolific completion code shown only after server-confirmed completion. */
-  prolificCompletionCode: "CZIX80EU",
+  prolificCompletionCode: "CE12T8IH",
   prolificCompletionUrl:
-    "https://app.prolific.com/submissions/complete?cc=CZIX80EU",
+    "https://app.prolific.com/submissions/complete?cc=CE12T8IH",
 } as const;
 
 /** Test admission is not recruitment readiness or a Prolific submission. */
