@@ -234,7 +234,7 @@ test("a corrected response snapshot supersedes its rejected 400 predecessor only
   ], "the unrelated event must remain ordered between the two snapshots");
 });
 
-test("a legacy stored 413 snapshot recovers through a later same-block snapshot", async () => {
+test("a legacy stored 413 backlog keeps only its latest complete same-block snapshot", async () => {
   store.clear();
   store.set("amne:writequeue", JSON.stringify([
     { id: "old-large", op: "saveResponses", payload: {
@@ -255,7 +255,7 @@ test("a legacy stored 413 snapshot recovers through a later same-block snapshot"
 
   const q = new WriteQueue("/api/persist");
   assert.equal(await q.flush(), true);
-  assert.deepEqual(sent, ["too large", "fixed"]);
+  assert.deepEqual(sent, ["fixed"]);
 });
 
 test("a transient 503 never discards or reorders same-block snapshots", async () => {

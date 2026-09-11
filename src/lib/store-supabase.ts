@@ -51,13 +51,44 @@ function responseSnapshot(item: QueuedWrite) {
 function supersedesSurveySnapshot(firstItem: QueuedWrite, secondItem: QueuedWrite) {
   const first = responseSnapshot(firstItem);
   const second = responseSnapshot(secondItem);
+  const preservesSubmissionProgress = first && second &&
+    ["_submitted", "_completed", "_checks_submitted"].every((key) =>
+      Reflect.get(first.responses, key) !== true || Reflect.get(second.responses, key) === true,
+    ) &&
+    (typeof Reflect.get(first.responses, "_submitted_parts") !== "number" ||
+      (typeof Reflect.get(second.responses, "_submitted_parts") === "number" &&
+        Reflect.get(second.responses, "_submitted_parts") >=
+          Reflect.get(first.responses, "_submitted_parts")));
   return Boolean(
     first && second &&
     RECOVERABLE_RESPONSE_BLOCK.test(first.block) &&
     second.participantKey === first.participantKey &&
     second.block === first.block &&
+    Object.is(
+      Reflect.get(first.responses, "_instrument_version"),
+      Reflect.get(second.responses, "_instrument_version"),
+    ) &&
+    preservesSubmissionProgress &&
     Object.keys(first.responses).every((key) => Object.hasOwn(second.responses, key)),
   );
+}
+
+/**
+ * Collapse only adjacent, cumulative survey drafts. `preservePrefix` protects
+ * the item currently owned by `run()` from queue mutation while fetch awaits.
+ */
+function compactSurveySnapshots(queue: QueuedWrite[], preservePrefix = 0): QueuedWrite[] {
+  const compacted = queue.slice(0, preservePrefix);
+  for (const item of queue.slice(preservePrefix)) {
+    while (
+      compacted.length > preservePrefix &&
+      supersedesSurveySnapshot(compacted[compacted.length - 1], item)
+    ) {
+      compacted.pop();
+    }
+    compacted.push(item);
+  }
+  return compacted;
 }
 
 const QUEUE_KEY = "amne:writequeue";
@@ -96,7 +127,11 @@ export class WriteQueue {
   private seq = 0;
 
   constructor(private endpoint: string, private storageKey = QUEUE_KEY) {
-    this.queue = readQueue(storageKey);
+    const storedQueue = readQueue(storageKey);
+    this.queue = compactSurveySnapshots(storedQueue);
+    if (this.queue.length !== storedQueue.length) {
+      writeQueue(this.queue, this.storageKey);
+    }
     if (this.queue.length) void this.drain();
     if (typeof window !== "undefined") {
       // One ordered transport only. A parallel beacon could replay an older
@@ -127,6 +162,9 @@ export class WriteQueue {
 
   private enqueue(item: QueuedWrite): void {
     this.queue.push(item);
+    // `drain()` captures queue[0] across an await. Never replace that object;
+    // compact only writes that have not started transport yet.
+    this.queue = compactSurveySnapshots(this.queue, this.draining ? 1 : 0);
     writeQueue(this.queue, this.storageKey);
     void this.drain();
   }
